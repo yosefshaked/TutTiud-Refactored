@@ -20,7 +20,7 @@
     "cors": {
       "allowedOrigins": [
         "https://tuttiud.thepcrunners.com",
-        "https://green-dune-05f6e103.westeurope.1.azurestaticapps.net"
+        "https://lemon-wave-0e6c61303.westeurope.1.azurestaticapps.net"
       ]
     }
   }
