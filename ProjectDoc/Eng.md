@@ -1,11 +1,12 @@
 # Project Documentation: Employee & Payroll Management System
 
-**Version: 1.11.0**
-**Last Updated: 2025-10-22**
+**Version: 1.12.0**
+**Last Updated: 2025-10-23**
 
 ## 1. Vision & Purpose
 
-The goal of this project is to provide a user-friendly, efficient, and reliable application for managing employee payroll. It serves as a replacement for an error-prone Excel file, tailored to the specific needs of a business with two main employee types: hourly workers and instructors paid per session.
+The goal of this project is to provide a user-friendly, efficient, and reliable application for managing employee payroll.
+As of version 1.12.0 the platform is branded as TutTiud while preserving existing functionality and sunsetting the previous legacy brand identity. It serves as a replacement for an error-prone Excel file, tailored to the specific needs of a business with two main employee types: hourly workers and instructors paid per session.
 
 **Key Requirements:**
 - A simple and intuitive user interface (primarily in Hebrew).

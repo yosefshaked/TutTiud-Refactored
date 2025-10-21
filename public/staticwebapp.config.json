@@ -19,8 +19,8 @@
   "api": {
     "cors": {
       "allowedOrigins": [
-        "https://tutrate.thepcrunners.com",
-        "https://green-dune-05f6e103.westeurope.1.azurestaticapps.net"
+        "https://tuttiud.thepcrunners.com",
+        "https://lemon-wave-0e6c61303.westeurope.1.azurestaticapps.net"
       ]
     }
   }
