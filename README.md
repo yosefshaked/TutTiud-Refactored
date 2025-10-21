@@ -1,6 +1,12 @@
-# Employee Management
+# TutTiud Employee Management
 
-This project is a Vite + React application for managing employees, work sessions and payroll records. Supabase provides persistence and authentication.
+TutTiud is a Vite + React application for managing employees, work sessions, and payroll records. Supabase provides persistence and authentication for the TutTiud experience.
+
+## Branding
+
+- The application now presents the TutTiud brand across the user interface and assets.
+- Placeholder logos in `public/icon.svg` and `public/vite.svg` display the TutTiud wordmark until final assets arrive.
+- Update the marketing copy and deployment domains through environment configuration when production assets are delivered.
 
 ## Key UI behavior
 

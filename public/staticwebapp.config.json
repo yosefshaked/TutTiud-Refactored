@@ -19,7 +19,7 @@
   "api": {
     "cors": {
       "allowedOrigins": [
-        "https://tutrate.thepcrunners.com",
+        "https://tuttiud.thepcrunners.com",
         "https://green-dune-05f6e103.westeurope.1.azurestaticapps.net"
       ]
     }
