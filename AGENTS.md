@@ -40,3 +40,4 @@
 - Invitation completion emails land on `/#/complete-registration` with `token_hash` (Supabase invite) and `invitation_token` (control-plane token). The page must call `supabase.auth.verifyOtp({ type: 'invite', token_hash })`, ask for a password, then redirect to `/#/accept-invite` while forwarding the original `invitation_token`.
 - The `/components/pages/AcceptInvitePage.jsx` route handles token lookups, renders login/registration CTAs when no session exists, blocks mismatched accounts until they sign out, and wires accept/decline buttons to the secure `/api/invitations/:id/(accept|decline)` endpoints before sending accepted users to the Dashboard.
 - TutTiud rebranding placeholder assets live in `public/icon.svg`, `public/icon.ico`, and `public/vite.svg` until final design delivery.
+- `tuttiud.setup_assistant_diagnostics()` now validates schema, RLS, policies, and indexes. Keep `SETUP_SQL_SCRIPT` (v2.3) as the source of truth when extending onboarding checks.

@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.0.0**
-**Last Updated: 2025-10-24**
+**Version: 2.1.0**
+**Last Updated: 2025-10-25**
 
 ## 1. Vision & Purpose
 
@@ -27,7 +27,7 @@ Key characteristics:
 1. Creates the `tuttiud` schema and the tables `Instructors`, `Students`, `SessionRecords`, and `Settings`.
 2. Enables RLS for every table and installs permissive policies (`Allow full access...`) for the authenticated role during MVP phase.
 3. Creates the reusable `app_user` role and grants usage/select privileges.
-4. Defines `tuttiud.setup_assistant_diagnostics()` which reports whether the schema, tables, and `app_user` role exist. The wizard relies on this diagnostic to confirm onboarding.
+4. Defines `tuttiud.setup_assistant_diagnostics()` which now confirms schema + table existence, verifies RLS + policies on every MVP table, and checks the critical indexes used by instructor/student dashboards.
 5. Generates a five-year JWT named `APP_DEDICATED_KEY (COPY THIS BACK TO THE APP)` that the admin pastes back into the wizard. The key is later encrypted and stored in the Control DB via `/api/save-org-credentials`.
 
 ## 4. Data Model (MVP)
@@ -56,7 +56,7 @@ Implemented in [`src/components/settings/SetupAssistant.jsx`](../src/components/
 
 1. **Database Preparation** – Presents the canonical SQL, explains how to run it in the Supabase SQL Editor, and reminds the admin to copy the JWT output.
 2. **Provide the Application Key** – Offers a dedicated textarea + clipboard helper for the JWT (`APP_DEDICATED_KEY`). The key stays local until the admin explicitly saves it.
-3. **Validation** – Runs `tuttiud.setup_assistant_diagnostics()` via the anon Supabase client. When all checks succeed the wizard posts the JWT to `/api/save-org-credentials`, records the verification timestamp, and unlocks the rest of the app. Errors surface in-line with actionable guidance and keep the wizard on the same step for retry.
+3. **Validation** – Runs `tuttiud.setup_assistant_diagnostics()` via the anon Supabase client. The function returns pass/fail rows for schema, RLS, policy, and index coverage. When all checks succeed the wizard posts the JWT to `/api/save-org-credentials`, which encrypts the key, persists `dedicated_key_saved_at`, `verified_at`, and `setup_completed`, and the UI records the verification timestamp before unlocking the rest of the app. Errors surface in-line with actionable guidance and keep the wizard on the same step for retry.
 
 The wizard always tracks loading, error, and success states, ensuring accessibility (`aria-live`) and RTL support.
 

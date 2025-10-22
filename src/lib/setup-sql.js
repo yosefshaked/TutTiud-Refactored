@@ -1,5 +1,5 @@
 export const SETUP_SQL_SCRIPT = `-- -- -- =================================================================
--- Tuttiud Platform Setup Script V2.2 (Idempotent RLS)
+-- Tuttiud Platform Setup Script V2.3 (Idempotent RLS + Diagnostics)
 -- =================================================================
 
 -- Part 1: Extensions and Schema Creation (No Changes)
@@ -88,15 +88,32 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA tuttiud GRANT USAGE, SELECT ON SEQUENCES TO a
 GRANT app_user TO postgres, authenticated, anon;
 
 
--- Part 5: Diagnostics Function (No Changes)
+-- Part 5: Diagnostics Function (Extended for MVP checks)
 CREATE OR REPLACE FUNCTION tuttiud.setup_assistant_diagnostics()
 RETURNS TABLE (check_name text, success boolean, details text)
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
   required_tables constant text[] := array['Instructors', 'Students', 'SessionRecords', 'Settings'];
+  required_indexes constant text[] := array[
+    'SessionRecords|SessionRecords_student_date_idx',
+    'SessionRecords|SessionRecords_instructor_idx'
+  ];
+  required_policies constant text[] := array[
+    'Instructors|Allow full access to authenticated users on Instructors',
+    'Students|Allow full access to authenticated users on Students',
+    'SessionRecords|Allow full access to authenticated users on SessionRecords',
+    'Settings|Allow full access to authenticated users on Settings'
+  ];
   table_name text;
-  table_exists boolean;
+  policy_spec text;
+  policy_parts text[];
+  policy_table text;
+  policy_name text;
+  index_spec text;
+  index_parts text[];
+  index_table text;
+  index_name text;
 BEGIN
   success := EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = 'tuttiud');
   check_name := 'Schema "tuttiud" exists';
@@ -110,6 +127,49 @@ BEGIN
     success := to_regclass('tuttiud.' || quote_ident(table_name)) IS NOT NULL;
     check_name := 'Table "' || table_name || '" exists';
     details := CASE WHEN success THEN 'OK' ELSE 'Table ' || table_name || ' is missing.' END;
+    RETURN NEXT;
+  END LOOP;
+  FOREACH table_name IN ARRAY required_tables LOOP
+    success := EXISTS(
+      SELECT 1
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'tuttiud'
+        AND c.relname = table_name
+        AND c.relrowsecurity = true
+    );
+    check_name := 'RLS enabled on "' || table_name || '"';
+    details := CASE WHEN success THEN 'OK' ELSE 'RLS is not enabled on ' || table_name || '.' END;
+    RETURN NEXT;
+  END LOOP;
+  FOREACH policy_spec IN ARRAY required_policies LOOP
+    policy_parts := string_to_array(policy_spec, '|');
+    policy_table := policy_parts[1];
+    policy_name := policy_parts[2];
+    success := EXISTS(
+      SELECT 1
+      FROM pg_policies p
+      WHERE p.schemaname = 'tuttiud'
+        AND p.tablename = policy_table
+        AND p.policyname = policy_name
+    );
+    check_name := 'Policy "' || policy_name || '" on "' || policy_table || '" exists';
+    details := CASE WHEN success THEN 'OK' ELSE 'Policy ' || policy_name || ' is missing.' END;
+    RETURN NEXT;
+  END LOOP;
+  FOREACH index_spec IN ARRAY required_indexes LOOP
+    index_parts := string_to_array(index_spec, '|');
+    index_table := index_parts[1];
+    index_name := index_parts[2];
+    success := EXISTS(
+      SELECT 1
+      FROM pg_indexes i
+      WHERE i.schemaname = 'tuttiud'
+        AND i.tablename = index_table
+        AND i.indexname = index_name
+    );
+    check_name := 'Index "' || index_name || '" on "' || index_table || '" exists';
+    details := CASE WHEN success THEN 'OK' ELSE 'Index ' || index_name || ' is missing.' END;
     RETURN NEXT;
   END LOOP;
 END;

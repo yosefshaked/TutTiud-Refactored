@@ -246,9 +246,11 @@ export default function SetupAssistant() {
         throw new Error(message);
       }
 
-      const savedTimestamp = typeof payload?.saved_at === 'string' && payload.saved_at
-        ? payload.saved_at
-        : new Date().toISOString();
+      const savedTimestamp = typeof payload?.verified_at === 'string' && payload.verified_at
+        ? payload.verified_at
+        : typeof payload?.saved_at === 'string' && payload.saved_at
+          ? payload.saved_at
+          : new Date().toISOString();
 
       setSavedAt(savedTimestamp);
       setAppKey('');

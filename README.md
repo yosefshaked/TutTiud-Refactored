@@ -15,16 +15,16 @@ The refactored codebase focuses on four launch stories:
 
 The onboarding wizard (`Settings → Supabase Setup`) leads every new organization through three steps:
 
-1. **Run the canonical SQL** – copy the script exported from [`src/lib/setup-sql.js`](src/lib/setup-sql.js) into the Supabase SQL editor and execute it.
+1. **Run the canonical SQL** – copy the script exported from [`src/lib/setup-sql.js`](src/lib/setup-sql.js) into the Supabase SQL editor and execute it. Version 2.3 extends the diagnostics to cover RLS, policies, and required indexes.
 2. **Paste the dedicated key** – grab the `APP_DEDICATED_KEY` JWT produced by the script and drop it into the wizard.
-3. **Validate & store** – the wizard runs `tuttiud.setup_assistant_diagnostics()`, encrypts the JWT through `/api/save-org-credentials`, records verification via `recordVerification`, and unlocks the rest of the app.
+3. **Validate & store** – the wizard runs `tuttiud.setup_assistant_diagnostics()` (schema/RLS/policy/index checks), encrypts the JWT through `/api/save-org-credentials`, and the API now persists `dedicated_key_saved_at`, `verified_at`, and `setup_completed` before the UI records verification and unlocks the rest of the app.
 
 All states (loading, error, success) are surfaced inline with accessible messages (`aria-live`). The wizard can be reopened at any time to re-run diagnostics or rotate the key.
 
 ## 🔑 Key UI behavior
 
 - **Supabase Setup Assistant** (`src/components/settings/SetupAssistant.jsx`) is the single entry point for onboarding. It owns the SQL copy helpers, JWT capture, and validation flow.
-- **Org context** (`src/org/OrgContext.jsx`) stores the encrypted dedicated key timestamp (`dedicated_key_saved_at`) and toggles `setup_completed` once verification succeeds.
+- **Org context** (`src/org/OrgContext.jsx`) stores the encrypted dedicated key timestamp (`dedicated_key_saved_at`) and still toggles `setup_completed` after verification, complementing the server-side persistence added to `/api/save-org-credentials`.
 - **Runtime verification helpers** (`src/runtime/verification.js`) expose `verifyOrgConnection({ dataClient })` which runs `tuttiud.setup_assistant_diagnostics()` and returns the diagnostic rows for custom UI messaging.
 - Feature modules (students, instructors, sessions) must load data exclusively through secure `/api/*` endpoints. The frontend never uses the dedicated JWT directly.
 
