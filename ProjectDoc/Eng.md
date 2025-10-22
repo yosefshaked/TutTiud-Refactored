@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.1.0**
-**Last Updated: 2025-10-25**
+**Version: 2.2.0**
+**Last Updated: 2025-10-26**
 
 ## 1. Vision & Purpose
 
@@ -60,14 +60,29 @@ Implemented in [`src/components/settings/SetupAssistant.jsx`](../src/components/
 
 The wizard always tracks loading, error, and success states, ensuring accessibility (`aria-live`) and RTL support.
 
-## 7. Core MVP Feature Support
+## 7. Core API Endpoints & MVP Feature Support
+
+### 7.1 Serverless API Contracts
+
+| Route | Method | Audience | Purpose |
+| :---- | :----- | :------- | :------ |
+| `/api/instructors` | GET | Admin/Owner | Reads `org_memberships` for `role = 'member'` and joins `profiles` to return `{ id, name }` pairs for instructor pickers. |
+| `/api/students` | GET | Admin/Owner | Returns every `tuttiud."Students"` row ordered by name for roster management. |
+| `/api/students` | POST | Admin/Owner | Inserts a student (name + optional contact info and instructor assignment) and echoes the created row. |
+| `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact info, instructor) and returns the refreshed row or 404. |
+| `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.user_id`, supporting the instructor dashboard. |
+| `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry after confirming members only write for students assigned to them. |
+
+All endpoints expect the tenant identifier (`org_id`) in the request body or query string. Authentication is enforced with the Supabase JWT provided by the desktop/web client, and every handler builds the tenant Supabase client through `api/_shared/org-bff.js` to reuse encryption, membership, and error handling routines.
+
+### 7.2 User Story Mapping
 
 | User Story | Implementation Notes |
 | :--------- | :------------------- |
-| **Instructor creates & manages session records** | `SessionRecords` table stores session metadata. The UI will scope list/detail views to the signed-in instructor and call `/api/session-records` (to be implemented) which uses the dedicated key for writes. |
-| **Instructor sees only assigned students** | `Students.assigned_instructor_id` links ownership. Client selectors filter by the authenticated instructor’s profile and the instructor dashboard queries through `/api/students?scope=mine`. |
-| **Administrator manages roster & assignments** | Admin UI will provide CRUD flows backed by secure endpoints (`/api/students`, `/api/instructors`) that insert into the MVP tables. Backups run through the Control DB (Supabase export) after onboarding. |
-| **Administrator views full roster + instructor pairing** | Reporting views join `Students` and `Instructors`. Indexes keep lookups fast even on large cohorts. |
+| **Instructor creates & manages session records** | `/api/sessions` writes into `SessionRecords` after verifying (for members) that the student belongs to them. Future endpoints can extend to edit/delete using the same helper. |
+| **Instructor sees only assigned students** | `/api/my-students` scopes the roster by `assigned_instructor_id = user_id`, so instructors never receive other students even before frontend filtering. |
+| **Administrator manages roster & assignments** | `/api/students` (POST/PUT) plus `/api/instructors` give admins the CRUD surface to create students and assign them to instructors. |
+| **Administrator views full roster + instructor pairing** | `/api/students` (GET) returns the entire roster and includes assignments, allowing the admin UI to render organization-wide dashboards. |
 
 ## 8. Developer Notes
 

@@ -28,6 +28,15 @@ All states (loading, error, success) are surfaced inline with accessible message
 - **Runtime verification helpers** (`src/runtime/verification.js`) expose `verifyOrgConnection({ dataClient })` which runs `tuttiud.setup_assistant_diagnostics()` and returns the diagnostic rows for custom UI messaging.
 - Feature modules (students, instructors, sessions) must load data exclusively through secure `/api/*` endpoints. The frontend never uses the dedicated JWT directly.
 
+## 🔐 Secure API endpoints (MVP)
+
+- `GET /api/instructors` – admin/owner list of instructor IDs + names derived from `org_memberships` and `profiles`.
+- `GET /api/students` – admin/owner roster of every student row from `tuttiud."Students"`.
+- `POST /api/students` – admin/owner creation of student records with optional instructor assignment.
+- `PUT /api/students/{studentId}` – admin/owner updates to student metadata (name, contact info, instructor).
+- `GET /api/my-students` – member/admin/owner view of students whose `assigned_instructor_id` equals the caller.
+- `POST /api/sessions` – member/admin/owner insertion of `SessionRecords` with assignment verification for members.
+
 ## 📚 Documentation
 
 - English & Hebrew project docs live in [`ProjectDoc/Eng.md`](ProjectDoc/Eng.md) and [`ProjectDoc/Heb.md`](ProjectDoc/Heb.md). Update both together.
