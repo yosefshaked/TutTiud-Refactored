@@ -3,6 +3,11 @@ import { useSupabase } from '@/context/SupabaseContext.jsx';
 
 const AuthContext = createContext(null);
 
+const FALLBACK_REDIRECT_URL = import.meta?.env?.VITE_PUBLIC_APP_URL
+  || import.meta?.env?.VITE_APP_BASE_URL
+  || import.meta?.env?.VITE_SITE_URL
+  || null;
+
 function extractProfile(session) {
   const user = session?.user;
   if (!user) return null;
@@ -18,6 +23,16 @@ function extractProfile(session) {
     email: user.email || metadata.email || null,
     name,
   };
+}
+
+function resolveRedirectUrl() {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  if (FALLBACK_REDIRECT_URL) {
+    return FALLBACK_REDIRECT_URL;
+  }
+  return undefined;
 }
 
 export function AuthProvider({ children }) {
@@ -56,12 +71,11 @@ export function AuthProvider({ children }) {
 
   const signInWithOAuth = useCallback(async (provider) => {
     const client = ensureAuthClient();
-    const origin = typeof window === 'undefined' ? undefined : window.location.origin;
-    const pathname = typeof window === 'undefined' ? undefined : window.location.pathname;
-    const redirectTo = origin && pathname ? `${origin}${pathname}` : undefined;
+    const redirectTo = resolveRedirectUrl();
+    const oauthOptions = redirectTo ? { redirectTo } : {};
     const { data, error } = await client.auth.signInWithOAuth({
       provider,
-      options: redirectTo ? { redirectTo } : {},
+      options: oauthOptions,
     });
     if (error) throw error;
     return data;

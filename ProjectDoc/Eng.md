@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.6.0**
-**Last Updated: 2025-10-30**
+**Version: 2.6.1**
+**Last Updated: 2025-10-23**
 
 ## 1. Vision & Purpose
 
@@ -90,6 +90,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - `verifyOrgConnection` (`src/runtime/verification.js`) now expects a Supabase data client and returns the diagnostics array so callers can render pass/fail status.
 - All onboarding status updates should call `recordVerification(orgId, timestamp)` to persist `setup_completed` / `verified_at` on the control-plane organization row.
 - Documentation must remain bilingual (see `ProjectDoc/Heb.md`) and the README should highlight the onboarding checklist for quick reference.
+- OAuth flows call `supabase.auth.signInWithOAuth` with `options.redirectTo`, resolving to `window.location.origin` or `VITE_PUBLIC_APP_URL`/`VITE_APP_BASE_URL`/`VITE_SITE_URL` so each shell returns users to the initiating Tuttiud app after third-party login.
 
 ## 9. Admin Student Management UI
 

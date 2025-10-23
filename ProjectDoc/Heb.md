@@ -1,7 +1,7 @@
 # תיעוד פרויקט: פלטפורמת Tuttiud לתמיכת תלמידים
 
-**גרסה: 2.6.0**
-**עודכן לאחרונה: 2025-10-30**
+**גרסה: 2.6.1**
+**עודכן לאחרונה: 2025-10-23**
 
 ## 1. חזון ומטרה
 
@@ -90,6 +90,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 - `verifyOrgConnection` (`src/runtime/verification.js`) מקבל כעת לקוח Supabase ומחזיר את מערך התוצאות כדי לרנדר סטטוס.
 - בעת השלמת האשף חובה לקרוא ל-`recordVerification(orgId, timestamp)` כדי לעדכן את `setup_completed` / `verified_at` ב-Control DB.
 - יש לשמור על תאימות מלאה בין מסמך זה לבין התרגום האנגלי ועל עדכון ה-README עם רשימת הצעדים.
+- זרימות OAuth קוראות ל-`supabase.auth.signInWithOAuth` עם `options.redirectTo` שנקבע לפי `window.location.origin` או המשתנים `VITE_PUBLIC_APP_URL` / `VITE_APP_BASE_URL` / `VITE_SITE_URL`, כדי להחזיר משתמשים אל אפליקציית Tuttiud שפתחה את הכניסה לאחר התחברות לספק חיצוני.
 
 ## 9. ממשק ניהול תלמידים למנהלים
 
