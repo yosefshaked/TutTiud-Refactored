@@ -57,19 +57,19 @@ ALTER TABLE tuttiud."Settings" ENABLE ROW LEVEL SECURITY;
 
 -- Policies for "Instructors"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors";
-CREATE POLICY "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 -- Policies for "Students"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Students" ON tuttiud."Students";
-CREATE POLICY "Allow full access to authenticated users on Students" ON tuttiud."Students" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on Students" ON tuttiud."Students" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 -- Policies for "SessionRecords"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on SessionRecords" ON tuttiud."SessionRecords";
-CREATE POLICY "Allow full access to authenticated users on SessionRecords" ON tuttiud."SessionRecords" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on SessionRecords" ON tuttiud."SessionRecords" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 -- Policies for "Settings"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Settings" ON tuttiud."Settings";
-CREATE POLICY "Allow full access to authenticated users on Settings" ON tuttiud."Settings" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on Settings" ON tuttiud."Settings" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 
 -- Part 4: Application Role and Permissions (No Changes)
