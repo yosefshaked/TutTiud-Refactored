@@ -165,7 +165,7 @@ export default function StudentManagementPage() {
 
   if (supabaseLoading) {
     return (
-      <div className="p-6 text-center text-slate-500">
+      <div className="p-6 text-center text-neutral-600">
         טוען חיבור...
       </div>
     );
@@ -173,7 +173,7 @@ export default function StudentManagementPage() {
 
   if (!user) {
     return (
-      <div className="p-6 text-center text-slate-500">
+      <div className="p-6 text-center text-neutral-600">
         יש להתחבר כדי להציג את רשימת התלמידים.
       </div>
     );
@@ -181,7 +181,7 @@ export default function StudentManagementPage() {
 
   if (!activeOrgHasConnection || !activeOrg) {
     return (
-      <div className="p-6 text-center text-slate-500">
+      <div className="p-6 text-center text-neutral-600">
         בחרו ארגון עם חיבור פעיל כדי לנהל תלמידים.
       </div>
     );
@@ -191,94 +191,87 @@ export default function StudentManagementPage() {
   const isEmpty = !isLoadingStudents && students.length === 0 && !studentsError;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 sm:p-6">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">ניהול תלמידים</h1>
-            <p className="text-slate-600">
-              צפייה, הוספה ושיוך של תלמידים למדריכים בארגון {activeOrg?.name || ''}.
-            </p>
-          </div>
-          <Button type="button" className="gap-2 self-start" onClick={handleOpenAddDialog}>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            תלמיד חדש
-          </Button>
-        </div>
-
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-xl text-slate-800">רשימת תלמידים</CardTitle>
-            {instructorsState === REQUEST_STATES.loading ? (
-              <p className="flex items-center gap-2 text-sm text-slate-500">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                טוען רשימת מדריכים...
-              </p>
-            ) : null}
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            {isLoadingStudents ? (
-              <div className="flex items-center justify-center py-12 text-slate-500">
-                <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
-                <span className="sr-only">טוען תלמידים...</span>
-              </div>
-            ) : null}
-
-            {studentsError && !isLoadingStudents ? (
-              <div className="rounded-md bg-red-50 p-4 text-sm text-red-700" role="alert">
-                {studentsError}
-              </div>
-            ) : null}
-
-            {isEmpty ? (
-              <div className="py-12 text-center text-slate-500">
-                עדיין לא נוספו תלמידים לארגון זה.
-              </div>
-            ) : null}
-
-            {!isLoadingStudents && !studentsError && students.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[180px] text-right">שם התלמיד</TableHead>
-                    <TableHead className="min-w-[200px] text-right">פרטי קשר</TableHead>
-                    <TableHead className="min-w-[160px] text-right">מדריך משויך</TableHead>
-                    <TableHead className="w-[120px] text-right">פעולות</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((student) => {
-                    const instructor = instructorMap.get(student.assigned_instructor_id) || null;
-                    return (
-                      <TableRow key={student.id}>
-                        <TableCell className="font-medium text-slate-900">{student.name}</TableCell>
-                        <TableCell className="text-slate-600">
-                          {student.contact_info || '—'}
-                        </TableCell>
-                        <TableCell className="text-slate-600">
-                          {instructor?.name || 'ללא מדריך'}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            onClick={() => handleOpenAssignment(student)}
-                          >
-                            <Pencil className="h-4 w-4" aria-hidden="true" />
-                            עריכה
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            ) : null}
-          </CardContent>
-        </Card>
+    <div className="space-y-lg">
+      <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-title-lg font-semibold text-foreground">ניהול תלמידים</h1>
+        <Button type="button" className="gap-sm self-start" onClick={handleOpenAddDialog}>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          תלמיד חדש
+        </Button>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base font-semibold text-foreground">רשימת תלמידים</CardTitle>
+          {instructorsState === REQUEST_STATES.loading ? (
+            <p className="flex items-center gap-xs text-sm text-neutral-600">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              טוען רשימת מדריכים...
+            </p>
+          ) : null}
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {isLoadingStudents ? (
+            <div className="flex items-center justify-center gap-sm py-xl text-neutral-600">
+              <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+              <span className="text-sm">טוען תלמידים...</span>
+            </div>
+          ) : null}
+
+          {studentsError && !isLoadingStudents ? (
+            <div className="rounded-lg bg-error/10 p-md text-sm text-error" role="alert">
+              {studentsError}
+            </div>
+          ) : null}
+
+          {isEmpty ? (
+            <div className="py-xl text-center text-sm text-neutral-500">
+              עדיין לא נוספו תלמידים לארגון זה.
+            </div>
+          ) : null}
+
+          {!isLoadingStudents && !studentsError && students.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[180px] text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
+                  <TableHead className="min-w-[200px] text-right text-sm font-medium text-neutral-600">פרטי קשר</TableHead>
+                  <TableHead className="min-w-[160px] text-right text-sm font-medium text-neutral-600">מדריך משויך</TableHead>
+                  <TableHead className="w-[120px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((student) => {
+                  const instructor = instructorMap.get(student.assigned_instructor_id) || null;
+                  return (
+                    <TableRow key={student.id}>
+                      <TableCell className="text-sm font-semibold text-foreground">{student.name}</TableCell>
+                      <TableCell className="text-sm text-neutral-600">
+                        {student.contact_info || '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-neutral-600">
+                        {instructor?.name || 'ללא מדריך'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-xs"
+                          onClick={() => handleOpenAssignment(student)}
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden="true" />
+                          עריכה
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) handleCloseAddDialog(); }}>
         <DialogContent>

@@ -85,55 +85,62 @@ function MobileNavigation() {
 
 function DesktopNavigation({ onSignOut }) {
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col md:border-l md:border-border md:bg-surface" dir="rtl">
-      <div className="flex flex-col gap-md px-lg py-lg">
-        <div className="flex justify-end">
-          <LogoPlaceholder />
+    <aside
+      className="hidden md:flex md:h-screen md:w-72 md:flex-col md:border-l md:border-border md:bg-surface"
+      dir="rtl"
+    >
+      <div className="flex h-full flex-col">
+        <div className="flex flex-col gap-md px-lg pt-lg">
+          <Link to="/Dashboard" className="flex items-center justify-end gap-sm text-right">
+            <div className="flex items-center justify-center">
+              <LogoPlaceholder />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Tuttiud</p>
+              <p className="text-xs text-neutral-500">פלטפורמת תלמידים</p>
+            </div>
+          </Link>
+          <Link
+            to="/TimeEntry"
+            className="inline-flex items-center justify-center gap-sm rounded-full bg-primary px-lg py-sm text-sm font-semibold text-primary-foreground shadow-lg transition hover:shadow-xl"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            <span>רישום מפגש חדש</span>
+          </Link>
         </div>
-        <Link to="/Dashboard" className="text-right">
-          <p className="text-xs text-neutral-500">פלטפורמת TutTiud</p>
-          <p className="text-title-sm font-semibold text-foreground">ניהול תלמידים</p>
-        </Link>
-        <Link
-          to="/TimeEntry"
-          className="inline-flex items-center justify-center gap-sm rounded-full bg-primary px-lg py-sm text-sm font-semibold text-primary-foreground shadow-lg transition hover:shadow-xl"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          <span>רישום מפגש חדש</span>
-        </Link>
-      </div>
-      <nav className="flex-1 space-y-1 px-md" aria-label="ניווט ראשי">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium transition",
-                  isActive ? "bg-primary/10 text-primary" : "text-neutral-600 hover:bg-neutral-100",
-                )
-              }
-            >
-              <div className="flex items-center gap-sm">
-                <Icon className="h-5 w-5" aria-hidden="true" />
-                <span>{item.label}</span>
-              </div>
-            </NavLink>
-          )
-        })}
-      </nav>
-      <div className="space-y-sm border-t border-border px-lg py-lg">
-        <OrgSwitcher />
-        <button
-          type="button"
-          onClick={onSignOut}
-          className="flex w-full items-center justify-center gap-sm rounded-xl border border-border px-md py-sm text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100"
-        >
-          <LogOut className="h-4 w-4" aria-hidden="true" />
-          התנתקות
-        </button>
+        <nav className="mt-md flex-1 space-y-1 px-lg" aria-label="ניווט ראשי">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium transition",
+                    isActive ? "bg-primary/10 text-primary" : "text-neutral-600 hover:bg-neutral-100",
+                  )
+                }
+              >
+                <div className="flex items-center gap-sm">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  <span>{item.label}</span>
+                </div>
+              </NavLink>
+            )
+          })}
+        </nav>
+        <div className="mt-auto space-y-sm border-t border-border px-lg py-lg">
+          <OrgSwitcher />
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="flex w-full items-center justify-center gap-sm rounded-xl border border-border px-md py-sm text-sm font-semibold text-neutral-600 transition hover:bg-neutral-100"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            התנתקות
+          </button>
+        </div>
       </div>
     </aside>
   )
@@ -164,7 +171,7 @@ export default function AppShell({ children }) {
     <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
       <DesktopNavigation onSignOut={handleSignOut} />
 
-      <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:pb-0">
+      <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
         <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
           <div className="flex items-center justify-between gap-sm">
             <div className="flex items-center gap-sm">
