@@ -28,10 +28,11 @@ export default function Login() {
       await signInWithEmail(email.trim(), password);
       toast.success('ברוך הבא! מתחבר למערכת...');
     } catch (error) {
-      console.error('Email sign-in failed', error);
-      const message = error?.message?.trim() || 'Invalid login credentials';
-      setLoginError(message);
-      toast.error('התחברות בדוא"ל נכשלה. בדוק את הפרטים ונסה שוב.');
+      const fallbackMessage = 'פרטי ההתחברות אינם תקינים. בדקו את הדוא"ל והסיסמה ונסו שוב.';
+      const message = error?.message?.trim();
+      console.error('Email sign-in failed', message || error);
+      setLoginError(fallbackMessage);
+      toast.error('התחברות בדוא"ל נכשלה. בדקו את הפרטים ונסו שוב.');
     } finally {
       setIsSubmitting(false);
     }
