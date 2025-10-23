@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.6.0**
-**Last Updated: 2025-10-30**
+**Version: 2.7.1**
+**Last Updated: 2025-10-26**
 
 ## 1. Vision & Purpose
 
@@ -90,6 +90,9 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - `verifyOrgConnection` (`src/runtime/verification.js`) now expects a Supabase data client and returns the diagnostics array so callers can render pass/fail status.
 - All onboarding status updates should call `recordVerification(orgId, timestamp)` to persist `setup_completed` / `verified_at` on the control-plane organization row.
 - Documentation must remain bilingual (see `ProjectDoc/Heb.md`) and the README should highlight the onboarding checklist for quick reference.
+- OAuth flows call `supabase.auth.signInWithOAuth` with `options.redirectTo`, resolving to the full browser URL (`origin + pathname + search + hash`) when `window.location` is available or falling back to `VITE_PUBLIC_APP_URL`/`VITE_APP_BASE_URL`/`VITE_SITE_URL` so each shell returns users to the exact page that initiated the Tuttiud login after third-party authentication.
+- Password reset is a two-step Supabase Auth flow: `/Pages/ForgotPassword.jsx` calls `resetPasswordForEmail` with a redirect to `/#/update-password`, and `/Pages/UpdatePassword.jsx` verifies matching credentials before calling the new `updatePassword` helper exposed by `AuthContext`. Both views use the refreshed design system components and RTL-friendly alerts for loading, success, and error states.
+- The login form surfaces Supabase authentication failures inline using the red error alert pattern so users immediately see when credentials are invalid.
 
 ## 9. Admin Student Management UI
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { LogIn, Mail, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/auth/AuthContext.jsx';
@@ -10,6 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthInFlight, setOauthInFlight] = useState(null);
+  const [loginError, setLoginError] = useState(null);
   const location = useLocation();
 
   const redirectPath = location.state?.from?.pathname || '/';
@@ -21,13 +22,17 @@ export default function Login() {
 
   const handleEmailSignIn = async (event) => {
     event.preventDefault();
+    setLoginError(null);
     setIsSubmitting(true);
     try {
       await signInWithEmail(email.trim(), password);
       toast.success('ברוך הבא! מתחבר למערכת...');
     } catch (error) {
-      console.error('Email sign-in failed', error);
-      toast.error('התחברות בדוא"ל נכשלה. בדוק את הפרטים ונסה שוב.');
+      const fallbackMessage = 'פרטי ההתחברות אינם תקינים. בדקו את הדוא"ל והסיסמה ונסו שוב.';
+      const message = error?.message?.trim();
+      console.error('Email sign-in failed', message || error);
+      setLoginError(fallbackMessage);
+      toast.error('התחברות בדוא"ל נכשלה. בדקו את הפרטים ונסו שוב.');
     } finally {
       setIsSubmitting(false);
     }
@@ -130,6 +135,25 @@ export default function Login() {
                 />
               </div>
             </label>
+
+            <div className="flex justify-end">
+              <Link
+                to="/forgot-password"
+                className="text-sm font-semibold text-blue-600 hover:text-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 rounded-md px-1"
+              >
+                שכחת סיסמה?
+              </Link>
+            </div>
+
+            {loginError ? (
+              <div
+                className="bg-rose-50 border border-rose-200 text-rose-700 text-right rounded-2xl px-4 py-3 shadow-sm"
+                role="alert"
+                aria-live="assertive"
+              >
+                {loginError}
+              </div>
+            ) : null}
 
             <button
               type="submit"

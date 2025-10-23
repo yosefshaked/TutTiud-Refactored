@@ -3,6 +3,13 @@ import { useSupabase } from '@/context/SupabaseContext.jsx';
 
 const AuthContext = createContext(null);
 
+const FALLBACK_REDIRECT_URL = import.meta?.env?.VITE_PUBLIC_APP_URL
+  || import.meta?.env?.VITE_APP_BASE_URL
+  || import.meta?.env?.VITE_SITE_URL
+  || null;
+
+const PASSWORD_RESET_HASH_PATH = '#/update-password';
+
 function extractProfile(session) {
   const user = session?.user;
   if (!user) return null;
@@ -18,6 +25,39 @@ function extractProfile(session) {
     email: user.email || metadata.email || null,
     name,
   };
+}
+
+function resolveRedirectUrl() {
+  if (typeof window !== 'undefined') {
+    const { location } = window;
+    if (location?.origin) {
+      const pathname = typeof location.pathname === 'string' ? location.pathname : '/';
+      const search = typeof location.search === 'string' ? location.search : '';
+      const hash = typeof location.hash === 'string' ? location.hash : '';
+      return `${location.origin}${pathname}${search}${hash}`;
+    }
+  }
+  if (FALLBACK_REDIRECT_URL) {
+    return FALLBACK_REDIRECT_URL;
+  }
+  return undefined;
+}
+
+function resolvePasswordResetRedirectUrl() {
+  let baseUrl = null;
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    baseUrl = window.location.origin;
+  } else if (FALLBACK_REDIRECT_URL) {
+    baseUrl = FALLBACK_REDIRECT_URL;
+  }
+
+  if (!baseUrl) {
+    return undefined;
+  }
+
+  const sanitizedBase = baseUrl.split('#')[0].replace(/\/+$/, '');
+  return `${sanitizedBase}/${PASSWORD_RESET_HASH_PATH}`;
 }
 
 export function AuthProvider({ children }) {
@@ -56,13 +96,28 @@ export function AuthProvider({ children }) {
 
   const signInWithOAuth = useCallback(async (provider) => {
     const client = ensureAuthClient();
-    const origin = typeof window === 'undefined' ? undefined : window.location.origin;
-    const pathname = typeof window === 'undefined' ? undefined : window.location.pathname;
-    const redirectTo = origin && pathname ? `${origin}${pathname}` : undefined;
+    const redirectTo = resolveRedirectUrl();
+    const oauthOptions = redirectTo ? { redirectTo } : {};
     const { data, error } = await client.auth.signInWithOAuth({
       provider,
-      options: redirectTo ? { redirectTo } : {},
+      options: oauthOptions,
     });
+    if (error) throw error;
+    return data;
+  }, [ensureAuthClient]);
+
+  const resetPasswordForEmail = useCallback(async (email) => {
+    const client = ensureAuthClient();
+    const redirectTo = resolvePasswordResetRedirectUrl();
+    const options = redirectTo ? { redirectTo } : undefined;
+    const { data, error } = await client.auth.resetPasswordForEmail(email, options);
+    if (error) throw error;
+    return data;
+  }, [ensureAuthClient]);
+
+  const updatePassword = useCallback(async (password) => {
+    const client = ensureAuthClient();
+    const { data, error } = await client.auth.updateUser({ password });
     if (error) throw error;
     return data;
   }, [ensureAuthClient]);
@@ -76,7 +131,9 @@ export function AuthProvider({ children }) {
     signOut,
     signInWithEmail,
     signInWithOAuth,
-  }), [status, session, profile, signOut, signInWithEmail, signInWithOAuth]);
+    resetPasswordForEmail,
+    updatePassword,
+  }), [status, session, profile, signOut, signInWithEmail, signInWithOAuth, resetPasswordForEmail, updatePassword]);
 
   return (
     <AuthContext.Provider value={value}>
