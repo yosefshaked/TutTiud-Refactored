@@ -100,7 +100,7 @@ export default function AcceptInvitePage() {
         console.error('Failed to refresh organizations after accepting invite', refreshError);
       }
       setDecision('accepted');
-      navigate('/Dashboard', { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       console.error('Failed to accept invitation', error);
       setActionError(error?.message || 'אישור ההזמנה נכשל. נסה שוב מאוחר יותר.');

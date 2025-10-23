@@ -122,6 +122,7 @@ export default function Settings() {
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
   const [isSetupDialogOpen, setIsSetupDialogOpen] = useState(!activeOrgHasConnection);
   const { authClient, user, loading, session } = useSupabase();
+  const membershipRole = activeOrg?.membership?.role ?? null;
 
   useEffect(() => {
     if (activeOrgHasConnection) {
@@ -362,13 +363,38 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">חגים וימי חופשה</h1>
-          <p className="text-slate-600">נהל את מדיניות החופשות והחגים הארגונית במקום מרכזי אחד</p>
-        </div>
+        <div className="max-w-5xl mx-auto space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">חגים וימי חופשה</h1>
+            <p className="text-slate-600">נהל את מדיניות החופשות והחגים הארגונית במקום מרכזי אחד</p>
+          </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
+          <Card className="border-0 shadow-lg bg-white/90" dir="rtl">
+            <CardHeader className="border-b border-slate-200 space-y-2">
+              <CardTitle className="text-xl font-semibold text-slate-900">מידע לניפוי באגים</CardTitle>
+              <p className="text-sm text-slate-600">
+                שימוש בנתונים אלו מאפשר להבין איך האפליקציה מזהה את המשתמש הנוכחי וההרשאות שלו.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-4 text-sm text-slate-700 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <dt className="font-medium text-slate-500">מזהה משתמש</dt>
+                  <dd className="break-all text-slate-900">{user?.id ?? '—'}</dd>
+                </div>
+                <div className="space-y-1">
+                  <dt className="font-medium text-slate-500">אימייל</dt>
+                  <dd className="break-all text-slate-900">{user?.email ?? '—'}</dd>
+                </div>
+                <div className="space-y-1">
+                  <dt className="font-medium text-slate-500">תפקיד מזוהה</dt>
+                  <dd className="text-slate-900">{membershipRole ? membershipRole : '—'}</dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]">
           <Card className="border-0 shadow-lg bg-white/80" dir="rtl">
             <CardHeader className="border-b border-slate-200 space-y-3">
               <CardTitle className="flex flex-col gap-2 text-xl font-semibold text-slate-900 sm:flex-row sm:items-center sm:justify-between">

@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useMemo, useState } from "react"
 import { Link, NavLink, Outlet } from "react-router-dom"
 import { Plus, LayoutDashboard, Users, BarChart3, Settings, LogOut, Megaphone } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -11,28 +11,39 @@ import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 import { cn } from "@/lib/utils"
 
-const navItems = [
-  {
-    label: "ראשי",
-    to: "/Dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "תלמידים",
-    to: "/admin/students",
-    icon: Users,
-  },
-  {
-    label: "דוחות",
-    to: "/Reports",
-    icon: BarChart3,
-  },
-  {
-    label: "הגדרות",
-    to: "/Settings",
-    icon: Settings,
-  },
-]
+const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
+
+function buildNavItems(role) {
+  const normalizedRole = typeof role === "string" ? role.toLowerCase() : "member"
+  const isAdminRole = normalizedRole === "admin" || normalizedRole === "owner"
+
+  const studentsDestination = isAdminRole ? "/admin/students" : "/my-students"
+
+  return [
+    {
+      label: "ראשי",
+      to: "/",
+      icon: LayoutDashboard,
+      end: true,
+    },
+    {
+      label: "תלמידים",
+      to: studentsDestination,
+      icon: Users,
+    },
+    {
+      label: "דוחות",
+      icon: BarChart3,
+      disabled: true,
+      tooltip: REPORTS_COMING_SOON_MESSAGE,
+    },
+    {
+      label: "הגדרות",
+      to: "/Settings",
+      icon: Settings,
+    },
+  ]
+}
 
 function LogoPlaceholder() {
   return (
@@ -42,7 +53,7 @@ function LogoPlaceholder() {
   )
 }
 
-function MobileNavigation() {
+function MobileNavigation({ navItems = [] }) {
   return (
     <nav
       role="navigation"
@@ -52,10 +63,29 @@ function MobileNavigation() {
       <div className="relative mx-auto flex max-w-md items-center justify-between gap-md">
         {navItems.map((item) => {
           const Icon = item.icon
+
+          if (item.disabled) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                aria-label={item.label}
+                aria-disabled="true"
+                title={item.tooltip}
+                onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
+                className="flex flex-1 cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
+            )
+          }
+
           return (
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               aria-label={item.label}
               className={({ isActive }) =>
                 cn(
@@ -82,7 +112,7 @@ function MobileNavigation() {
   )
 }
 
-function DesktopNavigation({ onSignOut }) {
+function DesktopNavigation({ navItems = [], onSignOut }) {
   return (
     <aside
       className="hidden md:flex md:h-screen md:w-72 md:flex-col md:border-l md:border-border md:bg-surface"
@@ -90,7 +120,7 @@ function DesktopNavigation({ onSignOut }) {
     >
       <div className="flex h-full flex-col">
         <div className="flex flex-col gap-md px-lg pt-lg">
-          <Link to="/Dashboard" className="flex items-center justify-end gap-sm text-right">
+          <Link to="/" className="flex items-center justify-end gap-sm text-right">
             <div className="flex items-center justify-center">
               <LogoPlaceholder />
             </div>
@@ -110,10 +140,31 @@ function DesktopNavigation({ onSignOut }) {
         <nav className="mt-md flex-1 space-y-1 px-lg" aria-label="ניווט ראשי">
           {navItems.map((item) => {
             const Icon = item.icon
+
+            if (item.disabled) {
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
+                  className="flex w-full cursor-not-allowed items-center justify-between gap-sm rounded-xl px-md py-sm text-right text-sm font-medium text-neutral-400 opacity-70"
+                  aria-disabled="true"
+                  title={item.tooltip}
+                >
+                  <div className="flex items-center gap-sm">
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </div>
+                  <Megaphone className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )
+            }
+
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.end}
                 className={({ isActive }) =>
                   cn(
                     "flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium transition",
@@ -149,6 +200,9 @@ export default function AppShell({ children }) {
   const { activeOrg } = useOrg()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
 
+  const membershipRole = activeOrg?.membership?.role
+  const navItems = useMemo(() => buildNavItems(membershipRole), [membershipRole])
+
   const handleOrgClick = () => {
     toast.info("בקרוב: בחירת ארגון נוסף")
   }
@@ -167,7 +221,7 @@ export default function AppShell({ children }) {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
-      <DesktopNavigation onSignOut={handleSignOut} />
+      <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} />
 
       <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
         <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
@@ -218,7 +272,7 @@ export default function AppShell({ children }) {
         </div>
       </div>
 
-      <MobileNavigation />
+      <MobileNavigation navItems={navItems} />
 
       <ChangelogModal open={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
       <Toaster richColors position="top-right" closeButton />
