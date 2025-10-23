@@ -35,6 +35,14 @@ const navItems = [
   },
 ]
 
+function LogoPlaceholder() {
+  return (
+    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-lg font-semibold text-primary">
+      T
+    </div>
+  )
+}
+
 function MobileNavigation() {
   return (
     <nav
@@ -79,11 +87,12 @@ function DesktopNavigation({ onSignOut }) {
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:border-l md:border-border md:bg-surface" dir="rtl">
       <div className="flex flex-col gap-md px-lg py-lg">
-        <Link to="/Dashboard" className="flex items-center justify-between text-right">
-          <div>
-            <p className="text-xs text-neutral-500">פלטפורמת TutTiud</p>
-            <p className="text-title-sm font-semibold text-foreground">ניהול תלמידים</p>
-          </div>
+        <div className="flex justify-end">
+          <LogoPlaceholder />
+        </div>
+        <Link to="/Dashboard" className="text-right">
+          <p className="text-xs text-neutral-500">פלטפורמת TutTiud</p>
+          <p className="text-title-sm font-semibold text-foreground">ניהול תלמידים</p>
         </Link>
         <Link
           to="/TimeEntry"
@@ -135,6 +144,10 @@ export default function AppShell({ children }) {
   const { activeOrg } = useOrg()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
 
+  const handleOrgClick = () => {
+    toast.info("בקרוב: בחירת ארגון נוסף")
+  }
+
   const handleSignOut = async () => {
     try {
       await signOut()
@@ -154,11 +167,15 @@ export default function AppShell({ children }) {
       <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:pb-0">
         <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
           <div className="flex items-center justify-between gap-sm">
-            <div>
-              <p className="text-xs text-neutral-500">ברוך הבא</p>
-              <p className="text-title-sm font-semibold text-foreground">
+            <div className="flex items-center gap-sm">
+              <LogoPlaceholder />
+              <button
+                type="button"
+                onClick={handleOrgClick}
+                className="inline-flex items-center rounded-full border border-border bg-surface px-md py-xs text-sm font-semibold text-foreground transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
                 {activeOrg?.name ? `ארגון: ${activeOrg.name}` : "בחרו ארגון לעבודה"}
-              </p>
+              </button>
             </div>
             <div className="flex items-center gap-xs">
               <button
