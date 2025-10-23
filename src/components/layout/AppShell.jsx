@@ -205,10 +205,6 @@ export default function AppShell({ children }) {
           </div>
         </header>
 
-        <div className="border-b border-border px-md py-sm md:hidden">
-          <OrgSwitcher />
-        </div>
-
         <OrgSelectionBanner />
         <OrgConfigBanner />
 
