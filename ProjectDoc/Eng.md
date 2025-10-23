@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.4.0**
-**Last Updated: 2025-10-28**
+**Version: 2.5.0**
+**Last Updated: 2025-10-29**
 
 ## 1. Vision & Purpose
 
@@ -99,7 +99,18 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
 - **App shell & routing** – `src/main.jsx` redirects `/Employees` to `/admin/students` and wraps authenticated routes with `src/components/layout/AppShell.jsx`. The shell renders a bottom tab bar + FAB on mobile and a left sidebar on desktop while keeping the student management view front and center.
 
-## 10. Design System Foundations (Mobile-First UI Kit)
+## 10. Instructor "My Students" Dashboard
+
+- **Feature slice** – the instructor experience now lives under `src/features/instructor/`. Shared-only components stay in
+  `components/`, while the `MyStudentsPage.jsx` container resides in `pages/` and wires the full view state.
+- **Page layout & routing** – `MyStudentsPage.jsx` composes the shared `PageLayout` shell, calls `GET /api/my-students` once the
+  organization connection is ready, and renders loading, error, and empty states. Successful fetches map each student to a
+  `Card` showing their name and contact details.
+- **Navigation updates** – `AppShell.jsx` now derives navigation items from the member role. Admins keep the `/admin/students`
+  destination, while instructors are routed to `/my-students`. The router (`src/main.jsx`) exposes the new `/my-students`
+  path so instructors land on their filtered roster.
+
+## 11. Design System Foundations (Mobile-First UI Kit)
 
 - **Tailwind configuration** – `tailwind.config.js` now defines a Nunito-based typography stack, a calm violet primary palette (`primary`), accessible neutral grays (`neutral`), and dedicated status colors for success, warning, and error states. The spacing scale introduces tokens (`2xs` → `3xl`) sized for generous touch targets and breathing room on small screens.
 - **UI primitives** – Generic components for the new design live in [`src/components/ui/Button.jsx`](../src/components/ui/Button.jsx), [`Card.jsx`](../src/components/ui/Card.jsx), [`Input.jsx`](../src/components/ui/Input.jsx), and [`PageLayout.jsx`](../src/components/ui/PageLayout.jsx). Use them when building new flows to guarantee consistent padding, typography, and contrast across mobile and desktop breakpoints.

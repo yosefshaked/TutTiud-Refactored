@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useMemo, useState } from "react"
 import { Link, NavLink, Outlet } from "react-router-dom"
 import { Plus, LayoutDashboard, Users, BarChart3, Settings, LogOut, Megaphone } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -11,28 +11,34 @@ import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 import { cn } from "@/lib/utils"
 
-const navItems = [
-  {
-    label: "ראשי",
-    to: "/Dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "תלמידים",
-    to: "/admin/students",
-    icon: Users,
-  },
-  {
-    label: "דוחות",
-    to: "/Reports",
-    icon: BarChart3,
-  },
-  {
-    label: "הגדרות",
-    to: "/Settings",
-    icon: Settings,
-  },
-]
+function buildNavItems(role) {
+  const normalizedRole = typeof role === "string" ? role.toLowerCase() : "member"
+
+  const studentsDestination = normalizedRole === "admin" ? "/admin/students" : "/my-students"
+
+  return [
+    {
+      label: "ראשי",
+      to: "/Dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      label: "תלמידים",
+      to: studentsDestination,
+      icon: Users,
+    },
+    {
+      label: "דוחות",
+      to: "/Reports",
+      icon: BarChart3,
+    },
+    {
+      label: "הגדרות",
+      to: "/Settings",
+      icon: Settings,
+    },
+  ]
+}
 
 function LogoPlaceholder() {
   return (
@@ -42,7 +48,7 @@ function LogoPlaceholder() {
   )
 }
 
-function MobileNavigation() {
+function MobileNavigation({ navItems = [] }) {
   return (
     <nav
       role="navigation"
@@ -82,7 +88,7 @@ function MobileNavigation() {
   )
 }
 
-function DesktopNavigation({ onSignOut }) {
+function DesktopNavigation({ navItems = [], onSignOut }) {
   return (
     <aside
       className="hidden md:flex md:h-screen md:w-72 md:flex-col md:border-l md:border-border md:bg-surface"
@@ -149,6 +155,9 @@ export default function AppShell({ children }) {
   const { activeOrg } = useOrg()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
 
+  const membershipRole = activeOrg?.membership?.role
+  const navItems = useMemo(() => buildNavItems(membershipRole), [membershipRole])
+
   const handleOrgClick = () => {
     toast.info("בקרוב: בחירת ארגון נוסף")
   }
@@ -167,7 +176,7 @@ export default function AppShell({ children }) {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
-      <DesktopNavigation onSignOut={handleSignOut} />
+      <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} />
 
       <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
         <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
@@ -218,7 +227,7 @@ export default function AppShell({ children }) {
         </div>
       </div>
 
-      <MobileNavigation />
+      <MobileNavigation navItems={navItems} />
 
       <ChangelogModal open={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
       <Toaster richColors position="top-right" closeButton />

@@ -21,6 +21,7 @@ import { AuthProvider } from './auth/AuthContext.jsx';
 import AuthGuard from './auth/AuthGuard.jsx';
 import { OrgProvider } from './org/OrgContext.jsx';
 import OrgSelection from './Pages/OrgSelection.jsx';
+import MyStudentsPage from './features/instructor/pages/MyStudentsPage.jsx';
 
 function App({ config = null }) {
   console.log('[DEBUG 4] App component rendering.');
@@ -44,6 +45,7 @@ function App({ config = null }) {
                     <Route path="/Dashboard" element={<Dashboard />} />
                     <Route path="/Employees" element={<Navigate to="/admin/students" replace />} />
                     <Route path="/admin/students" element={<StudentManagementPage />} />
+                    <Route path="/my-students" element={<MyStudentsPage />} />
                     <Route path="/TimeEntry" element={<TimeEntry />} />
                     <Route path="/Adjustments" element={<Navigate to="/TimeEntry?tab=adjustments" replace />} />
                     <Route path="/Reports" element={<ReportsErrorBoundary><Reports /></ReportsErrorBoundary>} />
