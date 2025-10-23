@@ -1,72 +1,143 @@
+import tailwindcssAnimate from "tailwindcss-animate"
+
 /** @type {import('tailwindcss').Config} */
 export default {
-    darkMode: ["class"],
-    // tailwind.config.js
-content: [
-  "./index.html",
-  "./src/**/*.{js,ts,jsx,tsx}",
-],
+  darkMode: ["class"],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
-  	extend: {
-  		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
-  		},
-  		colors: {
-  			background: 'hsl(var(--background))',
-  			foreground: 'hsl(var(--foreground))',
-  			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
-  			},
-  			popover: {
-  				DEFAULT: 'hsl(var(--popover))',
-  				foreground: 'hsl(var(--popover-foreground))'
-  			},
-  			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
-  			},
-  			secondary: {
-  				DEFAULT: 'hsl(var(--secondary))',
-  				foreground: 'hsl(var(--secondary-foreground))'
-  			},
-  			muted: {
-  				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
-  			},
-  			accent: {
-  				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))'
-  			},
-  			destructive: {
-  				DEFAULT: 'hsl(var(--destructive))',
-  				foreground: 'hsl(var(--destructive-foreground))'
-  			},
-  			border: 'hsl(var(--border))',
-  			input: 'hsl(var(--input))',
-  			ring: 'hsl(var(--ring))',
-  			chart: {
-  				'1': 'hsl(var(--chart-1))',
-  				'2': 'hsl(var(--chart-2))',
-  				'3': 'hsl(var(--chart-3))',
-  				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
-  			},
-  			sidebar: {
-  				DEFAULT: 'hsl(var(--sidebar-background))',
-  				foreground: 'hsl(var(--sidebar-foreground))',
-  				primary: 'hsl(var(--sidebar-primary))',
-  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-  				accent: 'hsl(var(--sidebar-accent))',
-  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-  				border: 'hsl(var(--sidebar-border))',
-  				ring: 'hsl(var(--sidebar-ring))'
-  			}
-  		}
-  	}
+    extend: {
+      fontFamily: {
+        sans: ["\"Nunito\"", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "\"Segoe UI\"", "sans-serif"],
+        heading: ["\"Nunito\"", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "\"Segoe UI\"", "sans-serif"],
+      },
+      fontSize: {
+        "display-lg": ["2.5rem", { lineHeight: "1.2", fontWeight: "700" }],
+        "display-md": ["2rem", { lineHeight: "1.25", fontWeight: "700" }],
+        "title-lg": ["1.5rem", { lineHeight: "1.3", fontWeight: "700" }],
+        "title-md": ["1.25rem", { lineHeight: "1.35", fontWeight: "600" }],
+        "body-lg": ["1.125rem", { lineHeight: "1.6", fontWeight: "500" }],
+        "body-md": ["1rem", { lineHeight: "1.6", fontWeight: "500" }],
+        "body-sm": ["0.875rem", { lineHeight: "1.5", fontWeight: "500" }],
+      },
+      spacing: {
+        "2xs": "0.375rem",
+        xs: "0.5rem",
+        sm: "0.75rem",
+        md: "1rem",
+        lg: "1.5rem",
+        xl: "2rem",
+        "2xl": "3rem",
+        "3xl": "4rem",
+      },
+      borderRadius: {
+        xl: "1.5rem",
+        lg: "1rem",
+      },
+      boxShadow: {
+        card: "0 18px 40px -25px rgba(15, 23, 42, 0.35)",
+      },
+      colors: {
+        background: "#F6F7FB",
+        surface: "#FFFFFF",
+        overlay: "rgba(15, 23, 42, 0.6)",
+        foreground: "#0F172A",
+        border: "#E2E8F0",
+        input: "#E2E8F0",
+        ring: "#4F46E5",
+        muted: {
+          DEFAULT: "#F8FAFC",
+          foreground: "#64748B",
+        },
+        card: {
+          DEFAULT: "#FFFFFF",
+          foreground: "#0F172A",
+        },
+        popover: {
+          DEFAULT: "#FFFFFF",
+          foreground: "#0F172A",
+        },
+        secondary: {
+          DEFAULT: "#E2E8F0",
+          foreground: "#334155",
+        },
+        accent: {
+          DEFAULT: "#EEF2FF",
+          foreground: "#4338CA",
+        },
+        primary: {
+          50: "#EEF2FF",
+          100: "#E0E7FF",
+          200: "#C7D2FE",
+          300: "#A5B4FC",
+          400: "#818CF8",
+          500: "#6366F1",
+          600: "#4F46E5",
+          700: "#4338CA",
+          800: "#3730A3",
+          900: "#312E81",
+          DEFAULT: "#4F46E5",
+          foreground: "#FFFFFF",
+        },
+        neutral: {
+          50: "#F8FAFC",
+          100: "#F1F5F9",
+          200: "#E2E8F0",
+          300: "#CBD5F5",
+          400: "#94A3B8",
+          500: "#64748B",
+          600: "#475569",
+          700: "#334155",
+          800: "#1E293B",
+          900: "#0F172A",
+        },
+        success: {
+          50: "#E9FDF3",
+          100: "#C9F7E1",
+          500: "#16A34A",
+          600: "#15803D",
+          DEFAULT: "#16A34A",
+          foreground: "#FFFFFF",
+        },
+        warning: {
+          50: "#FFF7E6",
+          100: "#FEEBC8",
+          500: "#F59E0B",
+          600: "#D97706",
+          DEFAULT: "#F59E0B",
+          foreground: "#0F172A",
+        },
+        error: {
+          50: "#FDEDED",
+          100: "#FBCACA",
+          200: "#FCA5A5",
+          500: "#DC2626",
+          600: "#B91C1C",
+          DEFAULT: "#DC2626",
+          foreground: "#FFFFFF",
+        },
+        destructive: {
+          DEFAULT: "#DC2626",
+          foreground: "#FFFFFF",
+        },
+        chart: {
+          1: "#4F46E5",
+          2: "#22C55E",
+          3: "#0EA5E9",
+          4: "#F59E0B",
+          5: "#EC4899",
+        },
+        sidebar: {
+          DEFAULT: "#F1F5F9",
+          foreground: "#0F172A",
+          primary: "#4F46E5",
+          "primary-foreground": "#FFFFFF",
+          accent: "#E0E7FF",
+          "accent-foreground": "#312E81",
+          border: "#E2E8F0",
+          ring: "#4F46E5",
+        },
+      },
+    },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 }
-

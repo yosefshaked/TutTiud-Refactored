@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.3.0**
-**Last Updated: 2025-10-27**
+**Version: 2.4.0**
+**Last Updated: 2025-10-28**
 
 ## 1. Vision & Purpose
 
@@ -98,3 +98,9 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **AddStudentForm.jsx** – collects `name` and `contactInfo`, enforces client-side validation, and raises `onSubmit` with trimmed values. The form is rendered inside a dialog launched from the Student Management page.
 - **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
 - **Routing & navigation** – `src/main.jsx` redirects `/Employees` to `/admin/students` and mounts the new page. `src/Layout.jsx` updates the sidebar entry (label + URL) to match the student-focused workflow and refreshes the sidebar tagline to “student & instruction management”.
+
+## 10. Design System Foundations (Mobile-First UI Kit)
+
+- **Tailwind configuration** – `tailwind.config.js` now defines a Nunito-based typography stack, a calm violet primary palette (`primary`), accessible neutral grays (`neutral`), and dedicated status colors for success, warning, and error states. The spacing scale introduces tokens (`2xs` → `3xl`) sized for generous touch targets and breathing room on small screens.
+- **UI primitives** – Generic components for the new design live in [`src/components/ui/Button.jsx`](../src/components/ui/Button.jsx), [`Card.jsx`](../src/components/ui/Card.jsx), [`Input.jsx`](../src/components/ui/Input.jsx), and [`PageLayout.jsx`](../src/components/ui/PageLayout.jsx). Use them when building new flows to guarantee consistent padding, typography, and contrast across mobile and desktop breakpoints.
+- **Progressive adoption** – Existing pages remain unchanged for now. Future tickets will migrate feature screens to the new layout by composing these primitives.

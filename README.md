@@ -30,6 +30,12 @@ All states (loading, error, success) are surfaced inline with accessible message
 - **Runtime verification helpers** (`src/runtime/verification.js`) expose `verifyOrgConnection({ dataClient })` which runs `tuttiud.setup_assistant_diagnostics()` and returns the diagnostic rows for custom UI messaging.
 - Feature modules (students, instructors, sessions) must load data exclusively through secure `/api/*` endpoints. The frontend never uses the dedicated JWT directly.
 
+## 🎨 Design system foundations
+
+- **Tailwind base theme** – `tailwind.config.js` now centers on the Nunito font family, a calm violet primary color ramp, balanced neutral grays, and dedicated success/warning/error accents. The spacing scale introduces tokens from `2xs` to `3xl` so mobile layouts feel open and touch-friendly.
+- **Reusable primitives** – New mobile-first components live in `src/components/ui/Button.jsx`, `Card.jsx`, `Input.jsx`, and `PageLayout.jsx`. Compose them when building fresh views to guarantee consistent padding, typography, and contrast.
+- **Adoption plan** – Existing screens will migrate in future tasks. For now, these primitives provide the foundation for the upcoming redesign.
+
 ## 🔐 Secure API endpoints (MVP)
 
 - `GET /api/instructors` – admin/owner list of instructor IDs + names derived from `org_memberships` and `profiles`.
