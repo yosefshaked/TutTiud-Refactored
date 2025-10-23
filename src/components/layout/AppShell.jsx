@@ -13,8 +13,9 @@ import { cn } from "@/lib/utils"
 
 function buildNavItems(role) {
   const normalizedRole = typeof role === "string" ? role.toLowerCase() : "member"
+  const isAdminRole = normalizedRole === "admin" || normalizedRole === "owner"
 
-  const studentsDestination = normalizedRole === "admin" ? "/admin/students" : "/my-students"
+  const studentsDestination = isAdminRole ? "/admin/students" : "/my-students"
 
   return [
     {
