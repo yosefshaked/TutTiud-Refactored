@@ -9,7 +9,6 @@ import ChangelogModal from "@/components/ChangelogModal"
 import PageLayout from "@/components/ui/PageLayout.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
-import OrgSwitcher from "@/org/OrgSwitcher.jsx"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -131,7 +130,6 @@ function DesktopNavigation({ onSignOut }) {
           })}
         </nav>
         <div className="mt-auto space-y-sm border-t border-border px-lg py-lg">
-          <OrgSwitcher />
           <button
             type="button"
             onClick={onSignOut}
