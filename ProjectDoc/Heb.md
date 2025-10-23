@@ -1,7 +1,7 @@
 # תיעוד פרויקט: פלטפורמת Tuttiud לתמיכת תלמידים
 
-**גרסה: 2.6.2**
-**עודכן לאחרונה: 2025-10-24**
+**גרסה: 2.7.0**
+**עודכן לאחרונה: 2025-10-25**
 
 ## 1. חזון ומטרה
 
@@ -91,6 +91,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 - בעת השלמת האשף חובה לקרוא ל-`recordVerification(orgId, timestamp)` כדי לעדכן את `setup_completed` / `verified_at` ב-Control DB.
 - יש לשמור על תאימות מלאה בין מסמך זה לבין התרגום האנגלי ועל עדכון ה-README עם רשימת הצעדים.
 - זרימות OAuth קוראות ל-`supabase.auth.signInWithOAuth` עם `options.redirectTo`, שמחושב ככתובת הדפדפן המלאה (`origin + pathname + search + hash`) כאשר `window.location` זמין, או נופל למשתנים `VITE_PUBLIC_APP_URL` / `VITE_APP_BASE_URL` / `VITE_SITE_URL`, כך שהמשתמש חוזר בדיוק לעמוד שבו התחיל את כניסת Tuttiud לאחר ההזדהות מול ספק חיצוני.
+- זרימת איפוס הסיסמה בנויה משני שלבים: `/Pages/ForgotPassword.jsx` מזניק את `resetPasswordForEmail` עם הפניה אל `/#/update-password`, ו-`/Pages/UpdatePassword.jsx` מוודא שסיסמאות תואמות לפני שהוא קורא לפעולת `updatePassword` החדשה מ-`AuthContext`. שני העמודים עושים שימוש בקומפוננטות מערכת העיצוב המעודכנת ומציגים מצבי טעינה, הצלחה ושגיאה ידידותיים ל-RTL.
 
 ## 9. ממשק ניהול תלמידים למנהלים
 

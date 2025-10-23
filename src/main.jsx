@@ -15,6 +15,8 @@ import { SupabaseProvider } from './context/SupabaseContext.jsx';
 import { isAuthClientInitialized } from './lib/supabase-manager.js';
 import Diagnostics from './runtime/Diagnostics.jsx';
 import Login from './Pages/Login.jsx';
+import ForgotPassword from './Pages/ForgotPassword.jsx';
+import UpdatePassword from './Pages/UpdatePassword.jsx';
 import CompleteRegistrationPage from './components/pages/CompleteRegistrationPage.jsx';
 import AcceptInvitePage from './components/pages/AcceptInvitePage.jsx';
 import { AuthProvider } from './auth/AuthContext.jsx';
@@ -33,6 +35,8 @@ function App({ config = null }) {
             <HashRouter>
               <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/update-password" element={<UpdatePassword />} />
                 <Route path="/complete-registration" element={<CompleteRegistrationPage />} />
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route element={<AuthGuard />}>
