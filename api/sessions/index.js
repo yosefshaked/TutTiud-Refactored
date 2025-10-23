@@ -117,7 +117,7 @@ export default async function (context, req) {
   }
 
   const studentResult = await tenantClient
-    .from('students')
+    .from('Students')
     .select('id, assigned_instructor_id')
     .eq('id', validation.studentId)
     .maybeSingle();
@@ -145,7 +145,7 @@ export default async function (context, req) {
   const sessionInstructorId = assignedInstructor || normalizedUserId;
 
   const { data, error } = await tenantClient
-    .from('session_records')
+    .from('SessionRecords')
     .insert([
       {
         student_id: validation.studentId,

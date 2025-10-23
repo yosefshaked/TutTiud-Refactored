@@ -193,7 +193,7 @@ export default async function (context, req) {
 
   if (method === 'GET') {
     const { data, error } = await tenantClient
-      .from('students')
+      .from('Students')
       .select('*')
       .order('name', { ascending: true });
 
@@ -218,7 +218,7 @@ export default async function (context, req) {
     }
 
     const { data, error } = await tenantClient
-      .from('students')
+      .from('Students')
       .insert([normalized.payload])
       .select()
       .single();
@@ -250,7 +250,7 @@ export default async function (context, req) {
   }
 
   const { data, error } = await tenantClient
-    .from('students')
+    .from('Students')
     .update(normalizedUpdates.updates)
     .eq('id', studentId)
     .select()

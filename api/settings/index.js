@@ -348,7 +348,7 @@ export default async function (context, req) {
 
   if (method === 'GET') {
     const { data, error } = await tenantClient
-      .from('settings')
+      .from('Settings')
       .select('key, settings_value');
 
     if (error) {
@@ -378,7 +378,7 @@ export default async function (context, req) {
     }
 
     const { error } = await tenantClient
-      .from('settings')
+      .from('Settings')
       .upsert(payload, { onConflict: 'key' });
 
     if (error) {
