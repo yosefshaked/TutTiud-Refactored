@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import Layout from './Layout.jsx';
 import Dashboard from './Pages/Dashboard.jsx';
-import Employees from './Pages/Employees.jsx';
+import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
 import TimeEntry from './Pages/TimeEntry.jsx';
 import Reports from './Pages/Reports.jsx';
 import ReportsErrorBoundary from './components/reports/ReportsErrorBoundary.js';
@@ -42,7 +42,8 @@ function App({ config = null }) {
 
                     {/* הגדרת כל העמודים */}
                     <Route path="/Dashboard" element={<Dashboard />} />
-                    <Route path="/Employees" element={<Employees />} />
+                    <Route path="/Employees" element={<Navigate to="/admin/students" replace />} />
+                    <Route path="/admin/students" element={<StudentManagementPage />} />
                     <Route path="/TimeEntry" element={<TimeEntry />} />
                     <Route path="/Adjustments" element={<Navigate to="/TimeEntry?tab=adjustments" replace />} />
                     <Route path="/Reports" element={<ReportsErrorBoundary><Reports /></ReportsErrorBoundary>} />

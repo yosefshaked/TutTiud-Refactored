@@ -24,6 +24,8 @@ All states (loading, error, success) are surfaced inline with accessible message
 ## 🔑 Key UI behavior
 
 - **Supabase Setup Assistant** (`src/components/settings/SetupAssistant.jsx`) is the single entry point for onboarding. It owns the SQL copy helpers, JWT capture, and validation flow.
+- **Admin Student Management** (`src/features/admin/pages/StudentManagementPage.jsx`) is the new mobile-first roster experience. It fetches `/api/students` on load, renders loading/error/empty states, opens `AddStudentForm` for creation, and drives instructor assignment through `AssignInstructorModal`.
+- **Feature-sliced admin components** live in `src/features/admin/components/`. Each component is scoped to the admin feature (forms, modals) while shared primitives stay in `src/components/ui`.
 - **Org context** (`src/org/OrgContext.jsx`) stores the encrypted dedicated key timestamp (`dedicated_key_saved_at`) and still toggles `setup_completed` after verification, complementing the server-side persistence added to `/api/save-org-credentials`.
 - **Runtime verification helpers** (`src/runtime/verification.js`) expose `verifyOrgConnection({ dataClient })` which runs `tuttiud.setup_assistant_diagnostics()` and returns the diagnostic rows for custom UI messaging.
 - Feature modules (students, instructors, sessions) must load data exclusively through secure `/api/*` endpoints. The frontend never uses the dedicated JWT directly.

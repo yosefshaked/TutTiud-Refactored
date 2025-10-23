@@ -39,8 +39,8 @@ const navigationItems = [
     icon: Calendar,
   },
   {
-    title: "עובדים",
-    url: "/Employees",
+    title: "תלמידים",
+    url: "/admin/students",
     icon: Users,
   },
   {
@@ -103,7 +103,7 @@ export default function Layout({ children }) {
               </div>
               <div>
                 <h2 className="font-bold text-slate-900 text-lg">TutTiud</h2>
-                <p className="text-sm text-slate-500">פלטפורמת ניהול עובדים ושכר</p>
+                <p className="text-sm text-slate-500">פלטפורמת ניהול תלמידים והדרכה</p>
               </div>
             </div>
           </SidebarHeader>

@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.2.0**
-**Last Updated: 2025-10-26**
+**Version: 2.3.0**
+**Last Updated: 2025-10-27**
 
 ## 1. Vision & Purpose
 
@@ -90,3 +90,11 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - `verifyOrgConnection` (`src/runtime/verification.js`) now expects a Supabase data client and returns the diagnostics array so callers can render pass/fail status.
 - All onboarding status updates should call `recordVerification(orgId, timestamp)` to persist `setup_completed` / `verified_at` on the control-plane organization row.
 - Documentation must remain bilingual (see `ProjectDoc/Heb.md`) and the README should highlight the onboarding checklist for quick reference.
+
+## 9. Admin Student Management UI
+
+- **Feature slice** – all admin-only UI now lives in `src/features/admin/`. Components scoped to this feature sit under `components/` while page-level containers are housed in `pages/`.
+- **StudentManagementPage.jsx** – renders the `/admin/students` route. It reads the active organization from `OrgContext`, fetches `/api/students` on mount, surfaces loading/error/empty states, and keeps an instructor map in memory for display. Dialog state is managed locally for add/edit flows.
+- **AddStudentForm.jsx** – collects `name` and `contactInfo`, enforces client-side validation, and raises `onSubmit` with trimmed values. The form is rendered inside a dialog launched from the Student Management page.
+- **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
+- **Routing & navigation** – `src/main.jsx` redirects `/Employees` to `/admin/students` and mounts the new page. `src/Layout.jsx` updates the sidebar entry (label + URL) to match the student-focused workflow and refreshes the sidebar tagline to “student & instruction management”.
