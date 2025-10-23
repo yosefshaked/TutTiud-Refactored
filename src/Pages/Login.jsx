@@ -10,6 +10,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oauthInFlight, setOauthInFlight] = useState(null);
+  const [loginError, setLoginError] = useState(null);
   const location = useLocation();
 
   const redirectPath = location.state?.from?.pathname || '/';
@@ -21,12 +22,15 @@ export default function Login() {
 
   const handleEmailSignIn = async (event) => {
     event.preventDefault();
+    setLoginError(null);
     setIsSubmitting(true);
     try {
       await signInWithEmail(email.trim(), password);
       toast.success('ברוך הבא! מתחבר למערכת...');
     } catch (error) {
       console.error('Email sign-in failed', error);
+      const message = error?.message?.trim() || 'Invalid login credentials';
+      setLoginError(message);
       toast.error('התחברות בדוא"ל נכשלה. בדוק את הפרטים ונסה שוב.');
     } finally {
       setIsSubmitting(false);
@@ -139,6 +143,16 @@ export default function Login() {
                 שכחת סיסמה?
               </Link>
             </div>
+
+            {loginError ? (
+              <div
+                className="bg-rose-50 border border-rose-200 text-rose-700 text-right rounded-2xl px-4 py-3 shadow-sm"
+                role="alert"
+                aria-live="assertive"
+              >
+                {loginError}
+              </div>
+            ) : null}
 
             <button
               type="submit"
