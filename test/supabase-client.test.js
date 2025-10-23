@@ -60,26 +60,37 @@ describe('shared Supabase client module', () => {
 });
 
 describe('verifyOrgConnection', () => {
-  it('requires a session/orgId options object', async () => {
-    await assert.rejects(() => verifyOrgConnection(), /session/);
+  it('requires a dataClient inside the options object', async () => {
+    await assert.rejects(() => verifyOrgConnection(), /dataClient/);
   });
 
-  it('returns ok when leave policy settings can be fetched', async () => {
+  it('calls the diagnostics runner and reports success', async () => {
     const calls = [];
-    const stubFetch = async (options) => {
-      calls.push(options);
-      return { exists: true, value: { enabled: true } };
+    const fakeClient = {
+      rpc: async (...args) => {
+        calls.push(args);
+        return { data: [{ success: true }], error: null };
+      },
     };
 
-    const options = {
-      session: { access_token: 'control-token' },
-      orgId: 'org-1234',
-    };
-
-    const result = await verifyOrgConnection(options, { fetchSettings: stubFetch });
+    const result = await verifyOrgConnection({ dataClient: fakeClient });
 
     assert.strictEqual(calls.length, 1);
-    assert.deepEqual(calls[0], options);
-    assert.deepEqual(result, { ok: true, settingsValue: { enabled: true } });
+    const [fnName] = calls[0];
+    assert.strictEqual(fnName, 'tuttiud.setup_assistant_diagnostics');
+    assert.deepEqual(result, { ok: true, diagnostics: [{ success: true }] });
+  });
+
+  it('surfaces diagnostic failures through ok=false', async () => {
+    const fakeClient = {
+      rpc: async () => ({ data: [{ success: false, check_name: 'Schema', details: 'Missing' }], error: null }),
+    };
+
+    const result = await verifyOrgConnection({ dataClient: fakeClient });
+
+    assert.deepEqual(result, {
+      ok: false,
+      diagnostics: [{ success: false, check_name: 'Schema', details: 'Missing' }],
+    });
   });
 });

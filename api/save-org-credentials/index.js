@@ -212,26 +212,58 @@ export default async function (context, req) {
   const encryptedKey = encryptDedicatedKey(dedicatedKey, encryptionKey);
   const savedAt = new Date().toISOString();
 
-  const baseUpdates = {
+  const fullUpdates = {
     dedicated_key_encrypted: encryptedKey,
     updated_at: savedAt,
+    dedicated_key_saved_at: savedAt,
+    verified_at: savedAt,
+    setup_completed: true,
   };
 
   let updateError = null;
   const { error: primaryError } = await supabase
     .from('organizations')
-    .update({
-      ...baseUpdates,
-      dedicated_key_saved_at: savedAt,
-    })
+    .update(fullUpdates)
     .eq('id', orgId);
 
   if (primaryError?.code === '42703') {
     const { error: fallbackError } = await supabase
       .from('organizations')
-      .update(baseUpdates)
+      .update({
+        dedicated_key_encrypted: encryptedKey,
+        updated_at: savedAt,
+      })
       .eq('id', orgId);
-    updateError = fallbackError;
+
+    if (fallbackError) {
+      updateError = fallbackError;
+    } else {
+      const optionalFields = [
+        ['dedicated_key_saved_at', savedAt],
+        ['verified_at', savedAt],
+        ['setup_completed', true],
+      ];
+
+      for (const [column, value] of optionalFields) {
+        const payload = { [column]: value };
+        if (column !== 'setup_completed') {
+          payload.updated_at = savedAt;
+        }
+
+        const { error: optionalError } = await supabase
+          .from('organizations')
+          .update(payload)
+          .eq('id', orgId);
+
+        if (optionalError) {
+          if (optionalError.code === '42703') {
+            continue;
+          }
+          updateError = optionalError;
+          break;
+        }
+      }
+    }
   } else {
     updateError = primaryError;
   }
@@ -247,5 +279,5 @@ export default async function (context, req) {
   }
 
   context.log?.info?.('save-org-credentials success', { orgId, userId });
-  return respond(context, 200, { saved: true, saved_at: savedAt });
+  return respond(context, 200, { saved: true, saved_at: savedAt, verified_at: savedAt });
 }
