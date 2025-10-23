@@ -8,13 +8,20 @@ function PageLayout({
   className,
   headerClassName,
   contentClassName,
+  fullHeight = true,
   ...props
 }) {
   return (
-    <div className="min-h-screen bg-background text-neutral-900">
+    <div
+      className={cn(
+        fullHeight ? "min-h-screen" : "min-h-full",
+        "bg-background text-neutral-900",
+      )}
+    >
       <div
         className={cn(
-          "mx-auto flex min-h-screen w-full max-w-5xl flex-col px-md py-lg sm:px-lg lg:px-xl",
+          "mx-auto flex w-full max-w-5xl flex-col px-md py-lg sm:px-lg lg:px-xl",
+          fullHeight ? "min-h-screen" : "min-h-full",
           className,
         )}
         {...props}

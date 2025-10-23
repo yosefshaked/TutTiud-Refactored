@@ -97,7 +97,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **StudentManagementPage.jsx** – renders the `/admin/students` route. It reads the active organization from `OrgContext`, fetches `/api/students` on mount, surfaces loading/error/empty states, and keeps an instructor map in memory for display. Dialog state is managed locally for add/edit flows.
 - **AddStudentForm.jsx** – collects `name` and `contactInfo`, enforces client-side validation, and raises `onSubmit` with trimmed values. The form is rendered inside a dialog launched from the Student Management page.
 - **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
-- **Routing & navigation** – `src/main.jsx` redirects `/Employees` to `/admin/students` and mounts the new page. `src/Layout.jsx` updates the sidebar entry (label + URL) to match the student-focused workflow and refreshes the sidebar tagline to “student & instruction management”.
+- **App shell & routing** – `src/main.jsx` redirects `/Employees` to `/admin/students` and wraps authenticated routes with `src/components/layout/AppShell.jsx`. The shell renders a bottom tab bar + FAB on mobile and a left sidebar on desktop while keeping the student management view front and center.
 
 ## 10. Design System Foundations (Mobile-First UI Kit)
 

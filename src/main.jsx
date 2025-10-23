@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
-import Layout from './Layout.jsx';
+import AppShell from './components/layout/AppShell.jsx';
 import Dashboard from './Pages/Dashboard.jsx';
 import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
 import TimeEntry from './Pages/TimeEntry.jsx';
@@ -36,7 +36,7 @@ function App({ config = null }) {
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route element={<AuthGuard />}>
                   <Route path="/select-org" element={<OrgSelection />} />
-                  <Route element={<Layout />}>
+                  <Route element={<AppShell />}>
                     {/* ניתוב אוטומטי מהעמוד הראשי לדשבורד */}
                     <Route path="/" element={<Navigate to="/Dashboard" replace />} />
 
