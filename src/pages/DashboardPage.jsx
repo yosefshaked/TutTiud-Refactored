@@ -1,46 +1,69 @@
-import React from "react"
+import React, { useMemo } from "react"
 import { Link } from "react-router-dom"
 
 import PageLayout from "@/components/ui/PageLayout.jsx"
 import Card from "@/components/ui/Card.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
+import { useOrg } from "@/org/OrgContext.jsx"
 
 function buildGreeting(user) {
   if (!user) {
-    return "Welcome!"
+    return "ברוך הבא!"
   }
 
-  if (user.name) {
-    return `Welcome, ${user.name}!`
+  const displayName = typeof user.name === "string" ? user.name.trim() : ""
+  if (displayName) {
+    return `ברוך הבא, ${displayName}!`
   }
 
   if (user.email) {
-    return `Welcome, ${user.email}!`
+    return `ברוך הבא, ${user.email}!`
   }
 
-  return "Welcome!"
+  return "ברוך הבא!"
 }
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const { activeOrg } = useOrg()
   const greeting = buildGreeting(user)
+
+  const membershipRole = activeOrg?.membership?.role
+  const { studentsLink, studentsTitle, studentsDescription } = useMemo(() => {
+    const normalizedRole = typeof membershipRole === "string" ? membershipRole.toLowerCase() : "member"
+    const isAdminRole = normalizedRole === "admin" || normalizedRole === "owner"
+
+    if (isAdminRole) {
+      return {
+        studentsLink: "/admin/students",
+        studentsTitle: "ניהול תלמידים",
+        studentsDescription: "מעבר לרשימת כלל התלמידים בארגון",
+      }
+    }
+
+    return {
+      studentsLink: "/my-students",
+      studentsTitle: "התלמידים שלי",
+      studentsDescription: "מעבר לרשימת התלמידים המשויכים אליך",
+    }
+  }, [membershipRole])
 
   return (
     <PageLayout
       title={greeting}
-      subtitle="Choose your next action to get started"
+      subtitle="מה תרצו לעשות כעת?"
       className="space-y-xl"
     >
       <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
-        <Link to="/my-students" className="group focus-visible:outline-none">
+        <Link to={studentsLink} className="group focus-visible:outline-none">
           <Card
             className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
           >
             <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
-              View My Students
+              {studentsTitle}
             </h2>
             <p className="mt-sm text-neutral-600">
-              See the roster assigned to you and open any student record in seconds.
+              {studentsDescription}
             </p>
           </Card>
         </Link>
@@ -50,10 +73,10 @@ export default function DashboardPage() {
             className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
           >
             <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
-              Document a New Session
+              תיעוד מפגש חדש
             </h2>
             <p className="mt-sm text-neutral-600">
-              Capture session notes and outcomes just like the central + button.
+              פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
             </p>
           </Card>
         </Link>

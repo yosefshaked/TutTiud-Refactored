@@ -11,6 +11,8 @@ import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 import { cn } from "@/lib/utils"
 
+const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
+
 function buildNavItems(role) {
   const normalizedRole = typeof role === "string" ? role.toLowerCase() : "member"
   const isAdminRole = normalizedRole === "admin" || normalizedRole === "owner"
@@ -33,7 +35,7 @@ function buildNavItems(role) {
       label: "דוחות",
       icon: BarChart3,
       disabled: true,
-      tooltip: "Reporting features coming soon!",
+      tooltip: REPORTS_COMING_SOON_MESSAGE,
     },
     {
       label: "הגדרות",
@@ -67,11 +69,11 @@ function MobileNavigation({ navItems = [] }) {
               <button
                 key={item.label}
                 type="button"
-                disabled
                 aria-label={item.label}
                 aria-disabled="true"
                 title={item.tooltip}
-                className="flex flex-1 flex-col items-center gap-1 text-xs font-medium text-neutral-400"
+                onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
+                className="flex flex-1 cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
                 <span>{item.label}</span>
@@ -141,10 +143,11 @@ function DesktopNavigation({ navItems = [], onSignOut }) {
 
             if (item.disabled) {
               return (
-                <div
+                <button
                   key={item.label}
-                  role="link"
-                  className="flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium text-neutral-400"
+                  type="button"
+                  onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
+                  className="flex w-full cursor-not-allowed items-center justify-between gap-sm rounded-xl px-md py-sm text-right text-sm font-medium text-neutral-400 opacity-70"
                   aria-disabled="true"
                   title={item.tooltip}
                 >
@@ -153,7 +156,7 @@ function DesktopNavigation({ navItems = [], onSignOut }) {
                     <span>{item.label}</span>
                   </div>
                   <Megaphone className="h-4 w-4" aria-hidden="true" />
-                </div>
+                </button>
               )
             }
 
