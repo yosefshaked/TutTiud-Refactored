@@ -78,7 +78,7 @@ function buildStudentUpdates(body) {
     if (!name) {
       return { error: 'invalid_name' };
     }
-    updates.name = name;
+    updates['name'] = name;
     hasAny = true;
   }
 
@@ -193,7 +193,7 @@ export default async function (context, req) {
 
   if (method === 'GET') {
     const { data, error } = await tenantClient
-      .from('Students')
+      .from('students')
       .select('*')
       .order('name', { ascending: true });
 
@@ -218,7 +218,7 @@ export default async function (context, req) {
     }
 
     const { data, error } = await tenantClient
-      .from('Students')
+      .from('students')
       .insert([normalized.payload])
       .select()
       .single();
@@ -250,7 +250,7 @@ export default async function (context, req) {
   }
 
   const { data, error } = await tenantClient
-    .from('Students')
+    .from('students')
     .update(normalizedUpdates.updates)
     .eq('id', studentId)
     .select()

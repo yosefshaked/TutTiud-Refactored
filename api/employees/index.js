@@ -231,7 +231,7 @@ async function fetchEmployeesBundle(tenantClient) {
   console.log('[DIAGNOSTIC TEST RUNNING]');
 
   // Test 1: Employees
-  const employeesResult = await tenantClient.from('Employees').select('*').order('name');
+  const employeesResult = await tenantClient.from('employees').select('*').order('name');
   if (employeesResult.error) {
     console.error('DIAGNOSTIC FAILED ON: Employees', employeesResult.error);
     return { error: new Error('Failed on Employees table') };
@@ -239,7 +239,7 @@ async function fetchEmployeesBundle(tenantClient) {
   console.log('DIAGNOSTIC PASSED: Employees');
 
   // Test 2: RateHistory
-  const ratesResult = await tenantClient.from('RateHistory').select('*');
+  const ratesResult = await tenantClient.from('rate_history').select('*');
   if (ratesResult.error) {
     console.error('DIAGNOSTIC FAILED ON: RateHistory', ratesResult.error);
     return { error: new Error('Failed on RateHistory table') };
@@ -247,7 +247,7 @@ async function fetchEmployeesBundle(tenantClient) {
   console.log('DIAGNOSTIC PASSED: RateHistory');
 
   // Test 3: Services
-  const servicesResult = await tenantClient.from('Services').select('*');
+  const servicesResult = await tenantClient.from('services').select('*');
   if (servicesResult.error) {
     console.error('DIAGNOSTIC FAILED ON: Services', servicesResult.error);
     return { error: new Error('Failed on Services table') };
@@ -255,7 +255,7 @@ async function fetchEmployeesBundle(tenantClient) {
   console.log('DIAGNOSTIC PASSED: Services');
 
   // Test 4: LeaveBalances
-  const leaveBalancesResult = await tenantClient.from('LeaveBalances').select('*');
+  const leaveBalancesResult = await tenantClient.from('leave_balances').select('*');
   if (leaveBalancesResult.error) {
     console.error('DIAGNOSTIC FAILED ON: LeaveBalances', leaveBalancesResult.error);
     return { error: new Error('Failed on LeaveBalances table') };
@@ -263,7 +263,7 @@ async function fetchEmployeesBundle(tenantClient) {
   console.log('DIAGNOSTIC PASSED: LeaveBalances');
 
   // Test 5: Settings
-  const settingsResult = await tenantClient.from('Settings').select('key, settings_value').in('key', ['leave_policy', 'leave_pay_policy']);
+  const settingsResult = await tenantClient.from('settings').select('key, settings_value').in('key', ['leave_policy', 'leave_pay_policy']);
   if (settingsResult.error) {
     console.error('DIAGNOSTIC FAILED ON: Settings', settingsResult.error);
     return { error: new Error('Failed on Settings table') };
@@ -332,7 +332,7 @@ async function upsertRateHistory(client, entries, options = {}) {
     return null;
   }
   const config = options?.onConflict ? { onConflict: options.onConflict } : undefined;
-  const { error } = await client.from('RateHistory').upsert(entries, config);
+  const { error } = await client.from('rate_history').upsert(entries, config);
   return error || null;
 }
 
@@ -467,7 +467,7 @@ export default async function (context, req) {
     const manualRateHistory = normalizeRateHistoryEntries(body.manual_rate_history || body.manualRateHistory, null);
 
     const insertResult = await tenantClient
-      .from('Employees')
+      .from('employees')
       .insert(employeePayload)
       .select('id')
       .single();
@@ -525,7 +525,7 @@ export default async function (context, req) {
 
     if (updates) {
       const updateResult = await tenantClient
-        .from('Employees')
+        .from('employees')
         .update(updates)
         .eq('id', employeeId);
 
@@ -573,7 +573,7 @@ export default async function (context, req) {
     }
 
     const { error } = await tenantClient
-      .from('Employees')
+      .from('employees')
       .delete()
       .eq('id', employeeId);
 

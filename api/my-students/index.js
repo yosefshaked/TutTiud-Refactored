@@ -70,7 +70,7 @@ export default async function (context, req) {
   }
 
   const { data, error } = await tenantClient
-    .from('Students')
+    .from('students')
     .select('*')
     .eq('assigned_instructor_id', normalizeString(userId))
     .order('name', { ascending: true });
