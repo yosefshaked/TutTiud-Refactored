@@ -369,7 +369,7 @@ export default async function (context, req) {
     }
 
     const insertResult = await tenantClient
-      .from('leave_balances')
+      .from('LeaveBalances')
       .insert(entries)
       .select('*');
 
@@ -393,7 +393,7 @@ export default async function (context, req) {
     }
 
     const deleteResult = await tenantClient
-      .from('leave_balances')
+      .from('LeaveBalances')
       .delete({ count: 'exact' })
       .in('id', ids);
 

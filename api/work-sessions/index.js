@@ -337,7 +337,7 @@ function resolveSessionId(context, body) {
 
 async function fetchWorkSessions(tenantClient, filters = {}) {
   let queryBuilder = tenantClient
-    .from('work_sessions')
+    .from('WorkSessions')
     .select('*');
 
   if (filters.startDate) {
@@ -361,7 +361,7 @@ async function deleteLedgerForSession(tenantClient, sessionId) {
     return { count: 0 };
   }
   const result = await tenantClient
-    .from('leave_balances')
+    .from('LeaveBalances')
     .delete({ count: 'exact' })
     .eq('work_session_id', sessionId);
   if (result.error) {
@@ -379,7 +379,7 @@ async function insertLedgerForSession(tenantClient, session) {
     ledgerEntry.work_session_id = session.id;
   }
   const insertResult = await tenantClient
-    .from('leave_balances')
+    .from('LeaveBalances')
     .insert(ledgerEntry)
     .select('*')
     .maybeSingle();
@@ -555,7 +555,7 @@ export default async function (context, req) {
     const insertPayload = preparedSessions.map(item => item.payload);
 
     const { data, error } = await tenantClient
-      .from('work_sessions')
+      .from('WorkSessions')
       .insert(insertPayload)
       .select('*');
 
@@ -587,7 +587,7 @@ export default async function (context, req) {
 
     if (cleanupNullIds.length) {
       const { error: nullCleanupError } = await tenantClient
-        .from('work_sessions')
+        .from('WorkSessions')
         .update({ metadata: null })
         .in('id', cleanupNullIds);
       if (nullCleanupError) {
@@ -598,7 +598,7 @@ export default async function (context, req) {
     if (!cleanupError && cleanupObjectTargets.length) {
       for (const target of cleanupObjectTargets) {
         const { error: objectCleanupError } = await tenantClient
-          .from('work_sessions')
+          .from('WorkSessions')
           .update({ metadata: target.metadata })
           .eq('id', target.id);
         if (objectCleanupError) {
@@ -613,7 +613,7 @@ export default async function (context, req) {
       const createdIds = createdRows.map(row => row?.id).filter(Boolean);
       if (createdIds.length) {
         const { error: rollbackError } = await tenantClient
-          .from('work_sessions')
+          .from('WorkSessions')
           .delete()
           .in('id', createdIds);
         if (rollbackError) {
@@ -639,7 +639,7 @@ export default async function (context, req) {
 
     if (isRestore) {
       const { data: existingSession, error: fetchError } = await tenantClient
-        .from('work_sessions')
+        .from('WorkSessions')
         .select('*')
         .eq('id', sessionId)
         .maybeSingle();
@@ -654,7 +654,7 @@ export default async function (context, req) {
       }
 
       const { error: updateError, data: updatedRows } = await tenantClient
-        .from('work_sessions')
+        .from('WorkSessions')
         .update({ deleted: false, deleted_at: null })
         .eq('id', sessionId)
         .select('*');
@@ -673,7 +673,7 @@ export default async function (context, req) {
       const cleanupResult = await deleteLedgerForSession(tenantClient, sessionId);
       if (cleanupResult.error) {
         await tenantClient
-          .from('work_sessions')
+          .from('WorkSessions')
           .update({ deleted: existingSession.deleted, deleted_at: existingSession.deleted_at })
           .eq('id', sessionId);
         context.log?.error?.('work-sessions restore ledger cleanup failed', { message: cleanupResult.error.message, sessionId });
@@ -683,7 +683,7 @@ export default async function (context, req) {
       const ledgerResult = await insertLedgerForSession(tenantClient, restoredSession);
       if (ledgerResult.error) {
         await tenantClient
-          .from('work_sessions')
+          .from('WorkSessions')
           .update({ deleted: true, deleted_at: existingSession.deleted_at || new Date().toISOString() })
           .eq('id', sessionId);
         context.log?.error?.('work-sessions restore ledger insert failed', { message: ledgerResult.error.message, sessionId });
@@ -700,7 +700,7 @@ export default async function (context, req) {
     }
 
     const { error, data } = await tenantClient
-      .from('work_sessions')
+      .from('WorkSessions')
       .update(updates)
       .eq('id', sessionId)
       .select('id');
@@ -728,7 +728,7 @@ export default async function (context, req) {
     const wantsPermanent = permanentFlag === 'true' || permanentFlag === '1';
 
     const { data: sessionRow, error: fetchError } = await tenantClient
-      .from('work_sessions')
+      .from('WorkSessions')
       .select('*')
       .eq('id', sessionId)
       .maybeSingle();
@@ -750,7 +750,7 @@ export default async function (context, req) {
       }
 
       const { error: deleteError, data } = await tenantClient
-        .from('work_sessions')
+        .from('WorkSessions')
         .delete()
         .eq('id', sessionId)
         .select('id');
@@ -777,7 +777,7 @@ export default async function (context, req) {
 
     const timestamp = new Date().toISOString();
     const { error: softDeleteError, data: updatedRows } = await tenantClient
-      .from('work_sessions')
+      .from('WorkSessions')
       .update({ deleted: true, deleted_at: timestamp })
       .eq('id', sessionId)
       .select('*');
@@ -794,7 +794,7 @@ export default async function (context, req) {
     const ledgerDeleteResult = await deleteLedgerForSession(tenantClient, sessionId);
     if (ledgerDeleteResult.error) {
       await tenantClient
-        .from('work_sessions')
+        .from('WorkSessions')
         .update({ deleted: sessionRow.deleted, deleted_at: sessionRow.deleted_at })
         .eq('id', sessionId);
       context.log?.error?.('work-sessions soft delete ledger cleanup failed', { message: ledgerDeleteResult.error.message, sessionId });

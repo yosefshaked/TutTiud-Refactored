@@ -355,7 +355,7 @@ export default async function (context, req) {
 
   if (method === 'GET') {
     const { data, error } = await tenantClient
-      .from('services')
+      .from('Services')
       .select('*')
       .order('name', { ascending: true });
 
@@ -374,7 +374,7 @@ export default async function (context, req) {
     }
 
     const { data, error } = await tenantClient
-      .from('services')
+      .from('Services')
       .insert(payload)
       .select('id')
       .single();
@@ -406,7 +406,7 @@ export default async function (context, req) {
     }
 
     const { error } = await tenantClient
-      .from('services')
+      .from('Services')
       .update(updates)
       .eq('id', serviceId);
 
@@ -425,7 +425,7 @@ export default async function (context, req) {
     }
 
     const { error, count } = await tenantClient
-      .from('services')
+      .from('Services')
       .delete({ count: 'exact' })
       .eq('id', serviceId);
 
