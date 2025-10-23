@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/auth/AuthContext.jsx';
+import { useSupabase } from '@/context/SupabaseContext.jsx';
 import Button from '@/components/ui/Button.jsx';
 import Input from '@/components/ui/Input.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
@@ -17,16 +18,73 @@ const REQUEST_STATUS = Object.freeze({
 });
 
 export default function UpdatePassword() {
+  const location = useLocation();
   const navigate = useNavigate();
-  const { session, status, updatePassword } = useAuth();
+  const { authClient } = useSupabase();
+  const { updatePassword } = useAuth();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [requestStatus, setRequestStatus] = useState(REQUEST_STATUS.idle);
   const [errorMessage, setErrorMessage] = useState('');
+  const [verificationStatus, setVerificationStatus] = useState('waiting-client');
+  const [verificationError, setVerificationError] = useState('');
 
-  const isAuthReady = status === 'ready';
-  const hasSession = Boolean(session);
+  const tokenHash = useMemo(() => {
+    const params = new URLSearchParams(location.search ?? '');
+    const value = params.get('token_hash') ?? params.get('tokenHash');
+    return value ? value.trim() : '';
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!authClient) {
+      setVerificationStatus('waiting-client');
+      return undefined;
+    }
+
+    if (!tokenHash) {
+      setVerificationError('קישור האיפוס אינו תקף עוד.');
+      setVerificationStatus('error');
+      return undefined;
+    }
+
+    let isActive = true;
+    setVerificationError('');
+    setVerificationStatus('verifying');
+
+    authClient.auth
+      .verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+      .then(({ error }) => {
+        if (!isActive) {
+          return;
+        }
+        if (error) {
+          throw error;
+        }
+        setVerificationStatus('ready');
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+        console.error('Failed to verify password recovery token', error);
+        const message =
+          error?.message === 'Token has been expired or revoked'
+            ? 'הקישור לאיפוס אינו פעיל או שפג תוקפו. נסו לשלוח בקשה חדשה דרך עמוד איפוס הסיסמה.'
+            : 'אימות קישור האיפוס נכשל. נסו לרענן את הדף או לשלוח בקשה חדשה.';
+        setVerificationError(message);
+        setVerificationStatus('error');
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [authClient, tokenHash]);
+
+  const isWaitingForClient = verificationStatus === 'waiting-client';
+  const isVerifying = verificationStatus === 'verifying';
+  const isVerificationReady = verificationStatus === 'ready';
+  const isVerificationError = verificationStatus === 'error';
 
   const isLoading = requestStatus === REQUEST_STATUS.loading;
   const isSuccess = requestStatus === REQUEST_STATUS.success;
@@ -35,7 +93,7 @@ export default function UpdatePassword() {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!hasSession) {
+    if (!isVerificationReady) {
       setErrorMessage('קישור האיפוס אינו תקף עוד.');
       setRequestStatus(REQUEST_STATUS.error);
       return;
@@ -90,18 +148,18 @@ export default function UpdatePassword() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 pt-6">
-          {!isAuthReady ? (
+          {isWaitingForClient || isVerifying ? (
             <div className="flex items-center justify-center gap-2 rounded-xl bg-white/60 p-4 text-slate-600" role="status">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               <span>טוען את החיבור המאובטח...</span>
             </div>
           ) : null}
 
-          {isAuthReady && !hasSession ? (
+          {isVerificationError ? (
             <Alert className="bg-amber-50 border-amber-200 text-amber-800" role="alert">
               <AlertTitle>קישור לא תקף</AlertTitle>
               <AlertDescription>
-                הקישור לאיפוס אינו פעיל או שפג תוקפו. נסו לשלוח בקשה חדשה דרך{' '}
+                {verificationError || 'הקישור לאיפוס אינו פעיל או שפג תוקפו. נסו לשלוח בקשה חדשה דרך '}
                 <Link to="/forgot-password" className="text-blue-600 hover:underline">
                   עמוד איפוס הסיסמה
                 </Link>
@@ -127,7 +185,7 @@ export default function UpdatePassword() {
             </Alert>
           ) : null}
 
-          {isAuthReady && hasSession ? (
+          {isVerificationReady ? (
             <form onSubmit={handleSubmit} className="space-y-5" noValidate>
               <Input
                 type="password"
