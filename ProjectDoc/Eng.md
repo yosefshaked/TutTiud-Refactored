@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.5.0**
-**Last Updated: 2025-10-29**
+**Version: 2.6.0**
+**Last Updated: 2025-10-30**
 
 ## 1. Vision & Purpose
 
@@ -106,11 +106,21 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **Page layout & routing** – `MyStudentsPage.jsx` composes the shared `PageLayout` shell, calls `GET /api/my-students` once the
   organization connection is ready, and renders loading, error, and empty states. Successful fetches map each student to a
   `Card` showing their name and contact details.
-- **Navigation updates** – `AppShell.jsx` now derives navigation items from the member role. Admins keep the `/admin/students`
-  destination, while instructors are routed to `/my-students`. The router (`src/main.jsx`) exposes the new `/my-students`
+- **Navigation updates** – `AppShell.jsx` derives the Students destination from the member role so admins/owners keep
+  `/admin/students` while instructors are routed to `/my-students`. The router (`src/main.jsx`) exposes the `/my-students`
   path so instructors land on their filtered roster.
 
-## 11. Design System Foundations (Mobile-First UI Kit)
+## 11. Focused Navigation Dashboard
+
+- **DashboardPage.jsx** – located at `src/pages/DashboardPage.jsx`, this lightweight home view greets the authenticated user and
+  presents two prominent actions: navigating to `/my-students` and launching the `/TimeEntry` flow used by the floating + button.
+- **Home routing** – the `AppShell` "ראשי" link now points to `/`, and `/Dashboard` redirects to the new landing page so the
+  simplified experience becomes the default route after login. All auth redirects (login, org selection, invite acceptance)
+  now target `/` as the canonical destination.
+- **Reports link state** – the "דוחות" navigation item is disabled in both mobile and desktop shells. Hovering or long-pressing
+  shows the tooltip "Reporting features coming soon!", preventing dead-end navigation while communicating the roadmap.
+
+## 12. Design System Foundations (Mobile-First UI Kit)
 
 - **Tailwind configuration** – `tailwind.config.js` now defines a Nunito-based typography stack, a calm violet primary palette (`primary`), accessible neutral grays (`neutral`), and dedicated status colors for success, warning, and error states. The spacing scale introduces tokens (`2xs` → `3xl`) sized for generous touch targets and breathing room on small screens.
 - **UI primitives** – Generic components for the new design live in [`src/components/ui/Button.jsx`](../src/components/ui/Button.jsx), [`Card.jsx`](../src/components/ui/Card.jsx), [`Input.jsx`](../src/components/ui/Input.jsx), and [`PageLayout.jsx`](../src/components/ui/PageLayout.jsx). Use them when building new flows to guarantee consistent padding, typography, and contrast across mobile and desktop breakpoints.

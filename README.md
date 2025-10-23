@@ -25,8 +25,10 @@ All states (loading, error, success) are surfaced inline with accessible message
 
 - **Supabase Setup Assistant** (`src/components/settings/SetupAssistant.jsx`) is the single entry point for onboarding. It owns the SQL copy helpers, JWT capture, and validation flow.
 - **App shell** (`src/components/layout/AppShell.jsx`) delivers the mobile-first navigation: a bottom tab bar with a central session FAB on phones and a desktop sidebar for wider screens.
+- **Dashboard landing page** (`src/pages/DashboardPage.jsx`) greets authenticated users, linking directly to `/my-students` and `/TimeEntry` so the Home tab always presents useful actions.
 - **Admin Student Management** (`src/features/admin/pages/StudentManagementPage.jsx`) is the new mobile-first roster experience. It fetches `/api/students` on load, renders loading/error/empty states, opens `AddStudentForm` for creation, and drives instructor assignment through `AssignInstructorModal`.
 - **Instructor My Students** (`src/features/instructor/pages/MyStudentsPage.jsx`) presents members with only their assigned students. It composes `PageLayout`, loads `/api/my-students`, and surfaces loading, error, and empty cards before rendering each student inside a `Card` with name and contact details.
+- **Reports navigation state** – the "דוחות" link is intentionally disabled (with a tooltip) until reporting ships, preventing dead ends in the main navigation.
 - **Feature-sliced admin components** live in `src/features/admin/components/`. Each component is scoped to the admin feature (forms, modals) while shared primitives stay in `src/components/ui`.
 - **Org context** (`src/org/OrgContext.jsx`) stores the encrypted dedicated key timestamp (`dedicated_key_saved_at`) and still toggles `setup_completed` after verification, complementing the server-side persistence added to `/api/save-org-credentials`.
 - **Runtime verification helpers** (`src/runtime/verification.js`) expose `verifyOrgConnection({ dataClient })` which runs `tuttiud.setup_assistant_diagnostics()` and returns the diagnostic rows for custom UI messaging.

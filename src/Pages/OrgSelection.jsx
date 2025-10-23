@@ -190,7 +190,7 @@ export default function OrgSelection() {
   const hasOrganizations = organizations.length > 0;
   const hasInvites = incomingInvites.length > 0;
   const returnTo = useMemo(() => {
-    return location.state?.from?.pathname || '/Dashboard';
+    return location.state?.from?.pathname || '/';
   }, [location.state]);
 
   const handleSelect = async (orgId) => {

@@ -20,8 +20,9 @@ function buildNavItems(role) {
   return [
     {
       label: "ראשי",
-      to: "/Dashboard",
+      to: "/",
       icon: LayoutDashboard,
+      end: true,
     },
     {
       label: "תלמידים",
@@ -30,8 +31,9 @@ function buildNavItems(role) {
     },
     {
       label: "דוחות",
-      to: "/Reports",
       icon: BarChart3,
+      disabled: true,
+      tooltip: "Reporting features coming soon!",
     },
     {
       label: "הגדרות",
@@ -59,10 +61,29 @@ function MobileNavigation({ navItems = [] }) {
       <div className="relative mx-auto flex max-w-md items-center justify-between gap-md">
         {navItems.map((item) => {
           const Icon = item.icon
+
+          if (item.disabled) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                disabled
+                aria-label={item.label}
+                aria-disabled="true"
+                title={item.tooltip}
+                className="flex flex-1 flex-col items-center gap-1 text-xs font-medium text-neutral-400"
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
+            )
+          }
+
           return (
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               aria-label={item.label}
               className={({ isActive }) =>
                 cn(
@@ -97,7 +118,7 @@ function DesktopNavigation({ navItems = [], onSignOut }) {
     >
       <div className="flex h-full flex-col">
         <div className="flex flex-col gap-md px-lg pt-lg">
-          <Link to="/Dashboard" className="flex items-center justify-end gap-sm text-right">
+          <Link to="/" className="flex items-center justify-end gap-sm text-right">
             <div className="flex items-center justify-center">
               <LogoPlaceholder />
             </div>
@@ -117,10 +138,30 @@ function DesktopNavigation({ navItems = [], onSignOut }) {
         <nav className="mt-md flex-1 space-y-1 px-lg" aria-label="ניווט ראשי">
           {navItems.map((item) => {
             const Icon = item.icon
+
+            if (item.disabled) {
+              return (
+                <div
+                  key={item.label}
+                  role="link"
+                  className="flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium text-neutral-400"
+                  aria-disabled="true"
+                  title={item.tooltip}
+                >
+                  <div className="flex items-center gap-sm">
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                    <span>{item.label}</span>
+                  </div>
+                  <Megaphone className="h-4 w-4" aria-hidden="true" />
+                </div>
+              )
+            }
+
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.end}
                 className={({ isActive }) =>
                   cn(
                     "flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium transition",

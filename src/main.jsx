@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import AppShell from './components/layout/AppShell.jsx';
-import Dashboard from './Pages/Dashboard.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
 import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
 import TimeEntry from './Pages/TimeEntry.jsx';
 import Reports from './Pages/Reports.jsx';
@@ -38,11 +38,9 @@ function App({ config = null }) {
                 <Route element={<AuthGuard />}>
                   <Route path="/select-org" element={<OrgSelection />} />
                   <Route element={<AppShell />}>
-                    {/* ניתוב אוטומטי מהעמוד הראשי לדשבורד */}
-                    <Route path="/" element={<Navigate to="/Dashboard" replace />} />
-
                     {/* הגדרת כל העמודים */}
-                    <Route path="/Dashboard" element={<Dashboard />} />
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/Dashboard" element={<Navigate to="/" replace />} />
                     <Route path="/Employees" element={<Navigate to="/admin/students" replace />} />
                     <Route path="/admin/students" element={<StudentManagementPage />} />
                     <Route path="/my-students" element={<MyStudentsPage />} />
@@ -54,7 +52,7 @@ function App({ config = null }) {
                     <Route path="/diagnostics" element={<Diagnostics />} />
                   </Route>
                 </Route>
-                <Route path="*" element={<Navigate to="/Dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </HashRouter>
           </OrgProvider>
