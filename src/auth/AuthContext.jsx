@@ -26,8 +26,14 @@ function extractProfile(session) {
 }
 
 function resolveRedirectUrl() {
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin;
+  if (typeof window !== 'undefined') {
+    const { location } = window;
+    if (location?.origin) {
+      const pathname = typeof location.pathname === 'string' ? location.pathname : '/';
+      const search = typeof location.search === 'string' ? location.search : '';
+      const hash = typeof location.hash === 'string' ? location.hash : '';
+      return `${location.origin}${pathname}${search}${hash}`;
+    }
   }
   if (FALLBACK_REDIRECT_URL) {
     return FALLBACK_REDIRECT_URL;
