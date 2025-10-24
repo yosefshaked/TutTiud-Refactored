@@ -317,6 +317,115 @@ function collectKeysFromQuery(query) {
   return normalizeKeyList(bucket.length === 1 ? bucket[0] : bucket);
 }
 
+function extractFirstString(candidates) {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+  return '';
+}
+
+function createOptionFallback(option) {
+  if (!option) {
+    return '';
+  }
+
+  if (typeof option === 'string') {
+    const trimmed = option.trim();
+    return trimmed ? trimmed : '';
+  }
+
+  if (typeof option !== 'object') {
+    const normalized = String(option).trim();
+    return normalized ? normalized : '';
+  }
+
+  if (typeof option.toString === 'function' && option.toString !== Object.prototype.toString) {
+    const custom = option.toString();
+    if (typeof custom === 'string' && custom.trim()) {
+      return custom.trim();
+    }
+  }
+
+  try {
+    const serialized = JSON.stringify(option);
+    if (serialized && serialized !== '{}') {
+      return serialized;
+    }
+  } catch {
+    // ignore
+  }
+
+  return '';
+}
+
+function normalizeSessionFormOption(option) {
+  if (option === null || option === undefined) {
+    return null;
+  }
+
+  if (typeof option === 'string') {
+    const trimmed = option.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return { value: trimmed, label: trimmed };
+  }
+
+  if (typeof option !== 'object') {
+    const normalized = String(option).trim();
+    if (!normalized) {
+      return null;
+    }
+    return { value: normalized, label: normalized };
+  }
+
+  const label = extractFirstString([
+    option.label,
+    option.title,
+    option.name,
+    option.text,
+    option.value,
+  ]);
+
+  const value = extractFirstString([
+    option.value,
+    option.id,
+    option.key,
+    option.code,
+    option.slug,
+  ]);
+
+  const normalized = {};
+
+  const idCandidate = extractFirstString([option.id, option.key]);
+  if (idCandidate) {
+    normalized.id = idCandidate;
+  }
+
+  const safeValue = value || label;
+  const safeLabel = label || value;
+
+  if (!safeValue && !safeLabel) {
+    const fallback = createOptionFallback(option);
+    if (!fallback) {
+      return null;
+    }
+    normalized.value = fallback;
+    normalized.label = fallback;
+    return normalized;
+  }
+
+  normalized.value = safeValue || safeLabel;
+  normalized.label = safeLabel || normalized.value;
+
+  return normalized;
+}
+
 function normalizeSessionFormQuestion(entry, index) {
   const fallbackId = `question_${index + 1}`;
 
@@ -360,17 +469,8 @@ function normalizeSessionFormQuestion(entry, index) {
 
   const options = Array.isArray(entry.options)
     ? entry.options
-        .map((option) => {
-          if (typeof option === 'string') {
-            const trimmed = option.trim();
-            return trimmed ? trimmed : null;
-          }
-          if (option === null || option === undefined) {
-            return null;
-          }
-          return String(option);
-        })
-        .filter((option) => typeof option === 'string' && option)
+        .map((option) => normalizeSessionFormOption(option))
+        .filter(Boolean)
     : [];
 
   const normalized = {
@@ -764,3 +864,8 @@ export default async function (context, req) {
 
   return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST,PUT,PATCH,DELETE' });
 }
+
+export {
+  normalizeSessionFormQuestion,
+  normalizeSessionFormConfigValue,
+};
