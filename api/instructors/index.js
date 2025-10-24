@@ -81,7 +81,7 @@ export default async function (context, req) {
 
   let builder = tenantClient
     .from('Instructors')
-    .select('id, name, email, phone, user_id, is_active, notes, metadata')
+    .select('id, name, email, phone, is_active, notes, metadata')
     .order('name', { ascending: true });
 
   if (!includeInactive) {

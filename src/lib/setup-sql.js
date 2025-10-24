@@ -9,17 +9,31 @@ CREATE SCHEMA IF NOT EXISTS tuttiud;
 
 -- Part 2: Table Creation within 'tuttiud' schema (No Changes)
 CREATE TABLE IF NOT EXISTS tuttiud."Instructors" (
-  "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  "id" uuid NOT NULL PRIMARY KEY REFERENCES auth.users("id"),
   "name" text NOT NULL,
   "email" text,
   "phone" text,
-  "user_id" uuid REFERENCES auth.users("id"),
   "is_active" boolean DEFAULT true,
   "notes" text,
   "metadata" jsonb
 );
 ALTER TABLE tuttiud."Instructors"
-  ADD COLUMN IF NOT EXISTS "user_id" uuid REFERENCES auth.users("id");
+  ALTER COLUMN "id" DROP DEFAULT;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE constraint_schema = 'tuttiud'
+      AND table_name = 'Instructors'
+      AND constraint_name = 'Instructors_id_fkey'
+  ) THEN
+    ALTER TABLE tuttiud."Instructors"
+      ADD CONSTRAINT "Instructors_id_fkey"
+      FOREIGN KEY ("id") REFERENCES auth.users("id");
+  END IF;
+END;
+$$;
 CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" text NOT NULL,
@@ -40,6 +54,52 @@ ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
   ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
   ADD COLUMN IF NOT EXISTS "default_service" text;
+ALTER TABLE tuttiud."Students"
+  DROP CONSTRAINT IF EXISTS "Students_assigned_instructor_id_fkey";
+DO $$
+DECLARE
+  has_user_id boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'tuttiud'
+      AND table_name = 'Instructors'
+      AND column_name = 'user_id'
+  ) INTO has_user_id;
+
+  IF has_user_id THEN
+    UPDATE tuttiud."Students" s
+    SET assigned_instructor_id = i.user_id
+    FROM tuttiud."Instructors" i
+    WHERE s.assigned_instructor_id = i.id
+      AND i.user_id IS NOT NULL
+      AND s.assigned_instructor_id IS DISTINCT FROM i.user_id;
+
+    UPDATE tuttiud."Instructors"
+    SET id = user_id
+    WHERE user_id IS NOT NULL
+      AND id IS DISTINCT FROM user_id;
+  END IF;
+END;
+$$;
+ALTER TABLE tuttiud."Instructors"
+  DROP COLUMN IF EXISTS "user_id";
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE constraint_schema = 'tuttiud'
+      AND table_name = 'Students'
+      AND constraint_name = 'Students_assigned_instructor_id_fkey'
+  ) THEN
+    ALTER TABLE tuttiud."Students"
+      ADD CONSTRAINT "Students_assigned_instructor_id_fkey"
+      FOREIGN KEY ("assigned_instructor_id") REFERENCES tuttiud."Instructors"("id");
+  END IF;
+END;
+$$;
 CREATE TABLE IF NOT EXISTS tuttiud."SessionRecords" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "date" date NOT NULL,
