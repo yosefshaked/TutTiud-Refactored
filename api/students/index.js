@@ -13,6 +13,8 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 
+const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?(?:Z|[+-](?:0\d|1\d|2[0-3]):[0-5]\d)?$/;
+
 function extractStudentId(context, req, body) {
   const candidate =
     normalizeString(context?.bindingData?.studentId) ||
@@ -41,6 +43,52 @@ function validateAssignedInstructor(candidate) {
   return { value: null, valid: false };
 }
 
+function coerceOptionalText(value) {
+  if (value === null || value === undefined) {
+    return { value: null, valid: true };
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return { value: trimmed || null, valid: true };
+  }
+  return { value: null, valid: false };
+}
+
+function coerceDayOfWeek(value) {
+  if (value === null || value === undefined || value === '') {
+    return { value: null, valid: true };
+  }
+
+  const numeric = typeof value === 'number' ? value : Number.parseInt(String(value).trim(), 10);
+
+  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 7) {
+    return { value: numeric, valid: true };
+  }
+
+  return { value: null, valid: false };
+}
+
+function coerceSessionTime(value) {
+  if (value === null || value === undefined || value === '') {
+    return { value: null, valid: true };
+  }
+
+  if (typeof value !== 'string') {
+    return { value: null, valid: false };
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { value: null, valid: true };
+  }
+
+  if (TIME_PATTERN.test(trimmed)) {
+    return { value: trimmed, valid: true };
+  }
+
+  return { value: null, valid: false };
+}
+
 function buildStudentPayload(body) {
   const name = normalizeString(body?.name);
   if (!name) {
@@ -60,11 +108,41 @@ function buildStudentPayload(body) {
     return { error: 'invalid_assigned_instructor' };
   }
 
+  const contactNameResult = coerceOptionalText(body?.contact_name ?? body?.contactName);
+  if (!contactNameResult.valid) {
+    return { error: 'invalid_contact_name' };
+  }
+
+  const contactPhoneResult = coerceOptionalText(body?.contact_phone ?? body?.contactPhone);
+  if (!contactPhoneResult.valid) {
+    return { error: 'invalid_contact_phone' };
+  }
+
+  const defaultServiceResult = coerceOptionalText(body?.default_service ?? body?.defaultService);
+  if (!defaultServiceResult.valid) {
+    return { error: 'invalid_default_service' };
+  }
+
+  const dayResult = coerceDayOfWeek(body?.default_day_of_week ?? body?.defaultDayOfWeek);
+  if (!dayResult.valid) {
+    return { error: 'invalid_default_day' };
+  }
+
+  const sessionTimeResult = coerceSessionTime(body?.default_session_time ?? body?.defaultSessionTime);
+  if (!sessionTimeResult.valid) {
+    return { error: 'invalid_default_session_time' };
+  }
+
   return {
     payload: {
       name,
       contact_info: contactInfo || null,
+      contact_name: contactNameResult.value,
+      contact_phone: contactPhoneResult.value,
       assigned_instructor_id: instructorId,
+      default_day_of_week: dayResult.value,
+      default_session_time: sessionTimeResult.value,
+      default_service: defaultServiceResult.value,
     },
   };
 }
@@ -78,7 +156,7 @@ function buildStudentUpdates(body) {
     if (!name) {
       return { error: 'invalid_name' };
     }
-    updates.name = name;
+    updates['name'] = name;
     hasAny = true;
   }
 
@@ -119,6 +197,61 @@ function buildStudentUpdates(body) {
     } else {
       return { error: 'invalid_assigned_instructor' };
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'contact_name') || Object.prototype.hasOwnProperty.call(body, 'contactName')) {
+    const { value, valid } = coerceOptionalText(
+      Object.prototype.hasOwnProperty.call(body, 'contact_name') ? body.contact_name : body.contactName,
+    );
+    if (!valid) {
+      return { error: 'invalid_contact_name' };
+    }
+    updates.contact_name = value;
+    hasAny = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'contact_phone') || Object.prototype.hasOwnProperty.call(body, 'contactPhone')) {
+    const { value, valid } = coerceOptionalText(
+      Object.prototype.hasOwnProperty.call(body, 'contact_phone') ? body.contact_phone : body.contactPhone,
+    );
+    if (!valid) {
+      return { error: 'invalid_contact_phone' };
+    }
+    updates.contact_phone = value;
+    hasAny = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'default_service') || Object.prototype.hasOwnProperty.call(body, 'defaultService')) {
+    const { value, valid } = coerceOptionalText(
+      Object.prototype.hasOwnProperty.call(body, 'default_service') ? body.default_service : body.defaultService,
+    );
+    if (!valid) {
+      return { error: 'invalid_default_service' };
+    }
+    updates.default_service = value;
+    hasAny = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'default_day_of_week') || Object.prototype.hasOwnProperty.call(body, 'defaultDayOfWeek')) {
+    const { value, valid } = coerceDayOfWeek(
+      Object.prototype.hasOwnProperty.call(body, 'default_day_of_week') ? body.default_day_of_week : body.defaultDayOfWeek,
+    );
+    if (!valid) {
+      return { error: 'invalid_default_day' };
+    }
+    updates.default_day_of_week = value;
+    hasAny = true;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'default_session_time') || Object.prototype.hasOwnProperty.call(body, 'defaultSessionTime')) {
+    const { value, valid } = coerceSessionTime(
+      Object.prototype.hasOwnProperty.call(body, 'default_session_time') ? body.default_session_time : body.defaultSessionTime,
+    );
+    if (!valid) {
+      return { error: 'invalid_default_session_time' };
+    }
+    updates.default_session_time = value;
+    hasAny = true;
   }
 
   if (!hasAny) {
@@ -213,7 +346,17 @@ export default async function (context, req) {
           ? 'missing student name'
           : normalized.error === 'invalid_assigned_instructor'
             ? 'invalid assigned instructor id'
-            : 'invalid payload';
+            : normalized.error === 'invalid_contact_name'
+              ? 'invalid contact name'
+              : normalized.error === 'invalid_contact_phone'
+                ? 'invalid contact phone'
+                : normalized.error === 'invalid_default_service'
+                  ? 'invalid default service'
+                  : normalized.error === 'invalid_default_day'
+                    ? 'invalid default day of week'
+                    : normalized.error === 'invalid_default_session_time'
+                      ? 'invalid default session time'
+          : 'invalid payload';
       return respond(context, 400, { message });
     }
 
@@ -245,7 +388,19 @@ export default async function (context, req) {
           ? 'invalid name'
           : normalizedUpdates.error === 'invalid_contact_info'
             ? 'invalid contact info'
-            : 'invalid assigned instructor id';
+            : normalizedUpdates.error === 'invalid_assigned_instructor'
+              ? 'invalid assigned instructor id'
+              : normalizedUpdates.error === 'invalid_contact_name'
+                ? 'invalid contact name'
+                : normalizedUpdates.error === 'invalid_contact_phone'
+                  ? 'invalid contact phone'
+                  : normalizedUpdates.error === 'invalid_default_service'
+                    ? 'invalid default service'
+                    : normalizedUpdates.error === 'invalid_default_day'
+                      ? 'invalid default day of week'
+                      : normalizedUpdates.error === 'invalid_default_session_time'
+                        ? 'invalid default session time'
+                        : 'invalid payload';
     return respond(context, 400, { message: updateMessage });
   }
 

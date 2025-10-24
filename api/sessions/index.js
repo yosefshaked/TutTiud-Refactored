@@ -14,6 +14,113 @@ import {
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+function sanitizeAnswerValue(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => {
+      if (typeof entry === 'string') {
+        const trimmed = entry.trim();
+        return trimmed === '' ? null : trimmed;
+      }
+      return entry;
+    });
+  }
+
+  if (typeof value === 'object') {
+    const nested = {};
+    for (const [key, entry] of Object.entries(value)) {
+      const normalizedKey = typeof key === 'string' ? key.trim() : '';
+      if (!normalizedKey) {
+        continue;
+      }
+      nested[normalizedKey] = sanitizeAnswerValue(entry);
+    }
+    return nested;
+  }
+
+  return null;
+}
+
+function coerceSessionContent(source) {
+  if (source === null || source === undefined) {
+    return { error: 'missing_content' };
+  }
+
+  let payload = source;
+
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (!trimmed) {
+      return { value: {} };
+    }
+
+    try {
+      payload = JSON.parse(trimmed);
+    } catch {
+      return { error: 'invalid_content' };
+    }
+  }
+
+  if (typeof payload !== 'object' || Array.isArray(payload)) {
+    return { error: 'invalid_content' };
+  }
+
+  const normalized = {};
+  for (const [key, value] of Object.entries(payload)) {
+    const normalizedKey = typeof key === 'string' ? key.trim() : '';
+    if (!normalizedKey) {
+      continue;
+    }
+
+    if (value === undefined) {
+      continue;
+    }
+
+    normalized[normalizedKey] = sanitizeAnswerValue(value);
+  }
+
+  return { value: normalized };
+}
+
+function coerceOptionalText(value) {
+  if (value === null || value === undefined) {
+    return { value: null, valid: true };
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return { value: trimmed || null, valid: true };
+  }
+  return { value: null, valid: false };
+}
+
+function resolveContentCandidate(body) {
+  if (!body || typeof body !== 'object') {
+    return undefined;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'content')) {
+    return body.content;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'answers')) {
+    return body.answers;
+  }
+
+  return undefined;
+}
+
 function validatePayload(body) {
   const studentId = normalizeString(body?.student_id || body?.studentId);
   if (!studentId || !UUID_PATTERN.test(studentId)) {
@@ -25,24 +132,88 @@ function validatePayload(body) {
     return { error: 'invalid_date' };
   }
 
-  const contentSource = body?.content;
-  if (contentSource === null || contentSource === undefined) {
-    return { error: 'missing_content' };
-  }
-  if (typeof contentSource !== 'string') {
-    return { error: 'invalid_content' };
-  }
-  const content = contentSource.trim();
-  if (!content) {
-    return { error: 'invalid_content' };
+  const contentSource = resolveContentCandidate(body);
+  const contentResult = coerceSessionContent(contentSource);
+  if (contentResult.error) {
+    return { error: contentResult.error };
   }
 
-  return { studentId, date, content };
+  const hasServiceField =
+    Object.prototype.hasOwnProperty.call(body ?? {}, 'service_context') ||
+    Object.prototype.hasOwnProperty.call(body ?? {}, 'serviceContext');
+
+  const serviceResult = coerceOptionalText(body?.service_context ?? body?.serviceContext);
+  if (!serviceResult.valid) {
+    return { error: 'invalid_service_context' };
+  }
+
+  return {
+    studentId,
+    date,
+    content: contentResult.value,
+    serviceContext: serviceResult.value,
+    hasExplicitService: hasServiceField,
+  };
 }
 
 function isMemberRole(role) {
   const normalized = normalizeString(role).toLowerCase();
   return normalized === 'member';
+}
+
+function extractSessionFormVersion(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  let payload = value;
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (!trimmed) {
+      return null;
+    }
+    try {
+      payload = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+
+  const candidate = Object.prototype.hasOwnProperty.call(payload, 'version')
+    ? payload.version
+    : null;
+
+  if (candidate === null || candidate === undefined) {
+    return null;
+  }
+
+  const numeric = typeof candidate === 'number'
+    ? candidate
+    : Number.parseInt(String(candidate).trim(), 10);
+
+  if (Number.isInteger(numeric) && numeric >= 0) {
+    return numeric;
+  }
+
+  return null;
+}
+
+async function resolveSessionFormVersion(tenantClient) {
+  const { data, error } = await tenantClient
+    .from('Settings')
+    .select('settings_value')
+    .eq('key', 'session_form_config')
+    .maybeSingle();
+
+  if (error) {
+    return { error };
+  }
+
+  return { version: extractSessionFormVersion(data?.settings_value) };
 }
 
 export default async function (context, req) {
@@ -107,7 +278,9 @@ export default async function (context, req) {
           ? 'invalid date'
           : validation.error === 'missing_content'
             ? 'missing session content'
-            : 'invalid content';
+            : validation.error === 'invalid_service_context'
+              ? 'invalid service context'
+              : 'invalid content';
     return respond(context, 400, { message });
   }
 
@@ -118,7 +291,7 @@ export default async function (context, req) {
 
   const studentResult = await tenantClient
     .from('Students')
-    .select('id, assigned_instructor_id')
+    .select('id, assigned_instructor_id, default_service')
     .eq('id', validation.studentId)
     .maybeSingle();
 
@@ -144,6 +317,27 @@ export default async function (context, req) {
 
   const sessionInstructorId = assignedInstructor || normalizedUserId;
 
+  const formVersionResult = await resolveSessionFormVersion(tenantClient);
+  if (formVersionResult.error) {
+    context.log?.error?.('sessions failed to resolve form version', {
+      message: formVersionResult.error.message,
+    });
+  }
+
+  const metadataPayload = {};
+  if (formVersionResult.version !== null) {
+    metadataPayload.form_version = formVersionResult.version;
+  }
+  if (normalizedUserId) {
+    metadataPayload.created_by = normalizedUserId;
+  }
+  const normalizedRole = normalizeString(role);
+  if (normalizedRole) {
+    metadataPayload.created_role = normalizedRole.toLowerCase();
+  }
+
+  const metadata = Object.keys(metadataPayload).length ? metadataPayload : null;
+
   const { data, error } = await tenantClient
     .from('SessionRecords')
     .insert([
@@ -152,6 +346,10 @@ export default async function (context, req) {
         date: validation.date,
         content: validation.content,
         instructor_id: sessionInstructorId || null,
+        service_context: validation.hasExplicitService
+          ? validation.serviceContext
+          : validation.serviceContext ?? studentResult.data.default_service ?? null,
+        metadata,
       },
     ])
     .select()

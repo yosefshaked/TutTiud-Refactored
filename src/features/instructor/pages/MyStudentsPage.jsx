@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { Loader2, Users } from "lucide-react"
 
 import { useSupabase } from "@/context/SupabaseContext.jsx"
@@ -6,6 +7,7 @@ import { useOrg } from "@/org/OrgContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
 import PageLayout from "@/components/ui/PageLayout.jsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
 
 const REQUEST_STATUS = Object.freeze({
   idle: "idle",
@@ -13,24 +15,6 @@ const REQUEST_STATUS = Object.freeze({
   success: "success",
   error: "error",
 })
-
-const ADMIN_ROLES = new Set(["admin", "owner"])
-
-function normalizeRole(role) {
-  if (typeof role === "string") {
-    return role.toLowerCase()
-  }
-  return "member"
-}
-
-function buildStudentsEndpoint(orgId) {
-  if (!orgId) {
-    return "my-students"
-  }
-
-  const searchParams = new URLSearchParams({ org_id: orgId })
-  return `my-students?${searchParams.toString()}`
-}
 
 export default function MyStudentsPage() {
   const { loading: supabaseLoading } = useSupabase()
@@ -42,8 +26,8 @@ export default function MyStudentsPage() {
 
   const activeOrgId = activeOrg?.id ?? null
   const membershipRole = activeOrg?.membership?.role
-  const normalizedRole = useMemo(() => normalizeRole(membershipRole), [membershipRole])
-  const isAdminMember = ADMIN_ROLES.has(normalizedRole)
+  const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole])
+  const isAdminMember = isAdminRole(normalizedRole)
 
   const canFetch = useMemo(() => {
     return (
@@ -71,7 +55,7 @@ export default function MyStudentsPage() {
       setErrorMessage("")
 
       try {
-        const endpoint = buildStudentsEndpoint(activeOrgId)
+        const endpoint = buildStudentsEndpoint(activeOrgId, normalizedRole)
         const payload = await authenticatedFetch(endpoint, {
           signal: abortController.signal,
         })
@@ -105,7 +89,7 @@ export default function MyStudentsPage() {
       isMounted = false
       abortController.abort()
     }
-  }, [activeOrgId, canFetch])
+  }, [activeOrgId, canFetch, normalizedRole])
 
   const isLoading = status === REQUEST_STATUS.loading
   const isError = status === REQUEST_STATUS.error
@@ -169,6 +153,13 @@ export default function MyStudentsPage() {
                       <dd>{contactInfo}</dd>
                     </div>
                   </dl>
+                  {student?.id ? (
+                    <div className="pt-sm">
+                      <Link to={`/students/${student.id}`} className="text-sm font-semibold text-primary hover:underline">
+                        צפייה בפרטי התלמיד
+                      </Link>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             )

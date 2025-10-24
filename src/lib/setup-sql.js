@@ -9,7 +9,7 @@ CREATE SCHEMA IF NOT EXISTS tuttiud;
 
 -- Part 2: Table Creation within 'tuttiud' schema (No Changes)
 CREATE TABLE IF NOT EXISTS tuttiud."Instructors" (
-  "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  "id" uuid NOT NULL PRIMARY KEY,
   "name" text NOT NULL,
   "email" text,
   "phone" text,
@@ -17,28 +17,134 @@ CREATE TABLE IF NOT EXISTS tuttiud."Instructors" (
   "notes" text,
   "metadata" jsonb
 );
+ALTER TABLE tuttiud."Instructors"
+  ALTER COLUMN "id" DROP DEFAULT;
+ALTER TABLE tuttiud."Instructors"
+  DROP CONSTRAINT IF EXISTS "Instructors_id_fkey";
 CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" text NOT NULL,
   "contact_info" text,
+  "contact_name" text,
+  "contact_phone" text,
   "assigned_instructor_id" uuid REFERENCES tuttiud."Instructors"("id"),
+  "default_day_of_week" integer,
+  "default_session_time" time with time zone,
+  "default_service" text,
   "tags" text[],
   "notes" text,
   "metadata" jsonb
 );
+ALTER TABLE tuttiud."Students"
+  ADD COLUMN IF NOT EXISTS "contact_name" text,
+  ADD COLUMN IF NOT EXISTS "contact_phone" text,
+  ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
+  ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
+  ADD COLUMN IF NOT EXISTS "default_service" text;
+ALTER TABLE tuttiud."Students"
+  DROP CONSTRAINT IF EXISTS "Students_assigned_instructor_id_fkey";
+DO $$
+DECLARE
+  has_user_id boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'tuttiud'
+      AND table_name = 'Instructors'
+      AND column_name = 'user_id'
+  ) INTO has_user_id;
+
+  IF has_user_id THEN
+    UPDATE tuttiud."Students" s
+    SET assigned_instructor_id = i.user_id
+    FROM tuttiud."Instructors" i
+    WHERE s.assigned_instructor_id = i.id
+      AND i.user_id IS NOT NULL
+      AND s.assigned_instructor_id IS DISTINCT FROM i.user_id;
+
+    UPDATE tuttiud."Instructors"
+    SET id = user_id
+    WHERE user_id IS NOT NULL
+      AND id IS DISTINCT FROM user_id;
+  END IF;
+END;
+$$;
+ALTER TABLE tuttiud."Instructors"
+  DROP COLUMN IF EXISTS "user_id";
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE constraint_schema = 'tuttiud'
+      AND table_name = 'Students'
+      AND constraint_name = 'Students_assigned_instructor_id_fkey'
+  ) THEN
+    ALTER TABLE tuttiud."Students"
+      ADD CONSTRAINT "Students_assigned_instructor_id_fkey"
+      FOREIGN KEY ("assigned_instructor_id") REFERENCES tuttiud."Instructors"("id");
+  END IF;
+END;
+$$;
 CREATE TABLE IF NOT EXISTS tuttiud."SessionRecords" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "date" date NOT NULL,
   "student_id" uuid NOT NULL REFERENCES tuttiud."Students"("id"),
   "instructor_id" uuid REFERENCES tuttiud."Instructors"("id"),
   "service_context" text,
-  "content" text,
+  "content" jsonb,
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz DEFAULT now(),
   "deleted" boolean NOT NULL DEFAULT false,
   "deleted_at" timestamptz,
   "metadata" jsonb
 );
+ALTER TABLE tuttiud."SessionRecords"
+  ADD COLUMN IF NOT EXISTS "service_context" text,
+  ADD COLUMN IF NOT EXISTS "content" jsonb,
+  ADD COLUMN IF NOT EXISTS "deleted" boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "deleted_at" timestamptz;
+DO $$
+DECLARE
+  column_type text;
+  record_row RECORD;
+  parsed jsonb;
+BEGIN
+  SELECT data_type INTO column_type
+  FROM information_schema.columns
+  WHERE table_schema = 'tuttiud'
+    AND table_name = 'SessionRecords'
+    AND column_name = 'content';
+
+  IF column_type IS NOT NULL AND column_type <> 'jsonb' THEN
+    ALTER TABLE tuttiud."SessionRecords"
+      ADD COLUMN IF NOT EXISTS "__content_jsonb" jsonb;
+
+    FOR record_row IN
+      SELECT "id", "content"
+      FROM tuttiud."SessionRecords"
+    LOOP
+      IF record_row.content IS NULL THEN
+        parsed := NULL;
+      ELSE
+        BEGIN
+          parsed := record_row.content::jsonb;
+        EXCEPTION WHEN others THEN
+          parsed := to_jsonb(record_row.content);
+        END;
+      END IF;
+
+      UPDATE tuttiud."SessionRecords"
+      SET "__content_jsonb" = parsed
+      WHERE "id" = record_row.id;
+    END LOOP;
+
+    ALTER TABLE tuttiud."SessionRecords" DROP COLUMN "content";
+    ALTER TABLE tuttiud."SessionRecords" RENAME COLUMN "__content_jsonb" TO "content";
+  END IF;
+END;
+$$;
 CREATE TABLE IF NOT EXISTS tuttiud."Settings" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "key" text NOT NULL UNIQUE,
@@ -57,19 +163,19 @@ ALTER TABLE tuttiud."Settings" ENABLE ROW LEVEL SECURITY;
 
 -- Policies for "Instructors"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors";
-CREATE POLICY "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 -- Policies for "Students"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Students" ON tuttiud."Students";
-CREATE POLICY "Allow full access to authenticated users on Students" ON tuttiud."Students" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on Students" ON tuttiud."Students" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 -- Policies for "SessionRecords"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on SessionRecords" ON tuttiud."SessionRecords";
-CREATE POLICY "Allow full access to authenticated users on SessionRecords" ON tuttiud."SessionRecords" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on SessionRecords" ON tuttiud."SessionRecords" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 -- Policies for "Settings"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Settings" ON tuttiud."Settings";
-CREATE POLICY "Allow full access to authenticated users on Settings" ON tuttiud."Settings" FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow full access to authenticated users on Settings" ON tuttiud."Settings" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 
 -- Part 4: Application Role and Permissions (No Changes)

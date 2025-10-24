@@ -223,6 +223,9 @@ export function createTenantClient({ supabaseUrl, anonKey, dedicatedKey }) {
         Authorization: `Bearer ${dedicatedKey}`,
       },
     },
+    db: {
+      schema: 'tuttiud',
+    },
   });
 }
 

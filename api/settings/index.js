@@ -168,6 +168,9 @@ function createTenantClient({ supabaseUrl, anonKey, dedicatedKey }) {
         Authorization: `Bearer ${dedicatedKey}`,
       },
     },
+    db: {
+      schema: 'tuttiud',
+    },
   });
 }
 
@@ -249,6 +252,254 @@ function normalizeSettingsObject(raw) {
   }
 
   return payload;
+}
+
+function normalizeKeyList(candidate) {
+  const result = [];
+
+  function pushValue(value) {
+    if (typeof value !== 'string') {
+      return;
+    }
+    const segments = value.split(',');
+    for (const segment of segments) {
+      const normalized = normalizeString(segment);
+      if (normalized) {
+        result.push(normalized);
+      }
+    }
+  }
+
+  if (Array.isArray(candidate)) {
+    for (const value of candidate) {
+      pushValue(typeof value === 'string' ? value : String(value ?? ''));
+    }
+  } else if (candidate !== null && candidate !== undefined) {
+    pushValue(String(candidate));
+  }
+
+  return Array.from(new Set(result));
+}
+
+function collectKeysFromBody(body) {
+  if (!body || typeof body !== 'object') {
+    return [];
+  }
+
+  if (Array.isArray(body.keys)) {
+    return normalizeKeyList(body.keys);
+  }
+
+  if (body.key !== undefined && body.key !== null) {
+    return normalizeKeyList(body.key);
+  }
+
+  return [];
+}
+
+function collectKeysFromQuery(query) {
+  if (!query || typeof query !== 'object') {
+    return [];
+  }
+
+  const bucket = [];
+  if (Object.prototype.hasOwnProperty.call(query, 'key')) {
+    bucket.push(query.key);
+  }
+  if (Object.prototype.hasOwnProperty.call(query, 'keys')) {
+    bucket.push(query.keys);
+  }
+
+  if (!bucket.length) {
+    return [];
+  }
+
+  return normalizeKeyList(bucket.length === 1 ? bucket[0] : bucket);
+}
+
+function normalizeSessionFormQuestion(entry, index) {
+  const fallbackId = `question_${index + 1}`;
+
+  if (!entry || typeof entry !== 'object') {
+    return {
+      id: fallbackId,
+      label: `שאלה ${index + 1}`,
+      type: 'text',
+      options: [],
+      required: false,
+    };
+  }
+
+  const idCandidates = [entry.id, entry.key, entry.name];
+  let id = '';
+  for (const candidate of idCandidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      id = candidate.trim();
+      break;
+    }
+  }
+  if (!id) {
+    id = fallbackId;
+  }
+
+  const labelCandidates = [entry.label, entry.title, entry.question];
+  let label = '';
+  for (const candidate of labelCandidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      label = candidate.trim();
+      break;
+    }
+  }
+  if (!label) {
+    label = id;
+  }
+
+  const type = typeof entry.type === 'string' && entry.type.trim()
+    ? entry.type.trim()
+    : 'text';
+
+  const options = Array.isArray(entry.options)
+    ? entry.options
+        .map((option) => {
+          if (typeof option === 'string') {
+            const trimmed = option.trim();
+            return trimmed ? trimmed : null;
+          }
+          if (option === null || option === undefined) {
+            return null;
+          }
+          return String(option);
+        })
+        .filter((option) => typeof option === 'string' && option)
+    : [];
+
+  const normalized = {
+    id,
+    label,
+    type,
+    options,
+    required: Boolean(entry.required),
+  };
+
+  if (typeof entry.placeholder === 'string' && entry.placeholder.trim()) {
+    normalized.placeholder = entry.placeholder.trim();
+  }
+
+  if (typeof entry.helpText === 'string' && entry.helpText.trim()) {
+    normalized.helpText = entry.helpText.trim();
+  }
+
+  return normalized;
+}
+
+function normalizeSessionFormConfigValue(raw) {
+  if (raw === null || raw === undefined) {
+    return { error: 'invalid_session_form_config' };
+  }
+
+  let payload = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return { error: 'invalid_session_form_config' };
+    }
+    try {
+      payload = JSON.parse(trimmed);
+    } catch {
+      return { error: 'invalid_session_form_config' };
+    }
+  }
+
+  if (Array.isArray(payload)) {
+    return {
+      questions: payload.map((entry, index) => normalizeSessionFormQuestion(entry, index)),
+    };
+  }
+
+  if (payload && typeof payload === 'object') {
+    const questionsSource = Array.isArray(payload.questions) ? payload.questions : [];
+    return {
+      questions: questionsSource.map((entry, index) => normalizeSessionFormQuestion(entry, index)),
+    };
+  }
+
+  return { error: 'invalid_session_form_config' };
+}
+
+function extractSessionFormVersion(value) {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+
+  let payload = value;
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (!trimmed) {
+      return 0;
+    }
+    try {
+      payload = JSON.parse(trimmed);
+    } catch {
+      return 0;
+    }
+  }
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return 0;
+  }
+
+  const candidate = Object.prototype.hasOwnProperty.call(payload, 'version') ? payload.version : null;
+  if (candidate === null || candidate === undefined) {
+    return 0;
+  }
+
+  const numeric = typeof candidate === 'number'
+    ? candidate
+    : Number.parseInt(String(candidate).trim(), 10);
+
+  if (Number.isInteger(numeric) && numeric >= 0) {
+    return numeric;
+  }
+
+  return 0;
+}
+
+async function applySessionFormVersioning(tenantClient, entries, existingSettings = null) {
+  const targetIndex = entries.findIndex((entry) => entry.key === 'session_form_config');
+  if (targetIndex === -1) {
+    return { entries };
+  }
+
+  const normalized = normalizeSessionFormConfigValue(entries[targetIndex].settings_value);
+  if (normalized.error) {
+    return { error: normalized.error };
+  }
+
+  let currentVersion = 0;
+  if (existingSettings && existingSettings.has('session_form_config')) {
+    currentVersion = extractSessionFormVersion(existingSettings.get('session_form_config'));
+  } else {
+    const { data, error } = await tenantClient
+      .from('Settings')
+      .select('settings_value')
+      .eq('key', 'session_form_config')
+      .maybeSingle();
+
+    if (error) {
+      return { error: 'failed_to_load_session_form_config' };
+    }
+
+    currentVersion = extractSessionFormVersion(data?.settings_value);
+  }
+
+  const nextVersion = currentVersion + 1;
+
+  entries[targetIndex].settings_value = {
+    version: nextVersion,
+    questions: normalized.questions,
+  };
+
+  return { entries, version: nextVersion };
 }
 
 export default async function (context, req) {
@@ -347,9 +598,16 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
-    const { data, error } = await tenantClient
+    const requestedKeys = collectKeysFromQuery(query);
+    let builder = tenantClient
       .from('Settings')
       .select('key, settings_value');
+
+    if (requestedKeys.length) {
+      builder = builder.in('key', requestedKeys);
+    }
+
+    const { data, error } = await builder;
 
     if (error) {
       context.log?.error?.('settings fetch failed', { message: error.message });
@@ -368,14 +626,38 @@ export default async function (context, req) {
       settingsMap[key] = entry.settings_value ?? null;
     }
 
+    if (requestedKeys.length) {
+      for (const key of requestedKeys) {
+        if (!Object.prototype.hasOwnProperty.call(settingsMap, key)) {
+          settingsMap[key] = null;
+        }
+      }
+    }
+
     return respond(context, 200, { settings: settingsMap });
   }
 
   if (method === 'POST') {
-    const payload = normalizeSettingsObject(body);
+    let payload = normalizeSettingsObject(body);
     if (!payload) {
       return respond(context, 400, { message: 'invalid settings payload' });
     }
+
+    const sessionFormResult = await applySessionFormVersioning(tenantClient, payload);
+    if (sessionFormResult.error) {
+      if (sessionFormResult.error !== 'invalid_session_form_config') {
+        context.log?.error?.('settings failed to prepare session form config', {
+          reason: sessionFormResult.error,
+        });
+      }
+      const status = sessionFormResult.error === 'invalid_session_form_config' ? 400 : 500;
+      const message = sessionFormResult.error === 'invalid_session_form_config'
+        ? 'invalid session form config'
+        : 'failed_to_load_session_form_config';
+      return respond(context, status, { message });
+    }
+
+    payload = sessionFormResult.entries;
 
     const { error } = await tenantClient
       .from('Settings')
@@ -386,8 +668,99 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_update_settings' });
     }
 
+    return respond(context, 201, { updated: true, count: payload.length });
+  }
+
+  if (method === 'PUT' || method === 'PATCH') {
+    let payload = normalizeSettingsObject(body);
+    if (!payload) {
+      return respond(context, 400, { message: 'invalid settings payload' });
+    }
+
+    const keys = payload.map((entry) => entry.key);
+    const { data: existing, error: existingError } = await tenantClient
+      .from('Settings')
+      .select('key, settings_value')
+      .in('key', keys);
+
+    if (existingError) {
+      context.log?.error?.('settings lookup failed before update', { message: existingError.message });
+      return respond(context, 500, { message: 'failed_to_update_settings' });
+    }
+
+    const existingMap = new Map();
+    for (const row of existing || []) {
+      if (!row || typeof row !== 'object') {
+        continue;
+      }
+      const key = normalizeString(row.key);
+      if (!key) {
+        continue;
+      }
+      existingMap.set(key, row.settings_value ?? null);
+    }
+
+    const existingKeys = new Set(existingMap.keys());
+    const missingKeys = keys.filter((key) => !existingKeys.has(key));
+
+    if (missingKeys.length) {
+      return respond(context, 404, { message: 'settings_not_found', keys: missingKeys });
+    }
+
+    const sessionFormResult = await applySessionFormVersioning(tenantClient, payload, existingMap);
+    if (sessionFormResult.error) {
+      if (sessionFormResult.error !== 'invalid_session_form_config') {
+        context.log?.error?.('settings failed to prepare session form config', {
+          reason: sessionFormResult.error,
+        });
+      }
+      const status = sessionFormResult.error === 'invalid_session_form_config' ? 400 : 500;
+      const message = sessionFormResult.error === 'invalid_session_form_config'
+        ? 'invalid session form config'
+        : 'failed_to_load_session_form_config';
+      return respond(context, status, { message });
+    }
+
+    payload = sessionFormResult.entries;
+
+    const { error } = await tenantClient
+      .from('Settings')
+      .upsert(payload, { onConflict: 'key' });
+
+    if (error) {
+      context.log?.error?.('settings update failed', { message: error.message });
+      return respond(context, 500, { message: 'failed_to_update_settings' });
+    }
+
     return respond(context, 200, { updated: true, count: payload.length });
   }
 
-  return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST' });
+  if (method === 'DELETE') {
+    const keysFromBody = collectKeysFromBody(body);
+    const keysFromQuery = collectKeysFromQuery(query);
+    const keys = Array.from(new Set([...keysFromBody, ...keysFromQuery]));
+
+    if (!keys.length) {
+      return respond(context, 400, { message: 'missing settings keys' });
+    }
+
+    const { data, error } = await tenantClient
+      .from('Settings')
+      .delete()
+      .in('key', keys)
+      .select('key');
+
+    if (error) {
+      context.log?.error?.('settings delete failed', { message: error.message });
+      return respond(context, 500, { message: 'failed_to_delete_settings' });
+    }
+
+    if (!data || !data.length) {
+      return respond(context, 404, { message: 'settings_not_found' });
+    }
+
+    return respond(context, 200, { deleted: data.map((entry) => entry.key) });
+  }
+
+  return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST,PUT,PATCH,DELETE' });
 }
