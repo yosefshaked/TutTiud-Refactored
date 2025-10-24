@@ -95,8 +95,8 @@ function normalizeQuestion(entry, index) {
     ? entry.key.trim()
     : typeof entry.id === 'string' && entry.id.trim()
       ? entry.id.trim()
-      : createQuestionKey(label, index);
-  const key = keySource.replace(/\s+/g, '_');
+      : label;
+  const key = createQuestionKey(keySource, index);
 
   const placeholder = typeof entry.placeholder === 'string' ? entry.placeholder : '';
   const required = Boolean(entry.required);
