@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.9.0**
-**Last Updated: 2025-11-02**
+**Version: 2.10.0**
+**Last Updated: 2025-11-03**
 
 ## 1. Vision & Purpose
 
@@ -141,5 +141,13 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **Session history rendering** – the page loads `session_form_config` through `/api/settings?keys=session_form_config`, normalizes questions with `parseSessionFormConfig`, and maps stored JSON answers back to their Hebrew labels. A 404 from the forthcoming `/api/session-records` endpoint is treated as “no sessions recorded” so UI scaffolding is testable today.
 - **SessionModalContext.jsx** – provided by `AppShell.jsx`, exposing `openSessionModal({ studentId, onCreated })` to any routed page. It keeps modal state in a single location so the FAB, desktop CTA, and Student Detail page all share the same creation flow.
 - **NewSessionModal.jsx** – orchestrates data dependencies: loads the student roster (admin vs. instructor scope), fetches `session_form_config`, and surfaces loading/error states. On submit it posts to `/api/sessions` with `{ student_id, date, service_context, content }` and triggers any supplied `onCreated` callback before closing.
-- **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, and collects answers for every configured question (text or textarea). Empty responses are stripped before sending the payload.
+- **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, and collects answers for every configured question (text, textarea, select, radio/button groups, numeric fields, and range scales). Empty responses are stripped before sending the payload.
 - **Shared utilities** – `src/features/students/utils/schedule.js` centralizes day/time formatting, `src/features/students/utils/endpoints.js` standardizes roster endpoint selection, and `src/features/sessions/utils/form-config.js` parses question configs so both the modal and detail view stay in sync.
+
+## 14. Session Form Management in Settings
+
+- **Modernized Settings page** – `/Pages/Settings.jsx` now focuses on diagnostics, Supabase connectivity, invitations, and the new session form manager. Legacy leave policy, holiday, and employment scope panels were removed to keep the page scoped to Tuttiud’s current feature set.
+- **Role-based access** – only administrators and organization owners render the management surface. Members/instructors still see the debugging card but no longer receive any administrative controls.
+- **SessionFormManager.jsx** – located at `src/components/settings/SessionFormManager.jsx`, this card loads the existing `session_form_config`, lists all questions, and lets admins add, edit, reorder, or delete entries before saving. Each question tracks `id`, `label`, `type`, `placeholder`, `required`, `options`, and (for range scales) numeric bounds. A dedicated “Save changes” button persists updates via `upsertSetting`, while inline validation prevents duplicate IDs, missing labels, or invalid option/range data.
+- **Improved parsing utilities** – `parseSessionFormConfig` now preserves `required`, `options`, and `range` metadata so runtime consumers (session modal/detail views) can render richer controls while staying backward compatible with minimal configs.
+- **Session capture parity** – `NewSessionForm.jsx` honors the expanded question types, rendering selects, radio/button groups, numeric/date inputs, and sliders alongside the existing text areas. Required fields are enforced client-side and the payload continues to trim empty responses before submission.
