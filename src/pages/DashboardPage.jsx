@@ -2,7 +2,7 @@ import React, { useMemo } from "react"
 import { Link } from "react-router-dom"
 
 import PageLayout from "@/components/ui/PageLayout.jsx"
-import Card from "@/components/ui/Card.jsx"
+import Card from "@/components/ui/CustomCard.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 
