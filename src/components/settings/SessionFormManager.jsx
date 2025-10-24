@@ -359,9 +359,13 @@ function validateQuestions(questions) {
         errors.push(`שאלה ${index + 1} חייבת לכלול לפחות שתי אפשרויות בחירה.`);
       }
       const values = new Set();
+      const reportedDuplicates = new Set();
       options.forEach((option) => {
         if (values.has(option.value)) {
-          errors.push(`לשאלה ${index + 1} קיימות אפשרויות עם ערך כפול (${option.value}).`);
+          if (!reportedDuplicates.has(option.value)) {
+            errors.push(`לשאלה ${index + 1} קיימות אפשרויות עם ערך כפול (${option.value}).`);
+            reportedDuplicates.add(option.value);
+          }
         } else {
           values.add(option.value);
         }
