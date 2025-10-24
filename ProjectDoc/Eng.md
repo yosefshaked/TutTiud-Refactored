@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.8.2**
-**Last Updated: 2025-10-29**
+**Version: 2.8.3**
+**Last Updated: 2025-10-30**
 
 ## 1. Vision & Purpose
 
@@ -35,7 +35,7 @@ Key characteristics:
 
 | Table | Purpose | Key Columns |
 | :---- | :------ | :---------- |
-| `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK mapped to `auth.users.id`), `name`, contact fields, `is_active`, `metadata` |
+| `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` |
 | `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `tags`, `notes`, `metadata` |
 | `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, timestamps, `metadata` |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
@@ -44,6 +44,8 @@ Supporting indexes:
 
 - `SessionRecords_student_date_idx` for chronological student lookups.
 - `SessionRecords_instructor_idx` for instructor dashboards.
+
+> **Instructor identity mapping:** Because the tenant database lives in a separate project from the control-plane auth store, `tuttiud."Instructors".id` is not backed by a database-level foreign key. The application is responsible for writing the correct `auth.users.id` when creating instructors and for keeping those mappings in sync.
 
 ## 5. Security Model & Keys
 

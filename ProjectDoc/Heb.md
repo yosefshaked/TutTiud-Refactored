@@ -1,7 +1,7 @@
 # תיעוד פרויקט: פלטפורמת Tuttiud לתמיכת תלמידים
 
-**גרסה: 2.8.2**
-**עודכן לאחרונה: 2025-10-29**
+**גרסה: 2.8.3**
+**עודכן לאחרונה: 2025-10-30**
 
 ## 1. חזון ומטרה
 
@@ -35,7 +35,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 | טבלה | תפקיד | עמודות מרכזיות |
 | :--- | :---- | :------------- |
-| `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK שממופה ל-`auth.users.id`), `name`, פרטי קשר, `is_active`, `metadata` |
+| `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK ששומר את `auth.users.id` ומנוהל ברמת האפליקציה), `name`, פרטי קשר, `is_active`, `metadata` |
 | `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `tags`, `notes`, `metadata` |
 | `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, חותמות זמן, `metadata` |
 | `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` |
@@ -44,6 +44,8 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - `SessionRecords_student_date_idx` לאיתור תלמידים כרונולוגי.
 - `SessionRecords_instructor_idx` ללוחות בקרה של מדריכים.
+
+> **מיפוי זהויות מדריכים:** מאחר שמסד הנתונים הטננטי נפרד ממסד האימות המרכזי, העמודה `tuttiud."Instructors".id` אינה מוגנת במפתח זר למסד `auth`. האחריות לשמור על התאמה בין רשומת המדריך ל-`auth.users.id` מוטלת על שכבת האפליקציה בעת יצירה ועדכונים.
 
 ## 5. מודל אבטחה ומפתחות
 

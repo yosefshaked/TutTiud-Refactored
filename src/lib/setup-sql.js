@@ -9,7 +9,7 @@ CREATE SCHEMA IF NOT EXISTS tuttiud;
 
 -- Part 2: Table Creation within 'tuttiud' schema (No Changes)
 CREATE TABLE IF NOT EXISTS tuttiud."Instructors" (
-  "id" uuid NOT NULL PRIMARY KEY REFERENCES auth.users("id"),
+  "id" uuid NOT NULL PRIMARY KEY,
   "name" text NOT NULL,
   "email" text,
   "phone" text,
@@ -19,21 +19,8 @@ CREATE TABLE IF NOT EXISTS tuttiud."Instructors" (
 );
 ALTER TABLE tuttiud."Instructors"
   ALTER COLUMN "id" DROP DEFAULT;
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM information_schema.table_constraints
-    WHERE constraint_schema = 'tuttiud'
-      AND table_name = 'Instructors'
-      AND constraint_name = 'Instructors_id_fkey'
-  ) THEN
-    ALTER TABLE tuttiud."Instructors"
-      ADD CONSTRAINT "Instructors_id_fkey"
-      FOREIGN KEY ("id") REFERENCES auth.users("id");
-  END IF;
-END;
-$$;
+ALTER TABLE tuttiud."Instructors"
+  DROP CONSTRAINT IF EXISTS "Instructors_id_fkey";
 CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" text NOT NULL,
