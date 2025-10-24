@@ -5,6 +5,7 @@ import './index.css';
 import AppShell from './components/layout/AppShell.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
+import StudentDetailPage from './features/students/pages/StudentDetailPage.jsx';
 import TimeEntry from './Pages/TimeEntry.jsx';
 import Reports from './Pages/Reports.jsx';
 import ReportsErrorBoundary from './components/reports/ReportsErrorBoundary.js';
@@ -47,6 +48,7 @@ function App({ config = null }) {
                     <Route path="/Dashboard" element={<Navigate to="/" replace />} />
                     <Route path="/Employees" element={<Navigate to="/admin/students" replace />} />
                     <Route path="/admin/students" element={<StudentManagementPage />} />
+                    <Route path="/students/:id" element={<StudentDetailPage />} />
                     <Route path="/my-students" element={<MyStudentsPage />} />
                     <Route path="/TimeEntry" element={<TimeEntry />} />
                     <Route path="/Adjustments" element={<Navigate to="/TimeEntry?tab=adjustments" replace />} />

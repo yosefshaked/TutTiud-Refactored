@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react"
+import React, { useCallback, useMemo, useState } from "react"
 import { Link, NavLink, Outlet } from "react-router-dom"
 import { Plus, LayoutDashboard, Users, BarChart3, Settings, LogOut, Megaphone } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -10,6 +10,8 @@ import PageLayout from "@/components/ui/PageLayout.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 import { cn } from "@/lib/utils"
+import NewSessionModal from "@/features/sessions/components/NewSessionModal.jsx"
+import { SessionModalContext } from "@/features/sessions/context/SessionModalContext.jsx"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -53,7 +55,7 @@ function LogoPlaceholder() {
   )
 }
 
-function MobileNavigation({ navItems = [] }) {
+function MobileNavigation({ navItems = [], onOpenSessionModal }) {
   return (
     <nav
       role="navigation"
@@ -100,19 +102,20 @@ function MobileNavigation({ navItems = [] }) {
           )
         })}
 
-        <Link
-          to="/TimeEntry"
+        <button
+          type="button"
+          onClick={() => onOpenSessionModal?.()}
           className="absolute -top-7 left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-4 ring-background"
           aria-label="יצירת רישום פגישה חדש"
         >
           <Plus className="h-6 w-6" aria-hidden="true" />
-        </Link>
+        </button>
       </div>
     </nav>
   )
 }
 
-function DesktopNavigation({ navItems = [], onSignOut }) {
+function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
   return (
     <aside
       className="hidden md:flex md:h-screen md:w-72 md:flex-col md:border-l md:border-border md:bg-surface"
@@ -129,13 +132,14 @@ function DesktopNavigation({ navItems = [], onSignOut }) {
               <p className="text-xs text-neutral-500">פלטפורמת תלמידים</p>
             </div>
           </Link>
-          <Link
-            to="/TimeEntry"
+          <button
+            type="button"
+            onClick={() => onOpenSessionModal?.()}
             className="inline-flex items-center justify-center gap-sm rounded-full bg-primary px-lg py-sm text-sm font-semibold text-primary-foreground shadow-lg transition hover:shadow-xl"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             <span>רישום מפגש חדש</span>
-          </Link>
+          </button>
         </div>
         <nav className="mt-md flex-1 space-y-1 px-lg" aria-label="ניווט ראשי">
           {navItems.map((item) => {
@@ -199,9 +203,38 @@ export default function AppShell({ children }) {
   const { signOut } = useAuth()
   const { activeOrg } = useOrg()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
+  const [sessionModalState, setSessionModalState] = useState({
+    isOpen: false,
+    studentId: '',
+    onCreated: null,
+  })
 
   const membershipRole = activeOrg?.membership?.role
   const navItems = useMemo(() => buildNavItems(membershipRole), [membershipRole])
+
+  const openSessionModal = useCallback((options = {}) => {
+    const { studentId = '', onCreated = null } = options
+    setSessionModalState({
+      isOpen: true,
+      studentId,
+      onCreated: typeof onCreated === 'function' ? onCreated : null,
+    })
+  }, [])
+
+  const closeSessionModal = useCallback(() => {
+    setSessionModalState({
+      isOpen: false,
+      studentId: '',
+      onCreated: null,
+    })
+  }, [])
+
+  const sessionModalContextValue = useMemo(() => ({
+    openSessionModal,
+    closeSessionModal,
+    isSessionModalOpen: sessionModalState.isOpen,
+    sessionModalStudentId: sessionModalState.studentId,
+  }), [openSessionModal, closeSessionModal, sessionModalState.isOpen, sessionModalState.studentId])
 
   const handleOrgClick = () => {
     toast.info("בקרוב: בחירת ארגון נוסף")
@@ -220,62 +253,69 @@ export default function AppShell({ children }) {
   const content = children ?? <Outlet />
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
-      <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} />
+    <SessionModalContext.Provider value={sessionModalContextValue}>
+      <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
+        <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
-      <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
-        <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
-          <div className="flex items-center justify-between gap-sm">
-            <div className="flex items-center gap-sm">
-              <LogoPlaceholder />
-              <button
-                type="button"
-                onClick={handleOrgClick}
-                className="inline-flex items-center rounded-full border border-border bg-surface px-md py-xs text-sm font-semibold text-foreground transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              >
-                {activeOrg?.name ? `ארגון: ${activeOrg.name}` : "בחרו ארגון לעבודה"}
-              </button>
+        <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
+          <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
+            <div className="flex items-center justify-between gap-sm">
+              <div className="flex items-center gap-sm">
+                <LogoPlaceholder />
+                <button
+                  type="button"
+                  onClick={handleOrgClick}
+                  className="inline-flex items-center rounded-full border border-border bg-surface px-md py-xs text-sm font-semibold text-foreground transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  {activeOrg?.name ? `ארגון: ${activeOrg.name}` : "בחרו ארגון לעבודה"}
+                </button>
+              </div>
+              <div className="flex items-center gap-xs">
+                <button
+                  type="button"
+                  onClick={() => setIsChangelogOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-full border border-border px-sm py-xs text-xs font-medium text-neutral-600 transition hover:bg-neutral-100"
+                >
+                  <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />
+                  עדכונים
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2 text-neutral-600 transition hover:bg-neutral-200"
+                  aria-label="התנתקות"
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-xs">
-              <button
-                type="button"
-                onClick={() => setIsChangelogOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-sm py-xs text-xs font-medium text-neutral-600 transition hover:bg-neutral-100"
-              >
-                <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />
-                עדכונים
-              </button>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2 text-neutral-600 transition hover:bg-neutral-200"
-                aria-label="התנתקות"
-              >
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
+          </header>
+
+          <OrgSelectionBanner />
+          <OrgConfigBanner />
+
+          <div className="flex-1 overflow-y-auto">
+            <PageLayout
+              fullHeight={false}
+              className="min-h-full pb-0"
+              contentClassName="pb-xl"
+              headerClassName="pb-sm"
+            >
+              {content}
+            </PageLayout>
           </div>
-        </header>
-
-        <OrgSelectionBanner />
-        <OrgConfigBanner />
-
-        <div className="flex-1 overflow-y-auto">
-          <PageLayout
-            fullHeight={false}
-            className="min-h-full pb-0"
-            contentClassName="pb-xl"
-            headerClassName="pb-sm"
-          >
-            {content}
-          </PageLayout>
         </div>
+        <MobileNavigation navItems={navItems} onOpenSessionModal={openSessionModal} />
+
+        <ChangelogModal open={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
+        <Toaster richColors position="top-right" closeButton />
+        <NewSessionModal
+          open={sessionModalState.isOpen}
+          onClose={closeSessionModal}
+          initialStudentId={sessionModalState.studentId}
+          onCreated={sessionModalState.onCreated}
+        />
       </div>
-
-      <MobileNavigation navItems={navItems} />
-
-      <ChangelogModal open={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
-      <Toaster richColors position="top-right" closeButton />
-    </div>
+    </SessionModalContext.Provider>
   )
 }

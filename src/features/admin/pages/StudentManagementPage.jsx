@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -245,7 +246,15 @@ export default function StudentManagementPage() {
                   const instructor = instructorMap.get(student.assigned_instructor_id) || null;
                   return (
                     <TableRow key={student.id}>
-                      <TableCell className="text-sm font-semibold text-foreground">{student.name}</TableCell>
+                      <TableCell className="text-sm font-semibold text-foreground">
+                        {student.id ? (
+                          <Link to={`/students/${student.id}`} className="text-primary hover:underline">
+                            {student.name || 'ללא שם'}
+                          </Link>
+                        ) : (
+                          student.name || 'ללא שם'
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-neutral-600">
                         {student.contact_info || '—'}
                       </TableCell>

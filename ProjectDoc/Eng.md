@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.8.3**
-**Last Updated: 2025-10-30**
+**Version: 2.9.0**
+**Last Updated: 2025-11-02**
 
 ## 1. Vision & Purpose
 
@@ -104,6 +104,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **StudentManagementPage.jsx** – renders the `/admin/students` route. It reads the active organization from `OrgContext`, fetches `/api/students` on mount, surfaces loading/error/empty states, and keeps an instructor map in memory for display. Dialog state is managed locally for add/edit flows.
 - **AddStudentForm.jsx** – collects `name` and `contactInfo`, enforces client-side validation, and raises `onSubmit` with trimmed values. The form is rendered inside a dialog launched from the Student Management page.
 - **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
+- **Roster deep links** – student names now link to `/students/:id`, sending admins directly into the dedicated detail page without leaving the management workflow.
 - **App shell & routing** – `src/main.jsx` redirects `/Employees` to `/admin/students` and wraps authenticated routes with `src/components/layout/AppShell.jsx`. The shell renders a bottom tab bar + FAB on mobile and a left sidebar on desktop while keeping the student management view front and center.
 
 ## 10. Instructor "My Students" Dashboard
@@ -113,6 +114,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **Page layout & routing** – `MyStudentsPage.jsx` composes the shared `PageLayout` shell, calls `GET /api/my-students` once the
   organization connection is ready, and renders loading, error, and empty states. Successful fetches map each student to a
   `Card` showing their name and contact details.
+- **Drill-down access** – each card includes a "צפייה בפרטי התלמיד" link to `/students/:id`, giving instructors a one-click path into the shared detail page while keeping the roster lightweight.
 - **Navigation updates** – `AppShell.jsx` derives the Students destination from the member role so admins/owners keep
   `/admin/students` while instructors are routed to `/my-students`. The router (`src/main.jsx`) exposes the `/my-students`
   path so instructors land on their filtered roster.
@@ -120,7 +122,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 ## 11. Focused Navigation Dashboard
 
 - **DashboardPage.jsx** – located at `src/pages/DashboardPage.jsx`, this lightweight home view greets the authenticated user and
-  presents two prominent actions: navigating to `/my-students` and launching the `/TimeEntry` flow used by the floating + button.
+  presents two prominent actions: navigating to `/my-students` and opening the session registration modal via the floating + button.
 - **Home routing** – the `AppShell` "ראשי" link now points to `/`, and `/Dashboard` redirects to the new landing page so the
   simplified experience becomes the default route after login. All auth redirects (login, org selection, invite acceptance)
   now target `/` as the canonical destination.
@@ -132,3 +134,12 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **Tailwind configuration** – `tailwind.config.js` now defines a Nunito-based typography stack, a calm violet primary palette (`primary`), accessible neutral grays (`neutral`), and dedicated status colors for success, warning, and error states. The spacing scale introduces tokens (`2xs` → `3xl`) sized for generous touch targets and breathing room on small screens.
 - **UI primitives** – Generic components for the new design live in [`src/components/ui/Button.jsx`](../src/components/ui/Button.jsx), [`Card.jsx`](../src/components/ui/Card.jsx), [`Input.jsx`](../src/components/ui/Input.jsx), and [`PageLayout.jsx`](../src/components/ui/PageLayout.jsx). Use them when building new flows to guarantee consistent padding, typography, and contrast across mobile and desktop breakpoints.
 - **Progressive adoption** – Existing pages remain unchanged for now. Future tickets will migrate feature screens to the new layout by composing these primitives.
+
+## 13. Student Detail & Session Registration Flow
+
+- **StudentDetailPage.jsx** – new route `/students/:id` shared by admins and instructors. It fetches the selected student via the appropriate roster endpoint, renders contact + scheduling defaults, and displays session history with graceful fallbacks when the history endpoint is not yet available.
+- **Session history rendering** – the page loads `session_form_config` through `/api/settings?keys=session_form_config`, normalizes questions with `parseSessionFormConfig`, and maps stored JSON answers back to their Hebrew labels. A 404 from the forthcoming `/api/session-records` endpoint is treated as “no sessions recorded” so UI scaffolding is testable today.
+- **SessionModalContext.jsx** – provided by `AppShell.jsx`, exposing `openSessionModal({ studentId, onCreated })` to any routed page. It keeps modal state in a single location so the FAB, desktop CTA, and Student Detail page all share the same creation flow.
+- **NewSessionModal.jsx** – orchestrates data dependencies: loads the student roster (admin vs. instructor scope), fetches `session_form_config`, and surfaces loading/error states. On submit it posts to `/api/sessions` with `{ student_id, date, service_context, content }` and triggers any supplied `onCreated` callback before closing.
+- **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, and collects answers for every configured question (text or textarea). Empty responses are stripped before sending the payload.
+- **Shared utilities** – `src/features/students/utils/schedule.js` centralizes day/time formatting, `src/features/students/utils/endpoints.js` standardizes roster endpoint selection, and `src/features/sessions/utils/form-config.js` parses question configs so both the modal and detail view stay in sync.
