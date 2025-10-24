@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.8.0**
-**Last Updated: 2025-10-27**
+**Version: 2.8.1**
+**Last Updated: 2025-10-28**
 
 ## 1. Vision & Purpose
 
@@ -28,7 +28,8 @@ Key characteristics:
 2. Enables RLS for every table and installs permissive policies (`Allow full access...`) for the authenticated role during MVP phase.
 3. Creates the reusable `app_user` role and grants usage/select privileges.
 4. Defines `tuttiud.setup_assistant_diagnostics()` which now confirms schema + table existence, verifies RLS + policies on every MVP table, and checks the critical indexes used by instructor/student dashboards.
-5. Generates a five-year JWT named `APP_DEDICATED_KEY (COPY THIS BACK TO THE APP)` that the admin pastes back into the wizard. The key is later encrypted and stored in the Control DB via `/api/save-org-credentials`.
+5. Applies `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` statements so rerunning the script will backfill newly required columns on existing tenants without dropping data.
+6. Generates a five-year JWT named `APP_DEDICATED_KEY (COPY THIS BACK TO THE APP)` that the admin pastes back into the wizard. The key is later encrypted and stored in the Control DB via `/api/save-org-credentials`.
 
 ## 4. Data Model (MVP)
 

@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS tuttiud."Instructors" (
   "notes" text,
   "metadata" jsonb
 );
+ALTER TABLE tuttiud."Instructors"
+  ADD COLUMN IF NOT EXISTS "user_id" uuid REFERENCES auth.users("id");
 CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" text NOT NULL,
@@ -32,6 +34,12 @@ CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "notes" text,
   "metadata" jsonb
 );
+ALTER TABLE tuttiud."Students"
+  ADD COLUMN IF NOT EXISTS "contact_name" text,
+  ADD COLUMN IF NOT EXISTS "contact_phone" text,
+  ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
+  ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
+  ADD COLUMN IF NOT EXISTS "default_service" text;
 CREATE TABLE IF NOT EXISTS tuttiud."SessionRecords" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "date" date NOT NULL,
@@ -45,6 +53,11 @@ CREATE TABLE IF NOT EXISTS tuttiud."SessionRecords" (
   "deleted_at" timestamptz,
   "metadata" jsonb
 );
+ALTER TABLE tuttiud."SessionRecords"
+  ADD COLUMN IF NOT EXISTS "service_context" text,
+  ADD COLUMN IF NOT EXISTS "content" jsonb,
+  ADD COLUMN IF NOT EXISTS "deleted" boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "deleted_at" timestamptz;
 CREATE TABLE IF NOT EXISTS tuttiud."Settings" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "key" text NOT NULL UNIQUE,
