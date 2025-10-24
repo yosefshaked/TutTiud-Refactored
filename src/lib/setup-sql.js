@@ -105,6 +105,46 @@ ALTER TABLE tuttiud."SessionRecords"
   ADD COLUMN IF NOT EXISTS "content" jsonb,
   ADD COLUMN IF NOT EXISTS "deleted" boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS "deleted_at" timestamptz;
+DO $$
+DECLARE
+  column_type text;
+  record_row RECORD;
+  parsed jsonb;
+BEGIN
+  SELECT data_type INTO column_type
+  FROM information_schema.columns
+  WHERE table_schema = 'tuttiud'
+    AND table_name = 'SessionRecords'
+    AND column_name = 'content';
+
+  IF column_type IS NOT NULL AND column_type <> 'jsonb' THEN
+    ALTER TABLE tuttiud."SessionRecords"
+      ADD COLUMN IF NOT EXISTS "__content_jsonb" jsonb;
+
+    FOR record_row IN
+      SELECT "id", "content"
+      FROM tuttiud."SessionRecords"
+    LOOP
+      IF record_row.content IS NULL THEN
+        parsed := NULL;
+      ELSE
+        BEGIN
+          parsed := record_row.content::jsonb;
+        EXCEPTION WHEN others THEN
+          parsed := to_jsonb(record_row.content);
+        END;
+      END IF;
+
+      UPDATE tuttiud."SessionRecords"
+      SET "__content_jsonb" = parsed
+      WHERE "id" = record_row.id;
+    END LOOP;
+
+    ALTER TABLE tuttiud."SessionRecords" DROP COLUMN "content";
+    ALTER TABLE tuttiud."SessionRecords" RENAME COLUMN "__content_jsonb" TO "content";
+  END IF;
+END;
+$$;
 CREATE TABLE IF NOT EXISTS tuttiud."Settings" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "key" text NOT NULL UNIQUE,
