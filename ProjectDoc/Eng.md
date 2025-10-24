@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.10.1**
-**Last Updated: 2025-11-04**
+**Version: 2.10.2**
+**Last Updated: 2025-11-05**
 
 ## 1. Vision & Purpose
 
@@ -76,6 +76,8 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.id` (Supabase auth UUID), supporting the instructor dashboard. |
 | `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry (JSON answer payload + optional service context) after confirming members only write for students assigned to them. |
 | `/api/settings` | GET/POST/PUT/PATCH/DELETE | Admin/Owner (read allowed to members) | Provides full CRUD for tenant settings, supporting creation of new keys like `session_form_config`. |
+
+> **Schema guardrails:** `/api/settings` now inspects `tuttiud.setup_assistant_diagnostics()` whenever Supabase reports missing tables or insufficient permissions. Schema or policy gaps surface as HTTP 424 with `settings_schema_incomplete` / `settings_schema_unverified` and include the failing diagnostic rows so admins can rerun the setup script before retrying.
 
 All endpoints expect the tenant identifier (`org_id`) in the request body or query string. Authentication is enforced with the Supabase JWT provided by the desktop/web client, and every handler builds the tenant Supabase client through `api/_shared/org-bff.js` to reuse encryption, membership, and error handling routines.
 
