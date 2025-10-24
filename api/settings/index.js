@@ -168,6 +168,9 @@ function createTenantClient({ supabaseUrl, anonKey, dedicatedKey }) {
         Authorization: `Bearer ${dedicatedKey}`,
       },
     },
+    db: {
+      schema: 'tuttiud',
+    },
   });
 }
 
@@ -249,6 +252,69 @@ function normalizeSettingsObject(raw) {
   }
 
   return payload;
+}
+
+function normalizeKeyList(candidate) {
+  const result = [];
+
+  function pushValue(value) {
+    if (typeof value !== 'string') {
+      return;
+    }
+    const segments = value.split(',');
+    for (const segment of segments) {
+      const normalized = normalizeString(segment);
+      if (normalized) {
+        result.push(normalized);
+      }
+    }
+  }
+
+  if (Array.isArray(candidate)) {
+    for (const value of candidate) {
+      pushValue(typeof value === 'string' ? value : String(value ?? ''));
+    }
+  } else if (candidate !== null && candidate !== undefined) {
+    pushValue(String(candidate));
+  }
+
+  return Array.from(new Set(result));
+}
+
+function collectKeysFromBody(body) {
+  if (!body || typeof body !== 'object') {
+    return [];
+  }
+
+  if (Array.isArray(body.keys)) {
+    return normalizeKeyList(body.keys);
+  }
+
+  if (body.key !== undefined && body.key !== null) {
+    return normalizeKeyList(body.key);
+  }
+
+  return [];
+}
+
+function collectKeysFromQuery(query) {
+  if (!query || typeof query !== 'object') {
+    return [];
+  }
+
+  const bucket = [];
+  if (Object.prototype.hasOwnProperty.call(query, 'key')) {
+    bucket.push(query.key);
+  }
+  if (Object.prototype.hasOwnProperty.call(query, 'keys')) {
+    bucket.push(query.keys);
+  }
+
+  if (!bucket.length) {
+    return [];
+  }
+
+  return normalizeKeyList(bucket.length === 1 ? bucket[0] : bucket);
 }
 
 export default async function (context, req) {
@@ -347,9 +413,16 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
-    const { data, error } = await tenantClient
+    const requestedKeys = collectKeysFromQuery(query);
+    let builder = tenantClient
       .from('Settings')
       .select('key, settings_value');
+
+    if (requestedKeys.length) {
+      builder = builder.in('key', requestedKeys);
+    }
+
+    const { data, error } = await builder;
 
     if (error) {
       context.log?.error?.('settings fetch failed', { message: error.message });
@@ -366,6 +439,14 @@ export default async function (context, req) {
         continue;
       }
       settingsMap[key] = entry.settings_value ?? null;
+    }
+
+    if (requestedKeys.length) {
+      for (const key of requestedKeys) {
+        if (!Object.prototype.hasOwnProperty.call(settingsMap, key)) {
+          settingsMap[key] = null;
+        }
+      }
     }
 
     return respond(context, 200, { settings: settingsMap });
@@ -386,8 +467,71 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_update_settings' });
     }
 
+    return respond(context, 201, { updated: true, count: payload.length });
+  }
+
+  if (method === 'PUT' || method === 'PATCH') {
+    const payload = normalizeSettingsObject(body);
+    if (!payload) {
+      return respond(context, 400, { message: 'invalid settings payload' });
+    }
+
+    const keys = payload.map((entry) => entry.key);
+    const { data: existing, error: existingError } = await tenantClient
+      .from('Settings')
+      .select('key')
+      .in('key', keys);
+
+    if (existingError) {
+      context.log?.error?.('settings lookup failed before update', { message: existingError.message });
+      return respond(context, 500, { message: 'failed_to_update_settings' });
+    }
+
+    const existingKeys = new Set((existing || []).map((row) => normalizeString(row?.key)).filter(Boolean));
+    const missingKeys = keys.filter((key) => !existingKeys.has(key));
+
+    if (missingKeys.length) {
+      return respond(context, 404, { message: 'settings_not_found', keys: missingKeys });
+    }
+
+    const { error } = await tenantClient
+      .from('Settings')
+      .upsert(payload, { onConflict: 'key' });
+
+    if (error) {
+      context.log?.error?.('settings update failed', { message: error.message });
+      return respond(context, 500, { message: 'failed_to_update_settings' });
+    }
+
     return respond(context, 200, { updated: true, count: payload.length });
   }
 
-  return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST' });
+  if (method === 'DELETE') {
+    const keysFromBody = collectKeysFromBody(body);
+    const keysFromQuery = collectKeysFromQuery(query);
+    const keys = Array.from(new Set([...keysFromBody, ...keysFromQuery]));
+
+    if (!keys.length) {
+      return respond(context, 400, { message: 'missing settings keys' });
+    }
+
+    const { data, error } = await tenantClient
+      .from('Settings')
+      .delete()
+      .in('key', keys)
+      .select('key');
+
+    if (error) {
+      context.log?.error?.('settings delete failed', { message: error.message });
+      return respond(context, 500, { message: 'failed_to_delete_settings' });
+    }
+
+    if (!data || !data.length) {
+      return respond(context, 404, { message: 'settings_not_found' });
+    }
+
+    return respond(context, 200, { deleted: data.map((entry) => entry.key) });
+  }
+
+  return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST,PUT,PATCH,DELETE' });
 }

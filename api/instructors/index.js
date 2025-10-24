@@ -9,16 +9,15 @@ import {
   readEnv,
   respond,
   resolveOrgId,
+  resolveTenantClient,
 } from '../_shared/org-bff.js';
 
-function toArray(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value;
-}
-
 export default async function (context, req) {
+  const method = String(req.method || 'GET').toUpperCase();
+  if (method !== 'GET') {
+    return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET' });
+  }
+
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
 
@@ -73,61 +72,28 @@ export default async function (context, req) {
     return respond(context, 403, { message: 'forbidden' });
   }
 
-  const { data: membershipRows, error: membershipError } = await supabase
-    .from('org_memberships')
-    .select('user_id')
-    .eq('org_id', orgId)
-    .eq('role', 'member');
+  const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
+  if (tenantError) {
+    return respond(context, tenantError.status, tenantError.body);
+  }
 
-  if (membershipError) {
-    context.log?.error?.('instructors failed to load membership rows', {
-      message: membershipError.message,
-      orgId,
-    });
+  const includeInactive = normalizeString(req?.query?.include_inactive).toLowerCase() === 'true';
+
+  let builder = tenantClient
+    .from('Instructors')
+    .select('id, name, email, phone, user_id, is_active, notes, metadata')
+    .order('name', { ascending: true });
+
+  if (!includeInactive) {
+    builder = builder.eq('is_active', true);
+  }
+
+  const { data, error } = await builder;
+
+  if (error) {
+    context.log?.error?.('instructors failed to fetch roster', { message: error.message });
     return respond(context, 500, { message: 'failed_to_load_instructors' });
   }
 
-  const instructorIds = Array.from(
-    new Set(
-      toArray(membershipRows)
-        .map((row) => normalizeString(row?.user_id))
-        .filter(Boolean),
-    ),
-  );
-
-  if (instructorIds.length === 0) {
-    return respond(context, 200, []);
-  }
-
-  const { data: profiles, error: profilesError } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .in('id', instructorIds);
-
-  if (profilesError) {
-    context.log?.error?.('instructors failed to load profiles', {
-      message: profilesError.message,
-      orgId,
-    });
-    return respond(context, 500, { message: 'failed_to_load_instructors' });
-  }
-
-  const instructorMap = new Map();
-  for (const profile of toArray(profiles)) {
-    if (!profile || typeof profile !== 'object') {
-      continue;
-    }
-    const id = normalizeString(profile.id);
-    if (!id || !instructorIds.includes(id)) {
-      continue;
-    }
-    const name = normalizeString(profile.full_name) || id;
-    instructorMap.set(id, { id, name });
-  }
-
-  const payload = instructorIds
-    .map((id) => instructorMap.get(id) ?? { id, name: id })
-    .filter((entry) => Boolean(entry?.id));
-
-  return respond(context, 200, payload);
+  return respond(context, 200, Array.isArray(data) ? data : []);
 }

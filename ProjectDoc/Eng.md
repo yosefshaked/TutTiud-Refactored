@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.7.1**
-**Last Updated: 2025-10-26**
+**Version: 2.8.0**
+**Last Updated: 2025-10-27**
 
 ## 1. Vision & Purpose
 
@@ -34,9 +34,9 @@ Key characteristics:
 
 | Table | Purpose | Key Columns |
 | :---- | :------ | :---------- |
-| `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK), `name`, contact fields, `is_active`, `metadata` |
-| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `assigned_instructor_id` (FK → `Instructors.id`), `tags`, `notes`, `metadata` |
-| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content`, `deleted`, timestamps, `metadata` |
+| `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK), `name`, contact fields, `user_id` (FK → `auth.users.id`), `is_active`, `metadata` |
+| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `tags`, `notes`, `metadata` |
+| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, timestamps, `metadata` |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
 
 Supporting indexes:
@@ -66,12 +66,13 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 
 | Route | Method | Audience | Purpose |
 | :---- | :----- | :------- | :------ |
-| `/api/instructors` | GET | Admin/Owner | Reads `org_memberships` for `role = 'member'` and joins `profiles` to return `{ id, name }` pairs for instructor pickers. |
-| `/api/students` | GET | Admin/Owner | Returns every `tuttiud."Students"` row ordered by name for roster management. |
-| `/api/students` | POST | Admin/Owner | Inserts a student (name + optional contact info and instructor assignment) and echoes the created row. |
-| `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact info, instructor) and returns the refreshed row or 404. |
+| `/api/instructors` | GET | Admin/Owner | Reads `tuttiud."Instructors"` (defaulting to active rows) and returns instructor records including `user_id` for auth linkage. |
+| `/api/students` | GET | Admin/Owner | Returns every `tuttiud."Students"` row ordered by name, including scheduling defaults and contact fields. |
+| `/api/students` | POST | Admin/Owner | Inserts a student (name + optional contact data, scheduling defaults, instructor assignment) and echoes the created row. |
+| `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor) and returns the refreshed row or 404. |
 | `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.user_id`, supporting the instructor dashboard. |
-| `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry after confirming members only write for students assigned to them. |
+| `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry (JSON answer payload + optional service context) after confirming members only write for students assigned to them. |
+| `/api/settings` | GET/POST/PUT/PATCH/DELETE | Admin/Owner (read allowed to members) | Provides full CRUD for tenant settings, supporting creation of new keys like `session_form_config`. |
 
 All endpoints expect the tenant identifier (`org_id`) in the request body or query string. Authentication is enforced with the Supabase JWT provided by the desktop/web client, and every handler builds the tenant Supabase client through `api/_shared/org-bff.js` to reuse encryption, membership, and error handling routines.
 

@@ -1,7 +1,7 @@
 # תיעוד פרויקט: פלטפורמת Tuttiud לתמיכת תלמידים
 
-**גרסה: 2.7.1**
-**עודכן לאחרונה: 2025-10-26**
+**גרסה: 2.8.0**
+**עודכן לאחרונה: 2025-10-27**
 
 ## 1. חזון ומטרה
 
@@ -34,9 +34,9 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 | טבלה | תפקיד | עמודות מרכזיות |
 | :--- | :---- | :------------- |
-| `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK), `name`, פרטי קשר, `is_active`, `metadata` |
-| `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `contact_info`, `assigned_instructor_id` (FK → `Instructors.id`), `tags`, `notes`, `metadata` |
-| `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content`, `deleted`, חותמות זמן, `metadata` |
+| `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK), `name`, פרטי קשר, `user_id` (מפתח זר ל-`auth.users.id`), `is_active`, `metadata` |
+| `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `tags`, `notes`, `metadata` |
+| `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, חותמות זמן, `metadata` |
 | `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` |
 
 אינדקסים תומכים:
@@ -66,12 +66,13 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 | נתיב | מתודה | קהל יעד | מטרה |
 | :--- | :---- | :------- | :---- |
-| `/api/instructors` | GET | מנהל/בעלים | קורא את `org_memberships` עם `role = 'member'` ומחבר ל-`profiles` כדי להחזיר זוגות `{ id, name }` לרשימות בחירה. |
-| `/api/students` | GET | מנהל/בעלים | מחזיר את כל הרשומות ב-`tuttiud."Students"` מסודרות לפי שם לניהול הרשימות. |
-| `/api/students` | POST | מנהל/בעלים | מוסיף תלמיד (שם + פרטי קשר אופציונליים ושיוך למדריך) ומחזיר את הרשומה שנוצרה. |
-| `/api/students/{studentId}` | PUT | מנהל/בעלים | מעדכן שדות תלמיד ניתנים לעריכה (שם, פרטי קשר, שיוך מדריך) ומחזיר את הרשומה המעודכנת או 404. |
+| `/api/instructors` | GET | מנהל/בעלים | קורא את `tuttiud."Instructors"` (ברירת מחדל: מדריכים פעילים) ומחזיר רשומות הכוללות `user_id` לצימוד מול `auth.users`. |
+| `/api/students` | GET | מנהל/בעלים | מחזיר את כל הרשומות ב-`tuttiud."Students"` לפי סדר אלפביתי, כולל פרטי קשר מורחבים והגדרות ברירת מחדל למפגשים. |
+| `/api/students` | POST | מנהל/בעלים | מוסיף תלמיד (שם + פרטי קשר, הגדרות ברירת מחדל ושיוך למדריך) ומחזיר את הרשומה שנוצרה. |
+| `/api/students/{studentId}` | PUT | מנהל/בעלים | מעדכן שדות תלמיד ניתנים לעריכה (שם, פרטי קשר, הגדרות ברירת מחדל, שיוך מדריך) ומחזיר את הרשומה המעודכנת או 404. |
 | `/api/my-students` | GET | מדריך/מנהל/בעלים | מסנן את הרשימה לפי `assigned_instructor_id === user_id` של הקריאה, לטובת דשבורד המדריך. |
-| `/api/sessions` | POST | מדריך/מנהל/בעלים | מוסיף רשומת `SessionRecords` לאחר אימות שמדריכים כותבים רק על תלמידים שהוקצו להם. |
+| `/api/sessions` | POST | מדריך/מנהל/בעלים | מוסיף רשומת `SessionRecords` (מטען תשובות במבנה JSON + הקשר שירות אופציונלי) לאחר אימות שמדריכים כותבים רק על תלמידים שהוקצו להם. |
+| `/api/settings` | GET/POST/PUT/PATCH/DELETE | מנהל/בעלים (קריאה מותרת גם לחברים) | מספק CRUD מלא על הגדרות הטננט, כולל יצירת מפתחות חדשים כגון `session_form_config`. |
 
 כל נקודות הקצה מצפות למזהה הטננט (`org_id`) בגוף הבקשה או בפרמטרי השאילתה. האימות מתבצע עם ה-JWT של Supabase שמספק הלקוח, וכל מטפל יוצר לקוח טננט דרך `api/_shared/org-bff.js` כדי למחזר את הלוגיקה של החברות, ההצפנה וטיפול השגיאות.
 

@@ -14,6 +14,47 @@ import {
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+function coerceSessionContent(source) {
+  if (source === null || source === undefined) {
+    return { error: 'missing_content' };
+  }
+
+  if (typeof source === 'string') {
+    const trimmed = source.trim();
+    if (!trimmed) {
+      return { error: 'invalid_content' };
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        return { value: parsed };
+      }
+    } catch {
+      // fall through to store raw string
+    }
+
+    return { value: trimmed };
+  }
+
+  if (typeof source === 'object') {
+    return { value: source };
+  }
+
+  return { error: 'invalid_content' };
+}
+
+function coerceOptionalText(value) {
+  if (value === null || value === undefined) {
+    return { value: null, valid: true };
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return { value: trimmed || null, valid: true };
+  }
+  return { value: null, valid: false };
+}
+
 function validatePayload(body) {
   const studentId = normalizeString(body?.student_id || body?.studentId);
   if (!studentId || !UUID_PATTERN.test(studentId)) {
@@ -25,19 +66,27 @@ function validatePayload(body) {
     return { error: 'invalid_date' };
   }
 
-  const contentSource = body?.content;
-  if (contentSource === null || contentSource === undefined) {
-    return { error: 'missing_content' };
-  }
-  if (typeof contentSource !== 'string') {
-    return { error: 'invalid_content' };
-  }
-  const content = contentSource.trim();
-  if (!content) {
-    return { error: 'invalid_content' };
+  const contentResult = coerceSessionContent(body?.content);
+  if (contentResult.error) {
+    return { error: contentResult.error };
   }
 
-  return { studentId, date, content };
+  const hasServiceField =
+    Object.prototype.hasOwnProperty.call(body ?? {}, 'service_context') ||
+    Object.prototype.hasOwnProperty.call(body ?? {}, 'serviceContext');
+
+  const serviceResult = coerceOptionalText(body?.service_context ?? body?.serviceContext);
+  if (!serviceResult.valid) {
+    return { error: 'invalid_service_context' };
+  }
+
+  return {
+    studentId,
+    date,
+    content: contentResult.value,
+    serviceContext: serviceResult.value,
+    hasExplicitService: hasServiceField,
+  };
 }
 
 function isMemberRole(role) {
@@ -107,7 +156,9 @@ export default async function (context, req) {
           ? 'invalid date'
           : validation.error === 'missing_content'
             ? 'missing session content'
-            : 'invalid content';
+            : validation.error === 'invalid_service_context'
+              ? 'invalid service context'
+              : 'invalid content';
     return respond(context, 400, { message });
   }
 
@@ -118,7 +169,7 @@ export default async function (context, req) {
 
   const studentResult = await tenantClient
     .from('Students')
-    .select('id, assigned_instructor_id')
+    .select('id, assigned_instructor_id, default_service')
     .eq('id', validation.studentId)
     .maybeSingle();
 
@@ -152,6 +203,9 @@ export default async function (context, req) {
         date: validation.date,
         content: validation.content,
         instructor_id: sessionInstructorId || null,
+        service_context: validation.hasExplicitService
+          ? validation.serviceContext
+          : validation.serviceContext ?? studentResult.data.default_service ?? null,
       },
     ])
     .select()
