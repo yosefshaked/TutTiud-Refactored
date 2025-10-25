@@ -8,6 +8,7 @@ import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
 import ServiceManager from '@/components/settings/ServiceManager.jsx';
+import InstructorManager from '@/components/settings/InstructorManager.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 
@@ -139,6 +140,15 @@ export default function Settings() {
 
             {canManageSessionForm && (
               <ServiceManager
+                session={session}
+                orgId={activeOrgId}
+                activeOrgHasConnection={activeOrgHasConnection}
+                tenantClientReady={tenantClientReady}
+              />
+            )}
+
+            {canManageSessionForm && (
+              <InstructorManager
                 session={session}
                 orgId={activeOrgId}
                 activeOrgHasConnection={activeOrgHasConnection}

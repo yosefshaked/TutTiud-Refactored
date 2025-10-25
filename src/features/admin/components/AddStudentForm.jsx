@@ -16,6 +16,7 @@ const INITIAL_STATE = {
   name: '',
   contactName: '',
   contactPhone: '',
+  assignedInstructorId: '',
   defaultService: '',
   defaultDayOfWeek: null,
   defaultSessionTime: null,
@@ -28,6 +29,8 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
+  const [instructors, setInstructors] = useState([]);
+  const [loadingInstructors, setLoadingInstructors] = useState(true);
   const { session } = useAuth();
   const { activeOrgId } = useOrg();
 
@@ -60,8 +63,24 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         setLoadingServices(false);
       }
     }
-    
+    async function loadInstructors() {
+      if (!session || !activeOrgId) return;
+      try {
+        setLoadingInstructors(true);
+        const searchParams = new URLSearchParams({ org_id: activeOrgId });
+        const roster = await authenticatedFetch(`instructors?${searchParams.toString()}`, { session });
+        // API returns only active instructors by default
+        setInstructors(Array.isArray(roster) ? roster : []);
+      } catch (err) {
+        console.error('Failed to load instructors', err);
+        setInstructors([]);
+      } finally {
+        setLoadingInstructors(false);
+      }
+    }
+
     loadServices();
+    loadInstructors();
   }, [session, activeOrgId]);
 
   const handleChange = (event) => {
@@ -94,6 +113,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       name: true,
       contactName: true,
       contactPhone: true,
+      assignedInstructorId: true,
       defaultDayOfWeek: true,
       defaultSessionTime: true,
     };
@@ -104,7 +124,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
     const trimmedContactPhone = values.contactPhone.trim();
 
     if (!trimmedName || !trimmedContactName || !trimmedContactPhone || 
-        !values.defaultDayOfWeek || !values.defaultSessionTime) {
+        !values.assignedInstructorId || !values.defaultDayOfWeek || !values.defaultSessionTime) {
       return;
     }
 
@@ -121,6 +141,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       name: trimmedName,
       contactName: trimmedContactName,
       contactPhone: trimmedContactPhone,
+      assignedInstructorId: values.assignedInstructorId,
       defaultService: values.defaultService || null,
       defaultDayOfWeek: values.defaultDayOfWeek,
       defaultSessionTime: values.defaultSessionTime,
@@ -132,6 +153,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
   const showNameError = touched.name && !values.name.trim();
   const showContactNameError = touched.contactName && !values.contactName.trim();
   const showContactPhoneError = touched.contactPhone && (!values.contactPhone.trim() || !validateIsraeliPhone(values.contactPhone));
+  const showInstructorError = touched.assignedInstructorId && !values.assignedInstructorId;
   const showDayError = touched.defaultDayOfWeek && !values.defaultDayOfWeek;
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
 
@@ -154,6 +176,33 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
             יש להזין שם תלמיד.
           </p>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="assigned-instructor">מדריך משויך *</Label>
+        <Select
+          value={values.assignedInstructorId}
+          onValueChange={(value) => handleSelectChange('assignedInstructorId', value)}
+          disabled={isSubmitting || loadingInstructors}
+          required
+        >
+          <SelectTrigger id="assigned-instructor">
+            <SelectValue placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'} />
+          </SelectTrigger>
+          <SelectContent>
+            {instructors.map((inst) => (
+              <SelectItem key={inst.id} value={inst.id}>
+                {inst.name || inst.email || inst.id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {showInstructorError && (
+          <p className="text-sm text-red-600" role="alert">
+            יש לבחור מדריך.
+          </p>
+        )}
+        <p className="text-xs text-slate-500">מוצגים רק מדריכים פעילים.</p>
       </div>
 
       <div className="space-y-2">

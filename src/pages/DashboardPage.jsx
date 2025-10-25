@@ -5,6 +5,7 @@ import PageLayout from "@/components/ui/PageLayout.jsx"
 import Card from "@/components/ui/CustomCard.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
+import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 
 function buildGreeting(user) {
   if (!user) {
@@ -26,6 +27,7 @@ function buildGreeting(user) {
 export default function DashboardPage() {
   const { user } = useAuth()
   const { activeOrg } = useOrg()
+  const { openSessionModal } = useSessionModal()
   const greeting = buildGreeting(user)
 
   const membershipRole = activeOrg?.membership?.role
@@ -68,7 +70,12 @@ export default function DashboardPage() {
           </Card>
         </Link>
 
-        <Link to="/TimeEntry" className="group focus-visible:outline-none">
+        <button
+          type="button"
+          onClick={() => openSessionModal?.()}
+          className="group focus-visible:outline-none"
+          aria-label="פתיחת טופס רישום מפגש חדש"
+        >
           <Card
             className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
           >
@@ -79,7 +86,7 @@ export default function DashboardPage() {
               פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
             </p>
           </Card>
-        </Link>
+        </button>
       </div>
     </PageLayout>
   )

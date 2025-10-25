@@ -24,6 +24,9 @@
 - When editing files in `ProjectDoc/`, keep `Eng.md` and `Heb.md` in sync and update their version and last-updated fields.
 
 ## Notes
+- Instructors are managed in the tenant `tuttiud."Instructors"` table. Records are not deleted; set `is_active=false` to disable. Clients should hide inactive instructors from selection.
+- Student creation requires selecting an active instructor. If a student's assigned instructor is later disabled, surfaces a warning in the roster and prompts reassignment; historical reports remain attributed via `assigned_instructor_id`.
+- `/api/instructors` returns only active instructors by default. Use `include_inactive=true` to fetch disabled ones for admin UIs.
 - WorkSessions inserts should omit `id` so the database can generate it; include `id` only when updating existing records.
 - `/api/work-sessions` now returns full inserted rows (not just IDs) so leave flows can capture the generated `id` for `LeaveBalances.work_session_id`.
 - Payroll calculations now rely solely on `WorkSessions.rate_used` and `total_payment`; avoid adding external salary adjustments in reports.

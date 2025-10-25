@@ -30,6 +30,7 @@ export default function StudentManagementPage() {
   const [isCreatingStudent, setIsCreatingStudent] = useState(false);
   const [createError, setCreateError] = useState('');
   const [studentForAssignment, setStudentForAssignment] = useState(null);
+  const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -109,6 +110,15 @@ export default function StudentManagementPage() {
     }
   }, [canFetch, refreshRoster]);
 
+  // Default the view for admins/owners who are also instructors to "mine"
+  useEffect(() => {
+    if (!user || !Array.isArray(instructors) || instructors.length === 0) return;
+    const isInstructor = instructors.some((i) => i?.id === user.id);
+    if (isInstructor) {
+      setFilterMode((prev) => (prev === 'all' ? 'mine' : prev));
+    }
+  }, [user, instructors]);
+
   const handleOpenAddDialog = () => {
     setCreateError('');
     setIsAddDialogOpen(true);
@@ -125,6 +135,7 @@ export default function StudentManagementPage() {
     name,
     contactName,
     contactPhone,
+    assignedInstructorId,
     defaultService,
     defaultDayOfWeek,
     defaultSessionTime,
@@ -144,6 +155,7 @@ export default function StudentManagementPage() {
         name,
         contact_name: contactName,
         contact_phone: contactPhone,
+        assigned_instructor_id: assignedInstructorId,
         default_service: defaultService,
         default_day_of_week: defaultDayOfWeek,
         default_session_time: defaultSessionTime,
@@ -206,14 +218,35 @@ export default function StudentManagementPage() {
   const isLoadingStudents = studentsState === REQUEST_STATES.loading;
   const isEmpty = !isLoadingStudents && students.length === 0 && !studentsError;
 
+  const displayedStudents = React.useMemo(() => {
+    if (filterMode === 'mine' && user?.id) {
+      return students.filter((s) => s.assigned_instructor_id === user.id);
+    }
+    return students;
+  }, [students, filterMode, user?.id]);
+
   return (
     <div className="space-y-lg">
       <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-title-lg font-semibold text-foreground">ניהול תלמידים</h1>
-        <Button type="button" className="gap-sm self-start" onClick={handleOpenAddDialog}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          תלמיד חדש
-        </Button>
+        <div className="flex items-center gap-3 self-start">
+          <div className="flex items-center gap-2 text-sm">
+            <label htmlFor="students-filter" className="text-neutral-600">הצג:</label>
+            <select
+              id="students-filter"
+              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value)}
+            >
+              <option value="mine">התלמידים שלי</option>
+              <option value="all">כל התלמידים</option>
+            </select>
+          </div>
+          <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            תלמיד חדש
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -246,18 +279,17 @@ export default function StudentManagementPage() {
             </div>
           ) : null}
 
-          {!isLoadingStudents && !studentsError && students.length > 0 ? (
+          {!isLoadingStudents && !studentsError && displayedStudents.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[180px] text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
-                  <TableHead className="min-w-[200px] text-right text-sm font-medium text-neutral-600">פרטי קשר</TableHead>
-                  <TableHead className="min-w-[160px] text-right text-sm font-medium text-neutral-600">מדריך משויך</TableHead>
+                  <TableHead className="min-w-[220px] text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
+                  <TableHead className="min-w-[260px] text-right text-sm font-medium text-neutral-600">פרטי קשר</TableHead>
                   <TableHead className="w-[120px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {students.map((student) => {
+                {displayedStudents.map((student) => {
                   const instructor = instructorMap.get(student.assigned_instructor_id) || null;
                   return (
                     <TableRow key={student.id}>
@@ -269,12 +301,27 @@ export default function StudentManagementPage() {
                         ) : (
                           student.name || 'ללא שם'
                         )}
+                        {filterMode === 'all' ? (
+                          <div className="mt-0.5 text-xs text-neutral-500">
+                            {instructor?.name ? (
+                              <>מדריך: {instructor.name}</>
+                            ) : student.assigned_instructor_id ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenAssignment(student)}
+                                className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
+                                title="שיוך מדריך מחדש"
+                              >
+                                המדריך הושבת — יש לשייך מדריך חדש
+                              </button>
+                            ) : (
+                              <>ללא מדריך</>
+                            )}
+                          </div>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-sm text-neutral-600">
                         {student.contact_info || '—'}
-                      </TableCell>
-                      <TableCell className="text-sm text-neutral-600">
-                        {instructor?.name || 'ללא מדריך'}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

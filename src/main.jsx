@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import AppShell from './components/layout/AppShell.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
+import DashboardPage from './Pages/DashboardPage.jsx';
 import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
 import StudentDetailPage from './features/students/pages/StudentDetailPage.jsx';
 import TimeEntry from './Pages/TimeEntry.jsx';
