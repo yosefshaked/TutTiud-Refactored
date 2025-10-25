@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
-import Button from '@/components/ui/Button.jsx';
-import Input from '@/components/ui/Input.jsx';
+import Button from '@/components/ui/CustomButton.jsx';
+import Input from '@/components/ui/CustomInput.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
 

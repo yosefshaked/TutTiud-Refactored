@@ -54,3 +54,7 @@ export async function fetchLeavePayPolicySettings(options) {
 export async function fetchEmploymentScopePolicySettings(options) {
   return fetchSettingsValue(options, 'employment_scope_policy');
 }
+
+export async function fetchSessionFormConfig(options) {
+  return fetchSettingsValue(options, 'session_form_config');
+}

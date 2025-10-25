@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { Loader2, MailCheck } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthContext.jsx';
-import Button from '@/components/ui/Button.jsx';
-import Input from '@/components/ui/Input.jsx';
+import Button from '@/components/ui/CustomButton.jsx';
+import Input from '@/components/ui/CustomInput.jsx';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
 
