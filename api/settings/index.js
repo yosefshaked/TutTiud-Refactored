@@ -11,7 +11,6 @@ import {
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
-import { normalizeSessionFormConfigValue } from '../_shared/settings-utils.js';
 
 const SETTINGS_DIAGNOSTIC_CHECKS = new Set([
   'Table "Settings" exists',
