@@ -9,7 +9,7 @@ import IsraeliPhoneInput, { validateIsraeliPhone } from '@/components/ui/Israeli
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect';
 import TimePickerInput from '@/components/ui/TimePickerInput';
 import { useAuth } from '@/auth/AuthContext';
-import { useOrganization } from '@/org/OrgProvider';
+import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
 
 const INITIAL_STATE = {
@@ -29,7 +29,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const { session } = useAuth();
-  const { activeOrgId } = useOrganization();
+  const { activeOrgId } = useOrg();
 
   useEffect(() => {
     if (!isSubmitting && !error) {
