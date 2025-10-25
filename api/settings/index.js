@@ -1,233 +1,94 @@
 /* eslint-env node */
-import process from 'node:process';
-import { Buffer } from 'node:buffer';
-import { createHash, createDecipheriv } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
-import { json, resolveBearerAuthorization } from '../_shared/http.js';
+import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
+import {
+  ensureMembership,
+  isAdminRole,
+  normalizeString,
+  parseRequestBody,
+  readEnv,
+  respond,
+  resolveOrgId,
+  resolveTenantClient,
+} from '../_shared/org-bff.js';
+import { normalizeSessionFormConfigValue } from '../_shared/settings-utils.js';
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SETTINGS_DIAGNOSTIC_CHECKS = new Set([
+  'Table "Settings" exists',
+  'RLS enabled on "Settings"',
+  'Policy "Allow full access to authenticated users on Settings" on "Settings" exists',
+]);
 
-function readEnv(context) {
-  if (context?.env && typeof context.env === 'object') {
-    return context.env;
-  }
-  return process.env ?? {};
-}
-
-function respond(context, status, body, extraHeaders) {
-  const response = json(status, body, extraHeaders);
-  context.res = response;
-  return response;
-}
-
-function normalizeString(value) {
-  if (typeof value !== 'string') {
-    return '';
-  }
-  return value.trim();
-}
-
-function resolveEncryptionSecret(env) {
-  const candidates = [
-    env.APP_ORG_CREDENTIALS_ENCRYPTION_KEY,
-    env.ORG_CREDENTIALS_ENCRYPTION_KEY,
-    env.APP_SECRET_ENCRYPTION_KEY,
-    env.APP_ENCRYPTION_KEY,
-  ];
-
-  for (const candidate of candidates) {
-    const normalized = normalizeString(candidate);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return '';
-}
-
-function decodeKeyMaterial(secret) {
-  const attempts = [
-    () => Buffer.from(secret, 'base64'),
-    () => Buffer.from(secret, 'hex'),
-  ];
-
-  for (const attempt of attempts) {
-    try {
-      const buffer = attempt();
-      if (buffer.length) {
-        return buffer;
-      }
-    } catch {
-      // ignore and try next format
-    }
-  }
-
-  return Buffer.from(secret, 'utf8');
-}
-
-function deriveEncryptionKey(secret) {
-  const normalized = normalizeString(secret);
-  if (!normalized) {
-    return null;
-  }
-
-  let keyBuffer = decodeKeyMaterial(normalized);
-
-  if (keyBuffer.length < 32) {
-    keyBuffer = createHash('sha256').update(keyBuffer).digest();
-  }
-
-  if (keyBuffer.length > 32) {
-    keyBuffer = keyBuffer.subarray(0, 32);
-  }
-
-  if (keyBuffer.length < 32) {
-    return null;
-  }
-
-  return keyBuffer;
-}
-
-function decryptDedicatedKey(payload, keyBuffer) {
-  const normalized = normalizeString(payload);
-  if (!normalized || !keyBuffer) {
-    return null;
-  }
-
-  const segments = normalized.split(':');
-  if (segments.length !== 5) {
-    return null;
-  }
-
-  const [, mode, ivPart, authTagPart, cipherPart] = segments;
-  if (mode !== 'gcm') {
-    return null;
-  }
-
-  try {
-    const iv = Buffer.from(ivPart, 'base64');
-    const authTag = Buffer.from(authTagPart, 'base64');
-    const cipherText = Buffer.from(cipherPart, 'base64');
-    const decipher = createDecipheriv('aes-256-gcm', keyBuffer, iv);
-    decipher.setAuthTag(authTag);
-    const decrypted = Buffer.concat([decipher.update(cipherText), decipher.final()]);
-    return decrypted.toString('utf8');
-  } catch {
-    return null;
-  }
-}
-
-function parseRequestBody(req) {
-  if (req?.body && typeof req.body === 'object') {
-    return req.body;
-  }
-
-  const rawBody = typeof req?.body === 'string'
-    ? req.body
-    : typeof req?.rawBody === 'string'
-      ? req.rawBody
-      : null;
-
-  if (!rawBody) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(rawBody);
-  } catch {
-    return {};
-  }
-}
-
-function isValidOrgId(value) {
-  return UUID_PATTERN.test(value);
-}
-
-function isAdminRole(role) {
-  if (!role) {
+function isSchemaOrPolicyError(error) {
+  if (!error) {
     return false;
   }
-  const normalized = String(role).trim().toLowerCase();
-  return normalized === 'admin' || normalized === 'owner';
+  const code = error.code || error.details;
+  if (code === '42P01' || code === '42501') {
+    return true;
+  }
+  const message = String(error.message || error.details || '').toLowerCase();
+  if (!message) {
+    return false;
+  }
+  if (message.includes('relation') && message.includes('settings')) {
+    return true;
+  }
+  if (message.includes('permission denied') && message.includes('settings')) {
+    return true;
+  }
+  return false;
 }
 
-function createTenantClient({ supabaseUrl, anonKey, dedicatedKey }) {
-  if (!supabaseUrl || !anonKey || !dedicatedKey) {
-    throw new Error('Missing tenant connection parameters.');
-  }
+async function verifySettingsInfrastructure(context, tenantClient) {
+  const { data, error } = await tenantClient
+    .rpc('tuttiud.setup_assistant_diagnostics');
 
-  return createClient(supabaseUrl, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-    global: {
-      headers: {
-        Authorization: `Bearer ${dedicatedKey}`,
+  if (error) {
+    context.log?.error?.('settings diagnostics failed', { message: error.message });
+    return {
+      status: 424,
+      body: {
+        message: 'settings_schema_unverified',
+        reason: 'diagnostics_failed',
       },
-    },
-    db: {
-      schema: 'tuttiud',
-    },
-  });
+    };
+  }
+
+  const relevantChecks = Array.isArray(data)
+    ? data.filter((entry) => entry && SETTINGS_DIAGNOSTIC_CHECKS.has(entry.check_name))
+    : [];
+
+  const failing = relevantChecks.filter((entry) => entry && entry.success === false);
+
+  if (failing.length) {
+    return {
+      status: 424,
+      body: {
+        message: 'settings_schema_incomplete',
+        diagnostics: failing.map((entry) => ({
+          check: entry.check_name,
+          details: entry.details,
+        })),
+      },
+    };
+  }
+
+  return null;
 }
 
-async function fetchOrgConnection(supabase, orgId) {
-  const [{ data: settings, error: settingsError }, { data: organization, error: orgError }] = await Promise.all([
-    supabase
-      .from('org_settings')
-      .select('supabase_url, anon_key')
-      .eq('org_id', orgId)
-      .maybeSingle(),
-    supabase
-      .from('organizations')
-      .select('dedicated_key_encrypted')
-      .eq('id', orgId)
-      .maybeSingle(),
-  ]);
-
-  if (settingsError) {
-    return { error: settingsError };
-  }
-
-  if (orgError) {
-    return { error: orgError };
-  }
-
-  if (!settings || !settings.supabase_url || !settings.anon_key) {
-    return { error: new Error('missing_connection_settings') };
-  }
-
-  if (!organization || !organization.dedicated_key_encrypted) {
-    return { error: new Error('missing_dedicated_key') };
+async function mapSettingsError(context, tenantClient, error, fallbackMessage) {
+  if (isSchemaOrPolicyError(error)) {
+    const infrastructureError = await verifySettingsInfrastructure(context, tenantClient);
+    if (infrastructureError) {
+      return infrastructureError;
+    }
   }
 
   return {
-    supabaseUrl: settings.supabase_url,
-    anonKey: settings.anon_key,
-    encryptedKey: organization.dedicated_key_encrypted,
+    status: 500,
+    body: { message: fallbackMessage },
   };
-}
-
-async function ensureMembership(supabase, orgId, userId) {
-  const { data, error } = await supabase
-    .from('org_memberships')
-    .select('role')
-    .eq('org_id', orgId)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return data.role || 'member';
 }
 
 function normalizeSettingsObject(raw) {
@@ -317,214 +178,6 @@ function collectKeysFromQuery(query) {
   return normalizeKeyList(bucket.length === 1 ? bucket[0] : bucket);
 }
 
-function extractFirstString(candidates) {
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string') {
-      const trimmed = candidate.trim();
-      if (trimmed) {
-        return trimmed;
-      }
-    }
-  }
-  return '';
-}
-
-function createOptionFallback(option) {
-  if (!option) {
-    return '';
-  }
-
-  if (typeof option === 'string') {
-    const trimmed = option.trim();
-    return trimmed ? trimmed : '';
-  }
-
-  if (typeof option !== 'object') {
-    const normalized = String(option).trim();
-    return normalized ? normalized : '';
-  }
-
-  if (typeof option.toString === 'function' && option.toString !== Object.prototype.toString) {
-    const custom = option.toString();
-    if (typeof custom === 'string' && custom.trim()) {
-      return custom.trim();
-    }
-  }
-
-  try {
-    const serialized = JSON.stringify(option);
-    if (serialized && serialized !== '{}') {
-      return serialized;
-    }
-  } catch {
-    // ignore
-  }
-
-  return '';
-}
-
-function normalizeSessionFormOption(option) {
-  if (option === null || option === undefined) {
-    return null;
-  }
-
-  if (typeof option === 'string') {
-    const trimmed = option.trim();
-    if (!trimmed) {
-      return null;
-    }
-    return { value: trimmed, label: trimmed };
-  }
-
-  if (typeof option !== 'object') {
-    const normalized = String(option).trim();
-    if (!normalized) {
-      return null;
-    }
-    return { value: normalized, label: normalized };
-  }
-
-  const label = extractFirstString([
-    option.label,
-    option.title,
-    option.name,
-    option.text,
-    option.value,
-  ]);
-
-  const value = extractFirstString([
-    option.value,
-    option.id,
-    option.key,
-    option.code,
-    option.slug,
-  ]);
-
-  const normalized = {};
-
-  const idCandidate = extractFirstString([option.id, option.key]);
-  if (idCandidate) {
-    normalized.id = idCandidate;
-  }
-
-  const safeValue = value || label;
-  const safeLabel = label || value;
-
-  if (!safeValue && !safeLabel) {
-    const fallback = createOptionFallback(option);
-    if (!fallback) {
-      return null;
-    }
-    normalized.value = fallback;
-    normalized.label = fallback;
-    return normalized;
-  }
-
-  normalized.value = safeValue || safeLabel;
-  normalized.label = safeLabel || normalized.value;
-
-  return normalized;
-}
-
-function normalizeSessionFormQuestion(entry, index) {
-  const fallbackId = `question_${index + 1}`;
-
-  if (!entry || typeof entry !== 'object') {
-    return {
-      id: fallbackId,
-      label: `שאלה ${index + 1}`,
-      type: 'text',
-      options: [],
-      required: false,
-    };
-  }
-
-  const idCandidates = [entry.id, entry.key, entry.name];
-  let id = '';
-  for (const candidate of idCandidates) {
-    if (typeof candidate === 'string' && candidate.trim()) {
-      id = candidate.trim();
-      break;
-    }
-  }
-  if (!id) {
-    id = fallbackId;
-  }
-
-  const labelCandidates = [entry.label, entry.title, entry.question];
-  let label = '';
-  for (const candidate of labelCandidates) {
-    if (typeof candidate === 'string' && candidate.trim()) {
-      label = candidate.trim();
-      break;
-    }
-  }
-  if (!label) {
-    label = id;
-  }
-
-  const type = typeof entry.type === 'string' && entry.type.trim()
-    ? entry.type.trim()
-    : 'text';
-
-  const options = Array.isArray(entry.options)
-    ? entry.options
-        .map((option) => normalizeSessionFormOption(option))
-        .filter(Boolean)
-    : [];
-
-  const normalized = {
-    id,
-    label,
-    type,
-    options,
-    required: Boolean(entry.required),
-  };
-
-  if (typeof entry.placeholder === 'string' && entry.placeholder.trim()) {
-    normalized.placeholder = entry.placeholder.trim();
-  }
-
-  if (typeof entry.helpText === 'string' && entry.helpText.trim()) {
-    normalized.helpText = entry.helpText.trim();
-  }
-
-  return normalized;
-}
-
-function normalizeSessionFormConfigValue(raw) {
-  if (raw === null || raw === undefined) {
-    return { error: 'invalid_session_form_config' };
-  }
-
-  let payload = raw;
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      return { error: 'invalid_session_form_config' };
-    }
-    try {
-      payload = JSON.parse(trimmed);
-    } catch {
-      return { error: 'invalid_session_form_config' };
-    }
-  }
-
-  if (Array.isArray(payload)) {
-    return {
-      questions: payload.map((entry, index) => normalizeSessionFormQuestion(entry, index)),
-    };
-  }
-
-  if (payload && typeof payload === 'object') {
-    const questionsSource = Array.isArray(payload.questions) ? payload.questions : [];
-    return {
-      questions: questionsSource.map((entry, index) => normalizeSessionFormQuestion(entry, index)),
-    };
-  }
-
-  return { error: 'invalid_session_form_config' };
-}
 
 function extractSessionFormVersion(value) {
   if (value === null || value === undefined) {
@@ -586,7 +239,7 @@ async function applySessionFormVersioning(tenantClient, entries, existingSetting
       .maybeSingle();
 
     if (error) {
-      return { error: 'failed_to_load_session_form_config' };
+      return { error: 'failed_to_load_session_form_config', supabaseError: error };
     }
 
     currentVersion = extractSessionFormVersion(data?.settings_value);
@@ -613,9 +266,8 @@ export default async function (context, req) {
 
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
-  const { supabaseUrl, serviceRoleKey } = adminConfig;
 
-  if (!supabaseUrl || !serviceRoleKey) {
+  if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
     context.log?.error?.('settings missing Supabase admin credentials');
     return respond(context, 500, { message: 'server_misconfigured' });
   }
@@ -638,24 +290,15 @@ export default async function (context, req) {
   const userId = authResult.data.user.id;
   const method = String(req.method || 'GET').toUpperCase();
   const body = method === 'GET' ? {} : parseRequestBody(req);
-  const query = req?.query ?? {};
-  const orgCandidate = body.org_id || body.orgId || query.org_id || query.orgId;
-  const orgId = normalizeString(orgCandidate);
+  const orgId = resolveOrgId(req, body);
 
-  if (!orgId || !isValidOrgId(orgId)) {
+  if (!orgId) {
     return respond(context, 400, { message: 'invalid org id' });
   }
 
   let role;
   try {
     role = await ensureMembership(supabase, orgId, userId);
-    if (!role) {
-      return respond(context, 403, { message: 'forbidden' });
-    }
-
-    if ((method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') && !isAdminRole(role)) {
-      return respond(context, 403, { message: 'forbidden' });
-    }
   } catch (membershipError) {
     context.log?.error?.('settings failed to verify membership', {
       message: membershipError?.message,
@@ -665,37 +308,20 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_verify_membership' });
   }
 
-  const connectionResult = await fetchOrgConnection(supabase, orgId);
-  if (connectionResult.error) {
-    const message = connectionResult.error.message || 'failed_to_load_connection';
-    const status = message === 'missing_connection_settings' ? 412 : message === 'missing_dedicated_key' ? 428 : 500;
-    return respond(context, status, { message });
+  if (!role) {
+    return respond(context, 403, { message: 'forbidden' });
   }
 
-  const encryptionSecret = resolveEncryptionSecret(env);
-  const encryptionKey = deriveEncryptionKey(encryptionSecret);
-
-  if (!encryptionKey) {
-    context.log?.error?.('settings missing encryption secret');
-    return respond(context, 500, { message: 'encryption_not_configured' });
+  if ((method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') && !isAdminRole(role)) {
+    return respond(context, 403, { message: 'forbidden' });
   }
 
-  const dedicatedKey = decryptDedicatedKey(connectionResult.encryptedKey, encryptionKey);
-  if (!dedicatedKey) {
-    return respond(context, 500, { message: 'failed_to_decrypt_key' });
+  const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
+  if (tenantError) {
+    return respond(context, tenantError.status, tenantError.body);
   }
 
-  let tenantClient;
-  try {
-    tenantClient = createTenantClient({
-      supabaseUrl: connectionResult.supabaseUrl,
-      anonKey: connectionResult.anonKey,
-      dedicatedKey,
-    });
-  } catch (clientError) {
-    context.log?.error?.('settings failed to create tenant client', { message: clientError?.message });
-    return respond(context, 500, { message: 'failed_to_connect_tenant' });
-  }
+  const query = req?.query ?? {};
 
   if (method === 'GET') {
     const requestedKeys = collectKeysFromQuery(query);
@@ -711,7 +337,8 @@ export default async function (context, req) {
 
     if (error) {
       context.log?.error?.('settings fetch failed', { message: error.message });
-      return respond(context, 500, { message: 'failed_to_fetch_settings' });
+      const mapped = await mapSettingsError(context, tenantClient, error, 'failed_to_fetch_settings');
+      return respond(context, mapped.status, mapped.body);
     }
 
     const settingsMap = {};
@@ -745,6 +372,15 @@ export default async function (context, req) {
 
     const sessionFormResult = await applySessionFormVersioning(tenantClient, payload);
     if (sessionFormResult.error) {
+      if (sessionFormResult.error === 'failed_to_load_session_form_config' && sessionFormResult.supabaseError) {
+        const mapped = await mapSettingsError(
+          context,
+          tenantClient,
+          sessionFormResult.supabaseError,
+          'failed_to_load_session_form_config',
+        );
+        return respond(context, mapped.status, mapped.body);
+      }
       if (sessionFormResult.error !== 'invalid_session_form_config') {
         context.log?.error?.('settings failed to prepare session form config', {
           reason: sessionFormResult.error,
@@ -765,7 +401,8 @@ export default async function (context, req) {
 
     if (error) {
       context.log?.error?.('settings upsert failed', { message: error.message });
-      return respond(context, 500, { message: 'failed_to_update_settings' });
+      const mapped = await mapSettingsError(context, tenantClient, error, 'failed_to_update_settings');
+      return respond(context, mapped.status, mapped.body);
     }
 
     return respond(context, 201, { updated: true, count: payload.length });
@@ -785,7 +422,8 @@ export default async function (context, req) {
 
     if (existingError) {
       context.log?.error?.('settings lookup failed before update', { message: existingError.message });
-      return respond(context, 500, { message: 'failed_to_update_settings' });
+      const mapped = await mapSettingsError(context, tenantClient, existingError, 'failed_to_update_settings');
+      return respond(context, mapped.status, mapped.body);
     }
 
     const existingMap = new Map();
@@ -809,6 +447,15 @@ export default async function (context, req) {
 
     const sessionFormResult = await applySessionFormVersioning(tenantClient, payload, existingMap);
     if (sessionFormResult.error) {
+      if (sessionFormResult.error === 'failed_to_load_session_form_config' && sessionFormResult.supabaseError) {
+        const mapped = await mapSettingsError(
+          context,
+          tenantClient,
+          sessionFormResult.supabaseError,
+          'failed_to_load_session_form_config',
+        );
+        return respond(context, mapped.status, mapped.body);
+      }
       if (sessionFormResult.error !== 'invalid_session_form_config') {
         context.log?.error?.('settings failed to prepare session form config', {
           reason: sessionFormResult.error,
@@ -829,7 +476,8 @@ export default async function (context, req) {
 
     if (error) {
       context.log?.error?.('settings update failed', { message: error.message });
-      return respond(context, 500, { message: 'failed_to_update_settings' });
+      const mapped = await mapSettingsError(context, tenantClient, error, 'failed_to_update_settings');
+      return respond(context, mapped.status, mapped.body);
     }
 
     return respond(context, 200, { updated: true, count: payload.length });
@@ -852,7 +500,8 @@ export default async function (context, req) {
 
     if (error) {
       context.log?.error?.('settings delete failed', { message: error.message });
-      return respond(context, 500, { message: 'failed_to_delete_settings' });
+      const mapped = await mapSettingsError(context, tenantClient, error, 'failed_to_delete_settings');
+      return respond(context, mapped.status, mapped.body);
     }
 
     if (!data || !data.length) {
@@ -865,7 +514,3 @@ export default async function (context, req) {
   return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST,PUT,PATCH,DELETE' });
 }
 
-export {
-  normalizeSessionFormQuestion,
-  normalizeSessionFormConfigValue,
-};

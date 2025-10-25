@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSessionFormConfigValue } from '../api/settings/index.js';
+import { normalizeSessionFormConfigValue } from '../api/_shared/settings-utils.js';
 
 describe('session form normalization', () => {
   it('preserves option objects when provided', () => {
