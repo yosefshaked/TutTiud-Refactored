@@ -7,6 +7,7 @@ import { PlugZap, Sparkles } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
+import ServiceManager from '@/components/settings/ServiceManager.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 
@@ -135,6 +136,15 @@ export default function Settings() {
               activeOrgHasConnection={activeOrgHasConnection}
               tenantClientReady={tenantClientReady}
             />
+
+            {canManageSessionForm && (
+              <ServiceManager
+                session={session}
+                orgId={activeOrgId}
+                activeOrgHasConnection={activeOrgHasConnection}
+                tenantClientReady={tenantClientReady}
+              />
+            )}
 
             <Dialog open={isSetupDialogOpen} onOpenChange={handleSetupDialogChange}>
               <DialogContent

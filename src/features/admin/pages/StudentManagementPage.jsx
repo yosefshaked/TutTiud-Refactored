@@ -121,7 +121,16 @@ export default function StudentManagementPage() {
     }
   };
 
-  const handleCreateStudent = async ({ name, contactInfo }) => {
+  const handleCreateStudent = async ({
+    name,
+    contactName,
+    contactPhone,
+    defaultService,
+    defaultDayOfWeek,
+    defaultSessionTime,
+    notes,
+    tags,
+  }) => {
     if (!canFetch) {
       return;
     }
@@ -133,7 +142,13 @@ export default function StudentManagementPage() {
       const body = {
         org_id: activeOrgId,
         name,
-        contact_info: contactInfo || undefined,
+        contact_name: contactName,
+        contact_phone: contactPhone,
+        default_service: defaultService,
+        default_day_of_week: defaultDayOfWeek,
+        default_session_time: defaultSessionTime,
+        notes,
+        tags,
       };
       await authenticatedFetch('students', {
         session,

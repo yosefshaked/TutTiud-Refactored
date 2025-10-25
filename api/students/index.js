@@ -14,6 +14,29 @@ import {
 } from '../_shared/org-bff.js';
 
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?(?:Z|[+-](?:0\d|1\d|2[0-3]):[0-5]\d)?$/;
+const ISRAELI_PHONE_PATTERN = /^(?:0(?:5[0-9]|[2-4|8-9][0-9])-?\d{7}|(?:\+?972-?)?5[0-9]-?\d{7})$/;
+
+function validateIsraeliPhone(value) {
+  if (value === null || value === undefined) {
+    return { value: null, valid: true };
+  }
+  
+  if (typeof value !== 'string') {
+    return { value: null, valid: false };
+  }
+  
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { value: null, valid: true };
+  }
+  
+  const normalized = trimmed.replace(/[\s-]/g, '');
+  if (ISRAELI_PHONE_PATTERN.test(normalized)) {
+    return { value: trimmed, valid: true };
+  }
+  
+  return { value: null, valid: false };
+}
 
 function extractStudentId(context, req, body) {
   const candidate =
@@ -113,7 +136,7 @@ function buildStudentPayload(body) {
     return { error: 'invalid_contact_name' };
   }
 
-  const contactPhoneResult = coerceOptionalText(body?.contact_phone ?? body?.contactPhone);
+  const contactPhoneResult = validateIsraeliPhone(body?.contact_phone ?? body?.contactPhone);
   if (!contactPhoneResult.valid) {
     return { error: 'invalid_contact_phone' };
   }
@@ -211,7 +234,7 @@ function buildStudentUpdates(body) {
   }
 
   if (Object.prototype.hasOwnProperty.call(body, 'contact_phone') || Object.prototype.hasOwnProperty.call(body, 'contactPhone')) {
-    const { value, valid } = coerceOptionalText(
+    const { value, valid } = validateIsraeliPhone(
       Object.prototype.hasOwnProperty.call(body, 'contact_phone') ? body.contact_phone : body.contactPhone,
     );
     if (!valid) {
