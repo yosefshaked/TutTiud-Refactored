@@ -8,7 +8,7 @@ import { Loader2 } from 'lucide-react';
 import IsraeliPhoneInput, { validateIsraeliPhone } from '@/components/ui/IsraeliPhoneInput';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect';
 import TimePickerInput from '@/components/ui/TimePickerInput';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/auth/AuthContext';
 import { useOrganization } from '@/org/OrgProvider';
 import { authenticatedFetch } from '@/lib/api-client';
 
