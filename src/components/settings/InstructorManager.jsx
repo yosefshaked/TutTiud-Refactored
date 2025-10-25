@@ -173,27 +173,62 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
               ) : (
                 <div className="space-y-2 max-h-72 overflow-y-auto">
                   {activeInstructors.map((i) => (
-                    <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
-                      <div className="min-w-[200px]">
-                        <div className="text-sm font-medium text-slate-900">{i.name || i.email || i.id}</div>
-                        <div className="text-xs text-slate-500">{i.email || '—'}</div>
+                    <div key={i.id} className="flex flex-col gap-2 rounded-md border p-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-[260px]">
+                          <Label htmlFor={`inst-name-${i.id}`} className="text-xs text-slate-600">שם</Label>
+                          <Input
+                            id={`inst-name-${i.id}`}
+                            placeholder="שם המדריך"
+                            className="h-8"
+                            defaultValue={i.name || ''}
+                            onBlur={(e) => {
+                              const val = e.target.value.trim();
+                              if (val !== (i.name || '')) {
+                                handleSaveDetails(i, { name: val || null });
+                              }
+                            }}
+                            disabled={isSaving}
+                          />
+                          <div className="mt-1 text-xs text-slate-500">{i.email || '—'}</div>
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <div>
+                            <Label htmlFor={`inst-phone-${i.id}`} className="text-xs text-slate-600">טלפון</Label>
+                            <Input
+                              id={`inst-phone-${i.id}`}
+                              placeholder="טלפון"
+                              className="h-8 w-40"
+                              defaultValue={i.phone || ''}
+                              onBlur={(e) => {
+                                const val = e.target.value.trim();
+                                if (val !== (i.phone || '')) {
+                                  handleSaveDetails(i, { phone: val || null });
+                                }
+                              }}
+                              disabled={isSaving}
+                            />
+                          </div>
+                          <Button type="button" variant="outline" size="sm" onClick={() => handleDisable(i)} disabled={isSaving}>
+                            <UserX className="h-4 w-4" /> השבת
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          placeholder="טלפון"
-                          className="h-8 w-40"
-                          defaultValue={i.phone || ''}
+                      <div>
+                        <Label htmlFor={`inst-notes-${i.id}`} className="text-xs text-slate-600">הערות</Label>
+                        <textarea
+                          id={`inst-notes-${i.id}`}
+                          className="mt-1 w-full resize-y rounded-md border p-2 text-sm"
+                          rows={2}
+                          defaultValue={i.notes || ''}
                           onBlur={(e) => {
                             const val = e.target.value.trim();
-                            if (val !== (i.phone || '')) {
-                              handleSaveDetails(i, { phone: val });
+                            if (val !== (i.notes || '')) {
+                              handleSaveDetails(i, { notes: val || null });
                             }
                           }}
                           disabled={isSaving}
                         />
-                        <Button type="button" variant="outline" size="sm" onClick={() => handleDisable(i)} disabled={isSaving}>
-                          <UserX className="h-4 w-4" /> השבת
-                        </Button>
                       </div>
                     </div>
                   ))}

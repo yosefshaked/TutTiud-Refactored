@@ -15,6 +15,7 @@ function todayIsoDate() {
 export default function NewSessionForm({
   students = [],
   questions = [],
+  services = [],
   initialStudentId = '',
   onSubmit,
   onCancel,
@@ -189,13 +190,31 @@ export default function NewSessionForm({
         </div>
         <div className="space-y-sm">
           <Label htmlFor="session-service">שירות ברירת מחדל</Label>
-          <Input
-            id="session-service"
-            value={serviceContext}
-            onChange={handleServiceChange}
-            placeholder="לדוגמה: שיעור פסנתר"
-            disabled={isSubmitting}
-          />
+          {Array.isArray(services) && services.length > 0 ? (
+            <>
+              <Input
+                id="session-service"
+                list="available-services"
+                value={serviceContext}
+                onChange={handleServiceChange}
+                placeholder="בחרו מהרשימה או הקלידו שירות"
+                disabled={isSubmitting}
+              />
+              <datalist id="available-services">
+                {services.map((svc) => (
+                  <option key={svc} value={svc} />
+                ))}
+              </datalist>
+            </>
+          ) : (
+            <Input
+              id="session-service"
+              value={serviceContext}
+              onChange={handleServiceChange}
+              placeholder="לדוגמה: שיעור פסנתר"
+              disabled={isSubmitting}
+            />
+          )}
           <p className="text-xs text-neutral-500">הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה.</p>
         </div>
       </div>

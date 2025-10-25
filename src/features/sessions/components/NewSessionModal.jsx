@@ -24,6 +24,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionError, setQuestionError] = useState('');
   const [questions, setQuestions] = useState([]);
+  const [services, setServices] = useState([]);
   const [submitState, setSubmitState] = useState(REQUEST_STATE.idle);
   const [submitError, setSubmitError] = useState('');
 
@@ -93,10 +94,25 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     }
   }, [open, canFetchStudents, activeOrgId]);
 
+  const loadServices = useCallback(async () => {
+    if (!open || !canFetchStudents) return;
+    try {
+      const searchParams = new URLSearchParams({ keys: 'available_services' });
+      if (activeOrgId) searchParams.set('org_id', activeOrgId);
+      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
+      const settingsValue = payload?.settings?.available_services;
+      setServices(Array.isArray(settingsValue) ? settingsValue : []);
+    } catch (error) {
+      console.error('Failed to load available services', error);
+      setServices([]);
+    }
+  }, [open, canFetchStudents, activeOrgId]);
+
   useEffect(() => {
     if (open) {
       void loadStudents();
       void loadQuestions();
+      void loadServices();
     } else {
       setStudentsState(REQUEST_STATE.idle);
       setStudentsError('');
@@ -104,8 +120,9 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setQuestionsState(REQUEST_STATE.idle);
       setQuestionError('');
       setQuestions([]);
+      setServices([]);
     }
-  }, [open, loadQuestions, loadStudents]);
+  }, [open, loadQuestions, loadStudents, loadServices]);
 
   const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
     setSubmitState(REQUEST_STATE.loading);
@@ -166,6 +183,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
           <NewSessionForm
             students={students}
             questions={questions}
+            services={services}
             initialStudentId={initialStudentId}
             onSubmit={handleSubmit}
             onCancel={onClose}
