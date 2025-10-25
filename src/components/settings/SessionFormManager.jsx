@@ -102,6 +102,9 @@ function extractRawQuestions(settingsValue) {
   if (Array.isArray(payload)) {
     return payload;
   }
+  if (payload && typeof payload === 'object' && payload.current && Array.isArray(payload.current.questions)) {
+    return payload.current.questions;
+  }
   if (payload && typeof payload === 'object' && Array.isArray(payload.questions)) {
     return payload.questions;
   }

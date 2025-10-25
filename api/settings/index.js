@@ -201,7 +201,13 @@ function extractSessionFormVersion(value) {
     return 0;
   }
 
-  const candidate = Object.prototype.hasOwnProperty.call(payload, 'version') ? payload.version : null;
+  let candidate = null;
+  if (payload.current && typeof payload.current === 'object') {
+    candidate = payload.current.version;
+  } else if (Object.prototype.hasOwnProperty.call(payload, 'version')) {
+    candidate = payload.version;
+  }
+
   if (candidate === null || candidate === undefined) {
     return 0;
   }
@@ -228,9 +234,9 @@ async function applySessionFormVersioning(tenantClient, entries, existingSetting
     return { error: normalized.error };
   }
 
-  let currentVersion = 0;
+  let existingData = null;
   if (existingSettings && existingSettings.has('session_form_config')) {
-    currentVersion = extractSessionFormVersion(existingSettings.get('session_form_config'));
+    existingData = existingSettings.get('session_form_config');
   } else {
     const { data, error } = await tenantClient
       .from('Settings')
@@ -242,14 +248,40 @@ async function applySessionFormVersioning(tenantClient, entries, existingSetting
       return { error: 'failed_to_load_session_form_config', supabaseError: error };
     }
 
-    currentVersion = extractSessionFormVersion(data?.settings_value);
+    existingData = data?.settings_value || null;
   }
 
+  const currentVersion = extractSessionFormVersion(existingData);
   const nextVersion = currentVersion + 1;
 
+  const history = [];
+  if (existingData && typeof existingData === 'object') {
+    if (existingData.current && existingData.current.version && existingData.current.questions) {
+      history.push({
+        version: existingData.current.version,
+        questions: existingData.current.questions,
+        saved_at: new Date().toISOString(),
+      });
+    } else if (existingData.version && existingData.questions) {
+      history.push({
+        version: existingData.version,
+        questions: existingData.questions,
+        saved_at: new Date().toISOString(),
+      });
+    }
+    
+    if (Array.isArray(existingData.history)) {
+      history.push(...existingData.history);
+    }
+  }
+
   entries[targetIndex].settings_value = {
-    version: nextVersion,
-    questions: normalized.questions,
+    current: {
+      version: nextVersion,
+      questions: normalized.questions,
+      saved_at: new Date().toISOString(),
+    },
+    history: history,
   };
 
   return { entries, version: nextVersion };

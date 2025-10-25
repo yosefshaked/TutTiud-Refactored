@@ -32,6 +32,10 @@ export function parseSessionFormConfig(settingsValue) {
     return payload.map((entry, index) => normalizeQuestion(entry, index));
   }
 
+  if (payload && typeof payload === 'object' && payload.current && Array.isArray(payload.current.questions)) {
+    return payload.current.questions.map((entry, index) => normalizeQuestion(entry, index));
+  }
+
   if (payload && typeof payload === 'object' && Array.isArray(payload.questions)) {
     return payload.questions.map((entry, index) => normalizeQuestion(entry, index));
   }
