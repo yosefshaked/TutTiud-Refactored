@@ -65,142 +65,112 @@ export default function ChangelogModal({ open, onClose }) {
 
         <h2
           id="changelog-title"
-          style={{ fontSize: 22, fontWeight: 700, color: '#2563eb', marginBottom: 18 }}
+          style={{ 
+            fontSize: 22, 
+            fontWeight: 700, 
+            color: '#5B5BD6', 
+            padding: '24px 24px 12px',
+            margin: 0,
+            borderBottom: '1px solid #e2e8f0'
+          }}
         >
-          עדכונים במערכת
+          עדכוני גרסה
         </h2>
 
-        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 17 }}>
+        <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
 
-          {/* 1.3.0 */}
-          <li className="mb-4" dir="rtl" style={{ marginBottom: 20, textAlign: 'right' }}>
-            <article className="space-y-3">
+          {/* 1.0.0 - TutTiud Launch */}
+          <li dir="rtl" style={{ marginBottom: 0, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <header>
-                <h1 className="font-bold text-lg" style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
-                  <time dateTime="2025-09-08">08/09/2025</time> – גרסה 1.3.0
-                </h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                  <span style={{ 
+                    background: '#5B5BD6', 
+                    color: 'white', 
+                    padding: '4px 12px', 
+                    borderRadius: '6px', 
+                    fontSize: '14px',
+                    fontWeight: 600
+                  }}>
+                    גרסה 1.0.0
+                  </span>
+                  <time dateTime="2025-10-26" style={{ color: '#64748b', fontSize: '14px' }}>
+                    26 באוקטובר 2025
+                  </time>
+                </div>
+                <h3 style={{ 
+                  fontWeight: 700, 
+                  fontSize: 20, 
+                  margin: 0,
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  🎉 השקת TutTiud - מערכת ניהול תלמידים ומפגשים
+                </h3>
               </header>
-              <section>
-                <ul className="list-disc pr-5 space-y-1" style={{ paddingRight: 18, margin: 0 }}>
-                  <li>הוספת טבלה לניהול רישום הזמנים</li>
-                  <li>תיקון באגים.</li>
-                </ul>
-              </section>
-            </article>
-          </li>
 
-          {/* 1.2.1 */}
-          <li className="mb-4" dir="rtl" style={{ marginBottom: 20, textAlign: 'right' }}>
-            <article className="space-y-3">
-              <header>
-                <h1 className="font-bold text-lg" style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
-                  <time dateTime="2025-09-08">08/09/2025</time> – גרסה 1.2.1
-                </h1>
-              </header>
               <section>
-                <ul className="list-disc pr-5 space-y-1" style={{ paddingRight: 18, margin: 0 }}>
-                  <li>חיפוש בדף העובדים כעת מוצא אם רשמתם בטעות באנגלית.</li>
-                  <li>תיקון באגים.</li>
-                </ul>
-              </section>
-            </article>
-          </li>
-
-          {/* 1.2.1 */}
-          <li className="mb-4" dir="rtl" style={{ marginBottom: 20, textAlign: 'right' }}>
-            <article className="space-y-3">
-              <header>
-                <h1 className="font-bold text-lg" style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
-                  <time dateTime="2025-09-08">08/09/2025</time> – גרסה 1.2.1
-                </h1>
-              </header>
-              <section>
-                <ul className="list-disc pr-5 space-y-1" style={{ paddingRight: 18, margin: 0 }}>
-                  <li>חיפוש בדף העובדים כעת מוצא אם רשמתם בטעות באנגלית.</li>
-                  <li>תיקון באגים.</li>
-                </ul>
-              </section>
-            </article>
-          </li>
-          
-          {/* 1.2.0 */}
-          <li className="mb-4" dir="rtl" style={{ marginBottom: 20, textAlign: 'right' }}>
-            <article className="space-y-3">
-              <header>
-                <h1 className="font-bold text-lg" style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
-                  <time dateTime="2025-09-08">08/09/2025</time> – 🚀 גרסה 1.2.0 זמינה!
-                </h1>
-              </header>
-              <section>
-                <ul className="list-disc pr-5 space-y-1" style={{ paddingRight: 18, margin: 0 }}>
-                  <li>הסברים בעברית במדדים ודוחות.</li>
-                  <li>אזהרה כשנבחר חודש חלקי - לתשומת לב כאשר נדרשים חישובים מדויקים יותר.</li>
-                  <li>תווית "התאמה" בפעילות אחרונה.</li>
-                  <li>גרפי מדריכים בצבעי שירותים.</li>
-                  <li>חישובים חודשיים מדויקים יותר (תשלומים, מגמות, דוחות, סיכומי שכר).</li>
-                  <li>תיקוני באגים ושיפורי תוויות בעברית.</li>
-                </ul>
-              </section>
-            </article>
-          </li>
-
-          {/* 1.1.0 */}
-          <li className="mb-4" dir="rtl" style={{ marginBottom: 20, textAlign: 'right' }}>
-            <article className="space-y-3">
-              <header>
-                <h1 className="font-bold text-lg" style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
-                  <time dateTime="2025-09-07">07/09/2025</time> – ✨ גרסה 1.1.0
-                </h1>
-              </header>
-              <section>
-                <ul className="list-disc pr-5 space-y-1" style={{ paddingRight: 18, margin: 0 }}>
-                  <li>סוג עובד חדש – "גלובלי" עם שכר חודשי קבוע.</li>
-                  <li>דף התאמות שכר: יכולת ניכוי וזיכוי/בונוס לעובדים.</li>
-                  <li>תצוגת טבלת עובדים מקצועית עם קיפול/פתיחת תעריפי מדריכים + "פתח/סגור הכל".</li>
-                  <li>בסיס לניהול חופשות (LeaveBalances). יכולת בפיתוח.</li>
-                  <li>שיפור לדיוק היסטוריית השכר והפעולות.</li>
-                  <li>תיקוני באגים קטנים ושיפורי ממשק.</li>
-                </ul>
-              </section>
-            </article>
-          </li>
-
-          {/* 1.0.0 (כפי שהיה בקוד שלך) */}
-          <li className="mb-4" dir="rtl" style={{ marginBottom: 0, textAlign: 'right' }}>
-            <article className="space-y-3">
-              <header>
-                <h1 className="font-bold text-lg" style={{ fontWeight: 700, fontSize: 18, margin: 0 }}>
-                  <time dateTime="2025-09-07">07/09/2025</time> – 🎉 ברוכים הבאים לגרסה 1.0.0 של מערכת ניהול עובדים ושכר!
-                </h1>
-                <p style={{ marginTop: 6, marginBottom: 10 }}>
-                  זוהי ההשקה הרשמית של המערכת החדשה, שנבנתה כדי להחליף את קובצי ה־Excel
-                  המורכבים ולאפשר עבודה פשוטה, מדויקת ואמינה.
+                <p style={{ margin: '0 0 16px', color: '#475569', lineHeight: 1.6 }}>
+                  ברוכים הבאים למערכת TutTiud! פלטפורמה מקצועית לניהול תלמידים, תיעוד מפגשים ומעקב אחר התקדמות.
                 </p>
-              </header>
 
-              <section>
-                <h2 className="font-semibold" style={{ fontWeight: 600, fontSize: 16, margin: '6px 0' }}>
-                  מה כולל בשלב זה:
-                </h2>
-                <ul className="list-disc pr-5 space-y-1" style={{ paddingRight: 18, margin: 0 }}>
-                  <li>📋 ניהול עובדים לפי סוג העסקה (שעתי / מדריך לפי שיעור)</li>
-                  <li>💰 הגדרת תעריפים דינמיים עם שמירת היסטוריה מלאה</li>
-                  <li>🐎 ניהול סוגי שירותים ומעקב אחרי ביצועי מדריכים</li>
-                  <li>📊 רישום שעות ושיעורים עם חישוב אוטומטי ושקיפות מלאה</li>
-                  <li>🔎 דיווחים אינטראקטיביים עם שמירה על דיוק היסטורי</li>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תכונות עיקריות:
+                </h4>
+                <ul style={{ 
+                  listStyle: 'none', 
+                  padding: 0, 
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>ניהול תלמידים:</strong> הוספה, עריכה וארגון תלמידים עם פרטי קשר מלאים
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>ניהול מדריכים:</strong> הקצאת תלמידים למדריכים והגדרת הרשאות
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>תיעוד מפגשים:</strong> רישום מפגשים עם טופס שאלות מותאם אישית
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>היסטוריית מפגשים:</strong> צפייה בכל המפגשים הקודמים לכל תלמיד
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>ניהול שירותים:</strong> הגדרת סוגי שירותים שונים לארגון
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>טופס מפגש מתקדם:</strong> יצירת שאלות מסוגים שונים (טקסט, מספר, בחירה, סולם ועוד)
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>ממשק מותאם נייד:</strong> עבודה נוחה ממכשירים ניידים וטאבלטים
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong style={{ fontWeight: 600 }}>ניהול ארגונים:</strong> תמיכה בריבוי ארגונים ומשתמשים
+                  </li>
                 </ul>
-              </section>
 
-              <section>
-                <h2 className="font-semibold" style={{ fontWeight: 600, fontSize: 16, margin: '10px 0 6px' }}>
-                  מה חשוב לדעת:
-                </h2>
-                <ul className="list-disc pr-5 space-y-1" style={{ paddingRight: 18, margin: 0 }}>
-                  <li>זוהי גרסת בסיס הראשונה – יתכנו עדכונים ושיפורים בהמשך.</li>
-                  <li>הפידבק שלכם קריטי – כל רעיון, תקלה או שאלה יעזרו לשפר.</li>
-                  <li>כל הנתונים נשמרים בצורה מאובטחת ונשענים על בסיס נתונים יציב (PostgreSQL + Supabase).</li>
-                </ul>
+                <div style={{ 
+                  marginTop: '20px', 
+                  padding: '16px', 
+                  background: '#f8fafc', 
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#475569' }}>
+                    <strong style={{ color: '#334155' }}>💡 טיפ:</strong> התחילו בהגדרת הארגון בעמוד ההגדרות, הוסיפו מדריכים ושירותים, ולאחר מכן התחילו להוסיף תלמידים.
+                  </p>
+                </div>
               </section>
             </article>
           </li>
