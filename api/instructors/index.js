@@ -39,8 +39,6 @@ export default async function (context, req) {
     authResult = await supabase.auth.getUser(authorization.token);
   } catch (error) {
     context.log?.error?.('instructors failed to validate token', { message: error?.message });
-    // If you need to tag the error, use a custom property instead of .name
-    error.customTag = 'instructors_token_validation';
     return respond(context, 401, { message: 'invalid or expired token' });
   }
 
@@ -173,7 +171,7 @@ export default async function (context, req) {
 
     const updates = {};
     if (Object.prototype.hasOwnProperty.call(body, 'name')) {
-      updates.name = normalizeString(body.name) || null;
+      updates['name'] = normalizeString(body.name) || null;
     }
     if (Object.prototype.hasOwnProperty.call(body, 'email')) {
       updates.email = normalizeString(body.email).toLowerCase() || null;
