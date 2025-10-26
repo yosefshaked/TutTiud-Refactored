@@ -198,6 +198,54 @@ export default function StudentManagementPage() {
     await refreshRoster();
   };
 
+  // Compute filtered/sorted students before any early returns to satisfy hooks rules
+  const displayedStudents = useMemo(() => {
+    let filtered = students;
+
+    // Filter by instructor (mine vs all)
+    if (filterMode === 'mine' && user?.id) {
+      filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
+    }
+    // Filter by day of week if selected
+    if (dayFilter) {
+      filtered = filtered.filter((s) => Number(s?.default_day_of_week) === Number(dayFilter));
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((student) => {
+        try {
+          // Search by student name
+          const studentName = String(student.name || '').toLowerCase();
+          if (studentName.includes(query)) return true;
+
+          // Search by parent/contact name
+          const contactName = String(student.contact_name || '').toLowerCase();
+          if (contactName.includes(query)) return true;
+
+          // Search by phone number
+          const contactPhone = String(student.contact_phone || '').toLowerCase();
+          if (contactPhone.includes(query)) return true;
+
+          // Search by default day of week (Hebrew label)
+          if (includesDayQuery(student.default_day_of_week, query)) return true;
+
+          // Search by default session time
+          const sessionTime = String(student.default_session_time || '').toLowerCase();
+          if (sessionTime.includes(query)) return true;
+
+          return false;
+        } catch (error) {
+          console.error('Error filtering student:', student, error);
+          return false;
+        }
+      });
+    }
+
+    return filtered;
+  }, [students, filterMode, user?.id, searchQuery, dayFilter]);
+
   if (supabaseLoading) {
     return (
       <div className="p-6 text-center text-neutral-600">
@@ -224,53 +272,6 @@ export default function StudentManagementPage() {
 
   const isLoadingStudents = studentsState === REQUEST_STATES.loading;
   const isEmpty = !isLoadingStudents && students.length === 0 && !studentsError;
-
-  const displayedStudents = React.useMemo(() => {
-    let filtered = students;
-    
-    // Filter by instructor (mine vs all)
-    if (filterMode === 'mine' && user?.id) {
-      filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
-    }
-    // Filter by day of week if selected
-    if (dayFilter) {
-      filtered = filtered.filter((s) => Number(s?.default_day_of_week) === Number(dayFilter));
-    }
-    
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((student) => {
-        try {
-          // Search by student name
-          const studentName = String(student.name || '').toLowerCase();
-          if (studentName.includes(query)) return true;
-          
-          // Search by parent/contact name
-          const contactName = String(student.contact_name || '').toLowerCase();
-          if (contactName.includes(query)) return true;
-          
-          // Search by phone number
-          const contactPhone = String(student.contact_phone || '').toLowerCase();
-          if (contactPhone.includes(query)) return true;
-          
-          // Search by default day of week (Hebrew label)
-          if (includesDayQuery(student.default_day_of_week, query)) return true;
-          
-          // Search by default session time
-          const sessionTime = String(student.default_session_time || '').toLowerCase();
-          if (sessionTime.includes(query)) return true;
-          
-          return false;
-        } catch (error) {
-          console.error('Error filtering student:', student, error);
-          return false;
-        }
-      });
-    }
-    
-    return filtered;
-  }, [students, filterMode, user?.id, searchQuery, dayFilter]);
 
   return (
     <PageLayout
@@ -476,7 +477,7 @@ export default function StudentManagementPage() {
       </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) handleCloseAddDialog(); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
           <DialogHeader>
             <DialogTitle>הוספת תלמיד חדש</DialogTitle>
           </DialogHeader>

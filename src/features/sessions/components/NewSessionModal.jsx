@@ -169,7 +169,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) { onClose?.(); } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>

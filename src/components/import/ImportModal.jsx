@@ -182,7 +182,7 @@ export default function ImportModal({ open, onOpenChange, employees, services, g
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto pb-28 sm:pb-6">
         <DialogHeader>
           <DialogTitle>ייבוא נתונים</DialogTitle>
         </DialogHeader>
