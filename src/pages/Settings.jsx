@@ -11,6 +11,7 @@ import ServiceManager from '@/components/settings/ServiceManager.jsx';
 import InstructorManager from '@/components/settings/InstructorManager.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
+import PageLayout from '@/components/ui/PageLayout.jsx';
 
 export default function Settings() {
   const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgId } = useOrg();
@@ -57,14 +58,11 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-sm md:p-md lg:p-lg">
-      <div className="mx-auto flex max-w-5xl flex-col gap-md md:gap-lg">
-        <header className="space-y-xs text-right">
-          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl md:text-3xl">הגדרות הארגון</h1>
-          <p className="text-sm text-slate-600 sm:text-base">
-            נטרו את מצב החיבור, הזמינו חברי צוות, ונטרו את טופס שאלות המפגש עבור הארגון הפעיל.
-          </p>
-        </header>
+    <PageLayout
+      title="הגדרות הארגון"
+      description="נטרו את מצב החיבור, הזמינו חברי צוות, ונטרו את טופס שאלות המפגש עבור הארגון הפעיל."
+      contentClassName="space-y-md md:space-y-lg"
+    >
 
         <Card className="border-0 bg-white/90 shadow-lg" dir="rtl">
           <CardHeader className="border-b border-slate-200 space-y-xs">
@@ -178,7 +176,6 @@ export default function Settings() {
             אין לך הרשאות ניהול. פנה למנהל מערכת לקבלת גישה להגדרות הארגון.
           </div>
         )}
-      </div>
-    </div>
+    </PageLayout>
   );
 }
