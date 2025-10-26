@@ -11,6 +11,7 @@ import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import AddStudentForm from '../components/AddStudentForm.jsx';
 import AssignInstructorModal from '../components/AssignInstructorModal.jsx';
+import PageLayout from '@/components/ui/PageLayout.jsx';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -226,9 +227,9 @@ export default function StudentManagementPage() {
   }, [students, filterMode, user?.id]);
 
   return (
-    <div className="space-y-lg">
-      <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-title-lg font-semibold text-foreground">ניהול תלמידים</h1>
+    <PageLayout
+      title="ניהול תלמידים"
+      actions={(
         <div className="flex items-center gap-3 self-start">
           <div className="flex items-center gap-2 text-sm">
             <label htmlFor="students-filter" className="text-neutral-600">הצג:</label>
@@ -247,9 +248,10 @@ export default function StudentManagementPage() {
             תלמיד חדש
           </Button>
         </div>
-      </div>
+      )}
+    >
 
-      <Card>
+      <Card className="w-full">
         <CardHeader className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-semibold text-foreground">רשימת תלמידים</CardTitle>
           {instructorsState === REQUEST_STATES.loading ? (
@@ -292,6 +294,10 @@ export default function StudentManagementPage() {
               <TableBody>
                 {displayedStudents.map((student) => {
                   const instructor = instructorMap.get(student.assigned_instructor_id) || null;
+                  const contactName = student.contact_name || '';
+                  const contactPhone = student.contact_phone || '';
+                  const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ') || '—';
+                  
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="text-sm font-semibold text-foreground">
@@ -322,7 +328,7 @@ export default function StudentManagementPage() {
                         ) : null}
                       </TableCell>
                       <TableCell className="text-sm text-neutral-600">
-                        {student.contact_info || '—'}
+                        {contactDisplay}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -368,6 +374,6 @@ export default function StudentManagementPage() {
         session={session}
         onAssigned={handleAssignmentSuccess}
       />
-    </div>
+    </PageLayout>
   );
 }
