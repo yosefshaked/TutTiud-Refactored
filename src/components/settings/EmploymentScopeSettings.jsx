@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { fetchEmploymentScopePolicySettings } from '@/lib/settings-client.js';
-import { upsertSetting } from '@/api/settings.js';
+import { fetchEmploymentScopePolicySettings } from '@/features/settings/api/index.js';
+import { upsertSetting } from '@/features/settings/api/settings.js';
 
 const EMPLOYMENT_SCOPE_OPTIONS = [
   { value: 'global', label: 'גלובלי', disabled: true },

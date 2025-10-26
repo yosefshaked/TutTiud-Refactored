@@ -1,10 +1,5 @@
 /* eslint-env node */
-import process from 'node:process';
-import { Buffer } from 'node:buffer';
-import { createHash, createDecipheriv } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
-import { json, resolveBearerAuthorization } from '../_shared/http.js';
-import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
+import { json } from '../_shared/http.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -168,6 +163,10 @@ function createTenantClient({ supabaseUrl, anonKey, dedicatedKey }) {
         Authorization: `Bearer ${dedicatedKey}`,
       },
     },
+    db: {
+      // All tenant data must live under the tuttiud schema. Avoid using public schema.
+      schema: 'tuttiud',
+    },
   });
 }
 
@@ -258,188 +257,9 @@ function resolveServiceId(context, body) {
   return null;
 }
 
-export default async function (context, req) {
-  context.log?.info?.('services API invoked');
-
-  const authorization = resolveBearerAuthorization(req);
-  if (!authorization?.token) {
-    context.log?.warn?.('services missing bearer token');
-    return respond(context, 401, { message: 'missing bearer' });
-  }
-
-  const env = readEnv(context);
-  const adminConfig = readSupabaseAdminConfig(env);
-  const { supabaseUrl, serviceRoleKey } = adminConfig;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    context.log?.error?.('services missing Supabase admin credentials');
-    return respond(context, 500, { message: 'server_misconfigured' });
-  }
-
-  const supabase = createSupabaseAdminClient(adminConfig);
-
-  let authResult;
-  try {
-    authResult = await supabase.auth.getUser(authorization.token);
-  } catch (error) {
-    context.log?.error?.('services failed to validate token', { message: error?.message });
-    return respond(context, 401, { message: 'invalid or expired token' });
-  }
-
-  if (authResult.error || !authResult.data?.user?.id) {
-    context.log?.warn?.('services token did not resolve to user');
-    return respond(context, 401, { message: 'invalid or expired token' });
-  }
-
-  const userId = authResult.data.user.id;
-  const method = String(req.method || 'GET').toUpperCase();
-  const body = method === 'GET' ? {} : parseRequestBody(req);
-  const query = req?.query ?? {};
-  const orgCandidate = body.org_id || body.orgId || query.org_id || query.orgId;
-  const orgId = normalizeString(orgCandidate);
-
-  if (!orgId || !isValidOrgId(orgId)) {
-    return respond(context, 400, { message: 'invalid org id' });
-  }
-
-  let role;
-  try {
-    role = await ensureMembership(supabase, orgId, userId);
-    if (!role) {
-      return respond(context, 403, { message: 'forbidden' });
-    }
-
-    if ((method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') && !isAdminRole(role)) {
-      return respond(context, 403, { message: 'forbidden' });
-    }
-  } catch (membershipError) {
-    context.log?.error?.('services failed to verify membership', {
-      message: membershipError?.message,
-      orgId,
-      userId,
-    });
-    return respond(context, 500, { message: 'failed_to_verify_membership' });
-  }
-
-  const connectionResult = await fetchOrgConnection(supabase, orgId);
-  if (connectionResult.error) {
-    const message = connectionResult.error.message || 'failed_to_load_connection';
-    const status = message === 'missing_connection_settings' ? 412 : message === 'missing_dedicated_key' ? 428 : 500;
-    return respond(context, status, { message });
-  }
-
-  const encryptionSecret = resolveEncryptionSecret(env);
-  const encryptionKey = deriveEncryptionKey(encryptionSecret);
-
-  if (!encryptionKey) {
-    context.log?.error?.('services missing encryption secret');
-    return respond(context, 500, { message: 'encryption_not_configured' });
-  }
-
-  const dedicatedKey = decryptDedicatedKey(connectionResult.encryptedKey, encryptionKey);
-  if (!dedicatedKey) {
-    return respond(context, 500, { message: 'failed_to_decrypt_key' });
-  }
-
-  let tenantClient;
-  try {
-    tenantClient = createTenantClient({
-      supabaseUrl: connectionResult.supabaseUrl,
-      anonKey: connectionResult.anonKey,
-      dedicatedKey,
-    });
-  } catch (clientError) {
-    context.log?.error?.('services failed to create tenant client', { message: clientError?.message });
-    return respond(context, 500, { message: 'failed_to_connect_tenant' });
-  }
-
-  if (method === 'GET') {
-    const { data, error } = await tenantClient
-      .from('Services')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) {
-      context.log?.error?.('services fetch failed', { message: error?.message });
-      return respond(context, 500, { message: 'failed_to_fetch_services' });
-    }
-
-    return respond(context, 200, { services: data ?? [] });
-  }
-
-  if (method === 'POST') {
-    const payload = normalizeServicePayload(body.service || body.data || body);
-    if (!payload) {
-      return respond(context, 400, { message: 'invalid service payload' });
-    }
-
-    const { data, error } = await tenantClient
-      .from('Services')
-      .insert(payload)
-      .select('id')
-      .single();
-
-    if (error) {
-      context.log?.error?.('services insert failed', { message: error.message });
-      return respond(context, 500, { message: 'failed_to_create_service' });
-    }
-
-    return respond(context, 201, { service_id: data?.id ?? null });
-  }
-
-  if (method === 'PATCH' || method === 'PUT') {
-    const serviceId = resolveServiceId(context, body);
-    if (!serviceId) {
-      return respond(context, 400, { message: 'invalid service id' });
-    }
-
-    const updates = normalizeServiceUpdates(body.updates || body.service || body.data);
-    if (!updates) {
-      return respond(context, 400, { message: 'invalid service payload' });
-    }
-
-    if ('org_id' in updates) {
-      delete updates.org_id;
-    }
-    if ('orgId' in updates) {
-      delete updates.orgId;
-    }
-
-    const { error } = await tenantClient
-      .from('Services')
-      .update(updates)
-      .eq('id', serviceId);
-
-    if (error) {
-      context.log?.error?.('services update failed', { message: error.message, serviceId });
-      return respond(context, 500, { message: 'failed_to_update_service' });
-    }
-
-    return respond(context, 200, { updated: true });
-  }
-
-  if (method === 'DELETE') {
-    const serviceId = resolveServiceId(context, body);
-    if (!serviceId) {
-      return respond(context, 400, { message: 'invalid service id' });
-    }
-
-    const { error, count } = await tenantClient
-      .from('Services')
-      .delete({ count: 'exact' })
-      .eq('id', serviceId);
-
-    if (error) {
-      context.log?.error?.('services delete failed', { message: error.message, serviceId });
-      return respond(context, 500, { message: 'failed_to_delete_service' });
-    }
-
-    if (!count) {
-      return respond(context, 404, { message: 'service_not_found' });
-    }
-
-    return respond(context, 200, { deleted: true });
-  }
-
-  return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST,PATCH,PUT,DELETE' });
+export default async function (context, _req) {
+  // Legacy endpoint removed. This app no longer uses a Services table.
+  const response = json(410, { message: 'legacy_unavailable', details: 'Services API has been retired.' });
+  context.res = response;
+  return response;
 }

@@ -10,6 +10,8 @@
 - No test script is configured; note this in your testing summary.
 - Run `npm run check:schema` before adding new persistence logic; if it reports missing columns, add a checklist note to the PR instead of coding around the gap.
 - Add any important information learned into this AGENTS.md file.
+	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
+	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.
 - Use ProjectDoc/Eng.md to understand the overall project.
 - **Refer to [ProjectDoc/Conventions.md](ProjectDoc/Conventions.md)** for folder structure, naming conventions, API patterns, and feature organization. Update it when adding new patterns or changing structure (with approval).
 - OAuth redirects must always include `options.redirectTo` when calling `supabase.auth.signInWithOAuth`. Resolve it from the full `window.location` URL (`origin + pathname + search + hash`) and fall back to `VITE_PUBLIC_APP_URL`, `VITE_APP_BASE_URL`, or `VITE_SITE_URL` when a browser location is unavailable.
@@ -41,6 +43,7 @@
 - Half-day leave is persisted with `WorkSessions.entry_type = 'leave_half_day'`; metadata no longer carries a `leave.half_day` flag.
 - System-paid leave is selected via the "על חשבון המערכת" switch in Time Entry; dropdowns now present only the paid, unpaid, and half-day labels.
 - Shared selectors `selectHolidayForDate` and `selectLeaveRemaining` must be the single source of truth for date disabling, payroll totals, and UI badges so reports, employees, and settings stay in sync.
+	- Legacy note (2025-10): The old selectors module at `src/lib/selectors.js` has been deprecated and replaced with no-op stubs to prevent accidental usage during the WorkSessions → SessionRecords migration. Do not import from `src/lib/selectors.js` or `src/selectors.js`. When reintroducing equivalents, implement them under feature slices using `SessionRecords` as the data source and update this note accordingly.
 - The Employees → Vacations & Holidays tab is read-only; use the Time Entry flow for any leave creation or adjustments and rely on the collapsible history rows for review.
 - Reports CSV export (`Reports.jsx`) now uses `buildCsvRows` with the column order defined in `CSV_HEADERS`; update that helper when adding or reordering export columns.
 - `/api/invitations` is the control-plane API for organization invites. It uses `APP_CONTROL_DB_URL` and `APP_CONTROL_DB_SERVICE_ROLE_KEY` for the Supabase admin client, enforces admin/owner membership before writes, auto-expires pending rows once `expires_at` passes, and updates statuses to `accepted`, `declined`, `revoked`, `expired`, or `failed`.
@@ -53,6 +56,21 @@
 - Admin UI is migrating to feature slices. Place admin-only components under `src/features/admin/components/` and mount full pages from `src/features/admin/pages/`. Reusable primitives still belong in `src/components/ui`.
 - The refreshed design system lives in `tailwind.config.js` (Nunito typography, primary/neutral/status palettes, spacing tokens) with base primitives in `src/components/ui/{Button,Card,Input,PageLayout}.jsx`. Prefer these when creating new mobile-first UI.
 - `src/components/layout/AppShell.jsx` is the new navigation shell. It renders the mobile bottom tabs + FAB and a desktop sidebar, so wrap future routes with it instead of the legacy `Layout.jsx`.
+
+- Frontend API clients are being colocated under feature slices:
+	- Sessions: `src/features/sessions/api/work-sessions.js`
+	- Services: `src/features/services/api/index.js`
+	- Settings: `src/features/settings/api/{settings.js,index.js}` (server API + client helpers)
+	Legacy files under `src/api/` now re-export from the new paths to ease migration. Prefer importing from the feature locations going forward.
+
+### Tenant schema policy
+- All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.
+- Supabase tenant clients must set `db: { schema: 'tuttiud' }`. Existing endpoints that used default schema have been updated accordingly (`/api/services`, `/api/work-sessions`).
+
+### Legacy: WorkSessions vs SessionRecords
+- WorkSessions is a legacy construct kept temporarily for compatibility with existing import and payroll flows.
+- New session data entry uses `SessionRecords` via `/api/sessions` and history reads via `/api/session-records`.
+- Plan to migrate remaining WorkSessions consumers (e.g., import flows) to `SessionRecords` once mapping and reporting requirements are finalized.
 
 ### UI Tokens: Popover/Select backgrounds
 - Our Select/Popover primitives use classes like `bg-popover` and `text-popover-foreground`. Ensure Tailwind maps these tokens to CSS variables. We extended `tailwind.config.js` colors to include `popover`, `popover-foreground`, `muted`, `accent`, `secondary`, `destructive`, and `card` using `hsl(var(--token))` so dropdown lists render with a visible background.

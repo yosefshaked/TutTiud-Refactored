@@ -8,8 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchSessionFormConfig } from '@/lib/settings-client.js';
-import { upsertSetting } from '@/api/settings.js';
+import { fetchSessionFormConfig } from '@/features/settings/api/index.js';
+import { upsertSetting } from '@/features/settings/api/settings.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',

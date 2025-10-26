@@ -13,11 +13,11 @@ import { downloadCsvTemplate, downloadExcelTemplate } from '@/lib/excelTemplate.
 import { format } from 'date-fns';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
-import { createWorkSessions } from '@/api/work-sessions.js';
+// Legacy import flow removed: WorkSessions are retired and not part of the current system.
 
 const GENERIC_RATE_SERVICE_ID = '00000000-0000-0000-0000-000000000000';
 
-export default function ImportModal({ open, onOpenChange, employees, services, getRateForDate, onImported, workSessions = [] }) {
+export default function ImportModal({ open, onOpenChange, employees, services, getRateForDate, workSessions = [] }) {
   const [employeeId, setEmployeeId] = useState('');
   const [tab, setTab] = useState('paste');
   const [text, setText] = useState('');
@@ -111,13 +111,8 @@ export default function ImportModal({ open, onOpenChange, employees, services, g
       toast.error('יש לבחור ארגון פעיל לפני ביצוע הייבוא.');
       return;
     }
-    try {
-      await createWorkSessions({ session, orgId: activeOrgId, sessions: filteredPayload });
-    } catch (error) {
-      toast.error(error.message || 'הייבוא נכשל. נסה שוב מאוחר יותר.');
-      return;
-    }
-    toast.success(`${filteredPayload.length} שורות יובאו בהצלחה`);
+    // Legacy import target removed. Inform the user and stop.
+    toast.error('ייבוא רישומי עבודה אינו נתמך יותר במערכת זו. השתמשו ברישומי מפגש (SessionRecords).');
     if (conflicts.length > 0) {
       const lines = conflicts.map(c => {
         const dateValue = c.date ? new Date(`${c.date}T00:00:00`) : null;
@@ -131,12 +126,7 @@ export default function ImportModal({ open, onOpenChange, employees, services, g
         toast.error(`לא ניתן להוסיף שעות בתאריך שכבר הוזנה בו חופשה:\n${lines.join('\n')}`, { duration: 15000 });
       }
     }
-    onImported();
-    setRows([]);
-    setText('');
-    setFile(null);
-    setEmployeeId('');
-    onOpenChange(false);
+    return;
   };
 
   const delimiterName = DELIMITERS[overrideDelim || detectedDelim];
