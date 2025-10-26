@@ -280,14 +280,15 @@ export default function StudentManagementPage() {
           ) : null}
 
           {!isLoadingStudents && !studentsError && displayedStudents.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[220px] text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
-                  <TableHead className="min-w-[260px] text-right text-sm font-medium text-neutral-600">פרטי קשר</TableHead>
-                  <TableHead className="w-[120px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="-mx-sm overflow-x-auto sm:mx-0">
+              <Table className="min-w-[640px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
+                    <TableHead className="text-right text-sm font-medium text-neutral-600">פרטי קשר</TableHead>
+                    <TableHead className="w-[120px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {displayedStudents.map((student) => {
                   const instructor = instructorMap.get(student.assigned_instructor_id) || null;
@@ -340,6 +341,7 @@ export default function StudentManagementPage() {
                 })}
               </TableBody>
             </Table>
+            </div>
           ) : null}
         </CardContent>
       </Card>

@@ -20,7 +20,7 @@ function PageLayout({
     >
       <div
         className={cn(
-          "mx-auto flex w-full max-w-5xl flex-col px-md py-lg sm:px-lg lg:px-xl",
+          "mx-auto flex w-full max-w-5xl flex-col px-sm py-md sm:px-md sm:py-lg lg:px-xl",
           fullHeight ? "min-h-screen" : "min-h-full",
           className,
         )}
@@ -29,14 +29,14 @@ function PageLayout({
         {(title || description || actions) && (
           <header
             className={cn(
-              "flex flex-col gap-sm pb-md sm:flex-row sm:items-end sm:justify-between",
+              "flex flex-col gap-sm pb-sm sm:pb-md sm:flex-row sm:items-end sm:justify-between",
               headerClassName,
             )}
           >
             <div className="space-y-xs">
-              {title ? <h1 className="text-title-lg font-semibold text-neutral-900">{title}</h1> : null}
+              {title ? <h1 className="text-xl font-semibold text-neutral-900 sm:text-title-lg">{title}</h1> : null}
               {description ? (
-                <p className="max-w-2xl text-body-md text-neutral-600">{description}</p>
+                <p className="max-w-2xl text-sm text-neutral-600 sm:text-body-md">{description}</p>
               ) : null}
             </div>
             {actions ? <div className="mt-sm sm:mt-0 sm:flex-shrink-0">{actions}</div> : null}

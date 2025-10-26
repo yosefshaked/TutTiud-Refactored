@@ -258,14 +258,14 @@ export default function AppShell({ children }) {
         <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
         <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
-          <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
-            <div className="flex items-center justify-between gap-sm">
-              <div className="flex items-center gap-sm">
+          <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-sm py-sm backdrop-blur md:border-none md:bg-transparent md:px-md md:py-sm">
+            <div className="flex items-center justify-between gap-xs">
+              <div className="flex items-center gap-xs sm:gap-sm">
                 <LogoPlaceholder />
                 <button
                   type="button"
                   onClick={handleOrgClick}
-                  className="inline-flex items-center rounded-full border border-border bg-surface px-md py-xs text-sm font-semibold text-foreground transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  className="inline-flex min-h-[44px] items-center rounded-full border border-border bg-surface px-sm py-xs text-xs font-semibold text-foreground transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:px-md sm:text-sm"
                 >
                   {activeOrg?.name ? `ארגון: ${activeOrg.name}` : "בחרו ארגון לעבודה"}
                 </button>
@@ -274,18 +274,18 @@ export default function AppShell({ children }) {
                 <button
                   type="button"
                   onClick={() => setIsChangelogOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full border border-border px-sm py-xs text-xs font-medium text-neutral-600 transition hover:bg-neutral-100"
+                  className="inline-flex min-h-[44px] items-center gap-1 rounded-full border border-border px-xs py-xs text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 sm:px-sm"
                 >
-                  <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />
-                  עדכונים
+                  <Megaphone className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">עדכונים</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2 text-neutral-600 transition hover:bg-neutral-200"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-neutral-100 p-2 text-neutral-600 transition hover:bg-neutral-200"
                   aria-label="התנתקות"
                 >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  <LogOut className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
             </div>
