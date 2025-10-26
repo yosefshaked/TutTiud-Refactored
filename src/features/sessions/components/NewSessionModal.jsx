@@ -147,7 +147,15 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     } catch (error) {
       console.error('Failed to save session record', error);
       setSubmitState(REQUEST_STATE.error);
-      setSubmitError(error?.message || 'שמירת המפגש נכשלה.');
+      // Map known server messages to clear, localized explanations
+      const serverMessage = error?.data?.message || error?.message || '';
+      let friendly = 'שמירת המפגש נכשלה.';
+      if (serverMessage === 'student_missing_instructor') {
+        friendly = 'לא ניתן לתעד מפגש: לתלמיד זה לא משויך מדריך פעיל. נא לשייך מדריך תחילה.';
+      } else if (serverMessage === 'student_not_assigned_to_user') {
+        friendly = 'לא ניתן לתעד: תלמיד זה לא משויך אליך.';
+      }
+      setSubmitError(friendly);
     }
   };
 

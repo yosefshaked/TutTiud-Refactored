@@ -315,7 +315,33 @@ export default async function (context, req) {
     return respond(context, 403, { message: 'student_not_assigned_to_user' });
   }
 
-  const sessionInstructorId = assignedInstructor || normalizedUserId;
+  // Resolve which instructor id should be written on the session.
+  // For members: we've already verified assignment above, so we can use the student's assigned instructor id.
+  // For admins/owners: prefer the student's assigned instructor; if missing, only fall back to the acting user
+  // when that user is actually an Instructor in this tenant. Otherwise, surface a clear validation error
+  // instead of letting the DB raise a foreign-key violation (which previously produced a 500).
+  let sessionInstructorId = assignedInstructor;
+  if (!sessionInstructorId && !isMemberRole(role) && normalizedUserId) {
+    const instructorLookup = await tenantClient
+      .from('Instructors')
+      .select('id, is_active')
+      .eq('id', normalizedUserId)
+      .maybeSingle();
+
+    if (instructorLookup.error) {
+      context.log?.error?.('sessions failed to verify acting user is instructor', { message: instructorLookup.error.message });
+      return respond(context, 500, { message: 'failed_to_verify_instructor' });
+    }
+
+    if (instructorLookup.data && instructorLookup.data.id) {
+      sessionInstructorId = instructorLookup.data.id;
+    }
+  }
+
+  // If after resolution there's still no instructor to attribute to, block with a specific message.
+  if (!sessionInstructorId) {
+    return respond(context, 400, { message: 'student_missing_instructor' });
+  }
 
   const formVersionResult = await resolveSessionFormVersion(tenantClient);
   if (formVersionResult.error) {
@@ -345,7 +371,7 @@ export default async function (context, req) {
         student_id: validation.studentId,
         date: validation.date,
         content: validation.content,
-        instructor_id: sessionInstructorId || null,
+  instructor_id: sessionInstructorId || null,
         service_context: validation.hasExplicitService
           ? validation.serviceContext
           : validation.serviceContext ?? studentResult.data.default_service ?? null,
