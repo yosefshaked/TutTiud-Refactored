@@ -116,12 +116,12 @@ export default function DetailedEntriesReport({
     const isHourlyOrGlobal = employee?.employee_type === 'hourly' || employee?.employee_type === 'global';
     return (
       <TableRow key={session.id} className="hover:bg-slate-50">
-        <TableCell className="font-medium text-center">{employee?.name || 'לא ידוע'}</TableCell>
+        <TableCell className="font-medium text-center text-xs sm:text-sm">{employee?.name || 'לא ידוע'}</TableCell>
         {showEmploymentScopeColumn ? (
-          <TableCell className="text-center">{employmentScopeLabel || '—'}</TableCell>
+          <TableCell className="hidden sm:table-cell text-center text-xs">{employmentScopeLabel || '—'}</TableCell>
         ) : null}
-        <TableCell className="text-center">{format(parseISO(session.date), 'dd/MM/yyyy', { locale: he })}</TableCell>
-        <TableCell className="w-64 items-start text-center">
+        <TableCell className="text-center text-xs sm:text-sm">{format(parseISO(session.date), 'dd/MM/yyyy', { locale: he })}</TableCell>
+        <TableCell className="items-start text-center">
           <ActivityBadge
             label={activityDetails.label}
             color={activityDetails.color}
@@ -129,13 +129,13 @@ export default function DetailedEntriesReport({
             title={activityDetails.label}
           />
         </TableCell>
-        <TableCell className="text-center">
+        <TableCell className="text-center text-xs sm:text-sm">
           {isHourlyOrGlobal ? `${session.hours || 0} שעות` : `${session.sessions_count || 0} מפגשים`}
         </TableCell>
-        <TableCell className="text-center">{session.students_count || '-'}</TableCell>
-        <TableCell className="text-center">₪{session.rate_used?.toFixed(2) || '0.00'}</TableCell>
-        <TableCell className="font-semibold text-center">₪{payment.toFixed(2)}</TableCell>
-        <TableCell className="text-sm text-slate-600">{session.notes || '-'}</TableCell>
+        <TableCell className="hidden lg:table-cell text-center text-xs sm:text-sm">{session.students_count || '-'}</TableCell>
+        <TableCell className="hidden md:table-cell text-center text-xs sm:text-sm">₪{session.rate_used?.toFixed(2) || '0.00'}</TableCell>
+        <TableCell className="font-semibold text-center text-xs sm:text-sm">₪{payment.toFixed(2)}</TableCell>
+        <TableCell className="hidden xl:table-cell text-xs text-slate-600">{session.notes || '-'}</TableCell>
       </TableRow>
     );
   };
@@ -164,20 +164,21 @@ export default function DetailedEntriesReport({
       {sessions.length === 0 ? (
         <div className="text-center py-8 text-slate-500"><p>אין נתונים להצגה עבור המסננים שנבחרו</p></div>
       ) : (
-        <div className="overflow-x-auto border rounded-lg bg-white">
+        <div className="w-full border rounded-lg bg-white">
+          <div className="w-full overflow-x-auto">
           {groupBy === 'none' ? (
-            <Table>
+            <Table className="w-full">
               <TableHeader>
                 <TableRow className="bg-slate-50 hover:bg-slate-50">
                   <TableHead className="text-center">עובד</TableHead>
-                  {showEmploymentScopeColumn ? <TableHead className="text-center">היקף משרה</TableHead> : null}
+                  {showEmploymentScopeColumn ? <TableHead className="hidden sm:table-cell text-center">היקף משרה</TableHead> : null}
                   <TableHead className="text-center">תאריך</TableHead>
-                  <TableHead className="w-64 text-center">סוג רישום</TableHead>
+                  <TableHead className="text-center">סוג</TableHead>
                   <TableHead className="text-center">כמות</TableHead>
-                  <TableHead className="text-center">תלמידים</TableHead>
-                  <TableHead className="text-center">תעריף</TableHead>
+                  <TableHead className="hidden lg:table-cell text-center">תלמידים</TableHead>
+                  <TableHead className="hidden md:table-cell text-center">תעריף</TableHead>
                   <TableHead className="text-center">סה״כ</TableHead>
-                  <TableHead className="text-center">הערות</TableHead>
+                  <TableHead className="hidden xl:table-cell text-center">הערות</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>{sortedSessions.map(session => renderSessionRow(session))}</TableBody>
@@ -185,15 +186,16 @@ export default function DetailedEntriesReport({
           ) : (
             sortedGroupEntries.map(([group, groupSessions]) => (
               <div key={group} className="mb-2">
-                <h4 className="sticky top-0 z-10 font-bold text-base p-2 bg-slate-100 border-b border-t">
+                <h4 className="sticky top-0 z-10 font-bold text-sm sm:text-base p-2 bg-slate-100 border-b border-t">
                   {group} – ₪{groupSessions.reduce((s, r) => s + resolvePayment(r), 0).toFixed(2)} • {groupSessions.reduce((s, r) => s + sessionHours(r), 0).toFixed(1)} שעות
                 </h4>
-                <Table>
+                <Table className="w-full">
                   <TableBody>{groupSessions.map(session => renderSessionRow(session))}</TableBody>
                 </Table>
               </div>
             ))
           )}
+          </div>
         </div>
       )}
     </div>

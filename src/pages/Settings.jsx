@@ -91,7 +91,7 @@ export default function Settings() {
 
         {canManageSessionForm ? (
           <>
-            <div className="grid w-full gap-md xl:grid-cols-[1.5fr,1fr]" dir="rtl">
+            <div className="grid w-full gap-md lg:grid-cols-2" dir="rtl">
               <Card className="w-full border-0 bg-white/80 shadow-lg">
                 <CardHeader className="border-b border-slate-200 space-y-xs">
                   <CardTitle className="flex flex-col gap-xs text-base font-semibold text-slate-900 sm:flex-row sm:items-center sm:justify-between sm:text-lg md:text-xl">

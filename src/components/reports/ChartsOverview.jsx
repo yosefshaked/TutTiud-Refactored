@@ -138,60 +138,61 @@ export default function ChartsOverview({ sessions, employees, isLoading, service
   return (
     <div className="space-y-8">
       <div>
-        <h3 className="text-lg font-semibold mb-4">תשלומים לפי עובד</h3>
+        <h3 className="text-base sm:text-lg font-semibold mb-4">תשלומים לפי עובד</h3>
         <div className="w-full overflow-x-auto">
-          <BarChart width={Math.max(800, paymentByEmployee.length * 120)} height={320} data={paymentByEmployee} margin={{ left: 50, right: 30, top: 20, bottom: 40 }}>
+          <BarChart width={Math.max(600, paymentByEmployee.length * 120)} height={280} data={paymentByEmployee} margin={{ left: 50, right: 30, top: 20, bottom: 40 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="name"
-              tick={{ fontSize: 15, angle: 0, textAnchor: 'middle', width: 120, wordBreak: 'break-all' }}
+              tick={{ fontSize: 13, angle: 0, textAnchor: 'middle', width: 120, wordBreak: 'break-all' }}
               interval={0}
               height={60}
               padding={{ left: 30, right: 10 }}
             />
-            <YAxis />
+            <YAxis tick={{ fontSize: 12 }} />
             <Tooltip formatter={(value) => [`₪${value.toLocaleString()}`, 'שכר']} />
             <Legend verticalAlign="top" align="center" layout="horizontal" height={36} />
-            <Bar dataKey="payment" fill="#3B82F6" name="שכר (₪)" barSize={40} radius={[8, 8, 0, 0]} label={{ position: 'top', fill: '#3B82F6', fontSize: 14 }} />
+            <Bar dataKey="payment" fill="#3B82F6" name="שכר (₪)" barSize={40} radius={[8, 8, 0, 0]} label={{ position: 'top', fill: '#3B82F6', fontSize: 12 }} />
           </BarChart>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>
-          <h3 className="text-lg font-semibold mb-4">התפלגות לפי סוג מפגש</h3>
+          <h3 className="text-base sm:text-lg font-semibold mb-4">התפלגות לפי סוג מפגש</h3>
           {sessions.length === 0 ? (
-            <div className="text-center text-slate-500 py-12">אין נתונים להצגה</div>
+            <div className="text-center text-slate-500 py-12 text-xs sm:text-sm">אין נתונים להצגה</div>
           ) : sessionsByType.length === 0 ? (
-            <div className="text-center text-slate-500 py-12">כל המפגשים הם מסוג לא ידוע</div>
+            <div className="text-center text-slate-500 py-12 text-xs sm:text-sm">כל המפגשים הם מסוג לא ידוע</div>
           ) : (
             <div>
               <div className="mb-2 flex gap-2 justify-center">
                 <button
-                  className={`px-3 py-1 rounded ${pieType === 'count' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                  className={`px-2 py-1 text-xs sm:px-3 sm:text-sm rounded ${pieType === 'count' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
                   onClick={() => setPieType('count')}
                 >
                   לפי מספר מפגשים
                 </button>
                 <button
-                  className={`px-3 py-1 rounded ${pieType === 'time' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+                  className={`px-2 py-1 text-xs sm:px-3 sm:text-sm rounded ${pieType === 'time' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
                   onClick={() => setPieType('time')}
                 >
                   לפי שעות
                 </button>
               </div>
-              <PieChart width={400} height={280}>
+              <div className="w-full flex justify-center">
+              <PieChart width={Math.min(400, window.innerWidth - 40)} height={280}>
                 <Pie
                   data={sessionsByType}
-                  cx={200}
+                  cx="50%"
                   cy={140}
                   labelLine={false}
                   label={({ percent, x, y }) => (
-                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={16} fill="#222">
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={14} fill="#222">
                       {`${(percent * 100).toFixed(0)}%`}
                     </text>
                   )}
-                  outerRadius={100}
+                  outerRadius={90}
                   fill="#8884d8"
                   dataKey="value"
                   paddingAngle={2}
@@ -202,18 +203,18 @@ export default function ChartsOverview({ sessions, employees, isLoading, service
                 </Pie>
                 <Tooltip formatter={(value, name, props) => {
                   const entry = props && props.payload;
-                  // Show service name and value type
                   const labelType = pieType === 'count' ? 'מפגשים' : 'שעות';
                   const text = `${entry.name}:\n${value} ${labelType}`;
                   const lines = text.length > 40 ? text.match(/.{1,40}/g) : [text];
                   return [lines.map((line, i) => <div key={i}>{line}</div>)];
                 }} />
               </PieChart>
-              <div className="flex flex-wrap justify-center mt-4 gap-4">
+              </div>
+              <div className="flex flex-wrap justify-center mt-4 gap-2 sm:gap-4">
                 {sessionsByType.map((entry, index) => (
                   <div key={entry.name} className="flex items-center gap-2">
                     <span style={{ width: 16, height: 16, background: COLORS[index % COLORS.length], display: 'inline-block', borderRadius: 4 }}></span>
-                    <span className="text-sm text-slate-700">{entry.name}</span>
+                    <span className="text-xs sm:text-sm text-slate-700">{entry.name}</span>
                   </div>
                 ))}
               </div>
@@ -222,25 +223,26 @@ export default function ChartsOverview({ sessions, employees, isLoading, service
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold mb-4">מגמה חודשית (6 חודשים אחרונים)</h3>
+          <h3 className="text-base sm:text-lg font-semibold mb-4">מגמה חודשית (6 חודשים אחרונים)</h3>
           <div className="mb-2 flex gap-2">
             <button
-              className={`px-3 py-1 rounded ${trendType === 'payment' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+              className={`px-2 py-1 text-xs sm:px-3 sm:text-sm rounded ${trendType === 'payment' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
               onClick={() => setTrendType('payment')}
             >
               שכר
             </button>
             <button
-              className={`px-3 py-1 rounded ${trendType === 'sessions' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
+              className={`px-2 py-1 text-xs sm:px-3 sm:text-sm rounded ${trendType === 'sessions' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}
               onClick={() => setTrendType('sessions')}
             >
               מפגשים
             </button>
           </div>
-          <LineChart width={440} height={270} data={monthlyData} margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
+          <div className="w-full flex justify-center">
+          <LineChart width={Math.min(440, window.innerWidth - 40)} height={270} data={monthlyData} margin={{ left: 20, right: 20, top: 20, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="month" tick={{ fontSize: 13 }} padding={{ left: 10, right: 10 }} />
-            <YAxis />
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} padding={{ left: 10, right: 10 }} />
+            <YAxis tick={{ fontSize: 11 }} />
             <Tooltip formatter={(value, name) => {
               if (trendType === 'payment') {
                 return [`₪${value.toLocaleString()}`, 'תשלום (₪)'];
@@ -252,12 +254,13 @@ export default function ChartsOverview({ sessions, employees, isLoading, service
             }} />
             <Legend verticalAlign="top" height={36} />
             {trendType === 'payment' && (
-              <Line type="monotone" dataKey="payment" stroke="#3B82F6" name="שכר (₪)" dot={{ r: 5 }} strokeWidth={3} label={({ x, y, value }) => <text x={x} y={y - 10} textAnchor="middle" fontSize={13} fill="#3B82F6">₪{value.toLocaleString()}</text>} />
+              <Line type="monotone" dataKey="payment" stroke="#3B82F6" name="שכר (₪)" dot={{ r: 4 }} strokeWidth={2} label={({ x, y, value }) => <text x={x} y={y - 10} textAnchor="middle" fontSize={11} fill="#3B82F6">₪{value.toLocaleString()}</text>} />
             )}
             {trendType === 'sessions' && (
-              <Line type="monotone" dataKey="sessions" stroke="#10B981" name="מפגשים" dot={{ r: 5 }} strokeWidth={3} label={({ x, y, value }) => <text x={x} y={y - 10} textAnchor="middle" fontSize={13} fill="#10B981">{value}</text>} />
+              <Line type="monotone" dataKey="sessions" stroke="#10B981" name="מפגשים" dot={{ r: 4 }} strokeWidth={2} label={({ x, y, value }) => <text x={x} y={y - 10} textAnchor="middle" fontSize={11} fill="#10B981">{value}</text>} />
             )}
           </LineChart>
+          </div>
         </div>
       </div>
     </div>

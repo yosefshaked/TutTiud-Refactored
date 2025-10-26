@@ -705,34 +705,36 @@ export default function SessionFormManager({
                         </div>
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid w-full gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                          <Label htmlFor={`question-label-${question.id}`}>טקסט השאלה</Label>
+                          <Label htmlFor={`question-label-${question.id}`} className="text-xs sm:text-sm">טקסט השאלה</Label>
                           <Input
                             id={`question-label-${question.id}`}
                             value={question.label}
                             onChange={(event) => handleQuestionChange(question.id, { label: event.target.value })}
                             placeholder="לדוגמה: מה היו יעדי המפגש?"
+                            className="text-sm"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor={`question-id-${question.id}`}>מזהה ייחודי</Label>
+                          <Label htmlFor={`question-id-${question.id}`} className="text-xs sm:text-sm">מזהה ייחודי</Label>
                           <Input
                             id={`question-id-${question.id}`}
                             value={question.id}
                             onChange={(event) => handleQuestionChange(question.id, { id: event.target.value })}
                             placeholder="לדוגמה: session_summary"
+                            className="text-sm"
                           />
-                          <p className="text-xs text-slate-500">השתמשו במזהה קבוע כדי לשמור על עקביות בין גרסאות.</p>
+                          <p className="text-[10px] text-slate-500 sm:text-xs">השתמשו במזהה קבוע כדי לשמור על עקביות בין גרסאות.</p>
                         </div>
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-3">
+                      <div className="grid w-full gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
-                          <Label htmlFor={`question-type-${question.id}`}>סוג השאלה</Label>
+                          <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
                           <select
                             id={`question-type-${question.id}`}
-                            className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 sm:text-sm"
                             value={question.type}
                             onChange={(event) => handleQuestionChange(question.id, { type: event.target.value })}
                           >
@@ -742,24 +744,25 @@ export default function SessionFormManager({
                           </select>
                         </div>
                         {supportsPlaceholder ? (
-                          <div className="space-y-2 md:col-span-2">
-                            <Label htmlFor={`question-placeholder-${question.id}`}>טקסט עזר</Label>
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor={`question-placeholder-${question.id}`} className="text-xs sm:text-sm">טקסט עזר</Label>
                             <Input
                               id={`question-placeholder-${question.id}`}
                               value={question.placeholder}
                               onChange={(event) => handleQuestionChange(question.id, { placeholder: event.target.value })}
                               placeholder="לדוגמה: תארו בקצרה את מהלך המפגש"
+                              className="text-sm"
                             />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 md:col-span-2">
+                          <div className="flex items-center gap-3 sm:col-span-2">
                             <div className="flex items-center gap-2">
                               <Switch
                                 checked={Boolean(question.required)}
                                 onCheckedChange={(next) => handleQuestionChange(question.id, { required: next })}
                                 id={`question-required-${question.id}`}
                               />
-                              <Label htmlFor={`question-required-${question.id}`} className="text-sm">שדה חובה</Label>
+                              <Label htmlFor={`question-required-${question.id}`} className="text-xs sm:text-sm">שדה חובה</Label>
                             </div>
                           </div>
                         )}
@@ -793,25 +796,27 @@ export default function SessionFormManager({
                           </div>
                           <div className="space-y-3">
                             {options.map((option) => (
-                              <div key={option.id} className="grid gap-3 md:grid-cols-[2fr,2fr,auto] md:items-end">
+                              <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto] sm:items-end">
                                 <div className="space-y-2">
-                                  <Label htmlFor={`option-label-${option.id}`}>תווית להצגה</Label>
+                                  <Label htmlFor={`option-label-${option.id}`} className="text-xs sm:text-sm">תווית להצגה</Label>
                                   <Input
                                     id={`option-label-${option.id}`}
                                     value={option.label}
                                     onChange={(event) => handleOptionChange(question.id, option.id, { label: event.target.value })}
                                     placeholder="לדוגמה: הושלם במלואו"
+                                    className="text-sm"
                                   />
                                 </div>
                                 <div className="space-y-2">
-                                  <Label htmlFor={`option-value-${option.id}`}>ערך לשמירה</Label>
+                                  <Label htmlFor={`option-value-${option.id}`} className="text-xs sm:text-sm">ערך לשמירה</Label>
                                   <Input
                                     id={`option-value-${option.id}`}
                                     value={option.value}
                                     onChange={(event) => handleOptionChange(question.id, option.id, { value: event.target.value })}
                                     placeholder="לדוגמה: completed"
+                                    className="text-sm"
                                   />
-                                  <p className="text-xs text-slate-400">יופיע בתוצאות ולוגים.</p>
+                                  <p className="text-[10px] text-slate-400 sm:text-xs">יופיע בתוצאות ולוגים.</p>
                                 </div>
                                 <Button
                                   type="button"
@@ -830,32 +835,35 @@ export default function SessionFormManager({
                       ) : null}
 
                       {supportsRange ? (
-                        <div className="grid gap-4 md:grid-cols-3">
+                        <div className="grid w-full gap-4 sm:grid-cols-3">
                           <div className="space-y-2">
-                            <Label htmlFor={`range-min-${question.id}`}>ערך מינימלי</Label>
+                            <Label htmlFor={`range-min-${question.id}`} className="text-xs sm:text-sm">ערך מינימלי</Label>
                             <Input
                               id={`range-min-${question.id}`}
                               type="number"
                               value={question.range?.min ?? DEFAULT_RANGE.min}
                               onChange={(event) => handleRangeChange(question.id, 'min', Number(event.target.value))}
+                              className="text-sm"
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor={`range-max-${question.id}`}>ערך מקסימלי</Label>
+                            <Label htmlFor={`range-max-${question.id}`} className="text-xs sm:text-sm">ערך מקסימלי</Label>
                             <Input
                               id={`range-max-${question.id}`}
                               type="number"
                               value={question.range?.max ?? DEFAULT_RANGE.max}
                               onChange={(event) => handleRangeChange(question.id, 'max', Number(event.target.value))}
+                              className="text-sm"
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor={`range-step-${question.id}`}>גודל צעד</Label>
+                            <Label htmlFor={`range-step-${question.id}`} className="text-xs sm:text-sm">גודל צעד</Label>
                             <Input
                               id={`range-step-${question.id}`}
                               type="number"
                               value={question.range?.step ?? DEFAULT_RANGE.step}
                               onChange={(event) => handleRangeChange(question.id, 'step', Number(event.target.value))}
+                              className="text-sm"
                             />
                           </div>
                         </div>

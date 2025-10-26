@@ -175,7 +175,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                   {activeInstructors.map((i) => (
                     <div key={i.id} className="flex flex-col gap-2 rounded-md border p-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="min-w-[260px]">
+                        <div className="w-full sm:min-w-[260px] sm:flex-1">
                           <Label htmlFor={`inst-name-${i.id}`} className="text-xs text-slate-600">שם</Label>
                           <Input
                             id={`inst-name-${i.id}`}
@@ -198,7 +198,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                             <Input
                               id={`inst-phone-${i.id}`}
                               placeholder="טלפון"
-                              className="h-8 w-40"
+                              className="h-8 w-32 sm:w-40"
                               defaultValue={i.phone || ''}
                               onBlur={(e) => {
                                 const val = e.target.value.trim();
@@ -209,8 +209,8 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                               disabled={isSaving}
                             />
                           </div>
-                          <Button type="button" variant="outline" size="sm" onClick={() => handleDisable(i)} disabled={isSaving}>
-                            <UserX className="h-4 w-4" /> השבת
+                          <Button type="button" variant="outline" size="sm" onClick={() => handleDisable(i)} disabled={isSaving} className="text-xs">
+                            <UserX className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">השבת</span>
                           </Button>
                         </div>
                       </div>
@@ -262,12 +262,12 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                 <div className="space-y-xs max-h-72 overflow-y-auto sm:space-y-sm">
                   {nonInstructorMembers.map((m) => (
                     <div key={m.id} className="flex items-center justify-between gap-sm rounded-md border p-sm">
-                      <div className="min-w-[200px]">
+                      <div className="w-full sm:min-w-[200px] sm:flex-1">
                         <div className="text-xs font-medium text-slate-900 sm:text-sm">{m?.profile?.full_name || m?.profile?.email || m.user_id}</div>
                         <div className="text-[10px] text-slate-500 sm:text-xs">{m?.profile?.email || '—'}</div>
                       </div>
                       <Button type="button" size="sm" className="gap-xs text-xs" onClick={() => handleAdd(m)} disabled={isSaving}>
-                        <UserPlus className="h-4 w-4" /> הוסף כמדריך
+                        <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">הוסף</span>
                       </Button>
                     </div>
                   ))}

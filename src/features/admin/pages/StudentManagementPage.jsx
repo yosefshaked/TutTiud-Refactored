@@ -261,7 +261,7 @@ export default function StudentManagementPage() {
             </p>
           ) : null}
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           {isLoadingStudents ? (
             <div className="flex items-center justify-center gap-sm py-xl text-neutral-600">
               <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
@@ -282,16 +282,15 @@ export default function StudentManagementPage() {
           ) : null}
 
           {!isLoadingStudents && !studentsError && displayedStudents.length > 0 ? (
-            <div className="-mx-sm overflow-x-auto sm:mx-0">
-              <Table className="min-w-[640px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
-                    <TableHead className="text-right text-sm font-medium text-neutral-600">פרטי קשר</TableHead>
-                    <TableHead className="w-[120px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
-                  </TableRow>
-                </TableHeader>
-              <TableBody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
+                  <TableHead className="hidden text-right text-sm font-medium text-neutral-600 sm:table-cell">פרטי קשר</TableHead>
+                  <TableHead className="w-[100px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
+                </TableRow>
+              </TableHeader>
+            <TableBody>
                 {displayedStudents.map((student) => {
                   const instructor = instructorMap.get(student.assigned_instructor_id) || null;
                   const contactName = student.contact_name || '';
@@ -327,7 +326,7 @@ export default function StudentManagementPage() {
                           </div>
                         ) : null}
                       </TableCell>
-                      <TableCell className="text-sm text-neutral-600">
+                      <TableCell className="hidden text-sm text-neutral-600 sm:table-cell">
                         {contactDisplay}
                       </TableCell>
                       <TableCell className="text-right">
@@ -335,11 +334,12 @@ export default function StudentManagementPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="gap-xs"
+                          className="gap-xs text-xs sm:text-sm"
                           onClick={() => handleOpenAssignment(student)}
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
-                          עריכה
+                          <span className="hidden sm:inline">עריכה</span>
+                          <span className="sm:hidden">✎</span>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -347,7 +347,6 @@ export default function StudentManagementPage() {
                 })}
               </TableBody>
             </Table>
-            </div>
           ) : null}
         </CardContent>
       </Card>
