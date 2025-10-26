@@ -17,7 +17,7 @@ async function resolveBearerToken() {
   return token;
 }
 
-export async function authenticatedFetch(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
+  void _session; void _accessToken;
   const token = await resolveBearerToken();
   const bearer = `Bearer ${token}`;
 

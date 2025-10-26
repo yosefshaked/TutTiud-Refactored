@@ -100,7 +100,6 @@ export default function MyStudentsPage() {
   const isLoading = status === REQUEST_STATUS.loading
   const isError = status === REQUEST_STATUS.error
   const isSuccess = status === REQUEST_STATUS.success
-  const isEmpty = isSuccess && students.length === 0
 
   const filteredStudents = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
