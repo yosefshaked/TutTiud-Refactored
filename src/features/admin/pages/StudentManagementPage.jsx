@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2, Pencil } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Loader2, Pencil, Search, X, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -32,6 +34,7 @@ export default function StudentManagementPage() {
   const [createError, setCreateError] = useState('');
   const [studentForAssignment, setStudentForAssignment] = useState(null);
   const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
+  const [searchQuery, setSearchQuery] = useState('');
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -220,11 +223,43 @@ export default function StudentManagementPage() {
   const isEmpty = !isLoadingStudents && students.length === 0 && !studentsError;
 
   const displayedStudents = React.useMemo(() => {
+    let filtered = students;
+    
+    // Filter by instructor (mine vs all)
     if (filterMode === 'mine' && user?.id) {
-      return students.filter((s) => s.assigned_instructor_id === user.id);
+      filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
     }
-    return students;
-  }, [students, filterMode, user?.id]);
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((student) => {
+        // Search by student name
+        const studentName = (student.name || '').toLowerCase();
+        if (studentName.includes(query)) return true;
+        
+        // Search by parent/contact name
+        const contactName = (student.contact_name || '').toLowerCase();
+        if (contactName.includes(query)) return true;
+        
+        // Search by phone number
+        const contactPhone = (student.contact_phone || '').toLowerCase();
+        if (contactPhone.includes(query)) return true;
+        
+        // Search by default day of week
+        const dayOfWeek = (student.default_day_of_week || '').toLowerCase();
+        if (dayOfWeek.includes(query)) return true;
+        
+        // Search by default session time
+        const sessionTime = (student.default_session_time || '').toLowerCase();
+        if (sessionTime.includes(query)) return true;
+        
+        return false;
+      });
+    }
+    
+    return filtered;
+  }, [students, filterMode, user?.id, searchQuery]);
 
   return (
     <PageLayout
@@ -254,12 +289,34 @@ export default function StudentManagementPage() {
       <Card className="w-full">
         <CardHeader className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-semibold text-foreground">רשימת תלמידים</CardTitle>
-          {instructorsState === REQUEST_STATES.loading ? (
-            <p className="flex items-center gap-xs text-sm text-neutral-600">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              טוען רשימת מדריכים...
-            </p>
-          ) : null}
+          <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
+            {instructorsState === REQUEST_STATES.loading ? (
+              <p className="flex items-center gap-xs text-sm text-neutral-600">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                טוען רשימת מדריכים...
+              </p>
+            ) : null}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+              <Input
+                type="text"
+                placeholder="חיפוש לפי שם, הורה, יום או שעה..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pr-10 text-sm"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+                  aria-label="נקה חיפוש"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingStudents ? (
@@ -277,12 +334,18 @@ export default function StudentManagementPage() {
 
           {isEmpty ? (
             <div className="py-xl text-center text-sm text-neutral-500">
-              עדיין לא נוספו תלמידים לארגון זה.
+              {searchQuery ? 'לא נמצאו תלמידים התואמים את החיפוש.' : 'עדיין לא נוספו תלמידים לארגון זה.'}
             </div>
           ) : null}
 
           {!isLoadingStudents && !studentsError && displayedStudents.length > 0 ? (
-            <Table>
+            <>
+              {searchQuery && (
+                <div className="mb-sm text-xs text-neutral-600">
+                  נמצאו {displayedStudents.length} תלמידים
+                </div>
+              )}
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
@@ -300,31 +363,67 @@ export default function StudentManagementPage() {
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="text-sm font-semibold text-foreground">
-                        {student.id ? (
-                          <Link to={`/students/${student.id}`} className="text-primary hover:underline">
-                            {student.name || 'ללא שם'}
-                          </Link>
-                        ) : (
-                          student.name || 'ללא שם'
-                        )}
-                        {filterMode === 'all' ? (
-                          <div className="mt-0.5 text-xs text-neutral-500">
-                            {instructor?.name ? (
-                              <>מדריך: {instructor.name}</>
-                            ) : student.assigned_instructor_id ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAssignment(student)}
-                                className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
-                                title="שיוך מדריך מחדש"
-                              >
-                                המדריך הושבת — יש לשייך מדריך חדש
-                              </button>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            {student.id ? (
+                              <Link to={`/students/${student.id}`} className="text-primary hover:underline">
+                                {student.name || 'ללא שם'}
+                              </Link>
                             ) : (
-                              <>ללא מדריך</>
+                              student.name || 'ללא שם'
                             )}
+                            {filterMode === 'all' ? (
+                              <div className="mt-0.5 text-xs text-neutral-500">
+                                {instructor?.name ? (
+                                  <>מדריך: {instructor.name}</>
+                                ) : student.assigned_instructor_id ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAssignment(student)}
+                                    className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
+                                    title="שיוך מדריך מחדש"
+                                  >
+                                    המדריך הושבת — יש לשייך מדריך חדש
+                                  </button>
+                                ) : (
+                                  <>ללא מדריך</>
+                                )}
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
+                          {contactDisplay !== '—' && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="sm:hidden rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                                  aria-label="הצג פרטי קשר"
+                                >
+                                  <User className="h-4 w-4" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 text-sm" align="end">
+                                <div className="space-y-1">
+                                  <div className="font-semibold text-neutral-900">פרטי קשר</div>
+                                  {contactName && (
+                                    <div>
+                                      <span className="text-xs text-neutral-500">שם: </span>
+                                      <span className="text-neutral-700">{contactName}</span>
+                                    </div>
+                                  )}
+                                  {contactPhone && (
+                                    <div>
+                                      <span className="text-xs text-neutral-500">טלפון: </span>
+                                      <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
+                                        {contactPhone}
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden text-sm text-neutral-600 sm:table-cell">
                         {contactDisplay}
@@ -347,6 +446,7 @@ export default function StudentManagementPage() {
                 })}
               </TableBody>
             </Table>
+            </>
           ) : null}
         </CardContent>
       </Card>
