@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
+import DayOfWeekSelect from "@/components/ui/DayOfWeekSelect.jsx"
 
 const REQUEST_STATUS = Object.freeze({
   idle: "idle",
@@ -26,6 +27,7 @@ export default function MyStudentsPage() {
   const [status, setStatus] = useState(REQUEST_STATUS.idle)
   const [errorMessage, setErrorMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [dayFilter, setDayFilter] = useState(null)
 
   const activeOrgId = activeOrg?.id ?? null
   const membershipRole = activeOrg?.membership?.role
@@ -100,13 +102,14 @@ export default function MyStudentsPage() {
   const isEmpty = isSuccess && students.length === 0
 
   const filteredStudents = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return students
-    }
-
     const query = searchQuery.toLowerCase().trim()
     return students.filter((student) => {
       try {
+        if (dayFilter && Number(student?.default_day_of_week) !== Number(dayFilter)) {
+          return false
+        }
+
+        if (!query) return true
         // Search by student name
         const studentName = String(student.name || '').toLowerCase()
         if (studentName.includes(query)) return true
@@ -137,7 +140,7 @@ export default function MyStudentsPage() {
         return false
       }
     })
-  }, [students, searchQuery])
+  }, [students, searchQuery, dayFilter])
 
   const hasNoResults = isSuccess && filteredStudents.length === 0
 
@@ -173,44 +176,52 @@ export default function MyStudentsPage() {
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
           <span>טוען את התלמידים שהוקצו לך...</span>
         </div>
-      ) : hasNoResults ? (
-        <div className="flex flex-col items-center justify-center gap-sm rounded-xl border border-dashed border-neutral-200 p-xl text-center text-neutral-600">
-          <Users className="h-10 w-10 text-neutral-400" aria-hidden="true" />
-          <p className="text-body-md">{searchQuery ? 'לא נמצאו תלמידים התואמים את החיפוש.' : 'לא הוקצו לך תלמידים עדיין.'}</p>
-          <p className="text-body-sm text-neutral-500">
-            {searchQuery ? 'נסו חיפוש אחר או נקו את תיבת החיפוש.' : 'כאשר מנהל הארגון יקצה אותך לתלמיד, הוא יופיע כאן.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="mb-md flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-              <Input
-                type="text"
-                placeholder="חיפוש לפי שם, הורה, יום או שעה..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pr-10 text-sm"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-                  aria-label="נקה חיפוש"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-            {searchQuery && (
-              <div className="text-xs text-neutral-600">
-                נמצאו {filteredStudents.length} תלמידים
+      ) : isSuccess ? (
+            <>
+              <div className="mb-md grid grid-cols-1 gap-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                <div className="relative w-full">
+                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+                  <Input
+                    type="text"
+                    placeholder="חיפוש לפי שם, הורה, יום או שעה..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pr-10 text-sm"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+                      aria-label="נקה חיפוש"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <DayOfWeekSelect
+                    value={dayFilter}
+                    onChange={setDayFilter}
+                    placeholder="סינון לפי יום"
+                  />
+                </div>
+                {searchQuery && (
+                  <div className="sm:col-span-2 text-xs text-neutral-600">
+                    נמצאו {filteredStudents.length} תלמידים
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <div className="grid gap-md md:grid-cols-2">
+              {hasNoResults ? (
+                <div className="flex flex-col items-center justify-center gap-sm rounded-xl border border-dashed border-neutral-200 p-xl text-center text-neutral-600">
+                  <Users className="h-10 w-10 text-neutral-400" aria-hidden="true" />
+                  <p className="text-body-md">{searchQuery ? 'לא נמצאו תלמידים התואמים את החיפוש.' : 'לא הוקצו לך תלמידים עדיין.'}</p>
+                  <p className="text-body-sm text-neutral-500">
+                    {searchQuery ? 'נסו חיפוש אחר או נקו את תיבת החיפוש.' : 'כאשר מנהל הארגון יקצה אותך לתלמיד, הוא יופיע כאן.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-md md:grid-cols-2">
           {filteredStudents.map((student) => {
             const contactName = student.contact_name || ''
             const contactPhone = student.contact_phone || ''
@@ -283,9 +294,10 @@ export default function MyStudentsPage() {
               </Card>
             )
           })}
-          </div>
+            </div>
+          )}
         </>
-      )}
+      ) : null}
     </PageLayout>
   )
 }

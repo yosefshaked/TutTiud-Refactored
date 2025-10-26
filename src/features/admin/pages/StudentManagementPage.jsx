@@ -14,6 +14,7 @@ import { authenticatedFetch } from '@/lib/api-client.js';
 import AddStudentForm from '../components/AddStudentForm.jsx';
 import AssignInstructorModal from '../components/AssignInstructorModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
+import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -35,6 +36,7 @@ export default function StudentManagementPage() {
   const [studentForAssignment, setStudentForAssignment] = useState(null);
   const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
   const [searchQuery, setSearchQuery] = useState('');
+  const [dayFilter, setDayFilter] = useState(null);
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -229,6 +231,10 @@ export default function StudentManagementPage() {
     if (filterMode === 'mine' && user?.id) {
       filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
     }
+    // Filter by day of week if selected
+    if (dayFilter) {
+      filtered = filtered.filter((s) => Number(s?.default_day_of_week) === Number(dayFilter));
+    }
     
     // Filter by search query
     if (searchQuery.trim()) {
@@ -264,7 +270,7 @@ export default function StudentManagementPage() {
     }
     
     return filtered;
-  }, [students, filterMode, user?.id, searchQuery]);
+  }, [students, filterMode, user?.id, searchQuery, dayFilter]);
 
   return (
     <PageLayout
@@ -321,6 +327,13 @@ export default function StudentManagementPage() {
                 </button>
               )}
             </div>
+            <div className="sm:w-56">
+              <DayOfWeekSelect
+                value={dayFilter}
+                onChange={setDayFilter}
+                placeholder="סינון לפי יום"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -340,6 +353,12 @@ export default function StudentManagementPage() {
           {isEmpty ? (
             <div className="py-xl text-center text-sm text-neutral-500">
               {searchQuery ? 'לא נמצאו תלמידים התואמים את החיפוש.' : 'עדיין לא נוספו תלמידים לארגון זה.'}
+            </div>
+          ) : null}
+
+          {!isLoadingStudents && !studentsError && !isEmpty && displayedStudents.length === 0 ? (
+            <div className="py-xl text-center text-sm text-neutral-500">
+              לא נמצאו תלמידים התואמים את המסננים/החיפוש.
             </div>
           ) : null}
 

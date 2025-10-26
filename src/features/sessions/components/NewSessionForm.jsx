@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { describeSchedule } from '@/features/students/utils/schedule.js';
 import { cn } from '@/lib/utils.js';
+import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 
 function todayIsoDate() {
   return format(new Date(), 'yyyy-MM-dd');
@@ -23,6 +24,8 @@ export default function NewSessionForm({
   error = '',
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [studentDayFilter, setStudentDayFilter] = useState(null);
   const [sessionDate, setSessionDate] = useState(todayIsoDate());
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
@@ -76,6 +79,38 @@ export default function NewSessionForm({
   const selectedStudent = useMemo(() => {
     return students.find((student) => student?.id === selectedStudentId) || null;
   }, [students, selectedStudentId]);
+
+  const filteredStudents = useMemo(() => {
+    const q = studentQuery.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter((s) => {
+      try {
+        // Day filter first
+        if (studentDayFilter && Number(s?.default_day_of_week) !== Number(studentDayFilter)) {
+          return false;
+        }
+
+        const name = String(s?.name || '').toLowerCase();
+        if (name.includes(q)) return true;
+
+        // Match by Hebrew day label (e.g., "יום שני")
+        const dayLabel = String(describeSchedule(s?.default_day_of_week, null) || '').toLowerCase();
+        if (dayLabel.includes(q)) return true;
+
+        // Match by time (e.g., 14:30)
+        const timeStr = String(describeSchedule(null, s?.default_session_time) || '').toLowerCase();
+        if (timeStr.includes(q)) return true;
+
+        // Also match full schedule text
+        const fullSchedule = String(describeSchedule(s?.default_day_of_week, s?.default_session_time) || '').toLowerCase();
+        if (fullSchedule.includes(q)) return true;
+
+        return false;
+      } catch {
+        return false;
+      }
+    });
+  }, [students, studentQuery, studentDayFilter]);
 
   useEffect(() => {
     if (!selectedStudent || serviceTouched) {
@@ -151,18 +186,39 @@ export default function NewSessionForm({
     <form className="space-y-lg" onSubmit={handleSubmit}>
       <div className="space-y-sm">
         <Label htmlFor="session-student">בחרו תלמיד *</Label>
+        <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="חיפוש לפי שם, יום או שעה..."
+              value={studentQuery}
+              onChange={(e) => setStudentQuery(e.target.value)}
+              className="w-full pr-3 text-sm"
+              disabled={isSubmitting || students.length === 0}
+              aria-label="חיפוש תלמיד"
+            />
+          </div>
+          <div>
+            <DayOfWeekSelect
+              value={studentDayFilter}
+              onChange={setStudentDayFilter}
+              disabled={isSubmitting || students.length === 0}
+              placeholder="סינון לפי יום"
+            />
+          </div>
+        </div>
         <select
           id="session-student"
           className="w-full rounded-lg border border-border bg-white p-sm text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
           value={selectedStudentId}
           onChange={handleStudentChange}
           required
-          disabled={isSubmitting || students.length === 0}
+          disabled={isSubmitting || filteredStudents.length === 0}
         >
           <option value="" disabled>
             בחרו תלמיד מהרשימה
           </option>
-          {students.map((student) => {
+          {filteredStudents.map((student) => {
             const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
             return (
               <option key={student.id} value={student.id}>
@@ -173,6 +229,8 @@ export default function NewSessionForm({
         </select>
         {students.length === 0 ? (
           <p className="text-xs text-neutral-500">אין תלמידים זמינים לשיוך מפגש חדש.</p>
+        ) : filteredStudents.length === 0 ? (
+          <p className="text-xs text-neutral-500">לא נמצאו תלמידים התואמים את החיפוש.</p>
         ) : null}
       </div>
 
