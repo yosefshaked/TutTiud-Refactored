@@ -312,15 +312,16 @@ export default function StudentDetailPage() {
   const scheduleDescription = describeSchedule(student?.default_day_of_week, student?.default_session_time);
 
   return (
-    <div className="space-y-xl">
+    <div className="space-y-md md:space-y-lg">
       <div className="flex flex-col gap-sm sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-xs">
-          <h1 className="text-2xl font-semibold text-foreground">פרטי תלמיד</h1>
-          <p className="text-sm text-neutral-600">סקירת הפרטים והמפגשים של {student?.name || 'תלמיד ללא שם'}.</p>
+          <h1 className="text-xl font-semibold text-foreground sm:text-2xl">פרטי תלמיד</h1>
+          <p className="text-xs text-neutral-600 sm:text-sm">סקירת הפרטים והמפגשים של {student?.name || 'תלמיד ללא שם'}.</p>
         </div>
         <Button
           type="button"
-          className="self-start"
+          className="self-start text-sm"
+          size="sm"
           onClick={handleOpenSessionModal}
           disabled={studentLoadError || isStudentLoading || !student}
         >
@@ -330,95 +331,95 @@ export default function StudentDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold text-foreground">מידע כללי</CardTitle>
+          <CardTitle className="text-base font-semibold text-foreground sm:text-lg">מידע כללי</CardTitle>
         </CardHeader>
         <CardContent>
           {isStudentLoading ? (
-            <div className="flex items-center gap-sm text-neutral-600" role="status">
+            <div className="flex items-center gap-sm text-neutral-600 text-sm" role="status">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               <span>טוען פרטי תלמיד...</span>
             </div>
           ) : studentLoadError ? (
-            <div className="rounded-lg bg-red-50 p-md text-sm text-red-700" role="alert">
+            <div className="rounded-lg bg-red-50 p-sm text-xs text-red-700 sm:p-md sm:text-sm" role="alert">
               {studentError}
             </div>
           ) : student ? (
-            <dl className="grid gap-lg sm:grid-cols-2">
+            <dl className="grid gap-md sm:gap-lg md:grid-cols-2">
               <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-sm font-medium text-neutral-600">
+                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
                   <User className="h-4 w-4" aria-hidden="true" />
                   שם התלמיד
                 </dt>
-                <dd className="text-base font-semibold text-foreground">{student.name}</dd>
+                <dd className="text-sm font-semibold text-foreground sm:text-base">{student.name}</dd>
               </div>
               <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-sm font-medium text-neutral-600">
+                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
                   <Phone className="h-4 w-4" aria-hidden="true" />
                   איש קשר
                 </dt>
-                <dd className="text-base text-foreground">{contactName}</dd>
+                <dd className="text-sm text-foreground sm:text-base">{contactName}</dd>
                 {contactPhone ? (
-                  <dd className="text-sm text-neutral-600">טלפון: {contactPhone}</dd>
+                  <dd className="text-xs text-neutral-600 sm:text-sm">טלפון: {contactPhone}</dd>
                 ) : null}
               </div>
               <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-sm font-medium text-neutral-600">
+                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
                   <Calendar className="h-4 w-4" aria-hidden="true" />
                   יום ושעה קבועים
                 </dt>
-                <dd className="text-base text-foreground">{scheduleDescription}</dd>
+                <dd className="text-sm text-foreground sm:text-base">{scheduleDescription}</dd>
                 {student?.default_session_time ? (
-                  <dd className="text-sm text-neutral-600">שעת ברירת מחדל: {formatDefaultTime(student.default_session_time)}</dd>
+                  <dd className="text-xs text-neutral-600 sm:text-sm">שעת ברירת מחדל: {formatDefaultTime(student.default_session_time)}</dd>
                 ) : null}
               </div>
               <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-sm font-medium text-neutral-600">
+                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
                   <Clock className="h-4 w-4" aria-hidden="true" />
                   שירות ברירת מחדל
                 </dt>
-                <dd className="text-base text-foreground">{defaultService}</dd>
+                <dd className="text-sm text-foreground sm:text-base">{defaultService}</dd>
               </div>
               {contactInfo ? (
                 <div className="space-y-xs sm:col-span-2">
-                  <dt className="text-sm font-medium text-neutral-600">פרטי קשר נוספים</dt>
-                  <dd className="whitespace-pre-wrap text-sm text-neutral-700">{contactInfo}</dd>
+                  <dt className="text-xs font-medium text-neutral-600 sm:text-sm">פרטי קשר נוספים</dt>
+                  <dd className="whitespace-pre-wrap break-words text-xs text-neutral-700 sm:text-sm">{contactInfo}</dd>
                 </div>
               ) : null}
             </dl>
           ) : (
-            <p className="text-sm text-neutral-600">לא נמצאו פרטי תלמיד להצגה.</p>
+            <p className="text-xs text-neutral-600 sm:text-sm">לא נמצאו פרטי תלמיד להצגה.</p>
           )}
         </CardContent>
       </Card>
 
-      <div className="space-y-md">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">היסטוריית מפגשים</h2>
-          <Link to={backDestination} className="inline-flex items-center gap-xs text-sm text-primary hover:underline">
+      <div className="space-y-sm md:space-y-md">
+        <div className="flex items-center justify-between gap-sm">
+          <h2 className="text-base font-semibold text-foreground sm:text-lg">היסטוריית מפגשים</h2>
+          <Link to={backDestination} className="inline-flex items-center gap-xs text-xs text-primary hover:underline sm:text-sm">
             חזרה לרשימת התלמידים
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
         {questionsState === REQUEST_STATE.error ? (
-          <div className="rounded-lg bg-amber-50 p-md text-sm text-amber-800" role="status">
+          <div className="rounded-lg bg-amber-50 p-sm text-xs text-amber-800 sm:p-md sm:text-sm" role="status">
             {questionsError}
           </div>
         ) : null}
         {isSessionsLoading ? (
-          <div className="flex items-center gap-sm text-neutral-600" role="status">
+          <div className="flex items-center gap-sm text-xs text-neutral-600 sm:text-sm" role="status">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             <span>טוען היסטוריית מפגשים...</span>
           </div>
         ) : sessionsLoadError ? (
-          <div className="rounded-lg bg-red-50 p-md text-sm text-red-700" role="alert">
+          <div className="rounded-lg bg-red-50 p-sm text-xs text-red-700 sm:p-md sm:text-sm" role="alert">
             {sessionError}
           </div>
         ) : noSessions ? (
-          <div className="rounded-xl border border-dashed border-neutral-300 p-lg text-center text-neutral-600">
+          <div className="rounded-xl border border-dashed border-neutral-300 p-md text-center text-xs text-neutral-600 sm:p-lg sm:text-sm">
             טרם תועדו מפגשים עבור תלמיד זה.
           </div>
         ) : (
-          <div className="space-y-md">
+          <div className="space-y-sm md:space-y-md">
             {sessions.map((record) => {
               const answers = buildAnswerList(record.content, questions);
               return (
@@ -426,28 +427,28 @@ export default function StudentDetailPage() {
                   <CardHeader className="space-y-xs">
                     <div className="flex flex-wrap items-center justify-between gap-sm">
                       <div className="space-y-1">
-                        <CardTitle className="text-base font-semibold text-foreground">
+                        <CardTitle className="text-sm font-semibold text-foreground sm:text-base">
                           {formatSessionDate(record.date)}
                         </CardTitle>
-                        <p className="text-sm text-neutral-500">
+                        <p className="text-xs text-neutral-500 sm:text-sm">
                           {record.service_context ? `שירות: ${record.service_context}` : 'ללא שירות מוגדר'}
                         </p>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-sm">
+                  <CardContent className="space-y-xs sm:space-y-sm">
                     {answers.length ? (
-                      <dl className="space-y-sm">
+                      <dl className="space-y-xs sm:space-y-sm">
                         {answers.map((entry, index) => (
                           <div key={`${record.id}-${entry.label}`} className="space-y-xs">
-                            <dt className="text-sm font-medium text-neutral-600">{entry.label}</dt>
-                            <dd className="whitespace-pre-wrap text-sm text-neutral-800">{entry.value}</dd>
+                            <dt className="text-xs font-medium text-neutral-600 sm:text-sm">{entry.label}</dt>
+                            <dd className="whitespace-pre-wrap break-words text-xs text-neutral-800 sm:text-sm">{entry.value}</dd>
                             {index < answers.length - 1 ? <Separator /> : null}
                           </div>
                         ))}
                       </dl>
                     ) : (
-                      <p className="text-sm text-neutral-500">לא תועדו תשובות עבור מפגש זה.</p>
+                      <p className="text-xs text-neutral-500 sm:text-sm">לא תועדו תשובות עבור מפגש זה.</p>
                     )}
                   </CardContent>
                 </Card>

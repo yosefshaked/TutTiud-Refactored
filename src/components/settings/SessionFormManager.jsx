@@ -611,10 +611,10 @@ export default function SessionFormManager({
     return (
       <Card className="border-0 shadow-lg bg-white/80">
         <CardHeader>
-          <CardTitle className="text-xl font-semibold text-slate-900">ניהול שאלות המפגש</CardTitle>
+          <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg">ניהול שאלות המפגש</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" role="status">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-sm text-xs text-amber-800 sm:p-md sm:text-sm" role="status">
             חברו את הארגון ל-Supabase באמצעות האשף לפני ניהול שאלות המפגש.
           </div>
         </CardContent>
@@ -624,16 +624,16 @@ export default function SessionFormManager({
 
   return (
     <Card className="border-0 shadow-lg bg-white/80" dir="rtl">
-      <CardHeader className="border-b border-slate-200 space-y-2">
-        <CardTitle className="text-xl font-semibold text-slate-900">ניהול טופס שאלות למפגש</CardTitle>
-        <p className="text-sm text-slate-600">
+      <CardHeader className="border-b border-slate-200 space-y-xs sm:space-y-sm">
+        <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">ניהול טופס שאלות למפגש</CardTitle>
+        <p className="text-xs text-slate-600 sm:text-sm">
           הגדירו את השאלות שיופיעו בטופס רישום המפגש. ניתן להוסיף, להסיר, לסדר ולדרוש שדות חובה.
         </p>
         <Badge variant="outline" className="w-fit text-xs text-slate-600">
           שמירה יוצרת גרסה חדשה שנשלטת בצד השרת
         </Badge>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-md sm:space-y-lg">
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-12 w-full" />

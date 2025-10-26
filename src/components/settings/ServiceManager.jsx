@@ -129,31 +129,32 @@ export default function ServiceManager({ session, orgId, activeOrgHasConnection,
   return (
     <Card className="border-0 shadow-lg bg-white/80">
       <CardHeader>
-        <CardTitle>ניהול שירותים</CardTitle>
-        <p className="text-sm text-slate-600 mt-2">
+        <CardTitle className="text-base sm:text-lg">ניהול שירותים</CardTitle>
+        <p className="text-xs text-slate-600 mt-xs sm:mt-sm sm:text-sm">
           הגדר את רשימת השירותים הזמינים בארגון. השירותים יופיעו בטופס הוספת תלמיד.
         </p>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-sm sm:space-y-md">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-md sm:py-lg">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <span className="mr-2 text-sm text-slate-600">טוען שירותים...</span>
+            <span className="mr-2 text-xs text-slate-600 sm:text-sm">טוען שירותים...</span>
           </div>
         ) : loadError ? (
-          <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded-md bg-red-50 p-sm text-xs text-red-700 sm:p-md sm:text-sm">
             {loadError}
           </div>
         ) : (
           <>
-            <div className="space-y-2">
-              <Label htmlFor="new-service">הוסף שירות חדש</Label>
-              <div className="flex gap-2">
+            <div className="space-y-xs sm:space-y-sm">
+              <Label htmlFor="new-service" className="text-xs sm:text-sm">הוסף שירות חדש</Label>
+              <div className="flex gap-sm">
                 <Input
                   id="new-service"
                   value={newService}
                   onChange={(e) => setNewService(e.target.value)}
                   placeholder="לדוגמה: פיזיותרפיה"
+                  className="text-sm"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -166,7 +167,8 @@ export default function ServiceManager({ session, orgId, activeOrgHasConnection,
                   type="button"
                   onClick={handleAddService}
                   disabled={isSaving}
-                  className="gap-2"
+                  size="sm"
+                  className="gap-xs text-sm"
                 >
                   <Plus className="h-4 w-4" />
                   הוסף
@@ -175,9 +177,9 @@ export default function ServiceManager({ session, orgId, activeOrgHasConnection,
             </div>
 
             {services.length > 0 ? (
-              <div className="space-y-2">
-                <Label>שירותים זמינים ({services.length})</Label>
-                <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-3">
+              <div className="space-y-xs sm:space-y-sm">
+                <Label className="text-xs sm:text-sm">שירותים זמינים ({services.length})</Label>
+                <div className="space-y-xs max-h-64 overflow-y-auto border rounded-md p-sm sm:space-y-sm sm:p-md">
                   {services.map((service, index) => (
                     <div
                       key={index}

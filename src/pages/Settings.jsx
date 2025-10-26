@@ -57,24 +57,24 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-8">
-      <div className="mx-auto flex max-w-5xl flex-col gap-6">
-        <header className="space-y-2 text-right">
-          <h1 className="text-3xl font-bold text-slate-900">הגדרות הארגון</h1>
-          <p className="text-slate-600">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-sm md:p-md lg:p-lg">
+      <div className="mx-auto flex max-w-5xl flex-col gap-md md:gap-lg">
+        <header className="space-y-xs text-right">
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl md:text-3xl">הגדרות הארגון</h1>
+          <p className="text-sm text-slate-600 sm:text-base">
             נטרו את מצב החיבור, הזמינו חברי צוות, ונטרו את טופס שאלות המפגש עבור הארגון הפעיל.
           </p>
         </header>
 
         <Card className="border-0 bg-white/90 shadow-lg" dir="rtl">
-          <CardHeader className="border-b border-slate-200 space-y-2">
-            <CardTitle className="text-xl font-semibold text-slate-900">מידע לניפוי באגים</CardTitle>
-            <p className="text-sm text-slate-600">
+          <CardHeader className="border-b border-slate-200 space-y-xs">
+            <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">מידע לניפוי באגים</CardTitle>
+            <p className="text-xs text-slate-600 sm:text-sm">
               שימוש בנתונים אלו מאפשר להבין איך האפליקציה מזהה את המשתמש הנוכחי וההרשאות שלו.
             </p>
           </CardHeader>
           <CardContent>
-            <dl className="grid gap-4 text-sm text-slate-700 sm:grid-cols-3">
+            <dl className="grid gap-sm text-xs text-slate-700 sm:grid-cols-2 sm:gap-md sm:text-sm md:grid-cols-3">
               <div className="space-y-1">
                 <dt className="font-medium text-slate-500">מזהה משתמש</dt>
                 <dd className="break-all text-slate-900">{user?.id ?? '—'}</dd>
@@ -93,11 +93,11 @@ export default function Settings() {
 
         {canManageSessionForm ? (
           <>
-            <div className="grid gap-6 xl:grid-cols-[1.5fr,1fr]" dir="rtl">
+            <div className="grid gap-md xl:grid-cols-[1.5fr,1fr]" dir="rtl">
               <Card className="border-0 bg-white/80 shadow-lg">
-                <CardHeader className="border-b border-slate-200 space-y-3">
-                  <CardTitle className="flex flex-col gap-2 text-xl font-semibold text-slate-900 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="flex items-center gap-2 text-slate-900">
+                <CardHeader className="border-b border-slate-200 space-y-xs">
+                  <CardTitle className="flex flex-col gap-xs text-base font-semibold text-slate-900 sm:flex-row sm:items-center sm:justify-between sm:text-lg md:text-xl">
+                    <span className="flex items-center gap-xs text-slate-900">
                       <PlugZap className="h-5 w-5 text-blue-600" aria-hidden="true" />
                       מצב חיבור Supabase
                     </span>
@@ -105,23 +105,23 @@ export default function Settings() {
                       {activeOrgHasConnection ? 'חיבור פעיל' : 'נדרש חיבור'}
                     </Badge>
                   </CardTitle>
-                  <p className="text-sm text-slate-600">
+                  <p className="text-xs text-slate-600 sm:text-sm">
                     {activeOrgHasConnection
                       ? 'החיבור הנוכחי מאפשר קריאה וכתיבה להגדרות הארגון. ניתן לפתוח את האשף כדי לעדכן מפתחות או להריץ בדיקות חוזרות.'
                       : 'השלימו את אשף ההגדרה כדי לחבר את Supabase ולשמור את הגדרות טופס המפגש עבור הארגון.'}
                   </p>
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
-                    <span>ארגון פעיל: {activeOrg ? activeOrg.name : 'לא נבחר ארגון'}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-xs text-xs text-slate-500 sm:text-sm">
+                    <span className="break-words">ארגון פעיל: {activeOrg ? activeOrg.name : 'לא נבחר ארגון'}</span>
                     {activeOrgHasConnection ? (
                       <div className="flex items-center gap-1 text-emerald-700">
                         <Sparkles className="h-4 w-4" aria-hidden="true" />
-                        <span>האשף זמין לכל בדיקה חוזרת</span>
+                        <span className="hidden sm:inline">האשף זמין לכל בדיקה חוזרת</span>
                       </div>
                     ) : null}
                   </div>
                 </CardHeader>
-                <CardContent className="flex flex-wrap items-center justify-end gap-3 pt-6">
-                  <Button onClick={() => setIsSetupDialogOpen(true)} className="gap-2">
+                <CardContent className="flex flex-wrap items-center justify-end gap-xs pt-sm sm:gap-sm sm:pt-md">
+                  <Button onClick={() => setIsSetupDialogOpen(true)} className="gap-xs text-sm" size="sm">
                     <PlugZap className="h-4 w-4" aria-hidden="true" />
                     {activeOrgHasConnection ? 'נהל חיבור Supabase' : 'התחל אשף הגדרה'}
                   </Button>
