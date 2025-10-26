@@ -12,6 +12,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 
+      // Intentionally ignore profile fetch errors; fallback to provided values.
 export default async function (context, req) {
   const method = String(req.method || 'GET').toUpperCase();
 
@@ -38,6 +39,8 @@ export default async function (context, req) {
     authResult = await supabase.auth.getUser(authorization.token);
   } catch (error) {
     context.log?.error?.('instructors failed to validate token', { message: error?.message });
+    // If you need to tag the error, use a custom property instead of .name
+    error.customTag = 'instructors_token_validation';
     return respond(context, 401, { message: 'invalid or expired token' });
   }
 
@@ -135,7 +138,9 @@ export default async function (context, req) {
         .maybeSingle();
       profileName = normalizeString(profile?.full_name);
       profileEmail = normalizeString(profile?.email).toLowerCase();
-    } catch {}
+    } catch {
+      // Intentionally ignore profile fetch errors; fallback to provided values.
+    }
 
     const insertPayload = {
       id: targetUserId,
