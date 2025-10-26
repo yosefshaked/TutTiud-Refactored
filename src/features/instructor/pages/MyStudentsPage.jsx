@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
+import { includesDayQuery } from "@/features/students/utils/schedule.js"
 import DayOfWeekSelect from "@/components/ui/DayOfWeekSelect.jsx"
 
 const REQUEST_STATUS = Object.freeze({
@@ -126,9 +127,8 @@ export default function MyStudentsPage() {
         const contactInfo = String(student.contact_info || '').toLowerCase()
         if (contactInfo.includes(query)) return true
 
-        // Search by default day of week
-        const dayOfWeek = String(student.default_day_of_week || '').toLowerCase()
-        if (dayOfWeek.includes(query)) return true
+  // Search by default day of week (Hebrew label)
+  if (includesDayQuery(student.default_day_of_week, query)) return true
 
         // Search by default session time
         const sessionTime = String(student.default_session_time || '').toLowerCase()

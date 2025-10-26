@@ -128,7 +128,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
               <LogoPlaceholder />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Tuttiud</p>
+              <p className="text-sm font-semibold text-foreground">תותיעוד</p>
               <p className="text-xs text-neutral-500">פלטפורמת תלמידים</p>
             </div>
           </Link>

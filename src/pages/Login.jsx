@@ -56,7 +56,7 @@ export default function Login() {
           <div className="flex items-center justify-end gap-3">
             <ShieldCheck className="w-10 h-10" />
             <div>
-              <p className="text-sm text-blue-100">TutTiud • פלטפורמת ניהול עובדים</p>
+              <p className="text-sm text-blue-100">תותיעוד • פלטפורמת ניהול עובדים</p>
               <h1 className="text-2xl font-bold">כניסה לחשבון</h1>
             </div>
           </div>

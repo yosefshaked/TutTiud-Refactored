@@ -14,6 +14,7 @@ import { authenticatedFetch } from '@/lib/api-client.js';
 import AddStudentForm from '../components/AddStudentForm.jsx';
 import AssignInstructorModal from '../components/AssignInstructorModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
+import { includesDayQuery } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 
 const REQUEST_STATES = {
@@ -253,9 +254,8 @@ export default function StudentManagementPage() {
           const contactPhone = String(student.contact_phone || '').toLowerCase();
           if (contactPhone.includes(query)) return true;
           
-          // Search by default day of week
-          const dayOfWeek = String(student.default_day_of_week || '').toLowerCase();
-          if (dayOfWeek.includes(query)) return true;
+          // Search by default day of week (Hebrew label)
+          if (includesDayQuery(student.default_day_of_week, query)) return true;
           
           // Search by default session time
           const sessionTime = String(student.default_session_time || '').toLowerCase();

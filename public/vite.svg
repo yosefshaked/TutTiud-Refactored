@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" role="img" aria-labelledby="title desc">
-  <title id="title">TutTiud logo</title>
-  <desc id="desc">Horizontal TutTiud placeholder logo</desc>
+  <title id="title">לוגו תותיעוד</title>
+  <desc id="desc">לוגו אופקי זמני של תותיעוד</desc>
   <defs>
     <linearGradient id="tuttiud-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#1d4ed8" />

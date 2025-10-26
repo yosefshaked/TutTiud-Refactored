@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { describeSchedule } from '@/features/students/utils/schedule.js';
+import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 
@@ -82,20 +82,20 @@ export default function NewSessionForm({
 
   const filteredStudents = useMemo(() => {
     const q = studentQuery.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter((s) => {
-      try {
-        // Day filter first
-        if (studentDayFilter && Number(s?.default_day_of_week) !== Number(studentDayFilter)) {
-          return false;
-        }
 
+    // Always apply day filter first
+    const byDay = students.filter((s) => dayMatches(s?.default_day_of_week, studentDayFilter));
+
+    if (!q) return byDay;
+
+    // Then apply text query over the day-filtered list
+    return byDay.filter((s) => {
+      try {
         const name = String(s?.name || '').toLowerCase();
         if (name.includes(q)) return true;
 
-        // Match by Hebrew day label (e.g., "יום שני")
-        const dayLabel = String(describeSchedule(s?.default_day_of_week, null) || '').toLowerCase();
-        if (dayLabel.includes(q)) return true;
+  // Match by Hebrew day label (e.g., "יום שני")
+  if (includesDayQuery(s?.default_day_of_week, q)) return true;
 
         // Match by time (e.g., 14:30)
         const timeStr = String(describeSchedule(null, s?.default_session_time) || '').toLowerCase();
@@ -111,6 +111,15 @@ export default function NewSessionForm({
       }
     });
   }, [students, studentQuery, studentDayFilter]);
+
+  useEffect(() => {
+    // If the currently selected student is filtered out, clear the selection
+    if (!selectedStudentId) return;
+    const stillVisible = filteredStudents.some((s) => s?.id === selectedStudentId);
+    if (!stillVisible) {
+      setSelectedStudentId('');
+    }
+  }, [filteredStudents, selectedStudentId]);
 
   useEffect(() => {
     if (!selectedStudent || serviceTouched) {

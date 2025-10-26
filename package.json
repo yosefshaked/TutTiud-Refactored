@@ -1,6 +1,6 @@
 {
   "name": "tuttiud-app",
-  "description": "TutTiud Employee Payroll Management System",
+  "description": "TutTiud Session Reports Management System",
   "author": "Shaked Yossef",
   "main": "electron.cjs",
   "private": true,
@@ -67,7 +67,7 @@
   },
   "build": {
     "appId": "com.HavatTut.salaryapp",
-    "productName": "TutTiud - טוטטיוד",
+  "productName": "TutTiud - תותיעוד",
     "files": [
       "dist/**/*",
       "electron.cjs",
