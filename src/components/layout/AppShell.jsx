@@ -254,7 +254,7 @@ export default function AppShell({ children }) {
 
   return (
     <SessionModalContext.Provider value={sessionModalContextValue}>
-      <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
+      <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden" dir="rtl">
         <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
         <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
@@ -294,7 +294,7 @@ export default function AppShell({ children }) {
           <OrgSelectionBanner />
           <OrgConfigBanner />
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
             <PageLayout
               fullHeight={false}
               className="min-h-full pb-0"
