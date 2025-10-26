@@ -203,13 +203,13 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                         </div>
                       </div>
                       <div id={`inst-editor-${i.id}`} hidden={!expanded[i.id]} className="mt-2 space-y-2">
-                        <div className="flex flex-wrap items-end gap-2">
+                        <div className="flex flex-wrap items-start gap-2">
                           <div className="w-full sm:min-w-[260px] sm:flex-1">
                             <Label htmlFor={`inst-name-${i.id}`} className="text-xs text-slate-600">שם</Label>
                             <Input
                               id={`inst-name-${i.id}`}
                               placeholder="שם המדריך"
-                              className="h-8"
+                              className="h-10"
                               defaultValue={i.name || ''}
                               onBlur={(e) => {
                                 const val = e.target.value.trim();
@@ -226,7 +226,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                             <Input
                               id={`inst-phone-${i.id}`}
                               placeholder="טלפון"
-                              className="h-8 w-32 sm:w-40"
+                              className="h-10 w-32 sm:w-40"
                               defaultValue={i.phone || ''}
                               onBlur={(e) => {
                                 const val = e.target.value.trim();

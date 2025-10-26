@@ -12,6 +12,7 @@ import { useOrg } from "@/org/OrgContext.jsx"
 import { cn } from "@/lib/utils"
 import NewSessionModal from "@/features/sessions/components/NewSessionModal.jsx"
 import { SessionModalContext } from "@/features/sessions/context/SessionModalContext.jsx"
+import useKeyboardAwareBottomOffset from "@/hooks/useKeyboardAwareBottomOffset.js"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -56,11 +57,13 @@ function LogoPlaceholder() {
 }
 
 function MobileNavigation({ navItems = [], onOpenSessionModal }) {
+  const keyboardOffset = useKeyboardAwareBottomOffset()
   return (
     <nav
       role="navigation"
       aria-label="ניווט ראשי"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
+  className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
+      style={keyboardOffset > 0 ? { transform: `translateY(-${keyboardOffset}px)` } : undefined}
     >
       <div className="relative mx-auto flex max-w-md items-center justify-between gap-md">
         {navItems.map((item) => {

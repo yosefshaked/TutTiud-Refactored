@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, Phone, Calendar, Clock, User } from 'lucide-react';
+import { Loader2, ArrowRight, Phone, Calendar, Clock, User, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -120,6 +120,7 @@ export default function StudentDetailPage() {
   const [sessionState, setSessionState] = useState(REQUEST_STATE.idle);
   const [sessionError, setSessionError] = useState('');
   const [sessions, setSessions] = useState([]);
+  const [expandedById, setExpandedById] = useState({});
 
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionsError, setQuestionsError] = useState('');
@@ -219,6 +220,10 @@ export default function StudentDetailPage() {
           return a.date < b.date ? 1 : -1;
         });
       setSessions(normalized);
+      // Default collapsed: only show headers until the user expands
+      const collapsed = {};
+      normalized.forEach((r) => { collapsed[r.id || r.date] = false; });
+      setExpandedById(collapsed);
       setSessionState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to load session history', error);
@@ -304,6 +309,18 @@ export default function StudentDetailPage() {
   const isSessionsLoading = sessionState === REQUEST_STATE.loading;
   const sessionsLoadError = sessionState === REQUEST_STATE.error;
   const noSessions = !isSessionsLoading && !sessionsLoadError && sessions.length === 0;
+
+  const toggleOne = (key) => setExpandedById((prev) => ({ ...prev, [key]: !prev[key] }));
+  const expandAll = () => setExpandedById((prev) => {
+    const next = { ...prev };
+    sessions.forEach((r) => { next[r.id || r.date] = true; });
+    return next;
+  });
+  const collapseAll = () => setExpandedById((prev) => {
+    const next = { ...prev };
+    sessions.forEach((r) => { next[r.id || r.date] = false; });
+    return next;
+  });
 
   const contactName = student?.contact_name || 'לא סופק';
   const contactPhone = student?.contact_phone || '';
@@ -395,10 +412,22 @@ export default function StudentDetailPage() {
       <div className="space-y-sm md:space-y-md">
         <div className="flex items-center justify-between gap-sm">
           <h2 className="text-base font-semibold text-foreground sm:text-lg">היסטוריית מפגשים</h2>
-          <Link to={backDestination} className="inline-flex items-center gap-xs text-xs text-primary hover:underline sm:text-sm">
-            חזרה לרשימת התלמידים
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
+          <div className="flex items-center gap-xs">
+            {sessions.length > 1 ? (
+              <div className="hidden gap-xs sm:flex">
+                <Button type="button" variant="outline" size="sm" onClick={expandAll}>
+                  פתח הכל
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={collapseAll}>
+                  כווץ הכל
+                </Button>
+              </div>
+            ) : null}
+            <Link to={backDestination} className="inline-flex items-center gap-xs text-xs text-primary hover:underline sm:text-sm">
+              חזרה לרשימת התלמידים
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
         {questionsState === REQUEST_STATE.error ? (
           <div className="rounded-lg bg-amber-50 p-sm text-xs text-amber-800 sm:p-md sm:text-sm" role="status">
@@ -422,11 +451,19 @@ export default function StudentDetailPage() {
           <div className="space-y-sm md:space-y-md">
             {sessions.map((record) => {
               const answers = buildAnswerList(record.content, questions);
+              const key = record.id || record.date;
+              const isOpen = Boolean(expandedById[key]);
               return (
-                <Card key={record.id || record.date}>
+                <Card key={key}>
                   <CardHeader className="space-y-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-sm">
-                      <div className="space-y-1">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-sm text-right"
+                      onClick={() => toggleOne(key)}
+                      aria-expanded={isOpen}
+                      aria-controls={`session-${key}`}
+                    >
+                      <div className="space-y-1 text-right">
                         <CardTitle className="text-sm font-semibold text-foreground sm:text-base">
                           {formatSessionDate(record.date)}
                         </CardTitle>
@@ -434,9 +471,10 @@ export default function StudentDetailPage() {
                           {record.service_context ? `שירות: ${record.service_context}` : 'ללא שירות מוגדר'}
                         </p>
                       </div>
-                    </div>
+                      {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
                   </CardHeader>
-                  <CardContent className="space-y-xs sm:space-y-sm">
+                  <CardContent id={`session-${key}`} hidden={!isOpen} className="space-y-xs sm:space-y-sm">
                     {answers.length ? (
                       <dl className="space-y-xs sm:space-y-sm">
                         {answers.map((entry, index) => (

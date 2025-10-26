@@ -2,9 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-[dir="rtl"] [data-state="checked"] > span {
-  transform: translateX(-100%);
-}
+/* Removed legacy RTL switch thumb override that caused leaking/overflow.
+   Our Switch component handles RTL internally. */
 
 @layer base {
   :root {
