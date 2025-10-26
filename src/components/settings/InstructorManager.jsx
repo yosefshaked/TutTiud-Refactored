@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, UserPlus, UserX, Save } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, UserPlus, UserX, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
 
@@ -18,6 +18,8 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
   const [loadState, setLoadState] = useState(REQUEST.idle);
   const [loadError, setLoadError] = useState('');
   const [saveState, setSaveState] = useState(SAVE.idle);
+  const [expanded, setExpanded] = useState({});
+  const toggleExpanded = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
   const instructorMap = useMemo(() => new Map(instructors.map((i) => [i.id, i])), [instructors]);
 
@@ -150,6 +152,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
   const inactiveInstructors = instructors.filter((i) => !i.is_active);
   const nonInstructorMembers = members.filter((m) => !instructorMap.has(m.user_id));
 
+
   return (
     <Card className="w-full border-0 shadow-lg bg-white/80">
       <CardHeader>
@@ -173,26 +176,51 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
               ) : (
                 <div className="space-y-xs max-h-72 overflow-y-auto sm:space-y-sm">
                   {activeInstructors.map((i) => (
-                    <div key={i.id} className="flex flex-col gap-2 rounded-md border p-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="w-full sm:min-w-[260px] sm:flex-1">
-                          <Label htmlFor={`inst-name-${i.id}`} className="text-xs text-slate-600">שם</Label>
-                          <Input
-                            id={`inst-name-${i.id}`}
-                            placeholder="שם המדריך"
-                            className="h-8"
-                            defaultValue={i.name || ''}
-                            onBlur={(e) => {
-                              const val = e.target.value.trim();
-                              if (val !== (i.name || '')) {
-                                handleSaveDetails(i, { name: val || null });
-                              }
-                            }}
-                            disabled={isSaving}
-                          />
-                          <div className="mt-1 text-xs text-slate-500">{i.email || '—'}</div>
+                    <div key={i.id} className="rounded-md border p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(i.id)}
+                          className="flex min-w-0 items-center gap-2 rounded px-2 py-1 hover:bg-slate-50"
+                          aria-expanded={Boolean(expanded[i.id])}
+                          aria-controls={`inst-editor-${i.id}`}
+                        >
+                          <span className="truncate text-sm font-medium text-slate-900">{i.name || i.email || i.id}</span>
+                          <span className="hidden text-xs text-slate-500 sm:inline">{i.email || '—'}</span>
+                          {expanded[i.id] ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <div className="hidden items-end gap-2 sm:flex">
+                            <div className="text-xs text-slate-600">{i.phone || '—'}</div>
+                          </div>
+                          <Button type="button" variant="outline" size="sm" onClick={() => handleDisable(i)} disabled={isSaving} className="text-xs">
+                            <UserX className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">השבת</span>
+                          </Button>
                         </div>
-                        <div className="flex items-end gap-2">
+                      </div>
+                      <div id={`inst-editor-${i.id}`} hidden={!expanded[i.id]} className="mt-2 space-y-2">
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="w-full sm:min-w-[260px] sm:flex-1">
+                            <Label htmlFor={`inst-name-${i.id}`} className="text-xs text-slate-600">שם</Label>
+                            <Input
+                              id={`inst-name-${i.id}`}
+                              placeholder="שם המדריך"
+                              className="h-8"
+                              defaultValue={i.name || ''}
+                              onBlur={(e) => {
+                                const val = e.target.value.trim();
+                                if (val !== (i.name || '')) {
+                                  handleSaveDetails(i, { name: val || null });
+                                }
+                              }}
+                              disabled={isSaving}
+                            />
+                            <div className="mt-1 text-xs text-slate-500">{i.email || '—'}</div>
+                          </div>
                           <div>
                             <Label htmlFor={`inst-phone-${i.id}`} className="text-xs text-slate-600">טלפון</Label>
                             <Input
@@ -209,26 +237,23 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                               disabled={isSaving}
                             />
                           </div>
-                          <Button type="button" variant="outline" size="sm" onClick={() => handleDisable(i)} disabled={isSaving} className="text-xs">
-                            <UserX className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">השבת</span>
-                          </Button>
                         </div>
-                      </div>
-                      <div>
-                        <Label htmlFor={`inst-notes-${i.id}`} className="text-xs text-slate-600">הערות</Label>
-                        <textarea
-                          id={`inst-notes-${i.id}`}
-                          className="mt-1 w-full resize-y rounded-md border p-2 text-sm"
-                          rows={2}
-                          defaultValue={i.notes || ''}
-                          onBlur={(e) => {
-                            const val = e.target.value.trim();
-                            if (val !== (i.notes || '')) {
-                              handleSaveDetails(i, { notes: val || null });
-                            }
-                          }}
-                          disabled={isSaving}
-                        />
+                        <div>
+                          <Label htmlFor={`inst-notes-${i.id}`} className="text-xs text-slate-600">הערות</Label>
+                          <textarea
+                            id={`inst-notes-${i.id}`}
+                            className="mt-1 w-full resize-y rounded-md border p-2 text-sm"
+                            rows={2}
+                            defaultValue={i.notes || ''}
+                            onBlur={(e) => {
+                              const val = e.target.value.trim();
+                              if (val !== (i.notes || '')) {
+                                handleSaveDetails(i, { notes: val || null });
+                              }
+                            }}
+                            disabled={isSaving}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}

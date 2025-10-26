@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ArrowDown, ArrowUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchSessionFormConfig } from '@/lib/settings-client.js';
 import { upsertSetting } from '@/api/settings.js';
@@ -401,6 +401,7 @@ export default function SessionFormManager({
   tenantClientReady,
 }) {
   const [questions, setQuestions] = useState([]);
+  const [expanded, setExpanded] = useState({});
   const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
   const [loadError, setLoadError] = useState('');
   const [saveState, setSaveState] = useState(SAVE_STATE.idle);
@@ -424,6 +425,10 @@ export default function SessionFormManager({
     const rawQuestions = extractRawQuestions(rawValue);
     const normalized = deserializeQuestions(rawQuestions);
     setQuestions(normalized);
+    // Collapse all by default on load for compact view
+    const collapsed = {};
+    normalized.forEach((q) => { collapsed[q.id] = false; });
+    setExpanded(collapsed);
     const payload = buildPayloadFromQuestions(normalized);
     lastSavedPayloadRef.current = payload;
     lastSavedSignatureRef.current = JSON.stringify(payload);
@@ -467,6 +472,9 @@ export default function SessionFormManager({
   const handleAddQuestion = () => {
     setQuestions((prev) => {
       const next = [...prev, createEmptyQuestion(prev.length)];
+      // Expand the newly added question for immediate editing
+      const last = next[next.length - 1];
+      setExpanded((e) => ({ ...e, [last.id]: true }));
       return next;
     });
   };
@@ -498,6 +506,10 @@ export default function SessionFormManager({
       }
       return nextQuestion;
     }));
+  };
+
+  const toggleExpanded = (id) => {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const handleMoveQuestion = (id, direction) => {
@@ -665,12 +677,22 @@ export default function SessionFormManager({
                   const requiresOptions = questionRequiresOptions(question.type);
                   const supportsRange = questionSupportsRange(question.type);
                   return (
-                    <div key={question.id} className="rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-sm space-y-4">
+                    <div key={question.id} className="rounded-2xl border border-slate-200 bg-white/60 p-2 sm:p-4 shadow-sm">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-slate-900">{label}</p>
-                          <p className="text-xs text-slate-500">מזהה: {question.id}</p>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(question.id)}
+                          className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-slate-50"
+                          aria-expanded={Boolean(expanded[question.id])}
+                          aria-controls={`q-editor-${question.id}`}
+                        >
+                          <span className="text-sm font-semibold text-slate-900">{label}</span>
+                          {expanded[question.id] ? (
+                            <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </button>
                         <div className="flex items-center gap-2">
                           <Button
                             type="button"
@@ -704,8 +726,9 @@ export default function SessionFormManager({
                           </Button>
                         </div>
                       </div>
-
-                      <div className="grid w-full gap-4 sm:grid-cols-2">
+                      <div id={`q-editor-${question.id}`} hidden={!expanded[question.id]} className="mt-3 space-y-4">
+                        <div className="text-xs text-slate-500">מזהה: {question.id}</div>
+                        <div className="grid w-full gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                           <Label htmlFor={`question-label-${question.id}`} className="text-xs sm:text-sm">טקסט השאלה</Label>
                           <Input
@@ -727,9 +750,9 @@ export default function SessionFormManager({
                           />
                           <p className="text-[10px] text-slate-500 sm:text-xs">השתמשו במזהה קבוע כדי לשמור על עקביות בין גרסאות.</p>
                         </div>
-                      </div>
+                        </div>
 
-                      <div className="grid w-full gap-4 sm:grid-cols-3">
+                        <div className="grid w-full gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
                           <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
                           <select
@@ -766,108 +789,109 @@ export default function SessionFormManager({
                             </div>
                           </div>
                         )}
-                      </div>
-
-                      {supportsPlaceholder ? (
-                        <div className="flex items-center gap-3">
-                          <Switch
-                            checked={Boolean(question.required)}
-                            onCheckedChange={(next) => handleQuestionChange(question.id, { required: next })}
-                            id={`question-required-${question.id}`}
-                          />
-                          <Label htmlFor={`question-required-${question.id}`} className="text-sm">שדה חובה</Label>
                         </div>
-                      ) : null}
 
-                      {requiresOptions ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-slate-800">אפשרויות בחירה</h4>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleAddOption(question.id)}
-                              className="gap-2"
-                            >
-                              <ListPlus className="h-4 w-4" aria-hidden="true" />
-                              הוסף אפשרות
-                            </Button>
+                        {supportsPlaceholder ? (
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              checked={Boolean(question.required)}
+                              onCheckedChange={(next) => handleQuestionChange(question.id, { required: next })}
+                              id={`question-required-${question.id}`}
+                            />
+                            <Label htmlFor={`question-required-${question.id}`} className="text-sm">שדה חובה</Label>
                           </div>
+                        ) : null}
+
+                        {requiresOptions ? (
                           <div className="space-y-3">
-                            {options.map((option) => (
-                              <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto] sm:items-end">
-                                <div className="space-y-2">
-                                  <Label htmlFor={`option-label-${option.id}`} className="text-xs sm:text-sm">תווית להצגה</Label>
-                                  <Input
-                                    id={`option-label-${option.id}`}
-                                    value={option.label}
-                                    onChange={(event) => handleOptionChange(question.id, option.id, { label: event.target.value })}
-                                    placeholder="לדוגמה: הושלם במלואו"
-                                    className="text-sm"
-                                  />
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-sm font-semibold text-slate-800">אפשרויות בחירה</h4>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAddOption(question.id)}
+                                className="gap-2"
+                              >
+                                <ListPlus className="h-4 w-4" aria-hidden="true" />
+                                הוסף אפשרות
+                              </Button>
+                            </div>
+                            <div className="space-y-3">
+                              {options.map((option) => (
+                                <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto] sm:items-end">
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`option-label-${option.id}`} className="text-xs sm:text-sm">תווית להצגה</Label>
+                                    <Input
+                                      id={`option-label-${option.id}`}
+                                      value={option.label}
+                                      onChange={(event) => handleOptionChange(question.id, option.id, { label: event.target.value })}
+                                      placeholder="לדוגמה: הושלם במלואו"
+                                      className="text-sm"
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor={`option-value-${option.id}`} className="text-xs sm:text-sm">ערך לשמירה</Label>
+                                    <Input
+                                      id={`option-value-${option.id}`}
+                                      value={option.value}
+                                      onChange={(event) => handleOptionChange(question.id, option.id, { value: event.target.value })}
+                                      placeholder="לדוגמה: completed"
+                                      className="text-sm"
+                                    />
+                                    <p className="text-[10px] text-slate-400 sm:text-xs">יופיע בתוצאות ולוגים.</p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleRemoveOption(question.id, option.id)}
+                                    className="self-center text-red-600 hover:bg-red-50"
+                                    aria-label="מחק אפשרות"
+                                  >
+                                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                  </Button>
                                 </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor={`option-value-${option.id}`} className="text-xs sm:text-sm">ערך לשמירה</Label>
-                                  <Input
-                                    id={`option-value-${option.id}`}
-                                    value={option.value}
-                                    onChange={(event) => handleOptionChange(question.id, option.id, { value: event.target.value })}
-                                    placeholder="לדוגמה: completed"
-                                    className="text-sm"
-                                  />
-                                  <p className="text-[10px] text-slate-400 sm:text-xs">יופיע בתוצאות ולוגים.</p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveOption(question.id, option.id)}
-                                  className="self-center text-red-600 hover:bg-red-50"
-                                  aria-label="מחק אפשרות"
-                                >
-                                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                </Button>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null}
 
-                      {supportsRange ? (
-                        <div className="grid w-full gap-4 sm:grid-cols-3">
-                          <div className="space-y-2">
-                            <Label htmlFor={`range-min-${question.id}`} className="text-xs sm:text-sm">ערך מינימלי</Label>
-                            <Input
-                              id={`range-min-${question.id}`}
-                              type="number"
-                              value={question.range?.min ?? DEFAULT_RANGE.min}
-                              onChange={(event) => handleRangeChange(question.id, 'min', Number(event.target.value))}
-                              className="text-sm"
-                            />
+                        {supportsRange ? (
+                          <div className="grid w-full gap-4 sm:grid-cols-3">
+                            <div className="space-y-2">
+                              <Label htmlFor={`range-min-${question.id}`} className="text-xs sm:text-sm">ערך מינימלי</Label>
+                              <Input
+                                id={`range-min-${question.id}`}
+                                type="number"
+                                value={question.range?.min ?? DEFAULT_RANGE.min}
+                                onChange={(event) => handleRangeChange(question.id, 'min', Number(event.target.value))}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`range-max-${question.id}`} className="text-xs sm:text-sm">ערך מקסימלי</Label>
+                              <Input
+                                id={`range-max-${question.id}`}
+                                type="number"
+                                value={question.range?.max ?? DEFAULT_RANGE.max}
+                                onChange={(event) => handleRangeChange(question.id, 'max', Number(event.target.value))}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`range-step-${question.id}`} className="text-xs sm:text-sm">גודל צעד</Label>
+                              <Input
+                                id={`range-step-${question.id}`}
+                                type="number"
+                                value={question.range?.step ?? DEFAULT_RANGE.step}
+                                onChange={(event) => handleRangeChange(question.id, 'step', Number(event.target.value))}
+                                className="text-sm"
+                              />
+                            </div>
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`range-max-${question.id}`} className="text-xs sm:text-sm">ערך מקסימלי</Label>
-                            <Input
-                              id={`range-max-${question.id}`}
-                              type="number"
-                              value={question.range?.max ?? DEFAULT_RANGE.max}
-                              onChange={(event) => handleRangeChange(question.id, 'max', Number(event.target.value))}
-                              className="text-sm"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`range-step-${question.id}`} className="text-xs sm:text-sm">גודל צעד</Label>
-                            <Input
-                              id={`range-step-${question.id}`}
-                              type="number"
-                              value={question.range?.step ?? DEFAULT_RANGE.step}
-                              onChange={(event) => handleRangeChange(question.id, 'step', Number(event.target.value))}
-                              className="text-sm"
-                            />
-                          </div>
-                        </div>
-                      ) : null}
+                        ) : null}
+                      </div>
                     </div>
                   );
                 })}
