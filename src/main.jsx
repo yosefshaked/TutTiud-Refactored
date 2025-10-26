@@ -6,9 +6,6 @@ import AppShell from './components/layout/AppShell.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
 import StudentDetailPage from './features/students/pages/StudentDetailPage.jsx';
-import TimeEntry from './pages/TimeEntry.jsx';
-import Reports from './pages/Reports.jsx';
-import ReportsErrorBoundary from './components/reports/ReportsErrorBoundary.js';
 import Services from './pages/Services.jsx';
 import Settings from './pages/Settings.jsx';
 import { RuntimeConfigProvider } from './runtime/RuntimeConfigContext.jsx';
@@ -50,10 +47,7 @@ function App({ config = null }) {
                     <Route path="/admin/students" element={<StudentManagementPage />} />
                     <Route path="/students/:id" element={<StudentDetailPage />} />
                     <Route path="/my-students" element={<MyStudentsPage />} />
-                    <Route path="/TimeEntry" element={<TimeEntry />} />
-                    <Route path="/Adjustments" element={<Navigate to="/TimeEntry?tab=adjustments" replace />} />
                     <Route path="/Reports" element={<ReportsErrorBoundary><Reports /></ReportsErrorBoundary>} />
-                    <Route path="/Services" element={<Services />} />
                     <Route path="/Settings" element={<Settings />} />
                     <Route path="/diagnostics" element={<Diagnostics />} />
                   </Route>
