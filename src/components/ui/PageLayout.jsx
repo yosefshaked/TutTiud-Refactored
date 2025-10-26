@@ -15,7 +15,7 @@ function PageLayout({
     <div
       className={cn(
         fullHeight ? "min-h-screen" : "min-h-full",
-        "bg-background text-neutral-900",
+        "bg-background text-neutral-900 w-full",
       )}
     >
       <div
@@ -24,6 +24,7 @@ function PageLayout({
           fullHeight ? "min-h-screen" : "min-h-full",
           className,
         )}
+        style={{ maxWidth: "min(1280px, 100vw)" }}
         {...props}
       >
         {(title || description || actions) && (

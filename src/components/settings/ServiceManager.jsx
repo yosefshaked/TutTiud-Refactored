@@ -110,7 +110,7 @@ export default function ServiceManager({ session, orgId, activeOrgHasConnection,
 
   if (!activeOrgHasConnection || !tenantClientReady) {
     return (
-      <Card className="border-0 shadow-lg bg-white/80">
+      <Card className="w-full border-0 shadow-lg bg-white/80">
         <CardHeader>
           <CardTitle>ניהול שירותים</CardTitle>
         </CardHeader>
@@ -127,7 +127,7 @@ export default function ServiceManager({ session, orgId, activeOrgHasConnection,
   const isSaving = saveState === SAVE_STATE.saving;
 
   return (
-    <Card className="border-0 shadow-lg bg-white/80">
+    <Card className="w-full border-0 shadow-lg bg-white/80">
       <CardHeader>
         <CardTitle className="text-base sm:text-lg">ניהול שירותים</CardTitle>
         <p className="text-xs text-slate-600 mt-xs sm:mt-sm sm:text-sm">

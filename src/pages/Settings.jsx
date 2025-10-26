@@ -64,7 +64,7 @@ export default function Settings() {
       contentClassName="space-y-md md:space-y-lg"
     >
 
-        <Card className="border-0 bg-white/90 shadow-lg" dir="rtl">
+        <Card className="w-full border-0 bg-white/90 shadow-lg" dir="rtl">
           <CardHeader className="border-b border-slate-200 space-y-xs">
             <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">מידע לניפוי באגים</CardTitle>
             <p className="text-xs text-slate-600 sm:text-sm">
@@ -91,8 +91,8 @@ export default function Settings() {
 
         {canManageSessionForm ? (
           <>
-            <div className="grid gap-md xl:grid-cols-[1.5fr,1fr]" dir="rtl">
-              <Card className="border-0 bg-white/80 shadow-lg">
+            <div className="grid w-full gap-md xl:grid-cols-[1.5fr,1fr]" dir="rtl">
+              <Card className="w-full border-0 bg-white/80 shadow-lg">
                 <CardHeader className="border-b border-slate-200 space-y-xs">
                   <CardTitle className="flex flex-col gap-xs text-base font-semibold text-slate-900 sm:flex-row sm:items-center sm:justify-between sm:text-lg md:text-xl">
                     <span className="flex items-center gap-xs text-slate-900">

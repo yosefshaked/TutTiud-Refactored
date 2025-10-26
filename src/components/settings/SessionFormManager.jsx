@@ -609,7 +609,7 @@ export default function SessionFormManager({
 
   if (!activeOrgHasConnection || !tenantClientReady) {
     return (
-      <Card className="border-0 shadow-lg bg-white/80">
+      <Card className="w-full border-0 shadow-lg bg-white/80">
         <CardHeader>
           <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg">ניהול שאלות המפגש</CardTitle>
         </CardHeader>
@@ -623,7 +623,7 @@ export default function SessionFormManager({
   }
 
   return (
-    <Card className="border-0 shadow-lg bg-white/80" dir="rtl">
+    <Card className="w-full border-0 shadow-lg bg-white/80" dir="rtl">
       <CardHeader className="border-b border-slate-200 space-y-xs sm:space-y-sm">
         <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">ניהול טופס שאלות למפגש</CardTitle>
         <p className="text-xs text-slate-600 sm:text-sm">

@@ -132,7 +132,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
 
   if (!activeOrgHasConnection || !tenantClientReady) {
     return (
-      <Card className="border-0 shadow-lg bg-white/80">
+      <Card className="w-full border-0 shadow-lg bg-white/80">
         <CardHeader>
           <CardTitle>ניהול מדריכים</CardTitle>
         </CardHeader>
@@ -151,7 +151,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
   const nonInstructorMembers = members.filter((m) => !instructorMap.has(m.user_id));
 
   return (
-    <Card className="border-0 shadow-lg bg-white/80">
+    <Card className="w-full border-0 shadow-lg bg-white/80">
       <CardHeader>
         <CardTitle className="text-base sm:text-lg">ניהול מדריכים</CardTitle>
         <p className="text-xs text-slate-600 mt-xs sm:mt-sm sm:text-sm">הוספה, השבתה והפעלה מחדש של מדריכים בארגון.</p>
