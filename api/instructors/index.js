@@ -5,12 +5,12 @@ import {
   ensureMembership,
   isAdminRole,
   normalizeString,
-  parseRequestBody,
   readEnv,
   respond,
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
+import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 
       // Intentionally ignore profile fetch errors; fallback to provided values.
 export default async function (context, req) {
@@ -47,7 +47,7 @@ export default async function (context, req) {
   }
 
   const userId = authResult.data.user.id;
-  const body = parseRequestBody(req);
+  const body = parseJsonBodyWithLimit(req, 96 * 1024, { mode: 'observe', context, endpoint: 'instructors' });
   const orgId = resolveOrgId(req, body);
 
   if (!orgId) {

@@ -5,13 +5,13 @@ import {
   ensureMembership,
   isAdminRole,
   normalizeString,
-  parseRequestBody,
   readEnv,
   respond,
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { normalizeSessionFormConfigValue } from '../_shared/settings-utils.js';
+import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 
 const SETTINGS_DIAGNOSTIC_CHECKS = new Set([
   'Table "Settings" exists',
@@ -321,7 +321,7 @@ export default async function (context, req) {
 
   const userId = authResult.data.user.id;
   const method = String(req.method || 'GET').toUpperCase();
-  const body = method === 'GET' ? {} : parseRequestBody(req);
+  const body = method === 'GET' ? {} : parseJsonBodyWithLimit(req, 256 * 1024, { mode: 'observe', context, endpoint: 'settings' });
   const orgId = resolveOrgId(req, body);
 
   if (!orgId) {

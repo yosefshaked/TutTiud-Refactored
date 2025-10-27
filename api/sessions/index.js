@@ -2,159 +2,18 @@
 import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
-  UUID_PATTERN,
   ensureMembership,
   normalizeString,
-  parseRequestBody,
   readEnv,
   respond,
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
+import { parseJsonBodyWithLimit, validateSessionWrite } from '../_shared/validation.js';
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_BODY_BYTES = 128 * 1024; // observe-only for now
 
-function sanitizeAnswerValue(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed === '' ? null : trimmed;
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((entry) => {
-      if (typeof entry === 'string') {
-        const trimmed = entry.trim();
-        return trimmed === '' ? null : trimmed;
-      }
-      return entry;
-    });
-  }
-
-  if (typeof value === 'object') {
-    const nested = {};
-    for (const [key, entry] of Object.entries(value)) {
-      const normalizedKey = typeof key === 'string' ? key.trim() : '';
-      if (!normalizedKey) {
-        continue;
-      }
-      nested[normalizedKey] = sanitizeAnswerValue(entry);
-    }
-    return nested;
-  }
-
-  return null;
-}
-
-function coerceSessionContent(source) {
-  if (source === null || source === undefined) {
-    return { error: 'missing_content' };
-  }
-
-  let payload = source;
-
-  if (typeof payload === 'string') {
-    const trimmed = payload.trim();
-    if (!trimmed) {
-      return { value: {} };
-    }
-
-    try {
-      payload = JSON.parse(trimmed);
-    } catch {
-      return { error: 'invalid_content' };
-    }
-  }
-
-  if (typeof payload !== 'object' || Array.isArray(payload)) {
-    return { error: 'invalid_content' };
-  }
-
-  const normalized = {};
-  for (const [key, value] of Object.entries(payload)) {
-    const normalizedKey = typeof key === 'string' ? key.trim() : '';
-    if (!normalizedKey) {
-      continue;
-    }
-
-    if (value === undefined) {
-      continue;
-    }
-
-    normalized[normalizedKey] = sanitizeAnswerValue(value);
-  }
-
-  return { value: normalized };
-}
-
-function coerceOptionalText(value) {
-  if (value === null || value === undefined) {
-    return { value: null, valid: true };
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return { value: trimmed || null, valid: true };
-  }
-  return { value: null, valid: false };
-}
-
-function resolveContentCandidate(body) {
-  if (!body || typeof body !== 'object') {
-    return undefined;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(body, 'content')) {
-    return body.content;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(body, 'answers')) {
-    return body.answers;
-  }
-
-  return undefined;
-}
-
-function validatePayload(body) {
-  const studentId = normalizeString(body?.student_id || body?.studentId);
-  if (!studentId || !UUID_PATTERN.test(studentId)) {
-    return { error: 'invalid_student_id' };
-  }
-
-  const date = normalizeString(body?.date);
-  if (!date || !DATE_PATTERN.test(date)) {
-    return { error: 'invalid_date' };
-  }
-
-  const contentSource = resolveContentCandidate(body);
-  const contentResult = coerceSessionContent(contentSource);
-  if (contentResult.error) {
-    return { error: contentResult.error };
-  }
-
-  const hasServiceField =
-    Object.prototype.hasOwnProperty.call(body ?? {}, 'service_context') ||
-    Object.prototype.hasOwnProperty.call(body ?? {}, 'serviceContext');
-
-  const serviceResult = coerceOptionalText(body?.service_context ?? body?.serviceContext);
-  if (!serviceResult.valid) {
-    return { error: 'invalid_service_context' };
-  }
-
-  return {
-    studentId,
-    date,
-    content: contentResult.value,
-    serviceContext: serviceResult.value,
-    hasExplicitService: hasServiceField,
-  };
-}
+// validation moved to _shared/validation.js (SOT)
 
 function isMemberRole(role) {
   const normalized = normalizeString(role).toLowerCase();
@@ -246,7 +105,7 @@ export default async function (context, req) {
   }
 
   const userId = authResult.data.user.id;
-  const body = parseRequestBody(req);
+  const body = parseJsonBodyWithLimit(req, MAX_BODY_BYTES, { mode: 'observe', context, endpoint: 'sessions' });
   const orgId = resolveOrgId(req, body);
 
   if (!orgId) {
@@ -269,7 +128,7 @@ export default async function (context, req) {
     return respond(context, 403, { message: 'forbidden' });
   }
 
-  const validation = validatePayload(body);
+  const validation = validateSessionWrite(body);
   if (validation.error) {
     const message =
       validation.error === 'invalid_student_id'
