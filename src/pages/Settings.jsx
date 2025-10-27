@@ -270,7 +270,7 @@ export default function Settings() {
 
         {/* Floating dialog for the selected module */}
         <Dialog open={Boolean(selectedModule)} onOpenChange={handleModuleDialogChange}>
-          <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden bg-white border border-slate-200 shadow-2xl">
+          <DialogContent hideDefaultClose className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden bg-white border border-slate-200 shadow-2xl">
             <EnhancedDialogHeader
               icon={
                 selectedModule === 'setup' ? <PlugZap /> :

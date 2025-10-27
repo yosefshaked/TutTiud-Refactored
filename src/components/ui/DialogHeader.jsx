@@ -21,18 +21,8 @@ export function EnhancedDialogHeader({
     <div className={cn(
       "relative flex items-center justify-between border-b bg-white px-6 py-4",
       className
-    )}>
-      <div className="flex items-center gap-3">
-        {icon && (
-          <div className="rounded-lg bg-blue-50 p-2.5 text-blue-600">
-            {React.cloneElement(icon, { className: 'h-5 w-5' })}
-          </div>
-        )}
-        <h2 className="text-xl font-bold text-slate-900">
-          {title}
-        </h2>
-      </div>
-      
+    )} dir="rtl">
+      {/* Close button on the left for RTL */}
       {onClose && (
         <button
           onClick={onClose}
@@ -42,6 +32,18 @@ export function EnhancedDialogHeader({
           <X className="h-5 w-5 transition-transform group-hover:rotate-90" />
         </button>
       )}
+      
+      {/* Title and icon on the right for RTL */}
+      <div className="flex items-center gap-3">
+        <h2 className="text-xl font-bold text-slate-900">
+          {title}
+        </h2>
+        {icon && (
+          <div className="rounded-lg bg-blue-50 p-2.5 text-blue-600">
+            {React.cloneElement(icon, { className: 'h-5 w-5' })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
