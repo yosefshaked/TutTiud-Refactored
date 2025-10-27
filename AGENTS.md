@@ -46,6 +46,11 @@
   - API endpoint: `GET /api/permissions-registry` returns permission metadata (optionally filtered by category) or defaults-only JSON.
 - Frontend: Backup card in Settings page shows grayed-out state when `backup_local_enabled = false` with message "גיבוי אינו זמין. נא לפנות לתמיכה על מנת לבחון הפעלת הפונקציה". Uses `initialize_org_permissions` RPC on load to ensure permissions exist.
 - OAuth backup destinations (Google Drive, OneDrive, Dropbox) planned but not yet implemented; permission flags reserved.
+- Admin tool: `test/verify-backup.cjs` allows super admins to verify backup file integrity and decryptability.
+  - Usage: `node test/verify-backup.cjs <backup-file-path> <password>`
+  - Prints manifest summary if successful, error if invalid or wrong password.
+  - Use for compliance, restore validation, and support troubleshooting.
+
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
 - Render the summary information in the base `<TableRow>` and immediately follow it with a conditional second `<TableRow>` that holds the drawer content inside a single spanning `<TableCell>` (e.g., `colSpan={totalColumns}`).

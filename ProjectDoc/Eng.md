@@ -156,3 +156,21 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **Improved parsing utilities** – `parseSessionFormConfig` now preserves `required`, `options`, and `range` metadata so runtime consumers (session modal/detail views) can render richer controls while staying backward compatible with minimal configs.
 - **Option persistence** – Server-side normalization (`api/settings/index.js`) now keeps option objects with their `value`, `label`, and optional `id` fields when saving configurations, preventing `[object Object]` strings and ensuring the SessionFormManager reloads distinct labels/values exactly as entered.
 - **Session capture parity** – `NewSessionForm.jsx` honors the expanded question types, rendering selects, radio/button groups, numeric/date inputs, and sliders alongside the existing text areas. Required fields are enforced client-side and the payload continues to trim empty responses before submission.
+
+## 15. Admin Tools
+
+### Backup Verification Script
+
+A Node.js script is provided for super admins/system administrators to verify backup file integrity and decryptability:
+
+- **Location:** `test/verify-backup.cjs`
+- **Usage:**
+  ```
+  node test/verify-backup.cjs <backup-file-path> <password>
+  ```
+- **Features:**
+  - Loads and decrypts a backup file using the provided password
+  - Prints manifest summary if successful
+  - Prints error if file is invalid or password is incorrect
+
+This tool is essential for validating backups before restore or for compliance checks.
