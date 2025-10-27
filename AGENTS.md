@@ -37,10 +37,11 @@
   - `restoreTenantData(tenantClient, manifest, options)`: transactional restore with optional `clearExisting` flag
 - Backup manifests are JSON with structure: `{ version: '1.0', schema_version: 'tuttiud_v1', org_id, created_at, metadata: { total_records }, tables: [{ name, records }] }`
 - Password generation: System auto-generates a human-friendly product-key style password (e.g., ABCD-EF12-3456-7890-ABCD, ~80-bit entropy). The user must save it from the response to decrypt later.
-- Cooldown enforcement: checks `org_settings.backup_history` array for last successful backup within 7 days; 429 response includes `next_allowed_at` and `days_remaining`.
+- Cooldown enforcement: checks `org_settings.backup_history` array for last successful backup within 7 days; 429 response includes `next_allowed_at` and `days_remaining`. Can be bypassed once by setting `permissions.backup_cooldown_override = true` in control DB; the flag is automatically reset to `false` after a successful backup.
 - Audit trail: all backup/restore operations appended to `org_settings.backup_history` JSONB array (last 100 entries kept) with type, status, timestamp, initiated_by, size_bytes/records_restored, error_message.
 - Control DB schema: run `scripts/control-db-backup-schema.sql` to add `org_settings.permissions` (jsonb) and `org_settings.backup_history` (jsonb) columns.
-- Permissions model: JSON column in `org_settings.permissions` with flags like `backup_local_enabled`, `backup_oauth_enabled`, `logo_enabled`. No dedicated tables for flexibility.
+- Permissions model: JSON column in `org_settings.permissions` with flags like `backup_local_enabled`, `backup_cooldown_override`, `backup_oauth_enabled`, `logo_enabled`. No dedicated tables for flexibility.
+- Frontend: Backup card in Settings page shows grayed-out state when `backup_local_enabled = false` with message "גיבוי אינו זמין. נא לפנות לתמיכה על מנת לבחון הפעלת הפונקציה".
 - OAuth backup destinations (Google Drive, OneDrive, Dropbox) planned but not yet implemented; permission flags reserved.
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.

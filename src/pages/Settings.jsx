@@ -23,6 +23,35 @@ export default function Settings() {
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
   const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup'
+  const [backupEnabled, setBackupEnabled] = useState(false);
+
+  // Fetch backup permissions
+  useEffect(() => {
+    if (!activeOrgId || !authClient) return;
+    
+    const fetchBackupPermissions = async () => {
+      try {
+        const { data, error } = await authClient
+          .from('org_settings')
+          .select('permissions')
+          .eq('org_id', activeOrgId)
+          .single();
+        
+        if (error) {
+          console.error('Error fetching backup permissions:', error);
+          setBackupEnabled(false);
+        } else {
+          const permissions = data?.permissions || {};
+          setBackupEnabled(permissions.backup_local_enabled === true);
+        }
+      } catch (err) {
+        console.error('Error fetching backup permissions:', err);
+        setBackupEnabled(false);
+      }
+    };
+    
+    fetchBackupPermissions();
+  }, [activeOrgId, authClient]);
 
   useEffect(() => {
     if (activeOrgHasConnection) {
@@ -240,18 +269,27 @@ export default function Settings() {
           </Card>
 
           {/* Backup & Restore Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+          <Card className={`group relative w-full overflow-hidden border-0 shadow-md transition-all duration-200 flex flex-col ${
+            backupEnabled ? 'bg-white/80 hover:shadow-xl hover:scale-[1.02]' : 'bg-slate-50 opacity-75'
+          }`}>
             <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start gap-2">
-                <div className="rounded-lg bg-slate-100 p-2 text-slate-700 transition-colors group-hover:bg-slate-700 group-hover:text-white">
+                <div className={`rounded-lg p-2 transition-colors ${
+                  backupEnabled 
+                    ? 'bg-slate-100 text-slate-700 group-hover:bg-slate-700 group-hover:text-white' 
+                    : 'bg-slate-200 text-slate-400'
+                }`}>
                   <ShieldCheck className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <CardTitle className="text-lg font-bold text-slate-900">
+                <CardTitle className={`text-lg font-bold ${backupEnabled ? 'text-slate-900' : 'text-slate-500'}`}>
                   גיבוי ושחזור
                 </CardTitle>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
-                יצירת קובץ גיבוי מוצפן של נתוני הארגון ושחזור מגיבוי קיים
+              <p className={`text-sm leading-relaxed min-h-[2.5rem] ${backupEnabled ? 'text-slate-600' : 'text-slate-500'}`}>
+                {backupEnabled 
+                  ? 'יצירת קובץ גיבוי מוצפן של נתוני הארגון ושחזור מגיבוי קיים'
+                  : 'גיבוי אינו זמין. נא לפנות לתמיכה על מנת לבחון הפעלת הפונקציה'
+                }
               </p>
             </CardHeader>
             <CardContent className="pt-0 mt-auto">
@@ -259,8 +297,8 @@ export default function Settings() {
                 size="sm" 
                 className="w-full gap-2" 
                 onClick={() => setSelectedModule('backup')} 
-                disabled={!canManageSessionForm}
-                variant={!canManageSessionForm ? 'secondary' : 'default'}
+                disabled={!canManageSessionForm || !backupEnabled}
+                variant={(!canManageSessionForm || !backupEnabled) ? 'secondary' : 'default'}
               >
                 <ShieldCheck className="h-4 w-4" /> ניהול גיבויים
               </Button>

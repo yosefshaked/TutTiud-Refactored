@@ -37,7 +37,7 @@ function checkBackupPermission(orgSettings) {
   return { allowed: true };
 }
 
-function checkBackupCooldown(backupHistory) {
+function checkBackupCooldown(backupHistory, permissions) {
   if (!backupHistory || !Array.isArray(backupHistory) || backupHistory.length === 0) {
     return { allowed: true };
   }
@@ -54,6 +54,11 @@ function checkBackupCooldown(backupHistory) {
   const daysSince = (now - lastBackupDate) / (1000 * 60 * 60 * 24);
 
   if (daysSince < BACKUP_COOLDOWN_DAYS) {
+    // Check for one-time override flag
+    if (permissions && permissions.backup_cooldown_override === true) {
+      return { allowed: true, overridden: true };
+    }
+    
     const nextAllowed = new Date(lastBackupDate.getTime() + BACKUP_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
     return {
       allowed: false,
@@ -155,8 +160,13 @@ export default async function backup(context, req) {
     return respond(context, 403, { message: permissionCheck.reason });
   }
 
+  // Parse permissions for cooldown check
+  const permissions = typeof orgSettings?.permissions === 'string'
+    ? JSON.parse(orgSettings.permissions)
+    : orgSettings?.permissions;
+
   // Check cooldown
-  const cooldownCheck = checkBackupCooldown(orgSettings?.backup_history);
+  const cooldownCheck = checkBackupCooldown(orgSettings?.backup_history, permissions);
   if (!cooldownCheck.allowed) {
     return respond(context, 429, {
       message: cooldownCheck.reason,
@@ -164,6 +174,8 @@ export default async function backup(context, req) {
       days_remaining: cooldownCheck.days_remaining,
     });
   }
+
+  const wasOverridden = cooldownCheck.overridden === true;
 
   // Auto-generate a human-friendly password for this backup (looks like a key)
   // Example: ABCD-EF12-3456-7890-ABCD (80 bits of entropy)
@@ -192,6 +204,16 @@ export default async function backup(context, req) {
       initiated_by: userId,
       size_bytes: encrypted.length,
     });
+
+    // Clear the override flag if it was used
+    if (wasOverridden) {
+      const updatedPermissions = { ...permissions, backup_cooldown_override: false };
+      await supabase
+        .from('org_settings')
+        .update({ permissions: updatedPermissions })
+        .eq('org_id', orgId);
+      context.log?.info?.('backup: cooldown override consumed and cleared', { orgId });
+    }
 
     context.log?.info?.('backup: completed', { orgId, sizeBytes: encrypted.length });
 
