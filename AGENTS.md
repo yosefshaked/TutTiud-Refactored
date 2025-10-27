@@ -40,8 +40,11 @@
 - Cooldown enforcement: checks `org_settings.backup_history` array for last successful backup within 7 days; 429 response includes `next_allowed_at` and `days_remaining`. Can be bypassed once by setting `permissions.backup_cooldown_override = true` in control DB; the flag is automatically reset to `false` after a successful backup.
 - Audit trail: all backup/restore operations appended to `org_settings.backup_history` JSONB array (last 100 entries kept) with type, status, timestamp, initiated_by, size_bytes/records_restored, error_message.
 - Control DB schema: run `scripts/control-db-backup-schema.sql` to add `org_settings.permissions` (jsonb) and `org_settings.backup_history` (jsonb) columns.
-- Permissions model: JSON column in `org_settings.permissions` with flags like `backup_local_enabled`, `backup_cooldown_override`, `backup_oauth_enabled`, `logo_enabled`. No dedicated tables for flexibility.
-- Frontend: Backup card in Settings page shows grayed-out state when `backup_local_enabled = false` with message "גיבוי אינו זמין. נא לפנות לתמיכה על מנת לבחון הפעלת הפונקציה".
+- Permissions model: Centralized in `permission_registry` table (control DB). Run `scripts/control-db-permissions-table.sql` to create the registry with default permissions for all features. Use `initialize_org_permissions(org_id)` DB function to auto-populate `org_settings.permissions` from registry defaults when null/empty.
+  - Available permissions: `backup_local_enabled`, `backup_cooldown_override`, `backup_oauth_enabled`, `logo_enabled`.
+  - Shared utilities: `api/_shared/permissions-utils.js` provides `ensureOrgPermissions()`, `getDefaultPermissions()`, `getPermissionRegistry()`.
+  - API endpoint: `GET /api/permissions-registry` returns permission metadata (optionally filtered by category) or defaults-only JSON.
+- Frontend: Backup card in Settings page shows grayed-out state when `backup_local_enabled = false` with message "גיבוי אינו זמין. נא לפנות לתמיכה על מנת לבחון הפעלת הפונקציה". Uses `initialize_org_permissions` RPC on load to ensure permissions exist.
 - OAuth backup destinations (Google Drive, OneDrive, Dropbox) planned but not yet implemented; permission flags reserved.
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.

@@ -25,51 +25,24 @@ export default function Settings() {
   const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup'
   const [backupEnabled, setBackupEnabled] = useState(false);
 
-  // Fetch backup permissions and initialize if empty
+  // Fetch backup permissions and initialize if empty using DB function
   useEffect(() => {
     if (!activeOrgId || !authClient) return;
     
     const fetchAndInitializePermissions = async () => {
       try {
-        const { data, error } = await authClient
-          .from('org_settings')
-          .select('permissions')
-          .eq('org_id', activeOrgId)
-          .single();
+        // Use the database function to ensure permissions are initialized
+        const { data: permissions, error } = await authClient
+          .rpc('initialize_org_permissions', { p_org_id: activeOrgId });
         
         if (error) {
-          console.error('Error fetching backup permissions:', error);
+          console.error('Error initializing/fetching permissions:', error);
           setBackupEnabled(false);
           return;
         }
         
-        let permissions = data?.permissions;
-        
-        // Initialize permissions if empty or null
-        if (!permissions || typeof permissions !== 'object' || Object.keys(permissions).length === 0) {
-          const defaultPermissions = {
-            backup_local_enabled: false,
-            backup_cooldown_override: false,
-            backup_oauth_enabled: false,
-            logo_enabled: false,
-          };
-          
-          // Update the control DB with default permissions
-          const { error: updateError } = await authClient
-            .from('org_settings')
-            .update({ permissions: defaultPermissions })
-            .eq('org_id', activeOrgId);
-          
-          if (updateError) {
-            console.error('Error initializing permissions:', updateError);
-          } else {
-            console.log('Initialized default permissions for org:', activeOrgId);
-          }
-          
-          permissions = defaultPermissions;
-        }
-        
-        setBackupEnabled(permissions.backup_local_enabled === true);
+        // permissions is already a JSONB object from the function
+        setBackupEnabled(permissions?.backup_local_enabled === true);
       } catch (err) {
         console.error('Error fetching backup permissions:', err);
         setBackupEnabled(false);
