@@ -24,14 +24,14 @@ export function EnhancedDialogHeader({
     )} dir="rtl">
       {/* Title and icon on the right for RTL - comes first in markup */}
       <div className="flex items-center gap-3 flex-1">
-        <h2 className="text-xl font-bold text-slate-900">
-          {title}
-        </h2>
         {icon && (
           <div className="rounded-lg bg-blue-50 p-2.5 text-blue-600">
             {React.cloneElement(icon, { className: 'h-5 w-5' })}
           </div>
         )}
+        <h2 className="text-xl font-bold text-slate-900">
+          {title}
+        </h2>
       </div>
       
       {/* Close button on the left for RTL - comes last in markup */}
