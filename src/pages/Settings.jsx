@@ -94,87 +94,174 @@ export default function Settings() {
         </Card>
 
         {/* Selector grid */}
-        <div className="grid w-full gap-md md:grid-cols-2 lg:grid-cols-3" dir="rtl">
-          <Card className="w-full border-0 bg-white/80 shadow-lg">
-            <CardHeader className="border-b border-slate-200 space-y-xs">
-              <CardTitle className="flex items-center justify-between gap-xs text-base font-semibold text-slate-900 sm:text-lg md:text-xl">
-                <span className="flex items-center gap-xs text-slate-900">
-                  <PlugZap className="h-5 w-5 text-blue-600" aria-hidden="true" />
-                  מצב חיבור Supabase
-                </span>
-                <Badge className={activeOrgHasConnection ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'}>
-                  {activeOrgHasConnection ? 'חיבור פעיל' : 'נדרש חיבור'}
+        <div className="grid w-full gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3" dir="rtl">
+          {/* Setup Assistant Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-blue-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-blue-100 p-2 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                    <PlugZap className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                  <CardTitle className="text-lg font-bold text-slate-900">
+                    חיבור Supabase
+                  </CardTitle>
+                </div>
+                <Badge className={activeOrgHasConnection ? 'bg-emerald-100 text-emerald-700 border-0' : 'bg-amber-100 text-amber-800 border-0'}>
+                  {activeOrgHasConnection ? 'פעיל' : 'נדרש'}
                 </Badge>
-              </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                הגדרת מפתחות Supabase, בדיקת חיבור, והרצת סקריפט הגדרה אוטומטית
+              </p>
             </CardHeader>
-            <CardContent className="flex items-center justify-end pt-sm">
-              <Button size="sm" className="gap-xs" onClick={() => { setSelectedModule('setup'); }}>
-                <PlugZap className="h-4 w-4" /> פתח/י אשף
+            <CardContent className="pt-0">
+              <Button 
+                size="sm" 
+                className="w-full gap-2 bg-blue-600 hover:bg-blue-700" 
+                onClick={() => { setSelectedModule('setup'); }}
+              >
+                <PlugZap className="h-4 w-4" /> פתח אשף הגדרה
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="w-full border-0 bg-white/80 shadow-lg">
-            <CardHeader className="border-b border-slate-200 space-y-xs">
-              <CardTitle className="flex items-center gap-xs text-base font-semibold text-slate-900 sm:text-lg md:text-xl">
-                <Users className="h-5 w-5 text-slate-700" /> ניהול חברי צוות
-              </CardTitle>
+          {/* Team Members Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-purple-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-purple-100 p-2 text-purple-600 transition-colors group-hover:bg-purple-600 group-hover:text-white">
+                  <Users className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  ניהול חברי צוות
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                הזמנת משתמשים חדשים, ניהול הרשאות, והסרת חברי צוות מהארגון
+              </p>
             </CardHeader>
-            <CardContent className="flex items-center justify-end pt-sm">
-              <Button size="sm" className="gap-xs" onClick={() => setSelectedModule('orgMembers')} disabled={!canManageSessionForm}>
-                פתח/י
+            <CardContent className="pt-0">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('orgMembers')} 
+                disabled={!canManageSessionForm}
+                variant={!canManageSessionForm ? 'secondary' : 'default'}
+              >
+                <Users className="h-4 w-4" /> נהל חברי צוות
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="w-full border-0 bg-white/80 shadow-lg">
-            <CardHeader className="border-b border-slate-200 space-y-xs">
-              <CardTitle className="flex items-center gap-xs text-base font-semibold text-slate-900 sm:text-lg md:text-xl">
-                <ClipboardList className="h-5 w-5 text-slate-700" /> טופס שאלות מפגש
-              </CardTitle>
+          {/* Session Form Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-emerald-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
+                  <ClipboardList className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  טופס שאלות מפגש
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                הגדרת שאלות מותאמות אישית לתיעוד מפגשים ומעקב אחר התקדמות תלמידים
+              </p>
             </CardHeader>
-            <CardContent className="flex items-center justify-end pt-sm">
-              <Button size="sm" className="gap-xs" onClick={() => setSelectedModule('sessionForm')} disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}>
-                פתח/י
+            <CardContent className="pt-0">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('sessionForm')} 
+                disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <ClipboardList className="h-4 w-4" /> נהל שאלות
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="w-full border-0 bg-white/80 shadow-lg">
-            <CardHeader className="border-b border-slate-200 space-y-xs">
-              <CardTitle className="flex items-center gap-xs text-base font-semibold text-slate-900 sm:text-lg md:text-xl">
-                <ListChecks className="h-5 w-5 text-slate-700" /> ניהול שירותים
-              </CardTitle>
+          {/* Services Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-orange-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-orange-100 p-2 text-orange-600 transition-colors group-hover:bg-orange-600 group-hover:text-white">
+                  <ListChecks className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  ניהול שירותים
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                הוספת וניהול רשימת השירותים הזמינים למשתמשי הארגון
+              </p>
             </CardHeader>
-            <CardContent className="flex items-center justify-end pt-sm">
-              <Button size="sm" className="gap-xs" onClick={() => setSelectedModule('services')} disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}>
-                פתח/י
+            <CardContent className="pt-0">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('services')} 
+                disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <ListChecks className="h-4 w-4" /> נהל שירותים
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="w-full border-0 bg-white/80 shadow-lg">
-            <CardHeader className="border-b border-slate-200 space-y-xs">
-              <CardTitle className="flex items-center gap-xs text-base font-semibold text-slate-900 sm:text-lg md:text-xl">
-                <Users className="h-5 w-5 text-slate-700" /> ניהול מדריכים
-              </CardTitle>
+          {/* Instructors Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-indigo-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-indigo-100 p-2 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
+                  <Users className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  ניהול מדריכים
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                הוספה, עריכה והשבתת מדריכים המשויכים לארגון
+              </p>
             </CardHeader>
-            <CardContent className="flex items-center justify-end pt-sm">
-              <Button size="sm" className="gap-xs" onClick={() => setSelectedModule('instructors')} disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}>
-                פתח/י
+            <CardContent className="pt-0">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('instructors')} 
+                disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <Users className="h-4 w-4" /> נהל מדריכים
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="w-full border-0 bg-white/80 shadow-lg">
-            <CardHeader className="border-b border-slate-200 space-y-xs">
-              <CardTitle className="flex items-center gap-xs text-base font-semibold text-slate-900 sm:text-lg md:text-xl">
-                <ShieldCheck className="h-5 w-5 text-slate-700" /> גיבוי ושחזור
-              </CardTitle>
+          {/* Backup & Restore Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-slate-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-slate-100 p-2 text-slate-700 transition-colors group-hover:bg-slate-700 group-hover:text-white">
+                  <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  גיבוי ושחזור
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                יצירת קובץ גיבוי מוצפן של נתוני הארגון ושחזור מגיבוי קיים
+              </p>
             </CardHeader>
-            <CardContent className="flex items-center justify-end pt-sm">
-              <Button size="sm" className="gap-xs" onClick={() => setSelectedModule('backup')} disabled={!canManageSessionForm}>
-                פתח/י
+            <CardContent className="pt-0">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('backup')} 
+                disabled={!canManageSessionForm}
+                variant={!canManageSessionForm ? 'secondary' : 'default'}
+              >
+                <ShieldCheck className="h-4 w-4" /> נהל גיבויים
               </Button>
             </CardContent>
           </Card>
