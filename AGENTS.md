@@ -25,6 +25,23 @@
 - Endpoints updated to use the helper in observe-mode: `api/sessions`, `api/settings`, `api/instructors`.
 - History quota scaffold: `api/_shared/history-quota.js` provides `ensureCapacity` in observe-only mode to collect size telemetry for settings histories without enforcing limits yet.
 - Future phases will introduce per-key quotas and pruning/archival for history-like settings. Until then, do not hard-reject large settings writes without product sign-off. Document changes in PRs and update this section when enforcement is enabled.
+
+### Backup and restore (2025-01)
+- `/api/backup` (POST) creates encrypted local backups with weekly cooldown (7 days). Requires admin/owner role and `permissions.backup_local_enabled = true` in `org_settings`.
+- `/api/restore` (POST) decrypts and restores backups. Requires admin/owner role and same permission flag. Supports optional `clear_existing` flag for clean restore.
+- Shared backup utilities in `api/_shared/backup-utils.js`:
+  - `encryptBackup(data, password)`: AES-256-GCM + gzip compression, returns encrypted Buffer
+  - `decryptBackup(encryptedData, password)`: reverses encryption, returns manifest object
+  - `exportTenantData(tenantClient, orgId)`: queries all tenant tables (Students, Instructors, SessionRecords, Settings, Services), returns manifest v1.0
+  - `validateBackupManifest(manifest)`: checks version/schema compatibility
+  - `restoreTenantData(tenantClient, manifest, options)`: transactional restore with optional `clearExisting` flag
+- Backup manifests are JSON with structure: `{ version: '1.0', schema_version: 'tuttiud_v1', org_id, created_at, metadata: { total_records }, tables: [{ name, records }] }`
+- Password generation: System auto-generates a human-friendly product-key style password (e.g., ABCD-EF12-3456-7890-ABCD, ~80-bit entropy). The user must save it from the response to decrypt later.
+- Cooldown enforcement: checks `org_settings.backup_history` array for last successful backup within 7 days; 429 response includes `next_allowed_at` and `days_remaining`.
+- Audit trail: all backup/restore operations appended to `org_settings.backup_history` JSONB array (last 100 entries kept) with type, status, timestamp, initiated_by, size_bytes/records_restored, error_message.
+- Control DB schema: run `scripts/control-db-backup-schema.sql` to add `org_settings.permissions` (jsonb) and `org_settings.backup_history` (jsonb) columns.
+- Permissions model: JSON column in `org_settings.permissions` with flags like `backup_local_enabled`, `backup_oauth_enabled`, `logo_enabled`. No dedicated tables for flexibility.
+- OAuth backup destinations (Google Drive, OneDrive, Dropbox) planned but not yet implemented; permission flags reserved.
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
 - Render the summary information in the base `<TableRow>` and immediately follow it with a conditional second `<TableRow>` that holds the drawer content inside a single spanning `<TableCell>` (e.g., `colSpan={totalColumns}`).
