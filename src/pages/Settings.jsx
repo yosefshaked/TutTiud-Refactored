@@ -97,8 +97,8 @@ export default function Settings() {
         {/* Selector grid */}
         <div className="grid w-full gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3" dir="rtl">
           {/* Setup Assistant Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
-            <CardHeader className="space-y-2 pb-3">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="rounded-lg bg-blue-100 p-2 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
@@ -116,7 +116,7 @@ export default function Settings() {
                 הגדרת מפתחות Supabase, בדיקת חיבור, והרצת סקריפט הגדרה אוטומטית
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 mt-auto">
               <Button 
                 size="sm" 
                 className="w-full gap-2 bg-blue-600 hover:bg-blue-700" 
@@ -128,8 +128,8 @@ export default function Settings() {
           </Card>
 
           {/* Team Members Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
-            <CardHeader className="space-y-2 pb-3">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-purple-100 p-2 text-purple-600 transition-colors group-hover:bg-purple-600 group-hover:text-white">
                   <Users className="h-5 w-5" aria-hidden="true" />
@@ -142,7 +142,7 @@ export default function Settings() {
                 הזמנת משתמשים חדשים, ניהול הרשאות, והסרת חברי צוות מהארגון
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 mt-auto">
               <Button 
                 size="sm" 
                 className="w-full gap-2" 
@@ -156,8 +156,8 @@ export default function Settings() {
           </Card>
 
           {/* Session Form Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
-            <CardHeader className="space-y-2 pb-3">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
                   <ClipboardList className="h-5 w-5" aria-hidden="true" />
@@ -170,7 +170,7 @@ export default function Settings() {
                 הגדרת שאלות מותאמות אישית לתיעוד מפגשים ומעקב אחר התקדמות תלמידים
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 mt-auto">
               <Button 
                 size="sm" 
                 className="w-full gap-2" 
@@ -184,8 +184,8 @@ export default function Settings() {
           </Card>
 
           {/* Services Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
-            <CardHeader className="space-y-2 pb-3">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-orange-100 p-2 text-orange-600 transition-colors group-hover:bg-orange-600 group-hover:text-white">
                   <ListChecks className="h-5 w-5" aria-hidden="true" />
@@ -198,7 +198,7 @@ export default function Settings() {
                 הוספת וניהול רשימת השירותים הזמינים למשתמשי הארגון
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 mt-auto">
               <Button 
                 size="sm" 
                 className="w-full gap-2" 
@@ -212,8 +212,8 @@ export default function Settings() {
           </Card>
 
           {/* Instructors Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
-            <CardHeader className="space-y-2 pb-3">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-indigo-100 p-2 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
                   <Users className="h-5 w-5" aria-hidden="true" />
@@ -226,7 +226,7 @@ export default function Settings() {
                 הוספה, עריכה והשבתת מדריכים המשויכים לארגון
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 mt-auto">
               <Button 
                 size="sm" 
                 className="w-full gap-2" 
@@ -240,8 +240,8 @@ export default function Settings() {
           </Card>
 
           {/* Backup & Restore Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
-            <CardHeader className="space-y-2 pb-3">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-slate-100 p-2 text-slate-700 transition-colors group-hover:bg-slate-700 group-hover:text-white">
                   <ShieldCheck className="h-5 w-5" aria-hidden="true" />
@@ -254,7 +254,7 @@ export default function Settings() {
                 יצירת קובץ גיבוי מוצפן של נתוני הארגון ושחזור מגיבוי קיים
               </p>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 mt-auto">
               <Button 
                 size="sm" 
                 className="w-full gap-2" 
