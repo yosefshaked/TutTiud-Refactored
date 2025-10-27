@@ -25,26 +25,64 @@ export default function Settings() {
   const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup'
   const [backupEnabled, setBackupEnabled] = useState(false);
 
-  // Fetch backup permissions and initialize if empty using DB function
+  // Fetch backup permissions and initialize if empty
   useEffect(() => {
     if (!activeOrgId || !authClient) return;
     
     const fetchAndInitializePermissions = async () => {
       try {
-        // Use the database function to ensure permissions are initialized
-        const { data: permissions, error } = await authClient
-          .rpc('initialize_org_permissions', { p_org_id: activeOrgId });
+        // First, get current permissions
+        const { data: orgSettings, error: fetchError } = await authClient
+          .from('org_settings')
+          .select('permissions')
+          .eq('org_id', activeOrgId)
+          .single();
         
-        if (error) {
-          console.error('Error initializing/fetching permissions:', error);
+        if (fetchError) {
+          console.error('Error fetching permissions:', fetchError);
           setBackupEnabled(false);
           return;
         }
         
-        // permissions is already a JSONB object from the function
+        let permissions = orgSettings?.permissions;
+        
+        // Check if permissions is null, empty object, or has no keys
+        const needsInitialization = !permissions || 
+          typeof permissions !== 'object' || 
+          Object.keys(permissions).length === 0;
+        
+        if (needsInitialization) {
+          console.log('Permissions empty/null, initializing with defaults from registry');
+          
+          // Get default permissions from the registry
+          const { data: defaults, error: defaultsError } = await authClient
+            .rpc('get_default_permissions');
+          
+          if (defaultsError) {
+            console.error('Error fetching default permissions:', defaultsError);
+            setBackupEnabled(false);
+            return;
+          }
+          
+          // Update org_settings with default permissions
+          const { error: updateError } = await authClient
+            .from('org_settings')
+            .update({ permissions: defaults })
+            .eq('org_id', activeOrgId);
+          
+          if (updateError) {
+            console.error('Error initializing permissions:', updateError);
+            setBackupEnabled(false);
+            return;
+          }
+          
+          console.log('Permissions initialized successfully');
+          permissions = defaults;
+        }
+        
         setBackupEnabled(permissions?.backup_local_enabled === true);
       } catch (err) {
-        console.error('Error fetching backup permissions:', err);
+        console.error('Error in permissions initialization:', err);
         setBackupEnabled(false);
       }
     };
