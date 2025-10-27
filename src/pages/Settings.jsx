@@ -25,11 +25,11 @@ export default function Settings() {
   const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup'
   const [backupEnabled, setBackupEnabled] = useState(false);
 
-  // Fetch backup permissions
+  // Fetch backup permissions and initialize if empty
   useEffect(() => {
     if (!activeOrgId || !authClient) return;
     
-    const fetchBackupPermissions = async () => {
+    const fetchAndInitializePermissions = async () => {
       try {
         const { data, error } = await authClient
           .from('org_settings')
@@ -40,17 +40,43 @@ export default function Settings() {
         if (error) {
           console.error('Error fetching backup permissions:', error);
           setBackupEnabled(false);
-        } else {
-          const permissions = data?.permissions || {};
-          setBackupEnabled(permissions.backup_local_enabled === true);
+          return;
         }
+        
+        let permissions = data?.permissions;
+        
+        // Initialize permissions if empty or null
+        if (!permissions || typeof permissions !== 'object' || Object.keys(permissions).length === 0) {
+          const defaultPermissions = {
+            backup_local_enabled: false,
+            backup_cooldown_override: false,
+            backup_oauth_enabled: false,
+            logo_enabled: false,
+          };
+          
+          // Update the control DB with default permissions
+          const { error: updateError } = await authClient
+            .from('org_settings')
+            .update({ permissions: defaultPermissions })
+            .eq('org_id', activeOrgId);
+          
+          if (updateError) {
+            console.error('Error initializing permissions:', updateError);
+          } else {
+            console.log('Initialized default permissions for org:', activeOrgId);
+          }
+          
+          permissions = defaultPermissions;
+        }
+        
+        setBackupEnabled(permissions.backup_local_enabled === true);
       } catch (err) {
         console.error('Error fetching backup permissions:', err);
         setBackupEnabled(false);
       }
     };
     
-    fetchBackupPermissions();
+    fetchAndInitializePermissions();
   }, [activeOrgId, authClient]);
 
   useEffect(() => {
