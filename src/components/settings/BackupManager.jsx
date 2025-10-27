@@ -45,35 +45,18 @@ export default function BackupManager({ session, orgId }) {
     const checkCooldown = async () => {
       setCheckingCooldown(true);
       try {
-        // Fetch backup history from settings
-        const data = await authenticatedFetch('settings', {
+        // Fetch cooldown status from control DB
+        const data = await authenticatedFetch(`backup-status?org_id=${encodeURIComponent(orgId)}` , {
           method: 'GET',
         });
-
-        const backupHistory = data?.backup_history || [];
-        
-        // Find last successful backup
-        const lastBackup = backupHistory
-          .filter(entry => entry.type === 'backup' && entry.status === 'completed')
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-
-        if (lastBackup) {
-          const lastBackupDate = new Date(lastBackup.timestamp);
-          const now = new Date();
-          const daysSince = (now - lastBackupDate) / (1000 * 60 * 60 * 24);
-          const cooldownDays = 7;
-
-          if (daysSince < cooldownDays) {
-            const nextAllowed = new Date(lastBackupDate.getTime() + cooldownDays * 24 * 60 * 60 * 1000);
-            setCooldownInfo({
-              active: true,
-              nextAllowedAt: nextAllowed.toISOString(),
-              daysRemaining: Math.ceil(cooldownDays - daysSince),
-              lastBackupDate: lastBackupDate.toISOString(),
-            });
-          } else {
-            setCooldownInfo({ active: false });
-          }
+        const cooldown = data?.cooldown || { active: false };
+        if (cooldown && cooldown.active) {
+          setCooldownInfo({
+            active: true,
+            nextAllowedAt: cooldown.next_allowed_at,
+            daysRemaining: cooldown.days_remaining,
+            lastBackupDate: cooldown.last_backup_at,
+          });
         } else {
           setCooldownInfo({ active: false });
         }
@@ -86,7 +69,7 @@ export default function BackupManager({ session, orgId }) {
     };
 
     checkCooldown();
-  }, [canAct]);
+  }, [canAct, orgId]);
 
   const handleCreateBackup = useCallback(async () => {
     if (!canAct) return;
