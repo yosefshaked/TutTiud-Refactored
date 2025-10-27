@@ -52,6 +52,8 @@ async function appendRestoreHistory(supabase, orgId, entry) {
 }
 
 export default async function restore(context, req) {
+  const startedAt = Date.now();
+  context.log?.info?.('restore: request received');
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
 
@@ -59,12 +61,14 @@ export default async function restore(context, req) {
     context.log?.error?.('restore missing Supabase admin credentials');
     return respond(context, 500, { message: 'server_misconfigured' });
   }
+  context.log?.info?.('restore: admin credentials present');
 
   const authorization = resolveBearerAuthorization(req);
   if (!authorization?.token) {
     context.log?.warn?.('restore missing bearer token');
     return respond(context, 401, { message: 'missing bearer' });
   }
+  context.log?.info?.('restore: bearer token detected');
 
   const supabase = createSupabaseAdminClient(adminConfig);
 
@@ -79,6 +83,7 @@ export default async function restore(context, req) {
   if (authResult.error || !authResult.data?.user?.id) {
     return respond(context, 401, { message: 'invalid or expired token' });
   }
+  context.log?.info?.('restore: token validated');
 
   const userId = authResult.data.user.id;
   const body = parseJsonBodyWithLimit(req, MAX_BACKUP_SIZE, { mode: 'enforce', context, endpoint: 'restore' });
@@ -87,6 +92,7 @@ export default async function restore(context, req) {
   if (!orgId) {
     return respond(context, 400, { message: 'invalid org id' });
   }
+  context.log?.info?.('restore: org resolved', { orgId });
 
   let role;
   try {
@@ -103,8 +109,10 @@ export default async function restore(context, req) {
   if (!role || !isAdminRole(role)) {
     return respond(context, 403, { message: 'forbidden' });
   }
+  context.log?.info?.('restore: membership verified', { role });
 
   // Check restore permissions
+  context.log?.info?.('restore: fetching org settings (permissions)');
   const { data: orgSettings, error: settingsError } = await supabase
     .from('org_settings')
     .select('permissions')
@@ -115,11 +123,14 @@ export default async function restore(context, req) {
     context.log?.error?.('restore failed to load org settings', { message: settingsError.message });
     return respond(context, 500, { message: 'failed_to_load_settings' });
   }
+  context.log?.info?.('restore: org settings loaded');
 
   const permissionCheck = checkRestorePermission(orgSettings);
   if (!permissionCheck.allowed) {
+    context.log?.warn?.('restore: permission denied', { reason: permissionCheck.reason });
     return respond(context, 403, { message: permissionCheck.reason });
   }
+  context.log?.info?.('restore: permission check passed');
 
   // Extract encrypted file and password
   const encryptedFile = body?.file; // Base64 or Buffer
@@ -129,6 +140,8 @@ export default async function restore(context, req) {
   if (!encryptedFile || !password) {
     return respond(context, 400, { message: 'missing_file_or_password' });
   }
+  const fileIsBase64 = typeof encryptedFile === 'string';
+  context.log?.info?.('restore: received payload', { clearExisting, fileEncoding: fileIsBase64 ? 'base64' : 'buffer' });
 
   // Convert base64 to Buffer if needed
   let encryptedBuffer;
@@ -139,24 +152,41 @@ export default async function restore(context, req) {
   } else {
     return respond(context, 400, { message: 'invalid_file_format' });
   }
+  context.log?.info?.('restore: encrypted file prepared', { size_bytes: encryptedBuffer?.byteLength ?? encryptedBuffer?.length });
 
   // Get tenant client
+  context.log?.info?.('restore: resolving tenant client');
   const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
   if (tenantError) {
     return respond(context, tenantError.status, tenantError.body);
   }
+  context.log?.info?.('restore: tenant client ready');
 
   try {
     // Decrypt
+    const tDecryptStart = Date.now();
     context.log?.info?.('restore: decrypting backup', { orgId });
     const manifest = await decryptBackup(encryptedBuffer, password);
+    const tDecryptMs = Date.now() - tDecryptStart;
+    context.log?.info?.('restore: decrypt completed', { orgId, duration_ms: tDecryptMs });
 
     // Validate
+    const tValidateStart = Date.now();
     const validation = validateBackupManifest(manifest);
     if (!validation.valid) {
       context.log?.warn?.('restore: invalid manifest', { orgId, error: validation.error });
       return respond(context, 400, { message: validation.error });
     }
+    const tValidateMs = Date.now() - tValidateStart;
+    context.log?.info?.('restore: manifest validated', {
+      orgId,
+      duration_ms: tValidateMs,
+      version: manifest?.version,
+      schema_version: manifest?.schema_version,
+      source_org_id: manifest?.org_id,
+      total_records: manifest?.metadata?.total_records,
+      tables: Array.isArray(manifest?.tables) ? manifest.tables.length : 0,
+    });
 
     // Warn if restoring from different org
     if (manifest.org_id !== orgId) {
@@ -164,8 +194,10 @@ export default async function restore(context, req) {
     }
 
     // Restore
+    const tRestoreStart = Date.now();
     context.log?.info?.('restore: restoring data', { orgId, clearExisting, records: manifest.metadata.total_records });
     const result = await restoreTenantData(tenantClient, manifest, { clearExisting });
+    const tRestoreMs = Date.now() - tRestoreStart;
 
     // Record success
     await appendRestoreHistory(supabase, orgId, {
@@ -177,7 +209,8 @@ export default async function restore(context, req) {
       records_restored: result.restored,
     });
 
-    context.log?.info?.('restore: completed', { orgId, restored: result.restored, errors: result.errors.length });
+    const totalMs = Date.now() - startedAt;
+    context.log?.info?.('restore: completed', { orgId, restored: result.restored, errors: result.errors.length, duration_ms: { decrypt: tDecryptMs, validate: tValidateMs, restore: tRestoreMs, total: totalMs } });
 
     return respond(context, 200, {
       message: 'restore_completed',
