@@ -112,7 +112,7 @@ export default function Settings() {
                   {activeOrgHasConnection ? 'פעיל' : 'נדרש'}
                 </Badge>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
                 הגדרת מפתחות Supabase, בדיקת חיבור, והרצת סקריפט הגדרה אוטומטית
               </p>
             </CardHeader>
@@ -138,7 +138,7 @@ export default function Settings() {
                   ניהול חברי צוות
                 </CardTitle>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
                 הזמנת משתמשים חדשים, ניהול הרשאות, והסרת חברי צוות מהארגון
               </p>
             </CardHeader>
@@ -166,7 +166,7 @@ export default function Settings() {
                   טופס שאלות מפגש
                 </CardTitle>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
                 הגדרת שאלות מותאמות אישית לתיעוד מפגשים ומעקב אחר התקדמות תלמידים
               </p>
             </CardHeader>
@@ -194,7 +194,7 @@ export default function Settings() {
                   ניהול שירותים
                 </CardTitle>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
                 הוספת וניהול רשימת השירותים הזמינים למשתמשי הארגון
               </p>
             </CardHeader>
@@ -222,7 +222,7 @@ export default function Settings() {
                   ניהול מדריכים
                 </CardTitle>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
                 הוספה, עריכה והשבתת מדריכים המשויכים לארגון
               </p>
             </CardHeader>
@@ -250,7 +250,7 @@ export default function Settings() {
                   גיבוי ושחזור
                 </CardTitle>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
                 יצירת קובץ גיבוי מוצפן של נתוני הארגון ושחזור מגיבוי קיים
               </p>
             </CardHeader>
@@ -270,7 +270,7 @@ export default function Settings() {
 
         {/* Floating dialog for the selected module */}
         <Dialog open={Boolean(selectedModule)} onOpenChange={handleModuleDialogChange}>
-          <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-50">
+          <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden bg-white border border-slate-200 shadow-2xl">
             <EnhancedDialogHeader
               icon={
                 selectedModule === 'setup' ? <PlugZap /> :
@@ -290,6 +290,7 @@ export default function Settings() {
                 selectedModule === 'backup' ? 'גיבוי ושחזור' :
                 ''
               }
+              onClose={() => setSelectedModule(null)}
             />
             
             <DialogHeader className="sr-only">
@@ -298,7 +299,7 @@ export default function Settings() {
             </DialogHeader>
 
             {/* Content area with padding and scroll */}
-            <div className="overflow-y-auto px-6 py-5 max-h-[calc(90vh-100px)]">
+            <div className="overflow-y-auto px-6 py-6 max-h-[calc(90vh-80px)] bg-slate-50/30">
               <div className="mx-auto max-w-4xl">
                 {selectedModule === 'setup' && (
                   <SetupAssistant />

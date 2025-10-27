@@ -1,42 +1,47 @@
 import React from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * Enhanced DialogHeader with gradient background and icon support
+ * Enhanced DialogHeader with clean design and custom close button
  * 
  * @param {Object} props
  * @param {React.ReactNode} props.icon - Icon component to display in the header
  * @param {string} props.title - Title text to display
+ * @param {Function} props.onClose - Callback when close button is clicked
  * @param {string} props.className - Additional classes for the header container
- * @param {string} props.gradientFrom - Starting color for gradient (default: 'from-blue-600')
- * @param {string} props.gradientTo - Ending color for gradient (default: 'to-indigo-600')
  */
 export function EnhancedDialogHeader({ 
   icon, 
   title, 
-  className,
-  gradientFrom = 'from-blue-600',
-  gradientTo = 'to-indigo-600'
+  onClose,
+  className
 }) {
   return (
     <div className={cn(
-      "relative border-b bg-gradient-to-r px-6 py-5",
-      gradientFrom,
-      gradientTo,
+      "relative flex items-center justify-between border-b bg-white px-6 py-4",
       className
     )}>
       <div className="flex items-center gap-3">
         {icon && (
-          <div className="rounded-lg bg-white/20 backdrop-blur-sm p-2.5">
-            {React.cloneElement(icon, { className: 'h-6 w-6 text-white' })}
+          <div className="rounded-lg bg-blue-50 p-2.5 text-blue-600">
+            {React.cloneElement(icon, { className: 'h-5 w-5' })}
           </div>
         )}
-        <h2 className="text-2xl font-bold text-white">
+        <h2 className="text-xl font-bold text-slate-900">
           {title}
         </h2>
       </div>
-      {/* Decorative gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none" />
+      
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="group rounded-lg p-2 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          aria-label="סגור"
+        >
+          <X className="h-5 w-5 transition-transform group-hover:rotate-90" />
+        </button>
+      )}
     </div>
   );
 }
