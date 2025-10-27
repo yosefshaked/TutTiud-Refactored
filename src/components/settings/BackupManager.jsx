@@ -1,11 +1,12 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Download, Upload, Loader2, Copy, ShieldCheck } from 'lucide-react';
+import { Download, Upload, Loader2, Copy, ShieldCheck, Clock, AlertCircle } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client.js';
 
 const REQUEST = {
@@ -31,9 +32,61 @@ export default function BackupManager({ session, orgId }) {
   const [fileNameShown, setFileNameShown] = useState('');
   const [restorePassword, setRestorePassword] = useState('');
   const [clearExisting, setClearExisting] = useState(false);
+  const [cooldownInfo, setCooldownInfo] = useState(null);
+  const [checkingCooldown, setCheckingCooldown] = useState(false);
   const fileInputRef = useRef(null);
 
   const canAct = useMemo(() => Boolean(session && orgId), [session, orgId]);
+
+  // Check cooldown status from backup history
+  useEffect(() => {
+    if (!canAct) return;
+
+    const checkCooldown = async () => {
+      setCheckingCooldown(true);
+      try {
+        // Fetch backup history from settings
+        const data = await authenticatedFetch('settings', {
+          method: 'GET',
+        });
+
+        const backupHistory = data?.backup_history || [];
+        
+        // Find last successful backup
+        const lastBackup = backupHistory
+          .filter(entry => entry.type === 'backup' && entry.status === 'completed')
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+
+        if (lastBackup) {
+          const lastBackupDate = new Date(lastBackup.timestamp);
+          const now = new Date();
+          const daysSince = (now - lastBackupDate) / (1000 * 60 * 60 * 24);
+          const cooldownDays = 7;
+
+          if (daysSince < cooldownDays) {
+            const nextAllowed = new Date(lastBackupDate.getTime() + cooldownDays * 24 * 60 * 60 * 1000);
+            setCooldownInfo({
+              active: true,
+              nextAllowedAt: nextAllowed.toISOString(),
+              daysRemaining: Math.ceil(cooldownDays - daysSince),
+              lastBackupDate: lastBackupDate.toISOString(),
+            });
+          } else {
+            setCooldownInfo({ active: false });
+          }
+        } else {
+          setCooldownInfo({ active: false });
+        }
+      } catch (error) {
+        console.error('Error checking cooldown:', error);
+        setCooldownInfo({ active: false });
+      } finally {
+        setCheckingCooldown(false);
+      }
+    };
+
+    checkCooldown();
+  }, [canAct]);
 
   const handleCreateBackup = useCallback(async () => {
     if (!canAct) return;
@@ -70,9 +123,32 @@ export default function BackupManager({ session, orgId }) {
       const sizeKB = Math.round((size_bytes || blob.size) / 1024);
       toast.success(`הגיבוי נוצר בהצלחה (${sizeKB}KB). שמור/י את הסיסמה!`);
       setCreateState(REQUEST.idle);
+      
+      // Refresh cooldown info
+      setCooldownInfo({
+        active: true,
+        nextAllowedAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        daysRemaining: 7,
+        lastBackupDate: new Date().toISOString(),
+      });
     } catch (error) {
       console.error('Create backup failed', error);
-      toast.error(error?.message || 'יצירת הגיבוי נכשלה');
+      
+      // Handle cooldown error
+      if (error?.status === 429) {
+        const daysRemaining = error?.data?.days_remaining || 7;
+        toast.error(`יש להמתין ${daysRemaining} ימים נוספים לפני יצירת גיבוי נוסף`);
+        
+        // Update cooldown info from error
+        setCooldownInfo({
+          active: true,
+          nextAllowedAt: error?.data?.next_allowed_at,
+          daysRemaining: error?.data?.days_remaining,
+        });
+      } else {
+        toast.error(error?.message || 'יצירת הגיבוי נכשלה');
+      }
+      
       setCreateState(REQUEST.error);
     }
   }, [canAct, orgId]);
@@ -151,13 +227,52 @@ export default function BackupManager({ session, orgId }) {
       </CardHeader>
 
       <CardContent className="space-y-md">
+        {/* Cooldown indicator */}
+        {checkingCooldown ? (
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            בודק זמינות גיבוי...
+          </div>
+        ) : cooldownInfo?.active ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-amber-900 text-sm mb-1">
+                גיבוי זמין בעוד {cooldownInfo.daysRemaining} ימים
+              </div>
+              <div className="text-xs text-amber-700">
+                הגיבוי הבא יהיה זמין ב-{new Date(cooldownInfo.nextAllowedAt).toLocaleDateString('he-IL', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </div>
+              {cooldownInfo.lastBackupDate && (
+                <div className="text-xs text-amber-600 mt-1">
+                  גיבוי אחרון: {new Date(cooldownInfo.lastBackupDate).toLocaleDateString('he-IL', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex flex-col gap-sm sm:flex-row sm:items-end">
           <div className="flex-1">
             <Label className="text-slate-700">יצירת גיבוי</Label>
             <p className="text-xs text-slate-500 mb-2">בלחיצה יווצר קובץ גיבוי מוצפן וסיסמה חד-פעמית. חובה לשמור את הסיסמה.</p>
-            <Button onClick={handleCreateBackup} disabled={createState === REQUEST.loading} className="gap-xs">
+            <Button 
+              onClick={handleCreateBackup} 
+              disabled={createState === REQUEST.loading || cooldownInfo?.active} 
+              className="gap-xs"
+            >
               {createState === REQUEST.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              צור/י גיבוי להורדה
+              {cooldownInfo?.active ? 'גיבוי לא זמין (ממתין)' : 'צור/י גיבוי להורדה'}
             </Button>
           </div>
 
