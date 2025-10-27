@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { EnhancedDialogHeader } from '@/components/ui/DialogHeader';
 import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
@@ -96,7 +97,7 @@ export default function Settings() {
         {/* Selector grid */}
         <div className="grid w-full gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3" dir="rtl">
           {/* Setup Assistant Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-blue-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
             <CardHeader className="space-y-2 pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -121,13 +122,13 @@ export default function Settings() {
                 className="w-full gap-2 bg-blue-600 hover:bg-blue-700" 
                 onClick={() => { setSelectedModule('setup'); }}
               >
-                <PlugZap className="h-4 w-4" /> פתח אשף הגדרה
+                <PlugZap className="h-4 w-4" /> פתיחת אשף הגדרה
               </Button>
             </CardContent>
           </Card>
 
           {/* Team Members Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-purple-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
             <CardHeader className="space-y-2 pb-3">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-purple-100 p-2 text-purple-600 transition-colors group-hover:bg-purple-600 group-hover:text-white">
@@ -149,13 +150,13 @@ export default function Settings() {
                 disabled={!canManageSessionForm}
                 variant={!canManageSessionForm ? 'secondary' : 'default'}
               >
-                <Users className="h-4 w-4" /> נהל חברי צוות
+                <Users className="h-4 w-4" /> ניהול חברי צוות
               </Button>
             </CardContent>
           </Card>
 
           {/* Session Form Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-emerald-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
             <CardHeader className="space-y-2 pb-3">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-emerald-100 p-2 text-emerald-600 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
@@ -177,13 +178,13 @@ export default function Settings() {
                 disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
                 variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
               >
-                <ClipboardList className="h-4 w-4" /> נהל שאלות
+                <ClipboardList className="h-4 w-4" /> ניהול שאלות
               </Button>
             </CardContent>
           </Card>
 
           {/* Services Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-orange-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
             <CardHeader className="space-y-2 pb-3">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-orange-100 p-2 text-orange-600 transition-colors group-hover:bg-orange-600 group-hover:text-white">
@@ -205,13 +206,13 @@ export default function Settings() {
                 disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
                 variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
               >
-                <ListChecks className="h-4 w-4" /> נהל שירותים
+                <ListChecks className="h-4 w-4" /> ניהול שירותים
               </Button>
             </CardContent>
           </Card>
 
           {/* Instructors Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-indigo-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
             <CardHeader className="space-y-2 pb-3">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-indigo-100 p-2 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
@@ -233,13 +234,13 @@ export default function Settings() {
                 disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
                 variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
               >
-                <Users className="h-4 w-4" /> נהל מדריכים
+                <Users className="h-4 w-4" /> ניהול מדריכים
               </Button>
             </CardContent>
           </Card>
 
           {/* Backup & Restore Card */}
-          <Card className="group relative w-full overflow-hidden border-0 bg-gradient-to-br from-slate-50 to-white shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
             <CardHeader className="space-y-2 pb-3">
               <div className="flex items-start gap-2">
                 <div className="rounded-lg bg-slate-100 p-2 text-slate-700 transition-colors group-hover:bg-slate-700 group-hover:text-white">
@@ -261,7 +262,7 @@ export default function Settings() {
                 disabled={!canManageSessionForm}
                 variant={!canManageSessionForm ? 'secondary' : 'default'}
               >
-                <ShieldCheck className="h-4 w-4" /> נהל גיבויים
+                <ShieldCheck className="h-4 w-4" /> ניהול גיבויים
               </Button>
             </CardContent>
           </Card>
@@ -269,48 +270,70 @@ export default function Settings() {
 
         {/* Floating dialog for the selected module */}
         <Dialog open={Boolean(selectedModule)} onOpenChange={handleModuleDialogChange}>
-          <DialogContent
-            wide
-            className="w-[min(100vw-2rem,1080px)] max-w-5xl bg-transparent p-0 shadow-none"
-          >
+          <DialogContent className="max-w-5xl max-h-[90vh] p-0 gap-0 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-50">
+            <EnhancedDialogHeader
+              icon={
+                selectedModule === 'setup' ? <PlugZap /> :
+                selectedModule === 'orgMembers' ? <Users /> :
+                selectedModule === 'sessionForm' ? <ClipboardList /> :
+                selectedModule === 'services' ? <ListChecks /> :
+                selectedModule === 'instructors' ? <Users /> :
+                selectedModule === 'backup' ? <ShieldCheck /> :
+                null
+              }
+              title={
+                selectedModule === 'setup' ? 'חיבור Supabase' :
+                selectedModule === 'orgMembers' ? 'ניהול חברי צוות' :
+                selectedModule === 'sessionForm' ? 'טופס שאלות מפגש' :
+                selectedModule === 'services' ? 'ניהול שירותים' :
+                selectedModule === 'instructors' ? 'ניהול מדריכים' :
+                selectedModule === 'backup' ? 'גיבוי ושחזור' :
+                ''
+              }
+            />
+            
             <DialogHeader className="sr-only">
-              <DialogTitle>ניהול הגדרות</DialogTitle>
-              <DialogDescription>בחר/י והגדיר/י את ההגדרה הרצויה</DialogDescription>
+              <DialogTitle>ניהול הגדרות מערכת</DialogTitle>
+              <DialogDescription>ניהול הגדרות מערכת</DialogDescription>
             </DialogHeader>
-            <div className="max-h-[85vh] overflow-y-auto p-2 sm:p-4">
-              {selectedModule === 'setup' && (
-                <SetupAssistant />
-              )}
-              {selectedModule === 'orgMembers' && (
-                <OrgMembersCard />
-              )}
-              {selectedModule === 'sessionForm' && (
-                <SessionFormManager
-                  session={session}
-                  orgId={activeOrgId}
-                  activeOrgHasConnection={activeOrgHasConnection}
-                  tenantClientReady={tenantClientReady}
-                />
-              )}
-              {selectedModule === 'services' && (
-                <ServiceManager
-                  session={session}
-                  orgId={activeOrgId}
-                  activeOrgHasConnection={activeOrgHasConnection}
-                  tenantClientReady={tenantClientReady}
-                />
-              )}
-              {selectedModule === 'instructors' && (
-                <InstructorManager
-                  session={session}
-                  orgId={activeOrgId}
-                  activeOrgHasConnection={activeOrgHasConnection}
-                  tenantClientReady={tenantClientReady}
-                />
-              )}
-              {selectedModule === 'backup' && (
-                <BackupManager session={session} orgId={activeOrgId} />
-              )}
+
+            {/* Content area with padding and scroll */}
+            <div className="overflow-y-auto px-6 py-5 max-h-[calc(90vh-100px)]">
+              <div className="mx-auto max-w-4xl">
+                {selectedModule === 'setup' && (
+                  <SetupAssistant />
+                )}
+                {selectedModule === 'orgMembers' && (
+                  <OrgMembersCard />
+                )}
+                {selectedModule === 'sessionForm' && (
+                  <SessionFormManager
+                    session={session}
+                    orgId={activeOrgId}
+                    activeOrgHasConnection={activeOrgHasConnection}
+                    tenantClientReady={tenantClientReady}
+                  />
+                )}
+                {selectedModule === 'services' && (
+                  <ServiceManager
+                    session={session}
+                    orgId={activeOrgId}
+                    activeOrgHasConnection={activeOrgHasConnection}
+                    tenantClientReady={tenantClientReady}
+                  />
+                )}
+                {selectedModule === 'instructors' && (
+                  <InstructorManager
+                    session={session}
+                    orgId={activeOrgId}
+                    activeOrgHasConnection={activeOrgHasConnection}
+                    tenantClientReady={tenantClientReady}
+                  />
+                )}
+                {selectedModule === 'backup' && (
+                  <BackupManager session={session} orgId={activeOrgId} />
+                )}
+              </div>
             </div>
           </DialogContent>
         </Dialog>
