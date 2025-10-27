@@ -10,7 +10,7 @@ import {
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
-import { parseJsonBodyWithLimit } from '../_shared/validation.js';
+import { parseJsonBodyWithLimit, validateInstructorCreate, validateInstructorUpdate } from '../_shared/validation.js';
 
       // Intentionally ignore profile fetch errors; fallback to provided values.
 export default async function (context, req) {
@@ -98,10 +98,12 @@ export default async function (context, req) {
   }
 
   if (method === 'POST') {
-    const targetUserId = normalizeString(body?.user_id || body?.userId || '');
-    if (!targetUserId) {
-      return respond(context, 400, { message: 'missing user_id' });
+    const validation = validateInstructorCreate(body);
+    if (validation.error) {
+      return respond(context, 400, { message: validation.error });
     }
+
+    const targetUserId = validation.userId;
 
     // Verify target user is a member of the org in control DB
     const { data: membership, error: membershipError } = await supabase
@@ -121,10 +123,10 @@ export default async function (context, req) {
     }
 
     // Fetch profile defaults if name/email not provided
-    const providedName = normalizeString(body?.name);
-    const providedEmail = normalizeString(body?.email).toLowerCase();
-    const providedPhone = normalizeString(body?.phone);
-    const notes = normalizeString(body?.notes);
+    const providedName = validation.name;
+    const providedEmail = validation.email;
+    const providedPhone = validation.phone;
+    const notes = validation.notes;
 
     let profileName = '';
     let profileEmail = '';
@@ -164,27 +166,13 @@ export default async function (context, req) {
   }
 
   if (method === 'PUT') {
-    const instructorId = normalizeString(body?.id || body?.instructor_id || body?.instructorId || '');
-    if (!instructorId) {
-      return respond(context, 400, { message: 'missing instructor id' });
+    const validation = validateInstructorUpdate(body);
+    if (validation.error) {
+      return respond(context, 400, { message: validation.error });
     }
 
-    const updates = {};
-    if (Object.prototype.hasOwnProperty.call(body, 'name')) {
-      updates['name'] = normalizeString(body.name) || null;
-    }
-    if (Object.prototype.hasOwnProperty.call(body, 'email')) {
-      updates.email = normalizeString(body.email).toLowerCase() || null;
-    }
-    if (Object.prototype.hasOwnProperty.call(body, 'phone')) {
-      updates.phone = normalizeString(body.phone) || null;
-    }
-    if (Object.prototype.hasOwnProperty.call(body, 'notes')) {
-      updates.notes = normalizeString(body.notes) || null;
-    }
-    if (Object.prototype.hasOwnProperty.call(body, 'is_active')) {
-      updates.is_active = Boolean(body.is_active);
-    }
+    const instructorId = validation.instructorId;
+    const updates = validation.updates;
 
     if (Object.keys(updates).length === 0) {
       return respond(context, 400, { message: 'no updates provided' });

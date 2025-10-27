@@ -20,11 +20,11 @@
 
 ### Request validation and payload limits (2025-10)
 - A shared server-side validation helper lives at `api/_shared/validation.js`.
-	- `parseJsonBodyWithLimit(req, limitBytes, { mode, context, endpoint })` safely parses JSON and logs when payloads exceed a soft limit. Default rollout uses `mode: 'observe'` to avoid breaking clients.
-	- Centralized validators expose SOT for specific flows (e.g., `validateSessionWrite`). Prefer using these from API routes instead of inlining validation logic.
+  - `parseJsonBodyWithLimit(req, limitBytes, { mode, context, endpoint })` safely parses JSON and logs when payloads exceed a soft limit. Default rollout uses `mode: 'observe'` to avoid breaking clients.
+  - Centralized validators expose SOT for specific flows (e.g., `validateSessionWrite`, `validateInstructorCreate`, `validateInstructorUpdate`). Prefer using these from API routes instead of inlining validation logic.
 - Endpoints updated to use the helper in observe-mode: `api/sessions`, `api/settings`, `api/instructors`.
+- History quota scaffold: `api/_shared/history-quota.js` provides `ensureCapacity` in observe-only mode to collect size telemetry for settings histories without enforcing limits yet.
 - Future phases will introduce per-key quotas and pruning/archival for history-like settings. Until then, do not hard-reject large settings writes without product sign-off. Document changes in PRs and update this section when enforcement is enabled.
-
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
 - Render the summary information in the base `<TableRow>` and immediately follow it with a conditional second `<TableRow>` that holds the drawer content inside a single spanning `<TableCell>` (e.g., `colSpan={totalColumns}`).

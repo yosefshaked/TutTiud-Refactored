@@ -144,3 +144,59 @@ export function validateSessionWrite(body) {
     hasExplicitService: hasServiceField,
   };
 }
+
+// ----- Instructors write validation (SOT) -----
+const PHONE_PATTERN = /^[0-9+\-()\s]{6,20}$/;
+
+export function validateInstructorCreate(body) {
+  const userId = normalizeString(body?.user_id || body?.userId);
+  if (!isUUID(userId)) {
+    return { error: 'missing_user_id' };
+  }
+
+  const name = normalizeString(body?.name) || '';
+  const emailRaw = normalizeString(body?.email).toLowerCase();
+  const email = emailRaw ? (isEmail(emailRaw) ? emailRaw : null) : '';
+  const phoneRaw = normalizeString(body?.phone);
+  const phone = phoneRaw ? (PHONE_PATTERN.test(phoneRaw) ? phoneRaw : null) : '';
+  const notes = normalizeString(body?.notes) || '';
+
+  return {
+    userId,
+    // empty strings mean "not provided"; nulls mean "provided but invalid"
+    name,
+    email,
+    phone,
+    notes,
+  };
+}
+
+export function validateInstructorUpdate(body) {
+  const instructorId = normalizeString(body?.id || body?.instructor_id || body?.instructorId);
+  if (!isUUID(instructorId)) {
+    return { error: 'missing_instructor_id' };
+  }
+
+  const updates = {};
+  if (Object.prototype.hasOwnProperty.call(body, 'name')) {
+    const v = normalizeString(body.name);
+    updates['name'] = v || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'email')) {
+    const v = normalizeString(body.email).toLowerCase();
+    updates.email = v ? (isEmail(v) ? v : null) : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'phone')) {
+    const v = normalizeString(body.phone);
+    updates.phone = v ? (PHONE_PATTERN.test(v) ? v : null) : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'notes')) {
+    const v = normalizeString(body.notes);
+    updates.notes = v || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'is_active')) {
+    updates.is_active = Boolean(body.is_active);
+  }
+
+  return { instructorId, updates };
+}
