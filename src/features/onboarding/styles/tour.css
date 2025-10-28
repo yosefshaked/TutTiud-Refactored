@@ -30,7 +30,7 @@
   font-weight: 700;
   color: #111827;
   margin: 0 0 12px 0;
-  padding: 20px 48px 0 20px; /* Add right padding to avoid X button overlap */
+  padding: 20px 20px 0 48px; /* Add left padding to avoid X button overlap */
   line-height: 1.4;
 }
 
@@ -98,7 +98,8 @@
 .driver-popover-close-btn {
   position: absolute;
   top: 16px;
-  right: 16px; /* Move to right side for RTL */
+  left: 16px !important; /* Keep on left for RTL interface */
+  right: auto !important;
   background: transparent;
   border: none;
   color: #9ca3af;
@@ -124,6 +125,8 @@
   font-size: 13px;
   color: #6b7280;
   font-weight: 500;
+  order: -1; /* Show progress before buttons */
+  margin-left: auto; /* Push to left for RTL */
 }
 
 /* Arrow customization */
@@ -149,17 +152,20 @@
 
 /* Overlay - reduce opacity to avoid double graying */
 .driver-overlay {
-  background-color: rgba(0, 0, 0, 0.4) !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Remove any additional overlays that might cause double graying */
-.driver-active-element-overlay {
-  display: none !important;
-}
-
-/* Highlighted element */
+/* Highlighted element - no gray overlay on top */
 .driver-active-element {
   border-radius: 8px;
+  background-color: transparent !important;
+  box-shadow: 0 0 0 5000px rgba(0, 0, 0, 0.5), 0 0 0 4px #ffffff !important;
+}
+
+/* Remove any additional semi-transparent overlays */
+.driver-active-element::before,
+.driver-active-element::after {
+  display: none !important;
 }
 
 /* Responsive adjustments for mobile */
@@ -171,7 +177,7 @@
 
   .driver-popover-title {
     font-size: 15px;
-    padding: 16px 40px 0 16px; /* Space for X button */
+    padding: 16px 16px 0 40px; /* Space for X button on left */
     margin: 0 0 8px 0;
   }
 
@@ -201,7 +207,8 @@
 
   .driver-popover-close-btn {
     top: 12px;
-    right: 12px;
+    left: 12px !important;
+    right: auto !important;
     font-size: 20px;
     width: 24px;
     height: 24px;

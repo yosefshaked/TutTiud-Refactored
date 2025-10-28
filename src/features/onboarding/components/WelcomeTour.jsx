@@ -25,7 +25,7 @@ export function WelcomeTour() {
       driverRef.current = driver({
         showProgress: true,
         allowClose: true,
-        overlayOpacity: 0.4,
+        overlayOpacity: 0.5,
         nextBtnText: 'הבא',
         prevBtnText: 'הקודם',
         doneBtnText: 'סיום',
@@ -36,6 +36,12 @@ export function WelcomeTour() {
         popoverClass: 'driverjs-theme',
         stagePadding: 4,
         popoverOffset: 10,
+        onHighlightStarted: (element) => {
+          // Remove any gray overlays on the highlighted element
+          if (element?.style) {
+            element.style.backgroundColor = 'transparent';
+          }
+        },
         steps,
         onDestroyStarted: () => {
           // Mark completed regardless of skip/finish to avoid nagging users
