@@ -25,23 +25,17 @@ export function WelcomeTour() {
       driverRef.current = driver({
         showProgress: true,
         allowClose: true,
-        overlayOpacity: 0.5,
+        overlayColor: 'transparent', // No overlay, only highlight
         nextBtnText: 'הבא',
         prevBtnText: 'הקודם',
         doneBtnText: 'סיום',
         closeBtnAriaLabel: 'סגור',
         animate: true,
         smoothScroll: true,
-        padding: 8,
+        padding: 10,
         popoverClass: 'driverjs-theme',
-        stagePadding: 4,
+        stagePadding: 5,
         popoverOffset: 10,
-        onHighlightStarted: (element) => {
-          // Remove any gray overlays on the highlighted element
-          if (element?.style) {
-            element.style.backgroundColor = 'transparent';
-          }
-        },
         steps,
         onDestroyStarted: () => {
           // Mark completed regardless of skip/finish to avoid nagging users
