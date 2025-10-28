@@ -24,18 +24,23 @@ export function WelcomeTour() {
     const timer = setTimeout(() => {
       driverRef.current = driver({
         showProgress: true,
+        progressText: '{{current}} מתוך {{total}}',
         allowClose: true,
-        overlayColor: 'transparent', // No overlay, only highlight
         nextBtnText: 'הבא',
         prevBtnText: 'הקודם',
         doneBtnText: 'סיום',
         closeBtnAriaLabel: 'סגור',
         animate: true,
         smoothScroll: true,
-        padding: 10,
         popoverClass: 'driverjs-theme',
-        stagePadding: 5,
-        popoverOffset: 10,
+        onHighlightStarted: (element, step, options) => {
+          // Add data attributes for progress gauge
+          const popover = document.querySelector('.driver-popover');
+          if (popover && options.state) {
+            popover.setAttribute('data-current-step', options.state.activeIndex + 1);
+            popover.setAttribute('data-total-steps', steps.length);
+          }
+        },
         steps,
         onDestroyStarted: () => {
           // Mark completed regardless of skip/finish to avoid nagging users
