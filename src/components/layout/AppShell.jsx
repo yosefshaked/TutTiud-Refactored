@@ -14,6 +14,7 @@ import NewSessionModal from "@/features/sessions/components/NewSessionModal.jsx"
 import { SessionModalContext } from "@/features/sessions/context/SessionModalContext.jsx"
 import useKeyboardAwareBottomOffset from "@/hooks/useKeyboardAwareBottomOffset.js"
 import OrgLogo from "@/components/layout/OrgLogo.jsx"
+import { WelcomeTour } from "@/features/onboarding/components/WelcomeTour.jsx"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -29,11 +30,13 @@ function buildNavItems(role) {
       to: "/",
       icon: LayoutDashboard,
       end: true,
+  tourKey: "dashboard",
     },
     {
       label: "תלמידים",
       to: studentsDestination,
       icon: Users,
+  tourKey: isAdminRole ? "admin-students" : "my-students",
     },
     {
       label: "דוחות",
@@ -45,6 +48,7 @@ function buildNavItems(role) {
       label: "הגדרות",
       to: "/Settings",
       icon: Settings,
+  tourKey: "settings",
     },
   ]
 }
@@ -84,6 +88,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               key={item.to}
               to={item.to}
               end={item.end}
+              data-tour={item.tourKey}
               aria-label={item.label}
               className={({ isActive }) =>
                 cn(
@@ -101,6 +106,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
         <button
           type="button"
           onClick={() => onOpenSessionModal?.()}
+          data-tour="fab-button"
           className="absolute -top-7 left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-4 ring-background"
           aria-label="יצירת רישום פגישה חדש"
         >
@@ -302,6 +308,7 @@ export default function AppShell({ children }) {
           </div>
         </div>
         <MobileNavigation navItems={navItems} onOpenSessionModal={openSessionModal} />
+  <WelcomeTour />
 
         <ChangelogModal open={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
         <Toaster richColors position="top-right" closeButton />
