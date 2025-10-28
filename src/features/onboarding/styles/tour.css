@@ -137,8 +137,17 @@
 .driver-popover[data-current-step="6"][data-total-steps="6"] .driver-popover-footer::after { width: 100%; }
 
 /* Overlay styling */
+.driver-overlay {
+  z-index: 9998 !important;
+}
+
 .driver-overlay path {
   fill: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Popover needs higher z-index than overlay */
+.driver-popover {
+  z-index: 9999 !important;
 }
 
 /* Prevent double overlay effect */
@@ -146,6 +155,7 @@
 .driver-highlighted-element {
   background: transparent !important;
   box-shadow: none !important;
+  z-index: 9999 !important;
 }
 
 /* Highlighted element border */
@@ -182,18 +192,18 @@
     left: 12px !important;
   }
 
-  /* Mobile: ensure popover appears above bottom navigation */
+  /* Mobile: ensure popover doesn't cover the FAB button */
   .driver-popover {
-    margin-bottom: 80px !important;
+    max-height: calc(100vh - 180px);
   }
 
-  /* Mobile: adjust highlighted element for bottom nav items */
+  /* Mobile: keep highlighted elements visible */
   [data-tour="dashboard"],
   [data-tour="my-students"],
   [data-tour="admin-students"],
   [data-tour="fab-button"],
   [data-tour="settings"] {
-    z-index: 9999 !important;
+    z-index: 10000 !important;
     position: relative !important;
   }
 }
