@@ -1,7 +1,9 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 2.9.0**
-**Last Updated: 2025-11-02**
+**Version: 2.10.3**
+**Last Updated: 2025-10-26**
+
+> **Developer Conventions:** For folder structure, naming rules, API patterns, and feature organization, refer to [Conventions.md](./Conventions.md).
 
 ## 1. Vision & Purpose
 
@@ -77,6 +79,8 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry (JSON answer payload + optional service context) after confirming members only write for students assigned to them. |
 | `/api/settings` | GET/POST/PUT/PATCH/DELETE | Admin/Owner (read allowed to members) | Provides full CRUD for tenant settings, supporting creation of new keys like `session_form_config`. |
 
+> **Schema guardrails:** `/api/settings` now inspects `tuttiud.setup_assistant_diagnostics()` whenever Supabase reports missing tables or insufficient permissions. Schema or policy gaps surface as HTTP 424 with `settings_schema_incomplete` / `settings_schema_unverified` and include the failing diagnostic rows so admins can rerun the setup script before retrying.
+
 All endpoints expect the tenant identifier (`org_id`) in the request body or query string. Authentication is enforced with the Supabase JWT provided by the desktop/web client, and every handler builds the tenant Supabase client through `api/_shared/org-bff.js` to reuse encryption, membership, and error handling routines.
 
 ### 7.2 User Story Mapping
@@ -141,5 +145,32 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **Session history rendering** – the page loads `session_form_config` through `/api/settings?keys=session_form_config`, normalizes questions with `parseSessionFormConfig`, and maps stored JSON answers back to their Hebrew labels. A 404 from the forthcoming `/api/session-records` endpoint is treated as “no sessions recorded” so UI scaffolding is testable today.
 - **SessionModalContext.jsx** – provided by `AppShell.jsx`, exposing `openSessionModal({ studentId, onCreated })` to any routed page. It keeps modal state in a single location so the FAB, desktop CTA, and Student Detail page all share the same creation flow.
 - **NewSessionModal.jsx** – orchestrates data dependencies: loads the student roster (admin vs. instructor scope), fetches `session_form_config`, and surfaces loading/error states. On submit it posts to `/api/sessions` with `{ student_id, date, service_context, content }` and triggers any supplied `onCreated` callback before closing.
-- **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, and collects answers for every configured question (text or textarea). Empty responses are stripped before sending the payload.
+- **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, and collects answers for every configured question (text, textarea, select, radio/button groups, numeric fields, and range scales). Empty responses are stripped before sending the payload.
 - **Shared utilities** – `src/features/students/utils/schedule.js` centralizes day/time formatting, `src/features/students/utils/endpoints.js` standardizes roster endpoint selection, and `src/features/sessions/utils/form-config.js` parses question configs so both the modal and detail view stay in sync.
+
+## 14. Session Form Management in Settings
+
+- **Modernized Settings page** – `/Pages/Settings.jsx` now focuses on diagnostics, Supabase connectivity, invitations, and the new session form manager. Legacy leave policy, holiday, and employment scope panels were removed to keep the page scoped to Tuttiud’s current feature set.
+- **Role-based access** – only administrators and organization owners render the management surface. Members/instructors still see the debugging card but no longer receive any administrative controls.
+- **SessionFormManager.jsx** – located at `src/components/settings/SessionFormManager.jsx`, this card loads the existing `session_form_config`, lists all questions, and lets admins add, edit, reorder, or delete entries before saving. Each question tracks `id`, `label`, `type`, `placeholder`, `required`, `options`, and (for range scales) numeric bounds. A dedicated “Save changes” button persists updates via `upsertSetting`, while inline validation prevents duplicate IDs, missing labels, or invalid option/range data.
+- **Improved parsing utilities** – `parseSessionFormConfig` now preserves `required`, `options`, and `range` metadata so runtime consumers (session modal/detail views) can render richer controls while staying backward compatible with minimal configs.
+- **Option persistence** – Server-side normalization (`api/settings/index.js`) now keeps option objects with their `value`, `label`, and optional `id` fields when saving configurations, preventing `[object Object]` strings and ensuring the SessionFormManager reloads distinct labels/values exactly as entered.
+- **Session capture parity** – `NewSessionForm.jsx` honors the expanded question types, rendering selects, radio/button groups, numeric/date inputs, and sliders alongside the existing text areas. Required fields are enforced client-side and the payload continues to trim empty responses before submission.
+
+## 15. Admin Tools
+
+### Backup Verification Script
+
+A Node.js script is provided for super admins/system administrators to verify backup file integrity and decryptability:
+
+- **Location:** `test/verify-backup.cjs`
+- **Usage:**
+  ```
+  node test/verify-backup.cjs <backup-file-path> <password>
+  ```
+- **Features:**
+  - Loads and decrypts a backup file using the provided password
+  - Prints manifest summary if successful
+  - Prints error if file is invalid or password is incorrect
+
+This tool is essential for validating backups before restore or for compliance checks.

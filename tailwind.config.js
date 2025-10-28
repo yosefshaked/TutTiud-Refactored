@@ -44,6 +44,30 @@ export default {
         border: "#E1E6EF",
         input: "#E1E6EF",
         ring: "#B8C2D9",
+        // Map shadcn/ui token colors to CSS variables so utility classes like
+        // bg-popover, text-popover-foreground, bg-accent, bg-muted, etc. work.
+        // This fixes invisible dropdown/popover backgrounds when those classes
+        // are used by primitives like Select/Popover.
+        popover: "hsl(var(--popover))",
+        "popover-foreground": "hsl(var(--popover-foreground))",
+        card: "hsl(var(--card))",
+        "card-foreground": "hsl(var(--card-foreground))",
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
         primary: {
           DEFAULT: "#5B5BD6",
           foreground: "#F9FAFF",

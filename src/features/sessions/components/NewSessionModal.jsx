@@ -24,6 +24,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionError, setQuestionError] = useState('');
   const [questions, setQuestions] = useState([]);
+  const [services, setServices] = useState([]);
   const [submitState, setSubmitState] = useState(REQUEST_STATE.idle);
   const [submitError, setSubmitError] = useState('');
 
@@ -93,10 +94,25 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     }
   }, [open, canFetchStudents, activeOrgId]);
 
+  const loadServices = useCallback(async () => {
+    if (!open || !canFetchStudents) return;
+    try {
+      const searchParams = new URLSearchParams({ keys: 'available_services' });
+      if (activeOrgId) searchParams.set('org_id', activeOrgId);
+      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
+      const settingsValue = payload?.settings?.available_services;
+      setServices(Array.isArray(settingsValue) ? settingsValue : []);
+    } catch (error) {
+      console.error('Failed to load available services', error);
+      setServices([]);
+    }
+  }, [open, canFetchStudents, activeOrgId]);
+
   useEffect(() => {
     if (open) {
       void loadStudents();
       void loadQuestions();
+      void loadServices();
     } else {
       setStudentsState(REQUEST_STATE.idle);
       setStudentsError('');
@@ -104,8 +120,9 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setQuestionsState(REQUEST_STATE.idle);
       setQuestionError('');
       setQuestions([]);
+      setServices([]);
     }
-  }, [open, loadQuestions, loadStudents]);
+  }, [open, loadQuestions, loadStudents, loadServices]);
 
   const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
     setSubmitState(REQUEST_STATE.loading);
@@ -130,7 +147,15 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     } catch (error) {
       console.error('Failed to save session record', error);
       setSubmitState(REQUEST_STATE.error);
-      setSubmitError(error?.message || 'שמירת המפגש נכשלה.');
+      // Map known server messages to clear, localized explanations
+      const serverMessage = error?.data?.message || error?.message || '';
+      let friendly = 'שמירת המפגש נכשלה.';
+      if (serverMessage === 'student_missing_instructor') {
+        friendly = 'לא ניתן לתעד מפגש: לתלמיד זה לא משויך מדריך פעיל. נא לשייך מדריך תחילה.';
+      } else if (serverMessage === 'student_not_assigned_to_user') {
+        friendly = 'לא ניתן לתעד: תלמיד זה לא משויך אליך.';
+      }
+      setSubmitError(friendly);
     }
   };
 
@@ -144,7 +169,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) { onClose?.(); } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
@@ -166,6 +191,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
           <NewSessionForm
             students={students}
             questions={questions}
+            services={services}
             initialStudentId={initialStudentId}
             onSubmit={handleSubmit}
             onCancel={onClose}

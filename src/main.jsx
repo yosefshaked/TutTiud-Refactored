@@ -6,24 +6,20 @@ import AppShell from './components/layout/AppShell.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
 import StudentDetailPage from './features/students/pages/StudentDetailPage.jsx';
-import TimeEntry from './Pages/TimeEntry.jsx';
-import Reports from './Pages/Reports.jsx';
-import ReportsErrorBoundary from './components/reports/ReportsErrorBoundary.js';
-import Services from './Pages/Services.jsx';
-import Settings from './Pages/Settings.jsx';
+import Settings from './pages/Settings.jsx';
 import { RuntimeConfigProvider } from './runtime/RuntimeConfigContext.jsx';
 import { SupabaseProvider } from './context/SupabaseContext.jsx';
 import { isAuthClientInitialized } from './lib/supabase-manager.js';
 import Diagnostics from './runtime/Diagnostics.jsx';
-import Login from './Pages/Login.jsx';
-import ForgotPassword from './Pages/ForgotPassword.jsx';
-import UpdatePassword from './Pages/UpdatePassword.jsx';
+import Login from './pages/Login.jsx';
+import ForgotPassword from './pages/ForgotPassword.jsx';
+import UpdatePassword from './pages/UpdatePassword.jsx';
 import CompleteRegistrationPage from './components/pages/CompleteRegistrationPage.jsx';
 import AcceptInvitePage from './components/pages/AcceptInvitePage.jsx';
 import { AuthProvider } from './auth/AuthContext.jsx';
 import AuthGuard from './auth/AuthGuard.jsx';
 import { OrgProvider } from './org/OrgContext.jsx';
-import OrgSelection from './Pages/OrgSelection.jsx';
+import OrgSelection from './pages/OrgSelection.jsx';
 import MyStudentsPage from './features/instructor/pages/MyStudentsPage.jsx';
 
 function App({ config = null }) {
@@ -50,10 +46,6 @@ function App({ config = null }) {
                     <Route path="/admin/students" element={<StudentManagementPage />} />
                     <Route path="/students/:id" element={<StudentDetailPage />} />
                     <Route path="/my-students" element={<MyStudentsPage />} />
-                    <Route path="/TimeEntry" element={<TimeEntry />} />
-                    <Route path="/Adjustments" element={<Navigate to="/TimeEntry?tab=adjustments" replace />} />
-                    <Route path="/Reports" element={<ReportsErrorBoundary><Reports /></ReportsErrorBoundary>} />
-                    <Route path="/Services" element={<Services />} />
                     <Route path="/Settings" element={<Settings />} />
                     <Route path="/diagnostics" element={<Diagnostics />} />
                   </Route>

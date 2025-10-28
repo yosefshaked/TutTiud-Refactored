@@ -103,7 +103,7 @@ export default function AssignInstructorModal({ open, onClose, student, orgId, s
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto pb-28 sm:pb-6">
         <DialogHeader>
           <DialogTitle>שיוך מדריך</DialogTitle>
           <DialogDescription>

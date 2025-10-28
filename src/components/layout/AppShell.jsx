@@ -12,6 +12,8 @@ import { useOrg } from "@/org/OrgContext.jsx"
 import { cn } from "@/lib/utils"
 import NewSessionModal from "@/features/sessions/components/NewSessionModal.jsx"
 import { SessionModalContext } from "@/features/sessions/context/SessionModalContext.jsx"
+import useKeyboardAwareBottomOffset from "@/hooks/useKeyboardAwareBottomOffset.js"
+import OrgLogo from "@/components/layout/OrgLogo.jsx"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -47,20 +49,14 @@ function buildNavItems(role) {
   ]
 }
 
-function LogoPlaceholder() {
-  return (
-    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-lg font-semibold text-primary">
-      T
-    </div>
-  )
-}
-
 function MobileNavigation({ navItems = [], onOpenSessionModal }) {
+  const keyboardOffset = useKeyboardAwareBottomOffset()
   return (
     <nav
       role="navigation"
       aria-label="ניווט ראשי"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
+  className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
+      style={keyboardOffset > 0 ? { transform: `translateY(-${keyboardOffset}px)` } : undefined}
     >
       <div className="relative mx-auto flex max-w-md items-center justify-between gap-md">
         {navItems.map((item) => {
@@ -123,13 +119,13 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
     >
       <div className="flex h-full flex-col">
         <div className="flex flex-col gap-md px-lg pt-lg">
-          <Link to="/" className="flex items-center justify-end gap-sm text-right">
-            <div className="flex items-center justify-center">
-              <LogoPlaceholder />
-            </div>
+          <Link to="/" className="flex items-center justify-end gap-sm text-right flex-row-reverse">
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Tuttiud</p>
+              <p className="text-sm font-semibold text-foreground">תותיעוד</p>
               <p className="text-xs text-neutral-500">פלטפורמת תלמידים</p>
+            </div>
+            <div className="flex items-center justify-center">
+              <OrgLogo />
             </div>
           </Link>
           <button
@@ -254,18 +250,18 @@ export default function AppShell({ children }) {
 
   return (
     <SessionModalContext.Provider value={sessionModalContextValue}>
-      <div className="flex min-h-screen bg-background text-foreground" dir="rtl">
+      <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden" dir="rtl">
         <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
         <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
-          <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-md py-sm backdrop-blur md:border-none md:bg-transparent md:px-lg">
-            <div className="flex items-center justify-between gap-sm">
-              <div className="flex items-center gap-sm">
-                <LogoPlaceholder />
+          <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-sm py-sm backdrop-blur md:border-none md:bg-transparent md:px-md md:py-sm">
+            <div className="flex items-center justify-between gap-xs">
+              <div className="flex items-center gap-xs sm:gap-sm">
+                <OrgLogo />
                 <button
                   type="button"
                   onClick={handleOrgClick}
-                  className="inline-flex items-center rounded-full border border-border bg-surface px-md py-xs text-sm font-semibold text-foreground transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  className="inline-flex min-h-[44px] items-center rounded-full border border-border bg-surface px-sm py-xs text-xs font-semibold text-foreground transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:px-md sm:text-sm"
                 >
                   {activeOrg?.name ? `ארגון: ${activeOrg.name}` : "בחרו ארגון לעבודה"}
                 </button>
@@ -274,18 +270,18 @@ export default function AppShell({ children }) {
                 <button
                   type="button"
                   onClick={() => setIsChangelogOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full border border-border px-sm py-xs text-xs font-medium text-neutral-600 transition hover:bg-neutral-100"
+                  className="inline-flex min-h-[44px] items-center gap-1 rounded-full border border-border px-xs py-xs text-xs font-medium text-neutral-600 transition hover:bg-neutral-100 sm:px-sm"
                 >
-                  <Megaphone className="h-3.5 w-3.5" aria-hidden="true" />
-                  עדכונים
+                  <Megaphone className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">עדכונים</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2 text-neutral-600 transition hover:bg-neutral-200"
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-neutral-100 p-2 text-neutral-600 transition hover:bg-neutral-200"
                   aria-label="התנתקות"
                 >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  <LogOut className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -294,7 +290,7 @@ export default function AppShell({ children }) {
           <OrgSelectionBanner />
           <OrgConfigBanner />
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
             <PageLayout
               fullHeight={false}
               className="min-h-full pb-0"

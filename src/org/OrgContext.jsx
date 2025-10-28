@@ -209,7 +209,7 @@ async function authenticatedFetch(path, { params, session: _session, accessToken
   if (!response.ok) {
     const message = payload?.message || 'An API error occurred';
     const error = new Error(message);
-    error.status = response.status;
+    void _session; void _accessToken;
     if (payload) {
       error.data = payload;
     }

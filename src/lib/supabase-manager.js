@@ -107,5 +107,9 @@ export function createDataClient(orgConfig) {
       autoRefreshToken: false,
       detectSessionInUrl: false,
     },
+    // Always target the tenant schema for data access
+    db: {
+      schema: 'tuttiud',
+    },
   });
 }

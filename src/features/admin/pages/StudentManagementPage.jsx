@@ -2,15 +2,20 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2, Pencil } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Loader2, Pencil, Search, X, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import AddStudentForm from '../components/AddStudentForm.jsx';
 import AssignInstructorModal from '../components/AssignInstructorModal.jsx';
+import PageLayout from '@/components/ui/PageLayout.jsx';
+import { includesDayQuery } from '@/features/students/utils/schedule.js';
+import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -30,6 +35,9 @@ export default function StudentManagementPage() {
   const [isCreatingStudent, setIsCreatingStudent] = useState(false);
   const [createError, setCreateError] = useState('');
   const [studentForAssignment, setStudentForAssignment] = useState(null);
+  const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dayFilter, setDayFilter] = useState(null);
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -109,6 +117,15 @@ export default function StudentManagementPage() {
     }
   }, [canFetch, refreshRoster]);
 
+  // Default the view for admins/owners who are also instructors to "mine"
+  useEffect(() => {
+    if (!user || !Array.isArray(instructors) || instructors.length === 0) return;
+    const isInstructor = instructors.some((i) => i?.id === user.id);
+    if (isInstructor) {
+      setFilterMode((prev) => (prev === 'all' ? 'mine' : prev));
+    }
+  }, [user, instructors]);
+
   const handleOpenAddDialog = () => {
     setCreateError('');
     setIsAddDialogOpen(true);
@@ -121,7 +138,17 @@ export default function StudentManagementPage() {
     }
   };
 
-  const handleCreateStudent = async ({ name, contactInfo }) => {
+  const handleCreateStudent = async ({
+    name,
+    contactName,
+    contactPhone,
+    assignedInstructorId,
+    defaultService,
+    defaultDayOfWeek,
+    defaultSessionTime,
+    notes,
+    tags,
+  }) => {
     if (!canFetch) {
       return;
     }
@@ -133,7 +160,14 @@ export default function StudentManagementPage() {
       const body = {
         org_id: activeOrgId,
         name,
-        contact_info: contactInfo || undefined,
+        contact_name: contactName,
+        contact_phone: contactPhone,
+        assigned_instructor_id: assignedInstructorId,
+        default_service: defaultService,
+        default_day_of_week: defaultDayOfWeek,
+        default_session_time: defaultSessionTime,
+        notes,
+        tags,
       };
       await authenticatedFetch('students', {
         session,
@@ -164,6 +198,54 @@ export default function StudentManagementPage() {
     await refreshRoster();
   };
 
+  // Compute filtered/sorted students before any early returns to satisfy hooks rules
+  const displayedStudents = useMemo(() => {
+    let filtered = students;
+
+    // Filter by instructor (mine vs all)
+    if (filterMode === 'mine' && user?.id) {
+      filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
+    }
+    // Filter by day of week if selected
+    if (dayFilter) {
+      filtered = filtered.filter((s) => Number(s?.default_day_of_week) === Number(dayFilter));
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((student) => {
+        try {
+          // Search by student name
+          const studentName = String(student.name || '').toLowerCase();
+          if (studentName.includes(query)) return true;
+
+          // Search by parent/contact name
+          const contactName = String(student.contact_name || '').toLowerCase();
+          if (contactName.includes(query)) return true;
+
+          // Search by phone number
+          const contactPhone = String(student.contact_phone || '').toLowerCase();
+          if (contactPhone.includes(query)) return true;
+
+          // Search by default day of week (Hebrew label)
+          if (includesDayQuery(student.default_day_of_week, query)) return true;
+
+          // Search by default session time
+          const sessionTime = String(student.default_session_time || '').toLowerCase();
+          if (sessionTime.includes(query)) return true;
+
+          return false;
+        } catch (error) {
+          console.error('Error filtering student:', student, error);
+          return false;
+        }
+      });
+    }
+
+    return filtered;
+  }, [students, filterMode, user?.id, searchQuery, dayFilter]);
+
   if (supabaseLoading) {
     return (
       <div className="p-6 text-center text-neutral-600">
@@ -192,26 +274,70 @@ export default function StudentManagementPage() {
   const isEmpty = !isLoadingStudents && students.length === 0 && !studentsError;
 
   return (
-    <div className="space-y-lg">
-      <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-title-lg font-semibold text-foreground">ניהול תלמידים</h1>
-        <Button type="button" className="gap-sm self-start" onClick={handleOpenAddDialog}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          תלמיד חדש
-        </Button>
-      </div>
+    <PageLayout
+      title="ניהול תלמידים"
+      actions={(
+        <div className="flex items-center gap-3 self-start">
+          <div className="flex items-center gap-2 text-sm">
+            <label htmlFor="students-filter" className="text-neutral-600">הצג:</label>
+            <select
+              id="students-filter"
+              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value)}
+            >
+              <option value="mine">התלמידים שלי</option>
+              <option value="all">כל התלמידים</option>
+            </select>
+          </div>
+          <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            תלמיד חדש
+          </Button>
+        </div>
+      )}
+    >
 
-      <Card>
+      <Card className="w-full">
         <CardHeader className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-semibold text-foreground">רשימת תלמידים</CardTitle>
-          {instructorsState === REQUEST_STATES.loading ? (
-            <p className="flex items-center gap-xs text-sm text-neutral-600">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              טוען רשימת מדריכים...
-            </p>
-          ) : null}
+          <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
+            {instructorsState === REQUEST_STATES.loading ? (
+              <p className="flex items-center gap-xs text-sm text-neutral-600">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                טוען רשימת מדריכים...
+              </p>
+            ) : null}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+              <Input
+                type="text"
+                placeholder="חיפוש לפי שם, הורה, יום או שעה..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pr-10 text-sm"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+                  aria-label="נקה חיפוש"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <div className="sm:w-56">
+              <DayOfWeekSelect
+                value={dayFilter}
+                onChange={setDayFilter}
+                placeholder="סינון לפי יום"
+              />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent>
           {isLoadingStudents ? (
             <div className="flex items-center justify-center gap-sm py-xl text-neutral-600">
               <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
@@ -227,50 +353,117 @@ export default function StudentManagementPage() {
 
           {isEmpty ? (
             <div className="py-xl text-center text-sm text-neutral-500">
-              עדיין לא נוספו תלמידים לארגון זה.
+              {searchQuery ? 'לא נמצאו תלמידים התואמים את החיפוש.' : 'עדיין לא נוספו תלמידים לארגון זה.'}
             </div>
           ) : null}
 
-          {!isLoadingStudents && !studentsError && students.length > 0 ? (
-            <Table>
+          {!isLoadingStudents && !studentsError && !isEmpty && displayedStudents.length === 0 ? (
+            <div className="py-xl text-center text-sm text-neutral-500">
+              לא נמצאו תלמידים התואמים את המסננים/החיפוש.
+            </div>
+          ) : null}
+
+          {!isLoadingStudents && !studentsError && displayedStudents.length > 0 ? (
+            <>
+              {searchQuery && (
+                <div className="mb-sm text-xs text-neutral-600">
+                  נמצאו {displayedStudents.length} תלמידים
+                </div>
+              )}
+              <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[180px] text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
-                  <TableHead className="min-w-[200px] text-right text-sm font-medium text-neutral-600">פרטי קשר</TableHead>
-                  <TableHead className="min-w-[160px] text-right text-sm font-medium text-neutral-600">מדריך משויך</TableHead>
-                  <TableHead className="w-[120px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
+                  <TableHead className="text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
+                  <TableHead className="hidden text-right text-sm font-medium text-neutral-600 sm:table-cell">פרטי קשר</TableHead>
+                  <TableHead className="w-[100px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {students.map((student) => {
+            <TableBody>
+                {displayedStudents.map((student) => {
                   const instructor = instructorMap.get(student.assigned_instructor_id) || null;
+                  const contactName = student.contact_name || '';
+                  const contactPhone = student.contact_phone || '';
+                  const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ') || '—';
+                  
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="text-sm font-semibold text-foreground">
-                        {student.id ? (
-                          <Link to={`/students/${student.id}`} className="text-primary hover:underline">
-                            {student.name || 'ללא שם'}
-                          </Link>
-                        ) : (
-                          student.name || 'ללא שם'
-                        )}
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            {student.id ? (
+                              <Link to={`/students/${student.id}`} className="text-primary hover:underline">
+                                {student.name || 'ללא שם'}
+                              </Link>
+                            ) : (
+                              student.name || 'ללא שם'
+                            )}
+                            {filterMode === 'all' ? (
+                              <div className="mt-0.5 text-xs text-neutral-500">
+                                {instructor?.name ? (
+                                  <>מדריך: {instructor.name}</>
+                                ) : student.assigned_instructor_id ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAssignment(student)}
+                                    className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
+                                    title="שיוך מדריך מחדש"
+                                  >
+                                    המדריך הושבת — יש לשייך מדריך חדש
+                                  </button>
+                                ) : (
+                                  <>ללא מדריך</>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                          {contactDisplay !== '—' && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="sm:hidden rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                                  aria-label="הצג פרטי קשר"
+                                >
+                                  <User className="h-4 w-4" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 text-sm" align="end">
+                                <div className="space-y-1">
+                                  <div className="font-semibold text-neutral-900">פרטי קשר</div>
+                                  {contactName && (
+                                    <div>
+                                      <span className="text-xs text-neutral-500">שם: </span>
+                                      <span className="text-neutral-700">{contactName}</span>
+                                    </div>
+                                  )}
+                                  {contactPhone && (
+                                    <div>
+                                      <span className="text-xs text-neutral-500">טלפון: </span>
+                                      <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
+                                        {contactPhone}
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-sm text-neutral-600">
-                        {student.contact_info || '—'}
-                      </TableCell>
-                      <TableCell className="text-sm text-neutral-600">
-                        {instructor?.name || 'ללא מדריך'}
+                      <TableCell className="hidden text-sm text-neutral-600 sm:table-cell">
+                        {contactDisplay}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="gap-xs"
+                          className="gap-xs text-xs sm:text-sm"
                           onClick={() => handleOpenAssignment(student)}
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
-                          עריכה
+                          <span className="hidden sm:inline">עריכה</span>
+                          <span className="sm:hidden">✎</span>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -278,12 +471,13 @@ export default function StudentManagementPage() {
                 })}
               </TableBody>
             </Table>
+            </>
           ) : null}
         </CardContent>
       </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) handleCloseAddDialog(); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
           <DialogHeader>
             <DialogTitle>הוספת תלמיד חדש</DialogTitle>
           </DialogHeader>
@@ -304,6 +498,6 @@ export default function StudentManagementPage() {
         session={session}
         onAssigned={handleAssignmentSuccess}
       />
-    </div>
+    </PageLayout>
   );
 }
