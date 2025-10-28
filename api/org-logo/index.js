@@ -41,8 +41,18 @@ export default async function (context, req) {
   }
 
   const userId = authResult.data.user.id;
-  const query = req?.query ?? {};
-  const orgId = resolveOrgId({ query }, {});
+  
+  // For GET, resolve from query. For POST/DELETE, parse body first
+  let body = {};
+  if (req.method === 'POST' || req.method === 'DELETE') {
+    try {
+      body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    } catch {
+      return respond(context, 400, { message: 'invalid_json' });
+    }
+  }
+  
+  const orgId = resolveOrgId(req, body);
   if (!orgId) {
     return respond(context, 400, { message: 'invalid org id' });
   }
@@ -105,13 +115,6 @@ export default async function (context, req) {
 
   // POST: Upload logo (URL)
   if (req.method === 'POST') {
-    let body;
-    try {
-      body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    } catch {
-      return respond(context, 400, { message: 'invalid_json' });
-    }
-
     const logoUrl = body?.logo_url;
     if (!logoUrl || typeof logoUrl !== 'string') {
       return respond(context, 400, { message: 'missing_logo_url' });
