@@ -12,6 +12,7 @@ import ServiceManager from '@/components/settings/ServiceManager.jsx';
 import InstructorManager from '@/components/settings/InstructorManager.jsx';
 import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
+import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
@@ -197,6 +198,9 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Onboarding Tour Card - Available to all users */}
+          <OnboardingCard />
 
           {/* Team Members Card */}
           <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
