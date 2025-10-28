@@ -66,9 +66,11 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_verify_membership' });
   }
 
-  if (!role || !isAdminRole(role)) {
+  if (!role) {
     return respond(context, 403, { message: 'forbidden' });
   }
+
+  const isAdmin = isAdminRole(role);
 
   const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
   if (tenantError) {
@@ -87,6 +89,11 @@ export default async function (context, req) {
       builder = builder.eq('is_active', true);
     }
 
+    // Non-admin users can only fetch their own instructor record
+    if (!isAdmin) {
+      builder = builder.eq('id', userId);
+    }
+
     const { data, error } = await builder;
 
     if (error) {
@@ -98,6 +105,11 @@ export default async function (context, req) {
   }
 
   if (method === 'POST') {
+    // Only admins can create instructors
+    if (!isAdmin) {
+      return respond(context, 403, { message: 'forbidden' });
+    }
+
     const validation = validateInstructorCreate(body);
     if (validation.error) {
       return respond(context, 400, { message: validation.error });
@@ -166,6 +178,11 @@ export default async function (context, req) {
   }
 
   if (method === 'PUT') {
+    // Only admins can update instructors
+    if (!isAdmin) {
+      return respond(context, 403, { message: 'forbidden' });
+    }
+
     const validation = validateInstructorUpdate(body);
     if (validation.error) {
       return respond(context, 400, { message: validation.error });
@@ -198,6 +215,11 @@ export default async function (context, req) {
   }
 
   if (method === 'DELETE') {
+    // Only admins can delete instructors
+    if (!isAdmin) {
+      return respond(context, 403, { message: 'forbidden' });
+    }
+
     const instructorId = normalizeString(body?.id || body?.instructor_id || body?.instructorId || '');
     if (!instructorId) {
       return respond(context, 400, { message: 'missing instructor id' });
