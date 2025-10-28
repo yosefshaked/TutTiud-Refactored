@@ -75,9 +75,9 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
                 aria-disabled="true"
                 title={item.tooltip}
                 onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
-                className="flex cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
+                className="flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
               >
-                <Icon className="h-5 w-5" aria-hidden="true" />
+                  <Icon className="h-6 w-6" aria-hidden="true" />
                 <span>{item.label}</span>
               </button>
             )
@@ -90,14 +90,14 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               end={item.end}
               data-tour={item.tourKey}
               aria-label={item.label}
-              className={({ isActive }) =>
+                className={({ isActive }) =>
                 cn(
-                  "flex flex-col items-center gap-1 text-xs font-medium",
+                  "flex flex-col items-center gap-1 h-12 text-sm font-medium",
                   isActive ? "text-primary" : "text-neutral-500",
                 )
               }
             >
-              <Icon className="h-5 w-5" aria-hidden="true" />
+              <Icon className="h-6 w-6" aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>
           )
@@ -128,9 +128,9 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
                 aria-disabled="true"
                 title={item.tooltip}
                 onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
-                className="flex cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
+                className="flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
               >
-                <Icon className="h-5 w-5" aria-hidden="true" />
+                  <Icon className="h-6 w-6" aria-hidden="true" />
                 <span>{item.label}</span>
               </button>
             )
@@ -143,14 +143,14 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               end={item.end}
               data-tour={item.tourKey}
               aria-label={item.label}
-              className={({ isActive }) =>
+                className={({ isActive }) =>
                 cn(
-                  "flex flex-col items-center gap-1 text-xs font-medium",
+                  "flex flex-col items-center gap-1 h-12 text-sm font-medium",
                   isActive ? "text-primary" : "text-neutral-500",
                 )
               }
             >
-              <Icon className="h-5 w-5" aria-hidden="true" />
+              <Icon className="h-6 w-6" aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>
           )
