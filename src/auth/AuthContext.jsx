@@ -28,18 +28,31 @@ function extractProfile(session) {
 }
 
 function resolveRedirectUrl() {
+  console.log('[resolveRedirectUrl] Starting resolution...');
+  console.log('[resolveRedirectUrl] typeof window:', typeof window);
+  
   if (typeof window !== 'undefined') {
     const { location } = window;
+    console.log('[resolveRedirectUrl] window.location:', location);
+    console.log('[resolveRedirectUrl] location?.origin:', location?.origin);
+    
     if (location?.origin) {
       const pathname = typeof location.pathname === 'string' ? location.pathname : '/';
       const search = typeof location.search === 'string' ? location.search : '';
       const hash = typeof location.hash === 'string' ? location.hash : '';
-      return `${location.origin}${pathname}${search}${hash}`;
+      const fullUrl = `${location.origin}${pathname}${search}${hash}`;
+      console.log('[resolveRedirectUrl] Resolved from window.location:', fullUrl);
+      return fullUrl;
     }
+    console.log('[resolveRedirectUrl] location.origin is falsy, falling back...');
   }
+  
   if (FALLBACK_REDIRECT_URL) {
+    console.log('[resolveRedirectUrl] Using FALLBACK_REDIRECT_URL:', FALLBACK_REDIRECT_URL);
     return FALLBACK_REDIRECT_URL;
   }
+  
+  console.log('[resolveRedirectUrl] No redirect URL available, returning undefined');
   return undefined;
 }
 
@@ -97,6 +110,10 @@ export function AuthProvider({ children }) {
   const signInWithOAuth = useCallback(async (provider) => {
     const client = ensureAuthClient();
     const redirectTo = resolveRedirectUrl();
+    console.log('[OAuth Debug] Resolved redirectTo:', redirectTo);
+    console.log('[OAuth Debug] window.location.origin:', typeof window !== 'undefined' ? window.location?.origin : 'N/A');
+    console.log('[OAuth Debug] window.location.href:', typeof window !== 'undefined' ? window.location?.href : 'N/A');
+    console.log('[OAuth Debug] FALLBACK_REDIRECT_URL:', FALLBACK_REDIRECT_URL);
     const oauthOptions = redirectTo ? { redirectTo } : {};
     const { data, error } = await client.auth.signInWithOAuth({
       provider,
