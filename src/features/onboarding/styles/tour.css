@@ -150,12 +150,11 @@
   z-index: 9999 !important;
 }
 
-/* Prevent double overlay effect */
+/* Ensure highlighted elements appear above the overlay without stripping their styling */
 .driver-active-element,
 .driver-highlighted-element {
-  background: transparent !important;
-  box-shadow: none !important;
-  z-index: 9999 !important;
+  position: relative;
+  z-index: 10000 !important;
 }
 
 /* Highlighted element border */
