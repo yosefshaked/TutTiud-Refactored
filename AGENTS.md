@@ -52,6 +52,20 @@
   - Prints manifest summary if successful, error if invalid or wrong password.
   - Use for compliance, restore validation, and support troubleshooting.
 
+### Custom Logo Feature (2025-10)
+- `/api/org-logo` (GET/POST/DELETE) manages organization custom logos. Requires `permissions.logo_enabled = true` in `org_settings`.
+  - GET: Returns `logo_url` (URL string or null). Available to all org members.
+  - POST: Admin/owner only. Accepts `logo_url` (URL string). Validates URL format.
+  - DELETE: Admin/owner only. Removes logo by setting `logo_url` to null.
+- Control DB schema: run `scripts/control-db-logo-schema.sql` to add `org_settings.logo_url` (text) column.
+- Frontend: `LogoManager.jsx` in Settings page allows setting/removing custom logo URL when `logo_enabled = true`.
+  - Disabled state shown with message "לוגו מותאם אישית אינו זמין. נא לפנות לתמיכה" when `logo_enabled = false`.
+  - Accepts public image URLs (PNG, JPG, SVG, GIF, etc.).
+  - Stores logo URL as plain text in control DB (no file upload, references external images).
+- Global display: `OrgLogo.jsx` component fetches and displays custom logo in AppShell header (desktop sidebar + mobile header). Falls back to TutTiud logo (`/icon.svg`) when no logo is set.
+- Logo refresh: Component refetches when `activeOrgId` changes, ensuring correct logo displays after org switch.
+- Logo sizing: Uses `object-contain` with white background padding to ensure logos fit nicely in all display locations (48px container).
+
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
 - Render the summary information in the base `<TableRow>` and immediately follow it with a conditional second `<TableRow>` that holds the drawer content inside a single spanning `<TableCell>` (e.g., `colSpan={totalColumns}`).

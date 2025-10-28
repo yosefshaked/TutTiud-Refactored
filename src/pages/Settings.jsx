@@ -11,6 +11,7 @@ import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
 import ServiceManager from '@/components/settings/ServiceManager.jsx';
 import InstructorManager from '@/components/settings/InstructorManager.jsx';
 import BackupManager from '@/components/settings/BackupManager.jsx';
+import LogoManager from '@/components/settings/LogoManager.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
@@ -22,8 +23,9 @@ export default function Settings() {
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo'
   const [backupEnabled, setBackupEnabled] = useState(false);
+  const [logoEnabled, setLogoEnabled] = useState(false);
 
   // Fetch backup permissions and initialize if empty
   useEffect(() => {
@@ -81,9 +83,11 @@ export default function Settings() {
         }
         
         setBackupEnabled(permissions?.backup_local_enabled === true);
+        setLogoEnabled(permissions?.logo_enabled === true);
       } catch (err) {
         console.error('Error in permissions initialization:', err);
         setBackupEnabled(false);
+        setLogoEnabled(false);
       }
     };
     
@@ -341,6 +345,43 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Custom Logo Card */}
+          <Card className={`group relative w-full overflow-hidden border-0 shadow-md transition-all duration-200 flex flex-col ${
+            logoEnabled ? 'bg-white/80 hover:shadow-xl hover:scale-[1.02]' : 'bg-slate-50 opacity-75'
+          }`}>
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className={`rounded-lg p-2 transition-colors ${
+                  logoEnabled 
+                    ? 'bg-pink-100 text-pink-600 group-hover:bg-pink-600 group-hover:text-white' 
+                    : 'bg-slate-200 text-slate-400'
+                }`}>
+                  <Sparkles className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className={`text-lg font-bold ${logoEnabled ? 'text-slate-900' : 'text-slate-500'}`}>
+                  לוגו מותאם אישית
+                </CardTitle>
+              </div>
+              <p className={`text-sm leading-relaxed min-h-[2.5rem] ${logoEnabled ? 'text-slate-600' : 'text-slate-500'}`}>
+                {logoEnabled 
+                  ? 'הגדרת כתובת URL של לוגו מותאם אישית שיוצג ברחבי האפליקציה'
+                  : 'לוגו מותאם אישית אינו זמין. נא לפנות לתמיכה'
+                }
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('logo')} 
+                disabled={!canManageSessionForm || !logoEnabled}
+                variant={(!canManageSessionForm || !logoEnabled) ? 'secondary' : 'default'}
+              >
+                <Sparkles className="h-4 w-4" /> ניהול לוגו
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Floating dialog for the selected module */}
@@ -354,6 +395,7 @@ export default function Settings() {
                 selectedModule === 'services' ? <ListChecks /> :
                 selectedModule === 'instructors' ? <Users /> :
                 selectedModule === 'backup' ? <ShieldCheck /> :
+                selectedModule === 'logo' ? <Sparkles /> :
                 null
               }
               title={
@@ -363,6 +405,7 @@ export default function Settings() {
                 selectedModule === 'services' ? 'ניהול שירותים' :
                 selectedModule === 'instructors' ? 'ניהול מדריכים' :
                 selectedModule === 'backup' ? 'גיבוי ושחזור' :
+                selectedModule === 'logo' ? 'לוגו מותאם אישית' :
                 ''
               }
               onClose={() => setSelectedModule(null)}
@@ -408,6 +451,9 @@ export default function Settings() {
                 )}
                 {selectedModule === 'backup' && (
                   <BackupManager session={session} orgId={activeOrgId} />
+                )}
+                {selectedModule === 'logo' && (
+                  <LogoManager session={session} orgId={activeOrgId} />
                 )}
               </div>
             </div>

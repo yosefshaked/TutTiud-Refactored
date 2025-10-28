@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import NewSessionModal from "@/features/sessions/components/NewSessionModal.jsx"
 import { SessionModalContext } from "@/features/sessions/context/SessionModalContext.jsx"
 import useKeyboardAwareBottomOffset from "@/hooks/useKeyboardAwareBottomOffset.js"
+import OrgLogo from "@/components/layout/OrgLogo.jsx"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -46,14 +47,6 @@ function buildNavItems(role) {
       icon: Settings,
     },
   ]
-}
-
-function LogoPlaceholder() {
-  return (
-    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-lg font-semibold text-primary">
-      T
-    </div>
-  )
 }
 
 function MobileNavigation({ navItems = [], onOpenSessionModal }) {
@@ -128,7 +121,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
         <div className="flex flex-col gap-md px-lg pt-lg">
           <Link to="/" className="flex items-center justify-end gap-sm text-right">
             <div className="flex items-center justify-center">
-              <LogoPlaceholder />
+              <OrgLogo />
             </div>
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">תותיעוד</p>
@@ -264,7 +257,7 @@ export default function AppShell({ children }) {
           <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-sm py-sm backdrop-blur md:border-none md:bg-transparent md:px-md md:py-sm">
             <div className="flex items-center justify-between gap-xs">
               <div className="flex items-center gap-xs sm:gap-sm">
-                <LogoPlaceholder />
+                <OrgLogo />
                 <button
                   type="button"
                   onClick={handleOrgClick}
