@@ -34,6 +34,8 @@ export default function BackupManager({ session, orgId }) {
   const [clearExisting, setClearExisting] = useState(false);
   const [cooldownInfo, setCooldownInfo] = useState(null);
   const [checkingCooldown, setCheckingCooldown] = useState(false);
+  const [overrideEnabled, setOverrideEnabled] = useState(false);
+  const [backupEnabled, setBackupEnabled] = useState(true);
   const fileInputRef = useRef(null);
 
   const canAct = useMemo(() => Boolean(session && orgId), [session, orgId]);
@@ -49,7 +51,9 @@ export default function BackupManager({ session, orgId }) {
         const data = await authenticatedFetch(`backup-status?org_id=${encodeURIComponent(orgId)}` , {
           method: 'GET',
         });
+        setBackupEnabled(Boolean(data?.enabled));
         const cooldown = data?.cooldown || { active: false };
+        setOverrideEnabled(Boolean(data?.override_enabled));
         if (cooldown && cooldown.active) {
           setCooldownInfo({
             active: true,
@@ -106,6 +110,7 @@ export default function BackupManager({ session, orgId }) {
       const sizeKB = Math.round((size_bytes || blob.size) / 1024);
       toast.success(`הגיבוי נוצר בהצלחה (${sizeKB}KB). שמור/י את הסיסמה!`);
       setCreateState(REQUEST.idle);
+      setOverrideEnabled(false); // consumed on success by backend
       
       // Refresh cooldown info
       setCooldownInfo({
@@ -210,11 +215,23 @@ export default function BackupManager({ session, orgId }) {
       </CardHeader>
 
       <CardContent className="space-y-md">
-        {/* Cooldown indicator */}
+        {/* Disabled/availability indicator */}
         {checkingCooldown ? (
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <Loader2 className="h-4 w-4 animate-spin" />
             בודק זמינות גיבוי...
+          </div>
+        ) : !backupEnabled ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-100 p-3 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-slate-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-semibold text-slate-800 text-sm mb-1">
+                גיבוי אינו זמין
+              </div>
+              <div className="text-xs text-slate-700">
+                גיבוי אינו זמין. נא לפנות לתמיכה על מנת לבחון הפעלת הפונקציה.
+              </div>
+            </div>
           </div>
         ) : cooldownInfo?.active ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-3">
@@ -241,6 +258,12 @@ export default function BackupManager({ session, orgId }) {
                   })}
                 </div>
               )}
+              {overrideEnabled && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant="outline" className="border-amber-400 text-amber-800 bg-amber-100">עקיפה זמינה</Badge>
+                  <span className="text-xs text-amber-700">לחיצה על יצירת גיבוי תצרוך את העקיפה החד-פעמית.</span>
+                </div>
+              )}
             </div>
           </div>
         ) : null}
@@ -251,11 +274,15 @@ export default function BackupManager({ session, orgId }) {
             <p className="text-xs text-slate-500 mb-2">בלחיצה יווצר קובץ גיבוי מוצפן וסיסמה חד-פעמית. חובה לשמור את הסיסמה.</p>
             <Button 
               onClick={handleCreateBackup} 
-              disabled={createState === REQUEST.loading || cooldownInfo?.active} 
+              disabled={!backupEnabled || createState === REQUEST.loading || (cooldownInfo?.active && !overrideEnabled)} 
               className="gap-xs"
             >
               {createState === REQUEST.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              {cooldownInfo?.active ? 'גיבוי לא זמין (ממתין)' : 'צור/י גיבוי להורדה'}
+              {!backupEnabled
+                ? 'גיבוי אינו זמין'
+                : cooldownInfo?.active 
+                ? (overrideEnabled ? 'עקוף ההמתנה וצור/י גיבוי' : 'גיבוי לא זמין (ממתין)') 
+                : 'צור/י גיבוי להורדה'}
             </Button>
           </div>
 
@@ -292,7 +319,7 @@ export default function BackupManager({ session, orgId }) {
             <Label htmlFor="clear-existing" className="text-slate-700">נקה נתונים קיימים לפני השחזור</Label>
           </div>
           <div className="flex items-end">
-            <Button onClick={handleRestore} disabled={restoreState === REQUEST.loading} className="gap-xs">
+            <Button onClick={handleRestore} disabled={!backupEnabled || restoreState === REQUEST.loading} className="gap-xs">
               {restoreState === REQUEST.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               שחזר/י מגיבוי
             </Button>
