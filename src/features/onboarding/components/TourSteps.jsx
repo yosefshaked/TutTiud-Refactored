@@ -18,7 +18,8 @@ export const adminTourSteps = [
     popover: {
       title: 'מסך ראשי',
       description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים.',
-      side: 'left',
+      side: 'top',
+      align: 'center',
     },
   },
   {
@@ -26,7 +27,8 @@ export const adminTourSteps = [
     popover: {
       title: 'ניהול תלמידים',
       description: 'כאן תוכלו לנהל את רשימת התלמידים, להוסיף תלמידים חדשים ולצפות בפרטיהם.',
-      side: 'left',
+      side: 'top',
+      align: 'center',
     },
   },
   {
@@ -34,7 +36,8 @@ export const adminTourSteps = [
     popover: {
       title: 'הוספת מפגש חדש',
       description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד את הפרטים, משך הזמן והערות.',
-      side: 'left',
+      side: 'top',
+      align: 'center',
     },
   },
   {
@@ -42,7 +45,8 @@ export const adminTourSteps = [
     popover: {
       title: 'הגדרות ארגון',
       description: 'בהגדרות תוכלו לנהל משתמשים, להזמין מדריכים חדשים, ולהגדיר העדפות ארגוניות.',
-      side: 'left',
+      side: 'top',
+      align: 'center',
     },
   },
   {
@@ -71,7 +75,8 @@ export const memberTourSteps = [
     popover: {
       title: 'מסך ראשי',
       description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים שלכם.',
-      side: 'left',
+      side: 'top',
+      align: 'center',
     },
   },
   {
@@ -79,7 +84,8 @@ export const memberTourSteps = [
     popover: {
       title: 'התלמידים שלי',
       description: 'כאן תוכלו לצפות ברשימת התלמידים שלכם ולמעקב אחר ההתקדמות שלהם.',
-      side: 'left',
+      side: 'top',
+      align: 'center',
     },
   },
   {
@@ -87,7 +93,8 @@ export const memberTourSteps = [
     popover: {
       title: 'הוספת מפגש חדש',
       description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד פרטים, משך זמן והערות.',
-      side: 'left',
+      side: 'top',
+      align: 'center',
     },
   },
   {

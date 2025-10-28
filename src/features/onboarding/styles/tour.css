@@ -136,14 +136,23 @@
 .driver-popover[data-current-step="5"][data-total-steps="6"] .driver-popover-footer::after { width: 83.33%; }
 .driver-popover[data-current-step="6"][data-total-steps="6"] .driver-popover-footer::after { width: 100%; }
 
-/* Overlay - single gray background */
+/* Overlay - single gray background, no double layer */
 .driver-overlay {
-  background-color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.6) !important;
 }
 
-/* Highlighted element */
+/* Prevent double overlay effect */
+.driver-active-element,
+.driver-highlighted-element {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Highlighted element border */
 .driver-active-element {
   border-radius: 8px;
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 4px;
 }
 
 /* Responsive adjustments for mobile */
@@ -172,4 +181,20 @@
     top: 12px;
     left: 12px !important;
   }
+
+  /* Mobile: ensure popover appears above bottom navigation */
+  .driver-popover {
+    margin-bottom: 80px !important;
+  }
+
+  /* Mobile: adjust highlighted element for bottom nav items */
+  [data-tour="dashboard"],
+  [data-tour="my-students"],
+  [data-tour="admin-students"],
+  [data-tour="fab-button"],
+  [data-tour="settings"] {
+    z-index: 9999 !important;
+    position: relative !important;
+  }
 }
+
