@@ -103,7 +103,8 @@ export const SupabaseProvider = ({ children }) => {
     authClient
       .auth
       .getSession()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        console.log('[SupabaseProvider] getSession result:', { session: data?.session, error });
         if (isMounted) {
           setSession(data?.session ?? null);
         }
@@ -120,7 +121,8 @@ export const SupabaseProvider = ({ children }) => {
         }
       });
 
-    const { data } = authClient.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = authClient.auth.onAuthStateChange((event, nextSession) => {
+      console.log('[SupabaseProvider] Auth state change:', event, nextSession);
       if (isMounted) {
         setSession(nextSession);
       }

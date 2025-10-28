@@ -60,6 +60,8 @@ export function initializeAuthClient(config) {
       storageKey: STORAGE_KEY,
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
     },
   });
   lastCredentials = { supabaseUrl, supabaseAnonKey };
