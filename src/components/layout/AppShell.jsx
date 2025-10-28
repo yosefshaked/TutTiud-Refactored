@@ -137,6 +137,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
           <button
             type="button"
             onClick={() => onOpenSessionModal?.()}
+            data-tour="fab-button"
             className="inline-flex items-center justify-center gap-sm rounded-full bg-primary px-lg py-sm text-sm font-semibold text-primary-foreground shadow-lg transition hover:shadow-xl"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -171,6 +172,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
                 key={item.to}
                 to={item.to}
                 end={item.end}
+                data-tour={item.tourKey}
                 className={({ isActive }) =>
                   cn(
                     "flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium transition",

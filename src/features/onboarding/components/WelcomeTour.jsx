@@ -30,6 +30,7 @@ export function WelcomeTour() {
         doneBtnText: 'סיום',
         closeBtnAriaLabel: 'דלג',
         animate: true,
+        padding: 10,
         steps,
         onDestroyStarted: () => {
           // Mark completed regardless of skip/finish to avoid nagging users
