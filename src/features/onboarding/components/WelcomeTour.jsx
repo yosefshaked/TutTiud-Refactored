@@ -25,16 +25,17 @@ export function WelcomeTour() {
       driverRef.current = driver({
         showProgress: true,
         allowClose: true,
-        overlayOpacity: 0.5,
+        overlayOpacity: 0.4,
         nextBtnText: 'הבא',
         prevBtnText: 'הקודם',
         doneBtnText: 'סיום',
         closeBtnAriaLabel: 'סגור',
         animate: true,
         smoothScroll: true,
-        padding: 10,
+        padding: 8,
         popoverClass: 'driverjs-theme',
-        stagePadding: 5,
+        stagePadding: 4,
+        popoverOffset: 10,
         steps,
         onDestroyStarted: () => {
           // Mark completed regardless of skip/finish to avoid nagging users
