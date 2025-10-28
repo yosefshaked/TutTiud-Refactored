@@ -76,6 +76,9 @@ export default function LogoManager({ session, orgId }) {
       setLogoUrlInput('');
       toast.success('הלוגו נשמר בהצלחה!');
       setSaveState(REQUEST.idle);
+      
+      // Notify other components to refresh the logo
+      window.dispatchEvent(new CustomEvent('org-logo-updated'));
     } catch (error) {
       console.error('Save logo failed', error);
       
@@ -103,6 +106,9 @@ export default function LogoManager({ session, orgId }) {
       setLogoUrl(null);
       toast.success('הלוגו הוסר בהצלחה.');
       setDeleteState(REQUEST.idle);
+      
+      // Notify other components to refresh the logo
+      window.dispatchEvent(new CustomEvent('org-logo-updated'));
     } catch (error) {
       console.error('Delete logo failed', error);
       toast.error(error?.message || 'הסרת הלוגו נכשלה');

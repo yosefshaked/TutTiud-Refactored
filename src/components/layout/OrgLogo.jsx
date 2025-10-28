@@ -18,6 +18,7 @@ export default function OrgLogo({ className = '' }) {
   const { activeOrgId } = useOrg();
   const [logoUrl, setLogoUrl] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!activeOrgId) {
@@ -27,6 +28,7 @@ export default function OrgLogo({ className = '' }) {
     }
 
     const fetchLogo = async () => {
+      setLoading(true);
       try {
         const data = await authenticatedFetch(`org-logo?org_id=${encodeURIComponent(activeOrgId)}`, {
           method: 'GET',
@@ -41,7 +43,17 @@ export default function OrgLogo({ className = '' }) {
     };
 
     fetchLogo();
-  }, [activeOrgId]);
+  }, [activeOrgId, refreshKey]);
+
+  useEffect(() => {
+    // Listen for logo update events
+    const handleLogoUpdate = () => {
+      setRefreshKey(prev => prev + 1);
+    };
+
+    window.addEventListener('org-logo-updated', handleLogoUpdate);
+    return () => window.removeEventListener('org-logo-updated', handleLogoUpdate);
+  }, []);
 
   if (loading) {
     return <LogoPlaceholder />;
