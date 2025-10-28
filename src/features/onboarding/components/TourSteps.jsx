@@ -14,10 +14,10 @@ export const adminTourSteps = [
     },
   },
   {
-    element: '[data-tour="fab-button"]',
+    element: '[data-tour="dashboard"]',
     popover: {
-      title: 'הוספת מפגש חדש',
-      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד את הפרטים, משך הזמן והערות.',
+      title: 'מסך ראשי',
+      description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים.',
       side: 'left',
     },
   },
@@ -30,10 +30,10 @@ export const adminTourSteps = [
     },
   },
   {
-    element: '[data-tour="dashboard"]',
+    element: '[data-tour="fab-button"]',
     popover: {
-      title: 'לוח הבקרה',
-      description: 'כאן תוכלו לראות סיכום של כל המפגשים, דוחות וסטטיסטיקות מהירות.',
+      title: 'הוספת מפגש חדש',
+      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד את הפרטים, משך הזמן והערות.',
       side: 'left',
     },
   },
@@ -67,10 +67,10 @@ export const memberTourSteps = [
     },
   },
   {
-    element: '[data-tour="fab-button"]',
+    element: '[data-tour="dashboard"]',
     popover: {
-      title: 'הוספת מפגש חדש',
-      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד פרטים, משך זמן והערות.',
+      title: 'מסך ראשי',
+      description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים שלכם.',
       side: 'left',
     },
   },
@@ -83,10 +83,10 @@ export const memberTourSteps = [
     },
   },
   {
-    element: '[data-tour="dashboard"]',
+    element: '[data-tour="fab-button"]',
     popover: {
-      title: 'לוח הבקרה',
-      description: 'כאן תוכלו לראות סיכום של המפגשים שלכם והיסטוריה עדכנית.',
+      title: 'הוספת מפגש חדש',
+      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד פרטים, משך זמן והערות.',
       side: 'left',
     },
   },

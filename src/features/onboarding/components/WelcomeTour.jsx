@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
+import '../styles/tour.css';
 import { useUserRole } from '../hooks/useUserRole.js';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus.js';
 import { getTourSteps } from './TourSteps.jsx';
@@ -28,9 +29,12 @@ export function WelcomeTour() {
         nextBtnText: 'הבא',
         prevBtnText: 'הקודם',
         doneBtnText: 'סיום',
-        closeBtnAriaLabel: 'דלג',
+        closeBtnAriaLabel: 'סגור',
         animate: true,
+        smoothScroll: true,
         padding: 10,
+        popoverClass: 'driverjs-theme',
+        stagePadding: 5,
         steps,
         onDestroyStarted: () => {
           // Mark completed regardless of skip/finish to avoid nagging users

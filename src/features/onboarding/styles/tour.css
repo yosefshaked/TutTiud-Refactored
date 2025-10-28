@@ -1,0 +1,192 @@
+/* Custom driver.js tour styling for TutTiud */
+
+/* RTL Support */
+.driver-popover {
+  direction: rtl;
+  text-align: right;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Popover container */
+.driver-popover.driverjs-theme {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  max-width: 400px;
+  padding: 0;
+}
+
+/* Title styling */
+.driver-popover-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px 0;
+  padding: 20px 20px 0 20px;
+  line-height: 1.4;
+}
+
+/* Description styling */
+.driver-popover-description {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #4b5563;
+  margin: 0;
+  padding: 0 20px;
+}
+
+/* Footer with buttons */
+.driver-popover-footer {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 20px 20px;
+  margin-top: 20px;
+  gap: 12px;
+}
+
+/* Button group */
+.driver-popover-navigation-btns {
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 8px;
+}
+
+/* Primary button (Next/Done) */
+.driver-popover-next-btn,
+.driver-popover-prev-btn {
+  background-color: #2563EB;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+}
+
+.driver-popover-next-btn:hover {
+  background-color: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Previous button */
+.driver-popover-prev-btn {
+  background-color: #f3f4f6;
+  color: #374151;
+  box-shadow: none;
+}
+
+.driver-popover-prev-btn:hover {
+  background-color: #e5e7eb;
+  box-shadow: none;
+}
+
+/* Close button */
+.driver-popover-close-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s ease;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.driver-popover-close-btn:hover {
+  color: #374151;
+}
+
+/* Progress indicator */
+.driver-popover-progress-text {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Arrow customization */
+.driver-popover-arrow {
+  border-color: #ffffff;
+}
+
+.driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: #ffffff;
+}
+
+.driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: #ffffff;
+}
+
+.driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: #ffffff;
+}
+
+.driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: #ffffff;
+}
+
+/* Overlay */
+.driver-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Highlighted element */
+.driver-active-element {
+  border-radius: 8px;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 640px) {
+  .driver-popover.driverjs-theme {
+    max-width: calc(100vw - 32px);
+  }
+
+  .driver-popover-title {
+    font-size: 16px;
+    padding: 16px 16px 0 16px;
+  }
+
+  .driver-popover-description {
+    font-size: 14px;
+    padding: 0 16px;
+  }
+
+  .driver-popover-footer {
+    padding: 12px 16px 16px 16px;
+  }
+
+  .driver-popover-next-btn,
+  .driver-popover-prev-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}
+
+/* Animation improvements */
+.driver-popover {
+  animation: driverFadeIn 0.3s ease-out;
+}
+
+@keyframes driverFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
