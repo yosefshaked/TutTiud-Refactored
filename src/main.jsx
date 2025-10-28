@@ -14,6 +14,7 @@ import Diagnostics from './runtime/Diagnostics.jsx';
 import Login from './pages/Login.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import UpdatePassword from './pages/UpdatePassword.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
 import CompleteRegistrationPage from './components/pages/CompleteRegistrationPage.jsx';
 import AcceptInvitePage from './components/pages/AcceptInvitePage.jsx';
 import { AuthProvider } from './auth/AuthContext.jsx';
@@ -34,6 +35,7 @@ function App({ config = null }) {
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/complete-registration" element={<CompleteRegistrationPage />} />
                 <Route path="/accept-invite" element={<AcceptInvitePage />} />
                 <Route element={<AuthGuard />}>
