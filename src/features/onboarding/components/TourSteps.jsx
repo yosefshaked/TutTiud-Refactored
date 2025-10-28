@@ -3,6 +3,31 @@
  * Each step targets a specific UI element and provides contextual help
  */
 
+function findVisibleElement(selector) {
+  if (!selector) return null;
+
+  const candidates = document.querySelectorAll(selector);
+  for (const element of candidates) {
+    if (!element) continue;
+
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    const hasSize = rect.width > 0 && rect.height > 0;
+    const isHidden =
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      parseFloat(style.opacity || '1') === 0;
+
+    if (!isHidden && hasSize) {
+      return element;
+    }
+  }
+
+  return null;
+}
+
+const selectVisible = (selector) => () => findVisibleElement(selector);
+
 export const adminTourSteps = [
   {
     element: 'body',
@@ -14,7 +39,7 @@ export const adminTourSteps = [
     },
   },
   {
-    element: '[data-tour="dashboard"]',
+    element: selectVisible('[data-tour="dashboard"]'),
     popover: {
       title: 'מסך ראשי',
       description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים.',
@@ -23,7 +48,7 @@ export const adminTourSteps = [
     },
   },
   {
-    element: '[data-tour="admin-students"]',
+    element: selectVisible('[data-tour="admin-students"]'),
     popover: {
       title: 'ניהול תלמידים',
       description: 'כאן תוכלו לנהל את רשימת התלמידים, להוסיף תלמידים חדשים ולצפות בפרטיהם.',
@@ -32,7 +57,7 @@ export const adminTourSteps = [
     },
   },
   {
-    element: '[data-tour="fab-button"]',
+    element: selectVisible('[data-tour="fab-button"]'),
     popover: {
       title: 'הוספת מפגש חדש',
       description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד את הפרטים, משך הזמן והערות.',
@@ -41,7 +66,7 @@ export const adminTourSteps = [
     },
   },
   {
-    element: '[data-tour="settings"]',
+    element: selectVisible('[data-tour="settings"]'),
     popover: {
       title: 'הגדרות ארגון',
       description: 'בהגדרות תוכלו לנהל משתמשים, להזמין מדריכים חדשים, ולהגדיר העדפות ארגוניות.',
@@ -71,7 +96,7 @@ export const memberTourSteps = [
     },
   },
   {
-    element: '[data-tour="dashboard"]',
+    element: selectVisible('[data-tour="dashboard"]'),
     popover: {
       title: 'מסך ראשי',
       description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים שלכם.',
@@ -80,7 +105,7 @@ export const memberTourSteps = [
     },
   },
   {
-    element: '[data-tour="my-students"]',
+    element: selectVisible('[data-tour="my-students"]'),
     popover: {
       title: 'התלמידים שלי',
       description: 'כאן תוכלו לצפות ברשימת התלמידים שלכם ולמעקב אחר ההתקדמות שלהם.',
@@ -89,7 +114,7 @@ export const memberTourSteps = [
     },
   },
   {
-    element: '[data-tour="fab-button"]',
+    element: selectVisible('[data-tour="fab-button"]'),
     popover: {
       title: 'הוספת מפגש חדש',
       description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד פרטים, משך זמן והערות.',

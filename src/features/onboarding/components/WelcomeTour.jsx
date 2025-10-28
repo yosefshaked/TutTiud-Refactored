@@ -22,6 +22,14 @@ export function WelcomeTour() {
 
     // Small delay to let UI render before positioning targets
     const timer = setTimeout(() => {
+      if (driverRef.current) {
+        try {
+          driverRef.current.destroy();
+        } catch {
+          // noop: the instance might already be cleaned up
+        }
+      }
+
       driverRef.current = driver({
         showProgress: true,
         progressText: '{{current}} מתוך {{total}}',
@@ -32,6 +40,10 @@ export function WelcomeTour() {
         closeBtnAriaLabel: 'סגור',
         animate: true,
         smoothScroll: true,
+        overlayOpacity: 0.6,
+        overlayColor: '#000000',
+        stageRadius: 12,
+        stagePadding: 8,
         popoverClass: 'driverjs-theme',
         onHighlightStarted: (element, step, options) => {
           // Add data attributes for progress gauge

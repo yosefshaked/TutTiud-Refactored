@@ -136,9 +136,9 @@
 .driver-popover[data-current-step="5"][data-total-steps="6"] .driver-popover-footer::after { width: 83.33%; }
 .driver-popover[data-current-step="6"][data-total-steps="6"] .driver-popover-footer::after { width: 100%; }
 
-/* Overlay - single gray background, no double layer */
-.driver-overlay {
-  background: rgba(0, 0, 0, 0.6) !important;
+/* Overlay styling */
+.driver-overlay path {
+  fill: rgba(0, 0, 0, 0.6) !important;
 }
 
 /* Prevent double overlay effect */
