@@ -59,11 +59,11 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
     <nav
       role="navigation"
       aria-label="ניווט ראשי"
-  className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
       style={keyboardOffset > 0 ? { transform: `translateY(-${keyboardOffset}px)` } : undefined}
     >
-      <div className="relative mx-auto flex max-w-md items-center justify-between gap-md">
-        {navItems.map((item) => {
+      <div className="relative mx-auto grid max-w-md grid-cols-5 items-center gap-md">
+        {navItems.slice(0, 2).map((item) => {
           const Icon = item.icon
 
           if (item.disabled) {
@@ -75,7 +75,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
                 aria-disabled="true"
                 title={item.tooltip}
                 onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
-                className="flex flex-1 cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
+                className="flex cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />
                 <span>{item.label}</span>
@@ -92,7 +92,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               aria-label={item.label}
               className={({ isActive }) =>
                 cn(
-                  "flex flex-1 flex-col items-center gap-1 text-xs font-medium",
+                  "flex flex-col items-center gap-1 text-xs font-medium",
                   isActive ? "text-primary" : "text-neutral-500",
                 )
               }
@@ -102,16 +102,59 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
             </NavLink>
           )
         })}
+        
+        {/* Middle column placeholder for FAB button */}
+        <div className="relative flex items-center justify-center" aria-hidden="true">
+          <button
+            type="button"
+            onClick={() => onOpenSessionModal?.()}
+            data-tour="fab-button"
+            className="absolute -top-7 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-4 ring-background"
+            aria-label="יצירת רישום פגישה חדש"
+          >
+            <Plus className="h-6 w-6" aria-hidden="true" />
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => onOpenSessionModal?.()}
-          data-tour="fab-button"
-          className="absolute -top-7 left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-4 ring-background"
-          aria-label="יצירת רישום פגישה חדש"
-        >
-          <Plus className="h-6 w-6" aria-hidden="true" />
-        </button>
+        {navItems.slice(2).map((item) => {
+          const Icon = item.icon
+
+          if (item.disabled) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                aria-label={item.label}
+                aria-disabled="true"
+                title={item.tooltip}
+                onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
+                className="flex cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
+            )
+          }
+
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              data-tour={item.tourKey}
+              aria-label={item.label}
+              className={({ isActive }) =>
+                cn(
+                  "flex flex-col items-center gap-1 text-xs font-medium",
+                  isActive ? "text-primary" : "text-neutral-500",
+                )
+              }
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              <span>{item.label}</span>
+            </NavLink>
+          )
+        })}
       </div>
     </nav>
   )
