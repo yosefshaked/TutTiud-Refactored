@@ -165,6 +165,11 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Onboarding Tour Card - Available to all users */}
+        <div className="w-full" dir="rtl">
+          <OnboardingCard />
+        </div>
+
         {/* Selector grid - only visible to admin/owner */}
         {canManageSessionForm && (
         <div className="grid w-full gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3" dir="rtl">
@@ -198,9 +203,6 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
-
-          {/* Onboarding Tour Card - Available to all users */}
-          <OnboardingCard />
 
           {/* Team Members Card */}
           <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
