@@ -45,6 +45,28 @@ export function OnboardingCard() {
           if (popover && options.state) {
             popover.setAttribute('data-current-step', options.state.activeIndex + 1);
             popover.setAttribute('data-total-steps', steps.length);
+            // Safety: ensure the Done button closes the tour when on the last step.
+            const nextBtn = popover.querySelector('.driver-popover-next-btn');
+            if (nextBtn) {
+              nextBtn._tuttiud_onclick = nextBtn._tuttiud_onclick || null;
+              if (nextBtn._tuttiud_onclick) {
+                try { nextBtn.removeEventListener('click', nextBtn._tuttiud_onclick); } catch {}
+                nextBtn._tuttiud_onclick = null;
+              }
+
+              const handler = () => {
+                try {
+                  if (options?.state && options.state.activeIndex === steps.length - 1) {
+                    try { driverInstance.destroy(); } catch { /* noop */ }
+                  }
+                } catch (err) {
+                  // swallow
+                }
+              };
+
+              nextBtn._tuttiud_onclick = handler;
+              nextBtn.addEventListener('click', handler);
+            }
           }
         },
         steps,
