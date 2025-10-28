@@ -8,7 +8,7 @@ Implement a comprehensive onboarding system to guide new users through the TutTi
 ### Phase 1: Welcome Tour ✅ (In Progress)
 **Goal**: Interactive step-by-step tour on first login
 
-**Library**: `react-joyride` - lightweight, customizable tour library
+**Library**: `driver.js` - framework-agnostic, works with React 19
 
 **Features**:
 - Role-aware tours (Admin/Owner vs Instructor/Member)
@@ -173,11 +173,10 @@ src/
 ## Dependencies to Install
 
 ```bash
-npm install react-joyride
+npm install driver.js
 ```
 
-Alternative lightweight options if needed:
-- `driver.js` - More customizable, no React dependency
+Alternative options if needed:
 - `intro.js` - Classic option, larger bundle
 - `shepherd.js` - Modern, accessible, medium size
 
