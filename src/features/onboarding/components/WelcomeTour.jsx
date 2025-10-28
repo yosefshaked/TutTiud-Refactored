@@ -28,15 +28,17 @@ export function WelcomeTour() {
         nextBtnText: 'הבא',
         prevBtnText: 'הקודם',
         doneBtnText: 'סיום',
-        closeBtnText: 'דלג',
+        closeBtnAriaLabel: 'דלג',
         animate: true,
+        steps,
         onDestroyStarted: () => {
           // Mark completed regardless of skip/finish to avoid nagging users
           markCompleted();
         },
       });
 
-      driverRef.current.highlight(steps);
+      // Start the multi-step tour
+      driverRef.current.drive();
     }, 500);
 
     return () => {

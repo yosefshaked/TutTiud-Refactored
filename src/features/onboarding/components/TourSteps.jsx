@@ -9,7 +9,7 @@ export const adminTourSteps = [
     popover: {
       title: 'ברוכים הבאים לתותיעוד! 👋',
       description: 'מערכת לניהול ותיעוד מפגשים עם תלמידים. בואו נעשה סיור קצר כדי להכיר את התכונות העיקריות.',
-      side: 'center',
+      side: 'over',
       align: 'center',
     },
   },
@@ -50,7 +50,7 @@ export const adminTourSteps = [
     popover: {
       title: 'מוכנים להתחיל! 🚀',
       description: 'זהו! אתם מוכנים להתחיל לתעד מפגשים. תמיד תוכלו לחזור למדריך דרך ההגדרות → "הצג מדריך שוב"',
-      side: 'center',
+      side: 'over',
       align: 'center',
     },
   },
@@ -62,7 +62,7 @@ export const memberTourSteps = [
     popover: {
       title: 'ברוכים הבאים לתותיעוד! 👋',
       description: 'מערכת לתיעוד ומעקב אחר המפגשים שלכם עם תלמידים. בואו נעשה סיור קצר כדי להכיר את המערכת.',
-      side: 'center',
+      side: 'over',
       align: 'center',
     },
   },
@@ -95,7 +95,7 @@ export const memberTourSteps = [
     popover: {
       title: 'מוכנים להתחיל! 🚀',
       description: 'זהו! אתם מוכנים להתחיל לתעד מפגשים עם התלמידים שלכם. תמיד תוכלו לחזור למדריך דרך ההגדרות → "הצג מדריך שוב"',
-      side: 'center',
+      side: 'over',
       align: 'center',
     },
   },
