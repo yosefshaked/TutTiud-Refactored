@@ -30,6 +30,34 @@ export function OnboardingCard() {
     setTimeout(() => {
   const steps = getTourSteps(isAdmin);
 
+  // Unified forced destroy (deferred + hard cleanup fallback) shared by all handlers
+  const forceDestroy = (reason) => {
+    // Defer to avoid racing internal driver handlers
+    setTimeout(() => {
+      if (finalizedRef.current) return;
+      try {
+        if (window.__TT_TOUR_DEBUG__) console.info('[tour:manual] forceDestroy:', reason);
+        driverInstance?.destroy();
+      } catch {}
+      // Fallback hard removal if DOM still present
+      setTimeout(() => {
+        if (finalizedRef.current) return;
+        const stillThere = document.querySelector('.driver-overlay') || document.querySelector('.driver-popover');
+        if (stillThere) {
+          try {
+            document.querySelectorAll('.driver-overlay,.driver-popover').forEach(n => n.remove());
+            document.querySelectorAll('.driver-active-element,.driver-highlighted-element')
+              .forEach((el) => {
+                el.classList.remove('driver-active-element','driver-highlighted-element');
+                el.style.removeProperty('z-index');
+                el.style.removeProperty('position');
+              });
+          } catch {}
+        }
+      }, 200);
+    }, 0);
+  };
+
   const driverInstance = driver({
         showProgress: true,
         progressText: '{{current}} מתוך {{total}}',
@@ -57,32 +85,7 @@ export function OnboardingCard() {
               bound.add(el);
             };
 
-            const forceDestroy = (reason) => {
-              // Defer to avoid racing internal driver handlers
-              setTimeout(() => {
-                if (finalizedRef.current) return;
-                try {
-                  if (window.__TT_TOUR_DEBUG__) console.info('[tour:manual] forceDestroy:', reason);
-                  driverInstance?.destroy();
-                } catch {}
-                // Fallback hard removal if DOM still present
-                setTimeout(() => {
-                  if (finalizedRef.current) return;
-                  const stillThere = document.querySelector('.driver-overlay') || document.querySelector('.driver-popover');
-                  if (stillThere) {
-                    try {
-                      document.querySelectorAll('.driver-overlay,.driver-popover').forEach(n => n.remove());
-                      document.querySelectorAll('.driver-active-element,.driver-highlighted-element')
-                        .forEach((el) => {
-                          el.classList.remove('driver-active-element','driver-highlighted-element');
-                          el.style.removeProperty('z-index');
-                          el.style.removeProperty('position');
-                        });
-                    } catch {}
-                  }
-                }, 200);
-              }, 0);
-            };
+            // use outer forceDestroy so document-level handlers can also access it
 
             const nextBtn = popover.querySelector('.driver-popover-next-btn');
             const doneBtn = popover.querySelector('.driver-popover-done-btn');
@@ -102,6 +105,7 @@ export function OnboardingCard() {
         },
         steps,
         onDestroyStarted: () => {
+          finalizedRef.current = true;
           setIsStarting(false);
           if (teardownRef.current.esc) {
             try { document.removeEventListener('keydown', teardownRef.current.esc); } catch {}

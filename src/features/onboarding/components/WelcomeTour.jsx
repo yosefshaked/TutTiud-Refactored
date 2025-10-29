@@ -114,6 +114,7 @@ export function WelcomeTour() {
         },
         steps,
         onDestroyStarted: () => {
+          finalizedRef.current = true;
           // Clean document listeners
           if (teardownRef.current.esc) {
             try { document.removeEventListener('keydown', teardownRef.current.esc); } catch {}
