@@ -21,8 +21,8 @@ import { useUserRole } from "@/features/onboarding/hooks/useUserRole.js"
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
 function buildNavItems(role) {
-  const normalizedRole = typeof role === "string" ? role.toLowerCase() : "member"
-  const isAdminRole = normalizedRole === "admin" || normalizedRole === "owner"
+  // role is already normalized (lowercase) from useUserRole
+  const isAdminRole = role === "admin" || role === "owner"
 
   const studentsDestination = isAdminRole ? "/admin/students" : "/my-students"
 
