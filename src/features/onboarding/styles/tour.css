@@ -174,13 +174,8 @@
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .tt-tour-popover {
-    max-width: calc(100vw - 24px) !important;
-    width: calc(100vw - 24px) !important;
-    left: 12px !important;
-    right: 12px !important;
-    bottom: 20px !important;
-    top: auto !important;
-    transform: none !important;
+    max-width: calc(100vw - 24px);
+    width: calc(100vw - 24px);
   }
 
   .tt-tour-card {
