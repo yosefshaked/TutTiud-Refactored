@@ -3,11 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Check, Loader2 } from 'lucide-react';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus.js';
-import { driver } from 'driver.js';
-import 'driver.js/dist/driver.css';
-import '../styles/tour.css';
 import { getTourSteps } from './TourSteps.jsx';
 import { useUserRole } from '../hooks/useUserRole.js';
+import { openTour } from '../customTour.js';
 
 /**
  * OnboardingCard - Settings card to manually activate the welcome tour
@@ -17,163 +15,18 @@ export function OnboardingCard() {
   const { completed, reset } = useOnboardingStatus();
   const { isAdmin } = useUserRole();
   const [isStarting, setIsStarting] = useState(false);
-  const teardownRef = React.useRef({ esc: null, overlay: null, doc: null, bound: new WeakSet() });
-  const finalizedRef = React.useRef(false);
-  const activeIndexRef = React.useRef(0);
-  const totalStepsRef = React.useRef(0);
 
   const handleStartTour = async () => {
     setIsStarting(true);
-    
-    // Reset the completion status
     await reset();
-    
-    // Small delay to ensure UI updates
+
+    // Small delay to ensure UI updates before measuring targets
     setTimeout(() => {
-  const steps = getTourSteps(isAdmin);
-
-  // Unified forced destroy (deferred + hard cleanup fallback) shared by all handlers
-  const forceDestroy = (reason) => {
-    // Defer to avoid racing internal driver handlers
-    setTimeout(() => {
-      if (finalizedRef.current) return;
-      try {
-        if (window.__TT_TOUR_DEBUG__) console.info('[tour:manual] forceDestroy:', reason);
-        driverInstance?.destroy();
-      } catch {}
-      // Fallback hard removal if DOM still present
-      setTimeout(() => {
-        if (finalizedRef.current) return;
-        const stillThere = document.querySelector('.driver-overlay') || document.querySelector('.driver-popover');
-        if (stillThere) {
-          try {
-            document.querySelectorAll('.driver-overlay,.driver-popover').forEach(n => n.remove());
-            document.querySelectorAll('.driver-active-element,.driver-highlighted-element')
-              .forEach((el) => {
-                el.classList.remove('driver-active-element','driver-highlighted-element');
-                el.style.removeProperty('z-index');
-                el.style.removeProperty('position');
-              });
-          } catch {}
-        }
-      }, 200);
-    }, 0);
-  };
-
-  const driverInstance = driver({
-        showProgress: true,
-        progressText: '{{current}} מתוך {{total}}',
-        allowClose: true,
-        nextBtnText: 'הבא',
-        prevBtnText: 'הקודם',
-        doneBtnText: 'סיום',
-        closeBtnAriaLabel: 'סגור',
-        animate: true,
-        smoothScroll: true,
-        popoverClass: 'driverjs-theme',
-        onHighlightStarted: (element, step, options) => {
-          // Add data attributes for progress gauge
-          const popover = document.querySelector('.driver-popover');
-          if (popover && options.state) {
-            const current = options.state.activeIndex + 1;
-            const total = steps.length;
-            popover.setAttribute('data-current-step', current);
-            popover.setAttribute('data-total-steps', total);
-            activeIndexRef.current = options.state.activeIndex;
-            totalStepsRef.current = total;
-            // Defensive bindings: close/done/next(last)
-            const bindClick = (el, fn) => {
-              if (!el) return;
-              const bound = teardownRef.current.bound;
-              if (bound.has(el)) return;
-              // capture phase to bypass any stopImmediatePropagation by the lib
-              el.addEventListener('click', fn, { capture: true });
-              bound.add(el);
-            };
-
-            // use outer forceDestroy so document-level handlers can also access it
-
-            const nextBtn = popover.querySelector('.driver-popover-next-btn');
-            const doneBtn = popover.querySelector('.driver-popover-done-btn');
-            const closeBtn = popover.querySelector('.driver-popover-close-btn');
-
-            bindClick(closeBtn, () => forceDestroy('close-btn'));
-            bindClick(doneBtn, () => forceDestroy('done-btn'));
-            if (nextBtn) {
-              bindClick(nextBtn, () => {
-                const curr = activeIndexRef.current + 1;
-                const total = totalStepsRef.current || steps.length;
-                if (curr >= total) forceDestroy('next-on-last');
-              });
-            }
-          }
-        },
-        steps,
-        onDestroyStarted: () => {
-          finalizedRef.current = true;
-          setIsStarting(false);
-          if (teardownRef.current.esc) {
-            try { document.removeEventListener('keydown', teardownRef.current.esc); } catch {}
-            teardownRef.current.esc = null;
-          }
-          if (teardownRef.current.overlay) {
-            try { document.querySelector('.driver-overlay')?.removeEventListener('click', teardownRef.current.overlay); } catch {}
-            teardownRef.current.overlay = null;
-          }
-          if (teardownRef.current.doc) {
-            try { document.removeEventListener('click', teardownRef.current.doc, true); } catch {}
-            teardownRef.current.doc = null;
-          }
-          teardownRef.current.bound = new WeakSet();
-        },
+      const steps = getTourSteps(isAdmin);
+      openTour(steps, {
+        // Manual launch should not mark onboarding completed; just stop the spinner
+        onClose: () => setIsStarting(false),
       });
-
-      // Document-level capture listener for Close/Done/Next(last)
-      const docClickCapture = (e) => {
-        const target = e.target;
-        if (!target) return;
-        const inPopover = target.closest?.('.driver-popover');
-        if (!inPopover) return;
-        const isClose = target.closest('.driver-popover-close-btn');
-        const isDone = target.closest('.driver-popover-done-btn');
-        const isNext = target.closest('.driver-popover-next-btn');
-        if (isClose || isDone) {
-          forceDestroy(isClose ? 'doc-close' : 'doc-done');
-          return;
-        }
-        if (isNext) {
-          const curr = activeIndexRef.current + 1;
-          const total = totalStepsRef.current || steps.length;
-          if (curr >= total) forceDestroy('doc-next-on-last');
-        }
-      };
-      document.addEventListener('click', docClickCapture, true);
-      teardownRef.current.doc = docClickCapture;
-
-      // ESC to close
-      const onEsc = (e) => {
-        if (e.key === 'Escape') {
-          try { driverInstance?.destroy(); } catch {}
-        }
-      };
-      document.addEventListener('keydown', onEsc);
-      teardownRef.current.esc = onEsc;
-
-      // Overlay click to close on last step only
-      const overlayHandler = () => {
-        const curr = activeIndexRef.current + 1;
-        const total = totalStepsRef.current || steps.length;
-        if (curr >= total) forceDestroy('overlay-last');
-      };
-      setTimeout(() => {
-        const overlay = document.querySelector('.driver-overlay');
-        if (overlay) {
-          overlay.addEventListener('click', overlayHandler, { passive: true });
-          teardownRef.current.overlay = overlayHandler;
-        }
-      }, 0);
-
-      driverInstance.drive();
     }, 300);
   };
 

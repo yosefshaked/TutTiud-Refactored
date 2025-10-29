@@ -15,6 +15,7 @@ import { SessionModalContext } from "@/features/sessions/context/SessionModalCon
 import useKeyboardAwareBottomOffset from "@/hooks/useKeyboardAwareBottomOffset.js"
 import OrgLogo from "@/components/layout/OrgLogo.jsx"
 import { WelcomeTour } from "@/features/onboarding/components/WelcomeTour.jsx"
+import CustomTourRenderer from "@/features/onboarding/components/CustomTourRenderer.jsx"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -353,7 +354,8 @@ export default function AppShell({ children }) {
           </div>
         </div>
         <MobileNavigation navItems={navItems} onOpenSessionModal={openSessionModal} />
-  <WelcomeTour />
+        <WelcomeTour />
+        <CustomTourRenderer />
 
         <ChangelogModal open={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
         <Toaster richColors position="top-right" closeButton />
