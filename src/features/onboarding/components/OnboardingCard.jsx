@@ -17,7 +17,7 @@ export function OnboardingCard() {
   const { completed, reset } = useOnboardingStatus();
   const { isAdmin } = useUserRole();
   const [isStarting, setIsStarting] = useState(false);
-  const teardownRef = React.useRef({ esc: null, overlay: null, bound: new WeakSet() });
+  const teardownRef = React.useRef({ esc: null, overlay: null, doc: null, bound: new WeakSet() });
 
   const handleStartTour = async () => {
     setIsStarting(true);
@@ -51,7 +51,8 @@ export function OnboardingCard() {
               if (!el) return;
               const bound = teardownRef.current.bound;
               if (bound.has(el)) return;
-              el.addEventListener('click', fn, { passive: true });
+              // capture phase to bypass any stopImmediatePropagation by the lib
+              el.addEventListener('click', fn, { capture: true });
               bound.add(el);
             };
 
@@ -89,9 +90,38 @@ export function OnboardingCard() {
             try { document.querySelector('.driver-overlay')?.removeEventListener('click', teardownRef.current.overlay); } catch {}
             teardownRef.current.overlay = null;
           }
+          if (teardownRef.current.doc) {
+            try { document.removeEventListener('click', teardownRef.current.doc, true); } catch {}
+            teardownRef.current.doc = null;
+          }
           teardownRef.current.bound = new WeakSet();
         },
       });
+
+      // Document-level capture listener for Close/Done/Next(last)
+      const docClickCapture = (e) => {
+        const target = e.target;
+        if (!target) return;
+        const inPopover = target.closest?.('.driver-popover');
+        if (!inPopover) return;
+        const isClose = target.closest('.driver-popover-close-btn');
+        const isDone = target.closest('.driver-popover-done-btn');
+        const isNext = target.closest('.driver-popover-next-btn');
+        if (isClose || isDone) {
+          try { driverInstance?.destroy(); } catch {}
+          return;
+        }
+        if (isNext) {
+          const pop = document.querySelector('.driver-popover');
+          const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
+          const curr = Number(pop?.getAttribute('data-current-step') || 1);
+          if (curr >= total) {
+            try { driverInstance?.destroy(); } catch {}
+          }
+        }
+      };
+      document.addEventListener('click', docClickCapture, true);
+      teardownRef.current.doc = docClickCapture;
 
       // ESC to close
       const onEsc = (e) => {

@@ -14,7 +14,7 @@ export function WelcomeTour() {
   const { isAdmin } = useUserRole();
   const { completed, loading, markCompleted } = useOnboardingStatus();
   const driverRef = useRef(null);
-  const teardownRef = useRef({ esc: null, overlay: null, bound: new WeakSet() });
+  const teardownRef = useRef({ esc: null, overlay: null, doc: null, bound: new WeakSet() });
 
   const steps = useMemo(() => getTourSteps(isAdmin), [isAdmin]);
 
@@ -57,7 +57,8 @@ export function WelcomeTour() {
               if (!el) return;
               const bound = teardownRef.current.bound;
               if (bound.has(el)) return;
-              el.addEventListener('click', fn, { passive: true });
+              // use capture so our handler runs even if the lib stops propagation
+              el.addEventListener('click', fn, { capture: true });
               bound.add(el);
             };
 
@@ -108,6 +109,33 @@ export function WelcomeTour() {
         },
       });
 
+      // Document-level capture listener as an additional safety net
+      const docClickCapture = (e) => {
+        const target = e.target;
+        if (!target) return;
+        const inPopover = target.closest?.('.driver-popover');
+        if (!inPopover) return;
+
+        const isClose = target.closest('.driver-popover-close-btn');
+        const isDone = target.closest('.driver-popover-done-btn');
+        const isNext = target.closest('.driver-popover-next-btn');
+
+        if (isClose || isDone) {
+          try { driverRef.current?.destroy(); } catch {}
+          return;
+        }
+        if (isNext) {
+          const pop = document.querySelector('.driver-popover');
+          const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
+          const curr = Number(pop?.getAttribute('data-current-step') || 1);
+          if (curr >= total) {
+            try { driverRef.current?.destroy(); } catch {}
+          }
+        }
+      };
+      document.addEventListener('click', docClickCapture, true);
+      teardownRef.current.doc = docClickCapture;
+
       // ESC to close
       const onEsc = (e) => {
         if (e.key === 'Escape') {
@@ -151,6 +179,14 @@ export function WelcomeTour() {
       if (teardownRef.current.overlay) {
         try { document.querySelector('.driver-overlay')?.removeEventListener('click', teardownRef.current.overlay); } catch {}
         teardownRef.current.overlay = null;
+      }
+          if (teardownRef.current.doc) {
+            try { document.removeEventListener('click', teardownRef.current.doc, true); } catch {}
+            teardownRef.current.doc = null;
+          }
+      if (teardownRef.current.doc) {
+        try { document.removeEventListener('click', teardownRef.current.doc, true); } catch {}
+        teardownRef.current.doc = null;
       }
       teardownRef.current.bound = new WeakSet();
     };
