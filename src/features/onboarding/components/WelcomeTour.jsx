@@ -15,6 +15,7 @@ export function WelcomeTour() {
   const { completed, loading, markCompleted } = useOnboardingStatus();
   const driverRef = useRef(null);
   const teardownRef = useRef({ esc: null, overlay: null, doc: null, bound: new WeakSet() });
+  const finalizedRef = useRef(false);
 
   const steps = useMemo(() => getTourSteps(isAdmin), [isAdmin]);
 
@@ -63,10 +64,30 @@ export function WelcomeTour() {
             };
 
             const forceDestroy = (reason) => {
-              try {
-                if (window.__TT_TOUR_DEBUG__) console.info('[tour] forceDestroy:', reason);
-                driverRef.current?.destroy();
-              } catch {}
+              // Defer to avoid racing internal driver click handlers
+              setTimeout(() => {
+                if (finalizedRef.current) return;
+                try {
+                  if (window.__TT_TOUR_DEBUG__) console.info('[tour] forceDestroy:', reason);
+                  driverRef.current?.destroy();
+                } catch {}
+                // Fallback: if popover/overlay still present after a short delay, hard-remove
+                setTimeout(() => {
+                  if (finalizedRef.current) return;
+                  const stillThere = document.querySelector('.driver-overlay') || document.querySelector('.driver-popover');
+                  if (stillThere) {
+                    try {
+                      document.querySelectorAll('.driver-overlay,.driver-popover').forEach(n => n.remove());
+                      document.querySelectorAll('.driver-active-element,.driver-highlighted-element')
+                        .forEach((el) => {
+                          el.classList.remove('driver-active-element','driver-highlighted-element');
+                          el.style.removeProperty('z-index');
+                          el.style.removeProperty('position');
+                        });
+                    } catch {}
+                  }
+                }, 200);
+              }, 0);
             };
 
             const isLast = options?.state?.activeIndex === steps.length - 1;
@@ -121,16 +142,14 @@ export function WelcomeTour() {
         const isNext = target.closest('.driver-popover-next-btn');
 
         if (isClose || isDone) {
-          try { driverRef.current?.destroy(); } catch {}
+          forceDestroy(isClose ? 'doc-close' : 'doc-done');
           return;
         }
         if (isNext) {
           const pop = document.querySelector('.driver-popover');
           const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
           const curr = Number(pop?.getAttribute('data-current-step') || 1);
-          if (curr >= total) {
-            try { driverRef.current?.destroy(); } catch {}
-          }
+          if (curr >= total) forceDestroy('doc-next-on-last');
         }
       };
       document.addEventListener('click', docClickCapture, true);
@@ -150,9 +169,7 @@ export function WelcomeTour() {
         const pop = document.querySelector('.driver-popover');
         const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
         const curr = Number(pop?.getAttribute('data-current-step') || 1);
-        if (curr >= total) {
-          try { driverRef.current?.destroy(); } catch {}
-        }
+        if (curr >= total) forceDestroy('overlay-last');
       };
       // Bind lazily after driver draws overlay
       setTimeout(() => {
@@ -189,6 +206,7 @@ export function WelcomeTour() {
         teardownRef.current.doc = null;
       }
       teardownRef.current.bound = new WeakSet();
+      finalizedRef.current = false;
     };
   }, [loading, completed, steps, markCompleted]);
 

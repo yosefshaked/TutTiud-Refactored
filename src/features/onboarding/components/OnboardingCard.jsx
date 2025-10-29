@@ -18,6 +18,7 @@ export function OnboardingCard() {
   const { isAdmin } = useUserRole();
   const [isStarting, setIsStarting] = useState(false);
   const teardownRef = React.useRef({ esc: null, overlay: null, doc: null, bound: new WeakSet() });
+  const finalizedRef = React.useRef(false);
 
   const handleStartTour = async () => {
     setIsStarting(true);
@@ -57,10 +58,30 @@ export function OnboardingCard() {
             };
 
             const forceDestroy = (reason) => {
-              try {
-                if (window.__TT_TOUR_DEBUG__) console.info('[tour:manual] forceDestroy:', reason);
-                driverInstance?.destroy();
-              } catch {}
+              // Defer to avoid racing internal driver handlers
+              setTimeout(() => {
+                if (finalizedRef.current) return;
+                try {
+                  if (window.__TT_TOUR_DEBUG__) console.info('[tour:manual] forceDestroy:', reason);
+                  driverInstance?.destroy();
+                } catch {}
+                // Fallback hard removal if DOM still present
+                setTimeout(() => {
+                  if (finalizedRef.current) return;
+                  const stillThere = document.querySelector('.driver-overlay') || document.querySelector('.driver-popover');
+                  if (stillThere) {
+                    try {
+                      document.querySelectorAll('.driver-overlay,.driver-popover').forEach(n => n.remove());
+                      document.querySelectorAll('.driver-active-element,.driver-highlighted-element')
+                        .forEach((el) => {
+                          el.classList.remove('driver-active-element','driver-highlighted-element');
+                          el.style.removeProperty('z-index');
+                          el.style.removeProperty('position');
+                        });
+                    } catch {}
+                  }
+                }, 200);
+              }, 0);
             };
 
             const nextBtn = popover.querySelector('.driver-popover-next-btn');
@@ -108,16 +129,14 @@ export function OnboardingCard() {
         const isDone = target.closest('.driver-popover-done-btn');
         const isNext = target.closest('.driver-popover-next-btn');
         if (isClose || isDone) {
-          try { driverInstance?.destroy(); } catch {}
+          forceDestroy(isClose ? 'doc-close' : 'doc-done');
           return;
         }
         if (isNext) {
           const pop = document.querySelector('.driver-popover');
           const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
           const curr = Number(pop?.getAttribute('data-current-step') || 1);
-          if (curr >= total) {
-            try { driverInstance?.destroy(); } catch {}
-          }
+          if (curr >= total) forceDestroy('doc-next-on-last');
         }
       };
       document.addEventListener('click', docClickCapture, true);
@@ -137,9 +156,7 @@ export function OnboardingCard() {
         const pop = document.querySelector('.driver-popover');
         const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
         const curr = Number(pop?.getAttribute('data-current-step') || 1);
-        if (curr >= total) {
-          try { driverInstance?.destroy(); } catch {}
-        }
+        if (curr >= total) forceDestroy('overlay-last');
       };
       setTimeout(() => {
         const overlay = document.querySelector('.driver-overlay');
