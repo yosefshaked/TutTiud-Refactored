@@ -75,7 +75,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
                 aria-disabled="true"
                 title={item.tooltip}
                 onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
-                className="flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
+                className="relative mobile-nav-item flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
               >
                   <Icon className="h-6 w-6" aria-hidden="true" />
                 <span>{item.label}</span>
@@ -92,7 +92,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               aria-label={item.label}
                 className={({ isActive }) =>
                 cn(
-                  "flex flex-col items-center gap-1 h-12 text-sm font-medium",
+                  "relative mobile-nav-item flex flex-col items-center gap-1 h-12 text-sm font-medium",
                   isActive ? "text-primary" : "text-neutral-500",
                 )
               }
@@ -109,7 +109,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
             type="button"
             onClick={() => onOpenSessionModal?.()}
             data-tour="fab-button"
-            className="absolute -top-7 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-4 ring-background"
+            className="absolute -top-6 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-2 ring-background"
             aria-label="יצירת רישום פגישה חדש"
           >
             <Plus className="h-6 w-6" aria-hidden="true" />
@@ -128,7 +128,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
                 aria-disabled="true"
                 title={item.tooltip}
                 onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
-                className="flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
+                className="relative mobile-nav-item flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
               >
                   <Icon className="h-6 w-6" aria-hidden="true" />
                 <span>{item.label}</span>
@@ -145,7 +145,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               aria-label={item.label}
                 className={({ isActive }) =>
                 cn(
-                  "flex flex-col items-center gap-1 h-12 text-sm font-medium",
+                  "relative mobile-nav-item flex flex-col items-center gap-1 h-12 text-sm font-medium",
                   isActive ? "text-primary" : "text-neutral-500",
                 )
               }

@@ -85,3 +85,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile nav invisible hit-area — expands touch target without visual change */
+@layer components {
+  .mobile-nav-item {
+    position: relative;
+  }
+
+  @media (max-width: 768px) {
+    .mobile-nav-item::before {
+      content: '';
+      position: absolute;
+      inset: -6px; /* expands tappable area by 12px in both dimensions */
+      pointer-events: auto; /* ensures the hit area receives taps */
+      /* invisible - no visual impact */
+      background: transparent;
+    }
+  }
+}
