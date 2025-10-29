@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { subscribe, getState, nextStep, prevStep, closeTour } from '../customTour.js';
+import '../styles/tour.css';
 
 function getElementFromStep(step) {
   if (!step) return null;
@@ -37,11 +38,27 @@ export default function CustomTourRenderer() {
       return;
     }
     const { rect } = res;
-    // Simple placement: prefer top, else bottom
-    const pop = popRef.current;
     const viewportH = window.innerHeight;
-    const preferTop = rect.top > viewportH / 2;
-    const placement = preferTop ? 'top' : 'bottom';
+    const viewportW = window.innerWidth;
+    
+    // Calculate available space and choose best placement
+    const spaceTop = rect.top;
+    const spaceBottom = viewportH - rect.bottom;
+    const spaceLeft = rect.left;
+    const spaceRight = viewportW - rect.right;
+    
+    // Prefer placement with most space
+    let placement = 'bottom';
+    if (spaceTop > spaceBottom && spaceTop > 200) {
+      placement = 'top';
+    } else if (spaceBottom > 200) {
+      placement = 'bottom';
+    } else if (spaceRight > 400) {
+      placement = 'right';
+    } else if (spaceLeft > 400) {
+      placement = 'left';
+    }
+    
     setLayout({ rect, placement });
   }, [tour.isOpen, tour.stepIndex]);
 
@@ -83,6 +100,50 @@ export default function CustomTourRenderer() {
     if (current >= total) closeTour('overlay');
   };
 
+  // Calculate popover position based on placement
+  let popoverStyle = {
+    position: 'fixed',
+    zIndex: 10001,
+  };
+
+  if (!r) {
+    // Center when no target
+    popoverStyle.top = '50%';
+    popoverStyle.left = '50%';
+    popoverStyle.transform = 'translate(-50%, -50%)';
+  } else {
+    const margin = 16;
+    const popoverWidth = 420;
+    const popoverHeight = 280;
+
+    switch (layout.placement) {
+      case 'top':
+        popoverStyle.top = `${Math.max(margin, r.top - popoverHeight - margin)}px`;
+        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
+        popoverStyle.transform = 'translateX(-50%)';
+        break;
+      case 'bottom':
+        popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
+        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
+        popoverStyle.transform = 'translateX(-50%)';
+        break;
+      case 'left':
+        popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
+        popoverStyle.left = `${Math.max(margin, r.left - popoverWidth - margin)}px`;
+        popoverStyle.transform = 'translateY(-50%)';
+        break;
+      case 'right':
+        popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
+        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, r.right + margin)}px`;
+        popoverStyle.transform = 'translateY(-50%)';
+        break;
+      default:
+        popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
+        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
+        popoverStyle.transform = 'translateX(-50%)';
+    }
+  }
+
   const Popover = (
     <div
       ref={popRef}
@@ -90,13 +151,7 @@ export default function CustomTourRenderer() {
       role="dialog"
       aria-modal="true"
       dir="rtl"
-      style={{
-        position: 'fixed',
-        zIndex: 10001,
-        top: r ? (layout.placement === 'top' ? Math.max(12, r.top - 140) : Math.min(window.innerHeight - 160, r.bottom + 12)) : '50%',
-        left: r ? Math.min(window.innerWidth - 12, Math.max(12, r.left + r.width / 2)) : '50%',
-        transform: r ? 'translateX(-50%)' : 'translate(-50%, -50%)',
-      }}
+      style={popoverStyle}
     >
       <div className="tt-tour-card">
         <button className="tt-tour-close" aria-label="סגור" onClick={() => closeTour('close')}>×</button>
