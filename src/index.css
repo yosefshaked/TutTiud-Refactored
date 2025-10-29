@@ -84,6 +84,7 @@
   body {
     @apply bg-background text-foreground;
   }
+  html { font-size: calc(16px * var(--a11y-font-scale, 1)); }
 }
 
 /* Mobile nav invisible hit-area — expands touch target without visual change */
@@ -102,4 +103,34 @@
       background: transparent;
     }
   }
+}
+
+/* High-contrast accessibility mode overrides */
+@layer base {
+  .a11y-hc {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 220 100% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 15%;
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 84% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 70%;
+    --input: 0 0% 70%;
+    --ring: 220 100% 30%;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 }

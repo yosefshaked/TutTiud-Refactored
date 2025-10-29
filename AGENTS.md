@@ -145,5 +145,15 @@
 - Our Select/Popover primitives use classes like `bg-popover` and `text-popover-foreground`. Ensure Tailwind maps these tokens to CSS variables. We extended `tailwind.config.js` colors to include `popover`, `popover-foreground`, `muted`, `accent`, `secondary`, `destructive`, and `card` using `hsl(var(--token))` so dropdown lists render with a visible background.
 - CSS variables are defined in `src/index.css` under `:root` and `.dark`. If adding new shadcn tokens, update both `index.css` and `tailwind.config.js` accordingly.
 
+### Accessibility Controls (2025-10)
+- In-app Accessibility menu adds persistent controls for:
+  - Font scale (90%–140%) via `--a11y-font-scale` (applied on `html`).
+  - High-contrast theme toggle (adds `a11y-hc` class on `html`).
+  - Text spacing toggle (adds `a11y-text-spacing` class; increases letter/word spacing and line-height).
+  - Underline links toggle (adds `a11y-underline-links` class; underlines all anchors with offset + thickness).
+  - Dyslexia-friendly font toggle (adds `a11y-dyslexia-font` class; uses `'OpenDyslexic', 'Atkinson Hyperlegible', Nunito, system-ui` stack; bundle a font file later if needed).
+- Styles are injected once at runtime by `AccessibilityProvider` (style tag `#a11y-dynamic-styles`) to avoid global CSS churn. If we later prefer static CSS, move the rules into `src/index.css` under `@layer base` and remove the injector.
+- Persistence uses localStorage keys `a11y:*`. The provider exposes `useAccessibility()` for UI wiring.
+
 ## Future Implementation: Organization Switching
 - The legacy AppShell sub-header (removed in the cleanup that consolidated the global header) previously hosted the organization-switching dropdown. When it rendered, it embedded the logic now housed in `src/org/OrgSwitcher.jsx` (see the git history for the pre-removal `AppShell.jsx` block) to list orgs, handle focus, and persist selection. When reintroducing org switching into the refreshed header, reuse that approach instead of recreating it from scratch.

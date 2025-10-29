@@ -17,6 +17,9 @@ import OrgLogo from "@/components/layout/OrgLogo.jsx"
 import { WelcomeTour } from "@/features/onboarding/components/WelcomeTour.jsx"
 import CustomTourRenderer from "@/features/onboarding/components/CustomTourRenderer.jsx"
 import { useUserRole } from "@/features/onboarding/hooks/useUserRole.js"
+import { AccessibilityProvider } from "@/features/accessibility/AccessibilityProvider.jsx"
+import AccessibilityButton from "@/features/accessibility/AccessibilityButton.jsx"
+import SkipLink from "@/features/accessibility/SkipLink.jsx"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -328,7 +331,9 @@ export default function AppShell({ children }) {
 
   return (
     <SessionModalContext.Provider value={sessionModalContextValue}>
+      <AccessibilityProvider>
       <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden" dir="rtl">
+        <SkipLink />
         <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
         <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
@@ -345,6 +350,7 @@ export default function AppShell({ children }) {
                 </button>
               </div>
               <div className="flex items-center gap-xs">
+                <AccessibilityButton />
                 <button
                   type="button"
                   onClick={() => setIsChangelogOpen(true)}
@@ -368,7 +374,7 @@ export default function AppShell({ children }) {
           <OrgSelectionBanner />
           <OrgConfigBanner />
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <main id="main-content" role="main" className="flex-1 overflow-y-auto overflow-x-hidden">
             <PageLayout
               fullHeight={false}
               className="min-h-full pb-0"
@@ -377,7 +383,7 @@ export default function AppShell({ children }) {
             >
               {content}
             </PageLayout>
-          </div>
+          </main>
         </div>
         <MobileNavigation navItems={navItems} onOpenSessionModal={openSessionModal} />
         <WelcomeTour />
@@ -392,6 +398,7 @@ export default function AppShell({ children }) {
           onCreated={sessionModalState.onCreated}
         />
       </div>
+      </AccessibilityProvider>
     </SessionModalContext.Provider>
   )
 }
