@@ -77,14 +77,20 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     setQuestionError('');
 
     try {
-      const searchParams = new URLSearchParams({ keys: 'session_form_config' });
+      const searchParams = new URLSearchParams({ keys: 'session_form_config', include_metadata: '1' });
       if (activeOrgId) {
         searchParams.set('org_id', activeOrgId);
       }
       const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
-      const settingsValue = payload?.settings?.session_form_config ?? null;
+      const entry = payload?.settings?.session_form_config ?? null;
+      const settingsValue = entry && typeof entry === 'object' && Object.prototype.hasOwnProperty.call(entry, 'value') ? entry.value : entry;
       const normalized = ensureSessionFormFallback(parseSessionFormConfig(settingsValue));
+      const metadata = entry && typeof entry === 'object' && Object.prototype.hasOwnProperty.call(entry, 'metadata') ? entry.metadata : null;
+      const preanswers = metadata && typeof metadata === 'object' && metadata.preconfigured_answers && typeof metadata.preconfigured_answers === 'object'
+        ? metadata.preconfigured_answers
+        : {};
       setQuestions(normalized);
+      setSuggestions(preanswers);
       setQuestionsState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to load session form configuration', error);
@@ -108,6 +114,8 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     }
   }, [open, canFetchStudents, activeOrgId]);
 
+  const [suggestions, setSuggestions] = useState({});
+
   useEffect(() => {
     if (open) {
       void loadStudents();
@@ -120,6 +128,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setQuestionsState(REQUEST_STATE.idle);
       setQuestionError('');
       setQuestions([]);
+      setSuggestions({});
       setServices([]);
     }
   }, [open, loadQuestions, loadStudents, loadServices]);
@@ -191,6 +200,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
           <NewSessionForm
             students={students}
             questions={questions}
+            suggestions={suggestions}
             services={services}
             initialStudentId={initialStudentId}
             onSubmit={handleSubmit}

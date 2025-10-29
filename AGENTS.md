@@ -44,6 +44,7 @@
   - Available permissions: `backup_local_enabled`, `backup_cooldown_override`, `backup_oauth_enabled`, `logo_enabled`.
   - Shared utilities: `api/_shared/permissions-utils.js` provides `ensureOrgPermissions()`, `getDefaultPermissions()`, `getPermissionRegistry()`.
   - API endpoint: `GET /api/permissions-registry` returns permission metadata (optionally filtered by category) or defaults-only JSON.
+  - New (2025-10): `session_form_preanswers_enabled` (boolean) and `session_form_preanswers_cap` (number, default 50) control the preconfigured answers feature and per-question cap. The registry now stores `default_value` as JSONB to support non-boolean defaults.
 - Frontend: Backup card in Settings page shows grayed-out state when `backup_local_enabled = false` with message "גיבוי אינו זמין. נא לפנות לתמיכה על מנת לבחון הפעלת הפונקציה". Uses `initialize_org_permissions` RPC on load to ensure permissions exist.
  - Frontend: Backup card now consumes `GET /api/backup-status` to determine `enabled`, cooldown, and one-time override; the card is disabled with the above message when `enabled=false`, and shows a cooldown banner with an "override available" badge when applicable.
 - OAuth backup destinations (Google Drive, OneDrive, Dropbox) planned but not yet implemented; permission flags reserved.
@@ -99,7 +100,7 @@
 - Invitation completion emails land on `/#/complete-registration` with `token_hash` (Supabase invite) and `invitation_token` (control-plane token). The page must call `supabase.auth.verifyOtp({ type: 'invite', token_hash })`, ask for a password, then redirect to `/#/accept-invite` while forwarding the original `invitation_token`.
 - The `/components/pages/AcceptInvitePage.jsx` route handles token lookups, renders login/registration CTAs when no session exists, blocks mismatched accounts until they sign out, and wires accept/decline buttons to the secure `/api/invitations/:id/(accept|decline)` endpoints before sending accepted users to the Dashboard.
 - TutTiud rebranding placeholder assets live in `public/icon.svg`, `public/icon.ico`, and `public/vite.svg` until final design delivery.
-- `tuttiud.setup_assistant_diagnostics()` now validates schema, RLS, policies, and indexes. Keep `SETUP_SQL_SCRIPT` (v2.3) as the source of truth when extending onboarding checks.
+- `tuttiud.setup_assistant_diagnostics()` now validates schema, RLS, policies, and indexes. Keep `SETUP_SQL_SCRIPT` (v2.4) as the source of truth when extending onboarding checks.
 - Shared BFF utilities for tenant access (`api/_shared/org-bff.js`) centralize org membership, encryption, and tenant client creation. Reuse them when building new `/api/*` handlers.
 - Admin UI is migrating to feature slices. Place admin-only components under `src/features/admin/components/` and mount full pages from `src/features/admin/pages/`. Reusable primitives still belong in `src/components/ui`.
 - The refreshed design system lives in `tailwind.config.js` (Nunito typography, primary/neutral/status palettes, spacing tokens) with base primitives in `src/components/ui/{Button,Card,Input,PageLayout}.jsx`. Prefer these when creating new mobile-first UI.
@@ -131,6 +132,23 @@
 	- Services: `src/features/services/api/index.js`
 	- Settings: `src/features/settings/api/{settings.js,index.js}` (server API + client helpers)
 	Legacy files under `src/api/` now re-export from the new paths to ease migration. Prefer importing from the feature locations going forward.
+
+### Session Form Question Types (2025-10)
+- Session form questions are managed via `SessionFormManager.jsx` (Settings page) and rendered in `NewSessionForm.jsx`.
+- Question type definitions in `QUESTION_TYPE_OPTIONS`:
+  - `textarea` - Multi-line text input
+  - `text` - Single-line text input
+  - `number` - Numeric input
+  - `date` - Date picker
+  - `select` - Dropdown menu
+  - `radio` - Traditional radio buttons with visible circular inputs (vertical stack)
+  - `buttons` - Modern button-style selection with hidden radio inputs (horizontal flex wrap, full button is clickable with primary color fill when selected)
+  - `scale` - Numeric range slider with min/max/step configuration
+- Visual distinction between `radio` and `buttons`:
+  - **`radio`**: Displays as a vertical list with visible radio button circles; uses subtle hover and border highlight when selected
+  - **`buttons`**: Displays as horizontally wrapped button group; radio input is hidden (`sr-only`); selected button gets primary background with white text and shadow; unselected buttons have neutral border with hover effects
+- Both types use the same data structure (options array) and validation rules (minimum 2 options required).
+- **Metadata support**: The `Settings` table includes a `metadata` jsonb column for storing auxiliary configuration. For `session_form_config`, this holds preconfigured answer lists for `text`/`textarea` questions under `metadata.preconfigured_answers[question_id]`. The cap is enforced server-side using control DB permissions and respected in the editor UI.
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.

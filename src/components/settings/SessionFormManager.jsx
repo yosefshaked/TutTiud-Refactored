@@ -10,6 +10,8 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Sa
 import { toast } from 'sonner';
 import { fetchSessionFormConfig } from '@/features/settings/api/index.js';
 import { upsertSetting } from '@/features/settings/api/settings.js';
+import { useSupabase } from '@/context/SupabaseContext.jsx';
+import { useOrg } from '@/org/OrgContext.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -409,6 +411,11 @@ export default function SessionFormManager({
   const [validationErrors, setValidationErrors] = useState([]);
   const lastSavedSignatureRef = useRef('[]');
   const lastSavedPayloadRef = useRef([]);
+  const [preanswersMap, setPreanswersMap] = useState({}); // { [questionId]: string[] }
+  const lastSavedPreanswersRef = useRef({});
+  const { authClient } = useSupabase();
+  const { activeOrgId } = useOrg();
+  const [cap, setCap] = useState(50);
 
   const canLoad = Boolean(session && orgId && activeOrgHasConnection && tenantClientReady);
 
@@ -421,7 +428,7 @@ export default function SessionFormManager({
   const isSaving = saveState === SAVE_STATE.saving;
   const isLoading = loadState === REQUEST_STATE.loading;
 
-  const applyLoadedQuestions = useCallback((rawValue) => {
+  const applyLoadedQuestions = useCallback((rawValue, metadata = null) => {
     const rawQuestions = extractRawQuestions(rawValue);
     const normalized = deserializeQuestions(rawQuestions);
     setQuestions(normalized);
@@ -432,6 +439,12 @@ export default function SessionFormManager({
     const payload = buildPayloadFromQuestions(normalized);
     lastSavedPayloadRef.current = payload;
     lastSavedSignatureRef.current = JSON.stringify(payload);
+    // load preconfigured answers from metadata
+    const incomingMap = metadata && typeof metadata === 'object' && metadata.preconfigured_answers && typeof metadata.preconfigured_answers === 'object'
+      ? metadata.preconfigured_answers
+      : {};
+    setPreanswersMap(incomingMap);
+    lastSavedPreanswersRef.current = incomingMap;
   }, []);
 
   const loadQuestions = useCallback(async () => {
@@ -444,8 +457,8 @@ export default function SessionFormManager({
     setLoadState(REQUEST_STATE.loading);
     setLoadError('');
     try {
-      const { value } = await fetchSessionFormConfig({ session, orgId });
-      applyLoadedQuestions(value);
+      const { value, metadata } = await fetchSessionFormConfig({ session, orgId });
+      applyLoadedQuestions(value, metadata);
       setValidationErrors([]);
       setSaveError('');
       setLoadState(REQUEST_STATE.idle);
@@ -458,6 +471,28 @@ export default function SessionFormManager({
       setLoadError(error?.message || 'טעינת שאלות המפגש נכשלה.');
     }
   }, [applyLoadedQuestions, canLoad, orgId, session]);
+
+  // Load cap from control DB org permissions (fallback 50)
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!authClient || !activeOrgId) return;
+        const { data: orgSettings, error } = await authClient
+          .from('org_settings')
+          .select('permissions')
+          .eq('org_id', activeOrgId)
+          .single();
+        if (error) return;
+        const perms = orgSettings?.permissions || {};
+        const capRaw = perms.session_form_preanswers_cap;
+        const parsed = Number.parseInt(String(capRaw ?? '50'), 10);
+        setCap(Number.isFinite(parsed) && parsed > 0 ? parsed : 50);
+      } catch {
+        setCap(50);
+      }
+    };
+    run();
+  }, [authClient, activeOrgId]);
 
   useEffect(() => {
     if (!canLoad) {
@@ -506,6 +541,34 @@ export default function SessionFormManager({
       }
       return nextQuestion;
     }));
+  };
+
+  const handleAddPreanswer = (questionId) => {
+    setPreanswersMap((prev) => {
+      const current = Array.isArray(prev[questionId]) ? prev[questionId] : [];
+      if (current.length >= cap) {
+        toast.error(`לא ניתן להוסיף יותר מ-${cap} תשובות מוכנות לשאלה זו.`);
+        return prev;
+      }
+      return { ...prev, [questionId]: [...current, ''] };
+    });
+  };
+
+  const handlePreanswerChange = (questionId, index, value) => {
+    setPreanswersMap((prev) => {
+      const current = Array.isArray(prev[questionId]) ? [...prev[questionId]] : [];
+      if (!current[index] && value.trim() === '') return prev;
+      current[index] = value;
+      return { ...prev, [questionId]: current };
+    });
+  };
+
+  const handleRemovePreanswer = (questionId, index) => {
+    setPreanswersMap((prev) => {
+      const current = Array.isArray(prev[questionId]) ? [...prev[questionId]] : [];
+      current.splice(index, 1);
+      return { ...prev, [questionId]: current };
+    });
   };
 
   const toggleExpanded = (id) => {
@@ -584,6 +647,7 @@ export default function SessionFormManager({
     const payload = lastSavedPayloadRef.current;
     const normalized = deserializeQuestions(payload);
     setQuestions(normalized);
+    setPreanswersMap(lastSavedPreanswersRef.current || {});
   };
 
   const handleSave = async () => {
@@ -593,6 +657,15 @@ export default function SessionFormManager({
     }
     setSaveError('');
     const errors = validateQuestions(questions);
+    // Validate preanswers cap
+    for (const q of questions) {
+      if (q.type === 'text' || q.type === 'textarea') {
+        const list = Array.isArray(preanswersMap[q.id]) ? preanswersMap[q.id] : [];
+        if (list.length > cap) {
+          errors.push(`לשאלה "${q.label}" יש יותר מ-${cap} תשובות מוכנות. נא להסיר חלק מהן.`);
+        }
+      }
+    }
     setValidationErrors(errors);
     if (errors.length) {
       toast.error('נא להשלים את הערכים החסרים לפני שמירה.');
@@ -601,14 +674,35 @@ export default function SessionFormManager({
     setSaveState(SAVE_STATE.saving);
     try {
       const payload = buildPayloadFromQuestions(questions);
+      // Build metadata: only include text/textarea preanswers, trim/unique up to cap
+      const preconfigured = {};
+      for (const q of questions) {
+        if (q.type !== 'text' && q.type !== 'textarea') continue;
+        const list = Array.isArray(preanswersMap[q.id]) ? preanswersMap[q.id] : [];
+        const unique = [];
+        const seen = new Set();
+        for (const raw of list) {
+          if (typeof raw !== 'string') continue;
+          const t = raw.trim();
+          if (!t || seen.has(t)) continue;
+          seen.add(t);
+          unique.push(t);
+          if (unique.length >= cap) break;
+        }
+        if (unique.length) {
+          preconfigured[q.id] = unique;
+        }
+      }
+
       await upsertSetting({
         session,
         orgId,
         key: 'session_form_config',
-        value: payload,
+        value: { value: payload, metadata: { preconfigured_answers: preconfigured } },
       });
       lastSavedPayloadRef.current = payload;
       lastSavedSignatureRef.current = JSON.stringify(payload);
+      lastSavedPreanswersRef.current = preanswersMap;
       setSaveState(SAVE_STATE.idle);
       toast.success('שאלות המפגש נשמרו בהצלחה.');
     } catch (error) {
@@ -801,6 +895,42 @@ export default function SessionFormManager({
                             <Label htmlFor={`question-required-${question.id}`} className="text-sm">שדה חובה</Label>
                           </div>
                         ) : null}
+
+                          {(question.type === 'text' || question.type === 'textarea') ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold text-slate-800">תשובות מוכנות (עד {cap})</h4>
+                                <Button type="button" variant="outline" size="sm" onClick={() => handleAddPreanswer(question.id)} className="gap-2">
+                                  <Plus className="h-4 w-4" aria-hidden="true" /> הוסף תשובה
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {(Array.isArray(preanswersMap[question.id]) ? preanswersMap[question.id] : []).map((ans, idx) => (
+                                  <div key={`${question.id}-pa-${idx}`} className="grid w-full gap-2 sm:grid-cols-[1fr,auto] sm:items-center">
+                                    <Input
+                                      value={ans}
+                                      onChange={(e) => handlePreanswerChange(question.id, idx, e.target.value)}
+                                      placeholder="תשובה מוכנה"
+                                      className="text-sm"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleRemovePreanswer(question.id, idx)}
+                                      className="text-red-600 hover:bg-red-50"
+                                      aria-label="מחק תשובה"
+                                    >
+                                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                {(!Array.isArray(preanswersMap[question.id]) || preanswersMap[question.id].length === 0) ? (
+                                  <p className="text-xs text-slate-500">לא הוגדרו תשובות מוכנות לשאלה זו.</p>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
 
                         {requiresOptions ? (
                           <div className="space-y-3">

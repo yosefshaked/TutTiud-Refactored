@@ -67,6 +67,31 @@ export async function fetchSettingsValue({ session, orgId, signal, key } = {}) {
   return { exists: false, value: null };
 }
 
+export async function fetchSettingsValueWithMeta({ session, orgId, signal, key } = {}) {
+  if (!key) {
+    throw new Error('נדרש מפתח הגדרה לקריאה.');
+  }
+
+  const validatedSession = ensureSession(session);
+  const normalizedOrgId = normalizeOrgId(orgId);
+  if (!normalizedOrgId) {
+    throw new Error('יש לבחור ארגון פעיל לפני ביצוע הפעולה.');
+  }
+
+  const options = { session: validatedSession, method: 'GET', signal };
+  const search = `?org_id=${encodeURIComponent(normalizedOrgId)}&keys=${encodeURIComponent(key)}&include_metadata=1`;
+  const response = await authenticatedFetch(`settings${search}`, options);
+  const entry = response?.settings?.[key];
+  if (!entry) {
+    return { exists: false, value: null, metadata: null };
+  }
+  if (entry && typeof entry === 'object' && Object.prototype.hasOwnProperty.call(entry, 'value')) {
+    return { exists: true, value: entry.value, metadata: entry.metadata ?? null };
+  }
+  // Fallback if server didn't include metadata
+  return { exists: true, value: entry, metadata: null };
+}
+
 export async function upsertSettings({ session, orgId, settings, signal } = {}) {
   const payload = ensureSettingsObject(settings);
   return requestSettings('POST', {

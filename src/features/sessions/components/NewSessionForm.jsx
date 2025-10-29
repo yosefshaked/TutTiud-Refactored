@@ -16,6 +16,7 @@ function todayIsoDate() {
 export default function NewSessionForm({
   students = [],
   questions = [],
+  suggestions = {},
   services = [],
   initialStudentId = '',
   onSubmit,
@@ -324,11 +325,28 @@ export default function NewSessionForm({
                       placeholder={placeholder}
                       required={required}
                     />
+                    {Array.isArray(suggestions?.[question.key]) && suggestions[question.key].length > 0 ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {suggestions[question.key].map((sugg) => (
+                          <button
+                            key={`${question.key}-sugg-${sugg}`}
+                            type="button"
+                            className="rounded-full border px-2 py-0.5 text-xs hover:bg-neutral-50"
+                            onClick={() => updateAnswer(question.key, sugg)}
+                            disabled={isSubmitting}
+                            title="הכנס תשובה מוכנה"
+                          >
+                            {sugg}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 );
               }
 
               if (question.type === 'text') {
+                const datalistId = `${questionId}-datalist`;
                 return (
                   <div key={question.key} className="space-y-xs">
                     <Label htmlFor={questionId}>
@@ -337,12 +355,20 @@ export default function NewSessionForm({
                     </Label>
                     <Input
                       id={questionId}
+                      list={Array.isArray(suggestions?.[question.key]) && suggestions[question.key].length ? datalistId : undefined}
                       value={answerValue ?? ''}
                       onChange={handleAnswerChange(question.key)}
                       disabled={isSubmitting}
                       placeholder={placeholder}
                       required={required}
                     />
+                    {Array.isArray(suggestions?.[question.key]) && suggestions[question.key].length ? (
+                      <datalist id={datalistId}>
+                        {suggestions[question.key].map((sugg) => (
+                          <option key={`${question.key}-sugg-${sugg}`} value={sugg} />
+                        ))}
+                      </datalist>
+                    ) : null}
                   </div>
                 );
               }
@@ -418,26 +444,43 @@ export default function NewSessionForm({
               }
 
               if (question.type === 'radio' || question.type === 'buttons') {
+                const isButtonStyle = question.type === 'buttons';
                 return (
                   <div key={question.key} className="space-y-xs">
                     <Label>
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <div className="space-y-2" role="radiogroup" aria-required={required}>
+                    <div 
+                      className={cn(
+                        'gap-2',
+                        isButtonStyle ? 'flex flex-wrap' : 'space-y-2'
+                      )} 
+                      role="radiogroup" 
+                      aria-required={required}
+                    >
                       {questionOptions.length === 0 ? (
                         <p className="text-xs text-neutral-500">אין אפשרויות זמינות לשאלה זו.</p>
                       ) : null}
                       {questionOptions.map((option, optionIndex) => {
                         const checked = answerValue === option.value;
                         const labelClass = cn(
-                          'flex items-center gap-xs rounded-lg border px-sm py-xs text-sm transition-colors',
-                          question.type === 'buttons'
-                            ? 'cursor-pointer'
-                            : 'cursor-pointer',
-                          checked
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border bg-white text-foreground'
+                          'flex items-center gap-xs text-sm transition-all',
+                          isButtonStyle
+                            ? cn(
+                                // Button style: hide radio, make whole area clickable
+                                'cursor-pointer rounded-lg border-2 px-md py-sm font-medium shadow-sm hover:shadow-md',
+                                checked
+                                  ? 'border-primary bg-primary text-white shadow-md'
+                                  : 'border-neutral-300 bg-white text-foreground hover:border-primary/50 hover:bg-primary/5'
+                              )
+                            : cn(
+                                // Traditional radio style: visible radio button
+                                'cursor-pointer rounded-lg border px-sm py-xs',
+                                checked
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border bg-white text-foreground hover:bg-neutral-50'
+                              )
                         );
                         return (
                           <label key={option.value} className={labelClass}>
@@ -449,7 +492,10 @@ export default function NewSessionForm({
                               onChange={() => updateAnswer(question.key, option.value)}
                               required={required && optionIndex === 0}
                               disabled={isSubmitting}
-                              className="h-4 w-4"
+                              className={cn(
+                                'h-4 w-4',
+                                isButtonStyle && 'sr-only' // Hide radio button for button style
+                              )}
                             />
                             <span>{option.label}</span>
                           </label>

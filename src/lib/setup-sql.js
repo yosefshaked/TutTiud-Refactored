@@ -1,5 +1,5 @@
 export const SETUP_SQL_SCRIPT = `-- -- -- =================================================================
--- Tuttiud Platform Setup Script V2.3 (Idempotent RLS + Diagnostics)
+-- Tuttiud Platform Setup Script V2.4 (Settings metadata column)
 -- =================================================================
 
 -- Part 1: Extensions and Schema Creation (No Changes)
@@ -148,8 +148,11 @@ $$;
 CREATE TABLE IF NOT EXISTS tuttiud."Settings" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "key" text NOT NULL UNIQUE,
-  "settings_value" jsonb NOT NULL
+  "settings_value" jsonb NOT NULL,
+  "metadata" jsonb
 );
+ALTER TABLE tuttiud."Settings"
+  ADD COLUMN IF NOT EXISTS "metadata" jsonb;
 CREATE INDEX IF NOT EXISTS "SessionRecords_student_date_idx" ON tuttiud."SessionRecords" ("student_id", "date");
 CREATE INDEX IF NOT EXISTS "SessionRecords_instructor_idx" ON tuttiud."SessionRecords" ("instructor_id");
 
