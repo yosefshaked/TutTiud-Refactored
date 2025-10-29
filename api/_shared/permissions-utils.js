@@ -15,7 +15,29 @@ export async function getDefaultPermissions(supabaseClient) {
       return null;
     }
     
-    return data || {};
+    // Coerce primitive JSONB values that may have been inserted as strings
+    const raw = data || {};
+    const result = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (typeof v === 'string') {
+        const t = v.trim().toLowerCase();
+        if (t === 'true') {
+          result[k] = true;
+          continue;
+        }
+        if (t === 'false') {
+          result[k] = false;
+          continue;
+        }
+        const num = Number(t);
+        if (!Number.isNaN(num)) {
+          result[k] = num;
+          continue;
+        }
+      }
+      result[k] = v;
+    }
+    return result;
   } catch (err) {
     console.error('Error fetching default permissions:', err);
     return null;
@@ -58,23 +80,47 @@ export async function ensureOrgPermissions(supabaseClient, orgId) {
     .select('permissions')
     .eq('org_id', orgId)
     .single();
-  
+
   if (fetchError) {
     console.error('Failed to fetch org settings:', fetchError);
     return null;
   }
-  
-  const permissions = orgSettings?.permissions;
-  
-  // Check if permissions need initialization
-  if (!permissions || 
-      typeof permissions !== 'object' || 
-      Object.keys(permissions).length === 0) {
-    // Initialize using the database function
+
+  const current = orgSettings?.permissions;
+
+  // If empty/null initialize entirely from defaults via DB helper
+  if (!current || typeof current !== 'object' || Object.keys(current).length === 0) {
     return await initializeOrgPermissions(supabaseClient, orgId);
   }
-  
-  return permissions;
+
+  // Fetch defaults from registry to backfill any missing keys
+  const defaults = await getDefaultPermissions(supabaseClient);
+  const merged = { ...current };
+  let changed = false;
+
+  if (defaults && typeof defaults === 'object') {
+    for (const [key, defVal] of Object.entries(defaults)) {
+      if (!Object.prototype.hasOwnProperty.call(merged, key)) {
+        merged[key] = defVal;
+        changed = true;
+      }
+    }
+  }
+
+  // Persist only if we actually added new keys
+  if (changed) {
+    const { error: updateError } = await supabaseClient
+      .from('org_settings')
+      .update({ permissions: merged, updated_at: new Date().toISOString() })
+      .eq('org_id', orgId);
+    if (updateError) {
+      console.error('Failed to persist merged org permissions:', updateError);
+      // return best-effort merged view even if persist failed
+      return merged;
+    }
+  }
+
+  return merged;
 }
 
 /**

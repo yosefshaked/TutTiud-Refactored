@@ -368,6 +368,13 @@ export default async function (context, req) {
   const query = req?.query ?? {};
 
   if (method === 'GET') {
+    // Ensure org permissions exist and backfill any missing keys from the registry
+    try {
+      await ensureOrgPermissions(supabase, orgId);
+    } catch (e) {
+      context.log?.warn?.('settings GET: ensureOrgPermissions failed (non-fatal)', { message: e?.message });
+    }
+
     const requestedKeys = collectKeysFromQuery(query);
     const includeMeta = query.include_metadata === '1' || query.include_metadata === 'true';
     let builder = tenantClient

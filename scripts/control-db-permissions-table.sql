@@ -93,7 +93,7 @@ INSERT INTO public.permission_registry (
     'גיבוי מקומי',
     'Allow organization to create encrypted local backups',
     'אפשר לארגון ליצור גיבויים מוצפנים מקומיים',
-    'false',
+    'false'::jsonb,
     'backup',
     true
   ),
@@ -103,7 +103,7 @@ INSERT INTO public.permission_registry (
     'עקיפת המתנה לגיבוי',
     'One-time override of the 7-day backup cooldown (automatically resets after use)',
     'עקיפה חד-פעמית של תקופת ההמתנה של 7 ימים (מתאפסת אוטומטית לאחר שימוש)',
-    'false',
+    'false'::jsonb,
     'backup',
     true
   ),
@@ -113,7 +113,7 @@ INSERT INTO public.permission_registry (
     'גיבוי ענן (Google Drive, OneDrive)',
     'Allow organization to backup to cloud storage providers',
     'אפשר לארגון לגבות לספקי אחסון ענן',
-    'false',
+    'false'::jsonb,
     'backup',
     true
   ),
@@ -123,7 +123,7 @@ INSERT INTO public.permission_registry (
     'לוגו מותאם אישית',
     'Allow organization to upload and use a custom logo',
     'אפשר לארגון להעלות ולהשתמש בלוגו מותאם אישית',
-    'false',
+    'false'::jsonb,
     'branding',
     true
   ),
@@ -134,7 +134,7 @@ INSERT INTO public.permission_registry (
     'טופס מפגש: תשובות מוכנות מראש',
     'Allow organizations to configure predefined answer lists for text/textarea questions',
     'אפשר לארגון להגדיר רשימות תשובות מוכנות לשאלות טקסט/טקסט חופשי',
-    'true',
+    'true'::jsonb,
     'features',
     false
   ),
@@ -145,7 +145,7 @@ INSERT INTO public.permission_registry (
     'טופס מפגש: תקרת תשובות מוכנות',
     'Maximum number of preconfigured answers allowed per question (text/textarea)',
     'מספר מרבי של תשובות מוכנות לשאלה (טקסט/טקסט חופשי)',
-    '50',
+    '50'::jsonb,
     'features',
     false
   )
