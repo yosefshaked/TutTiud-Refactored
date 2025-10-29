@@ -8,37 +8,60 @@ const STORAGE_KEYS = {
   textSpacing: 'a11y:textSpacing',
   underlineLinks: 'a11y:underlineLinks',
   dyslexiaFont: 'a11y:dyslexiaFont',
+  highlightInteractives: 'a11y:highlightInteractives',
+  noAnimations: 'a11y:noAnimations',
+  structureOverlay: 'a11y:structureOverlay',
+  grayscale: 'a11y:grayscale',
 }
 
 const A11Y_STYLE_ID = 'a11y-dynamic-styles'
 const A11Y_CSS = `
-/**************** Accessibility helpers: text spacing, underline links, dyslexia-friendly font ***************/
-@layer base {
-  /* Text spacing increases letter/word spacing and line-height across body text. */
-  .a11y-text-spacing {
-    --a11y-letter-spacing: 0.12em;
-    --a11y-word-spacing: 0.16em;
-    --a11y-line-height: 1.75;
-  }
-  .a11y-text-spacing body,
-  .a11y-text-spacing .prose,
-  .a11y-text-spacing *:where(p,li,span,a,button,label,small,strong,em) {
-    letter-spacing: var(--a11y-letter-spacing);
-    word-spacing: var(--a11y-word-spacing);
-    line-height: var(--a11y-line-height);
-  }
+/* Accessibility helpers: no @layer here since this is injected at runtime */
 
-  /* Always underline links for clearer affordance. */
-  .a11y-underline-links a[href] {
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-    text-decoration-thickness: 2px;
-  }
+/* Text spacing increases letter/word spacing and line-height across body text. */
+.a11y-text-spacing body,
+.a11y-text-spacing .prose,
+.a11y-text-spacing *:where(p,li,span,a,button,label,small,strong,em) {
+  letter-spacing: 0.12em;
+  word-spacing: 0.16em;
+  line-height: 1.75;
+}
 
-  /* Dyslexia-friendly font family. To fully enable, bundle a font like OpenDyslexic/Atkinson Hyperlegible. */
-  .a11y-dyslexia-font body {
-    font-family: 'OpenDyslexic', 'Atkinson Hyperlegible', Nunito, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
-  }
+/* Underline links for clearer affordance */
+.a11y-underline-links a[href] {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 2px;
+}
+
+/* Dyslexia-friendly font family */
+.a11y-dyslexia-font body {
+  font-family: 'OpenDyslexic', 'Atkinson Hyperlegible', Nunito, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji' !important;
+}
+
+/* Highlight interactive elements (buttons, links, controls) */
+.a11y-highlight-interactives :is(a[href], button, [role="button"], input, select, textarea, [tabindex]:not([tabindex="-1"])) {
+  outline: 2px solid rgb(59 130 246 / 0.9);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.8), 0 0 0 4px rgba(59,130,246,0.6);
+}
+
+/* Stop animations and transitions globally */
+.a11y-no-animations *, .a11y-no-animations *::before, .a11y-no-animations *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+/* Page structure overlay: outline landmarks and headings */
+.a11y-structure :is(main, nav, aside, header, footer, section, article, h1, h2, h3, h4, h5, h6) {
+  outline: 2px dashed rgba(16,185,129,0.9);
+  outline-offset: 2px;
+}
+
+/* Grayscale mode */
+.a11y-grayscale {
+  filter: grayscale(1);
 }
 `
 
@@ -87,6 +110,10 @@ export function AccessibilityProvider({ children }) {
   const [textSpacing, setTextSpacingState] = useState(false)
   const [underlineLinks, setUnderlineLinksState] = useState(false)
   const [dyslexiaFont, setDyslexiaFontState] = useState(false)
+  const [highlightInteractives, setHighlightInteractives] = useState(false)
+  const [noAnimations, setNoAnimations] = useState(false)
+  const [structureOverlay, setStructureOverlay] = useState(false)
+  const [grayscale, setGrayscale] = useState(false)
 
   // Inject dynamic styles once
   useEffect(() => { ensureA11yStylesInjected() }, [])
@@ -96,21 +123,33 @@ export function AccessibilityProvider({ children }) {
     try {
       const storedScale = parseFloat(localStorage.getItem(STORAGE_KEYS.fontScale) || '1')
       const storedHc = localStorage.getItem(STORAGE_KEYS.highContrast) === '1'
-      const storedTs = localStorage.getItem(STORAGE_KEYS.textSpacing) === '1'
-      const storedUl = localStorage.getItem(STORAGE_KEYS.underlineLinks) === '1'
-      const storedDf = localStorage.getItem(STORAGE_KEYS.dyslexiaFont) === '1'
+  const storedTs = localStorage.getItem(STORAGE_KEYS.textSpacing) === '1'
+  const storedUl = localStorage.getItem(STORAGE_KEYS.underlineLinks) === '1'
+  const storedDf = localStorage.getItem(STORAGE_KEYS.dyslexiaFont) === '1'
+  const storedHi = localStorage.getItem(STORAGE_KEYS.highlightInteractives) === '1'
+  const storedNa = localStorage.getItem(STORAGE_KEYS.noAnimations) === '1'
+  const storedSo = localStorage.getItem(STORAGE_KEYS.structureOverlay) === '1'
+  const storedGs = localStorage.getItem(STORAGE_KEYS.grayscale) === '1'
 
       setFontScaleState(Number.isFinite(storedScale) ? storedScale : 1)
       setHighContrastState(Boolean(storedHc))
       setTextSpacingState(Boolean(storedTs))
       setUnderlineLinksState(Boolean(storedUl))
-      setDyslexiaFontState(Boolean(storedDf))
+  setDyslexiaFontState(Boolean(storedDf))
+  setHighlightInteractives(Boolean(storedHi))
+  setNoAnimations(Boolean(storedNa))
+  setStructureOverlay(Boolean(storedSo))
+  setGrayscale(Boolean(storedGs))
 
       applyFontScale(storedScale)
       applyHighContrast(storedHc)
       applyTextSpacing(storedTs)
       applyUnderlineLinks(storedUl)
       applyDyslexiaFont(storedDf)
+  document.documentElement.classList.toggle('a11y-highlight-interactives', storedHi)
+  document.documentElement.classList.toggle('a11y-no-animations', storedNa)
+  document.documentElement.classList.toggle('a11y-structure', storedSo)
+  document.documentElement.classList.toggle('a11y-grayscale', storedGs)
     } catch (err) {
       // noop: fallback to defaults when storage is unavailable
       console.warn('[a11y] Failed to load preferences', err)
@@ -119,6 +158,7 @@ export function AccessibilityProvider({ children }) {
       applyTextSpacing(false)
       applyUnderlineLinks(false)
       applyDyslexiaFont(false)
+      document.documentElement.classList.remove('a11y-highlight-interactives','a11y-no-animations','a11y-structure','a11y-grayscale')
     }
   }, [])
 
@@ -168,18 +208,62 @@ export function AccessibilityProvider({ children }) {
     })
   }, [])
 
+  const toggleHighlightInteractives = useCallback(() => {
+    setHighlightInteractives((prev) => {
+      const next = !prev
+      try { localStorage.setItem(STORAGE_KEYS.highlightInteractives, next ? '1' : '0') } catch (err) { console.warn('[a11y] Failed to save highlight preference', err) }
+      document.documentElement.classList.toggle('a11y-highlight-interactives', next)
+      return next
+    })
+  }, [])
+
+  const toggleNoAnimations = useCallback(() => {
+    setNoAnimations((prev) => {
+      const next = !prev
+      try { localStorage.setItem(STORAGE_KEYS.noAnimations, next ? '1' : '0') } catch (err) { console.warn('[a11y] Failed to save animation preference', err) }
+      document.documentElement.classList.toggle('a11y-no-animations', next)
+      return next
+    })
+  }, [])
+
+  const toggleStructureOverlay = useCallback(() => {
+    setStructureOverlay((prev) => {
+      const next = !prev
+      try { localStorage.setItem(STORAGE_KEYS.structureOverlay, next ? '1' : '0') } catch (err) { console.warn('[a11y] Failed to save structure overlay', err) }
+      document.documentElement.classList.toggle('a11y-structure', next)
+      return next
+    })
+  }, [])
+
+  const toggleGrayscale = useCallback(() => {
+    setGrayscale((prev) => {
+      const next = !prev
+      try { localStorage.setItem(STORAGE_KEYS.grayscale, next ? '1' : '0') } catch (err) { console.warn('[a11y] Failed to save grayscale preference', err) }
+      document.documentElement.classList.toggle('a11y-grayscale', next)
+      return next
+    })
+  }, [])
+
   const reset = useCallback(() => {
     setFontScale(1)
     setHighContrastState(false)
     setTextSpacingState(false)
     setUnderlineLinksState(false)
     setDyslexiaFontState(false)
+    setHighlightInteractives(false)
+    setNoAnimations(false)
+    setStructureOverlay(false)
+    setGrayscale(false)
     try {
       localStorage.removeItem(STORAGE_KEYS.fontScale)
       localStorage.removeItem(STORAGE_KEYS.highContrast)
       localStorage.removeItem(STORAGE_KEYS.textSpacing)
       localStorage.removeItem(STORAGE_KEYS.underlineLinks)
       localStorage.removeItem(STORAGE_KEYS.dyslexiaFont)
+      localStorage.removeItem(STORAGE_KEYS.highlightInteractives)
+      localStorage.removeItem(STORAGE_KEYS.noAnimations)
+      localStorage.removeItem(STORAGE_KEYS.structureOverlay)
+      localStorage.removeItem(STORAGE_KEYS.grayscale)
     } catch (err) {
       console.warn('[a11y] Failed to clear preferences', err)
     }
@@ -187,6 +271,7 @@ export function AccessibilityProvider({ children }) {
     applyTextSpacing(false)
     applyUnderlineLinks(false)
     applyDyslexiaFont(false)
+    document.documentElement.classList.remove('a11y-highlight-interactives','a11y-no-animations','a11y-structure','a11y-grayscale')
   }, [setFontScale])
 
   const value = useMemo(() => ({
@@ -207,8 +292,20 @@ export function AccessibilityProvider({ children }) {
     dyslexiaFont,
     toggleDyslexiaFont,
 
+    highlightInteractives,
+    toggleHighlightInteractives,
+
+    noAnimations,
+    toggleNoAnimations,
+
+    structureOverlay,
+    toggleStructureOverlay,
+
+    grayscale,
+    toggleGrayscale,
+
     reset,
-  }), [fontScale, setFontScale, increaseFont, decreaseFont, highContrast, toggleHighContrast, textSpacing, toggleTextSpacing, underlineLinks, toggleUnderlineLinks, dyslexiaFont, toggleDyslexiaFont, reset])
+  }), [fontScale, setFontScale, increaseFont, decreaseFont, highContrast, toggleHighContrast, textSpacing, toggleTextSpacing, underlineLinks, toggleUnderlineLinks, dyslexiaFont, toggleDyslexiaFont, highlightInteractives, toggleHighlightInteractives, noAnimations, toggleNoAnimations, structureOverlay, toggleStructureOverlay, grayscale, toggleGrayscale, reset])
 
   return (
     <A11yContext.Provider value={value}>

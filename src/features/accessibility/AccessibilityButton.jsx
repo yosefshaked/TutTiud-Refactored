@@ -12,6 +12,10 @@ export default function AccessibilityButton() {
     textSpacing, toggleTextSpacing,
     underlineLinks, toggleUnderlineLinks,
     dyslexiaFont, toggleDyslexiaFont,
+    highlightInteractives, toggleHighlightInteractives,
+    noAnimations, toggleNoAnimations,
+    structureOverlay, toggleStructureOverlay,
+    grayscale, toggleGrayscale,
     reset,
   } = useAccessibility()
 
@@ -60,6 +64,26 @@ export default function AccessibilityButton() {
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">גופן מותאם לדיסלקסיה</span>
             <Switch checked={dyslexiaFont} onCheckedChange={toggleDyslexiaFont} aria-label="הפעל גופן מותאם לדיסלקסיה" />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">הדגש לחצנים וקישורים</span>
+            <Switch checked={highlightInteractives} onCheckedChange={toggleHighlightInteractives} aria-label="הדגש רכיבים אינטראקטיביים" />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">עצור אנימציות</span>
+            <Switch checked={noAnimations} onCheckedChange={toggleNoAnimations} aria-label="עצור אנימציות ומעברים" />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">סימון מבנה העמוד</span>
+            <Switch checked={structureOverlay} onCheckedChange={toggleStructureOverlay} aria-label="הצג קווי מתאר לאזורים וכותרות" />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">מצב גווני אפור</span>
+            <Switch checked={grayscale} onCheckedChange={toggleGrayscale} aria-label="הפעל מצב גווני אפור" />
           </div>
 
           <div className="pt-1">

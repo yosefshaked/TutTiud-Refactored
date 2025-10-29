@@ -130,6 +130,12 @@
   }
 }
 
+/* Make high-contrast visually stronger even when components use fixed palette classes */
+.a11y-hc {
+  /* Slight global contrast/saturation boost */
+  filter: contrast(1.1) saturate(1.05);
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
