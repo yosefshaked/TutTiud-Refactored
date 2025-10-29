@@ -148,6 +148,7 @@
 /* Popover needs higher z-index than overlay */
 .driver-popover {
   z-index: 9999 !important;
+  pointer-events: auto !important; /* ensure clicks always reach popover */
 }
 
 /* Ensure highlighted elements appear above the overlay without stripping their styling */
@@ -155,6 +156,11 @@
 .driver-highlighted-element {
   position: relative;
   z-index: 10000 !important;
+}
+
+/* Ensure popover children are clickable regardless of overlay pointer-events */
+.driver-popover * {
+  pointer-events: auto !important;
 }
 
 /* Highlighted element border */

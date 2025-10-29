@@ -17,6 +17,7 @@ export function OnboardingCard() {
   const { completed, reset } = useOnboardingStatus();
   const { isAdmin } = useUserRole();
   const [isStarting, setIsStarting] = useState(false);
+  const teardownRef = React.useRef({ esc: null, overlay: null, bound: new WeakSet() });
 
   const handleStartTour = async () => {
     setIsStarting(true);
@@ -26,9 +27,9 @@ export function OnboardingCard() {
     
     // Small delay to ensure UI updates
     setTimeout(() => {
-      const steps = getTourSteps(isAdmin);
-      
-      const driverInstance = driver({
+  const steps = getTourSteps(isAdmin);
+
+  const driverInstance = driver({
         showProgress: true,
         progressText: '{{current}} מתוך {{total}}',
         allowClose: true,
@@ -45,35 +46,78 @@ export function OnboardingCard() {
           if (popover && options.state) {
             popover.setAttribute('data-current-step', options.state.activeIndex + 1);
             popover.setAttribute('data-total-steps', steps.length);
-            // Safety: ensure the Done button closes the tour when on the last step.
+            // Defensive bindings: close/done/next(last)
+            const bindClick = (el, fn) => {
+              if (!el) return;
+              const bound = teardownRef.current.bound;
+              if (bound.has(el)) return;
+              el.addEventListener('click', fn, { passive: true });
+              bound.add(el);
+            };
+
+            const forceDestroy = (reason) => {
+              try {
+                if (window.__TT_TOUR_DEBUG__) console.info('[tour:manual] forceDestroy:', reason);
+                driverInstance?.destroy();
+              } catch {}
+            };
+
             const nextBtn = popover.querySelector('.driver-popover-next-btn');
+            const doneBtn = popover.querySelector('.driver-popover-done-btn');
+            const closeBtn = popover.querySelector('.driver-popover-close-btn');
+
+            bindClick(closeBtn, () => forceDestroy('close-btn'));
+            bindClick(doneBtn, () => forceDestroy('done-btn'));
             if (nextBtn) {
-              nextBtn._tuttiud_onclick = nextBtn._tuttiud_onclick || null;
-              if (nextBtn._tuttiud_onclick) {
-                try { nextBtn.removeEventListener('click', nextBtn._tuttiud_onclick); } catch {}
-                nextBtn._tuttiud_onclick = null;
-              }
-
-              const handler = () => {
-                try {
-                  if (options?.state && options.state.activeIndex === steps.length - 1) {
-                    try { driverInstance.destroy(); } catch { /* noop */ }
-                  }
-                } catch (err) {
-                  // swallow
-                }
-              };
-
-              nextBtn._tuttiud_onclick = handler;
-              nextBtn.addEventListener('click', handler);
+              bindClick(nextBtn, () => {
+                const current = document.querySelector('.driver-popover');
+                const total = Number(current?.getAttribute('data-total-steps') || steps.length);
+                const curr = Number(current?.getAttribute('data-current-step') || (options?.state?.activeIndex ?? 0) + 1);
+                if (curr >= total) forceDestroy('next-on-last');
+              });
             }
           }
         },
         steps,
         onDestroyStarted: () => {
           setIsStarting(false);
+          if (teardownRef.current.esc) {
+            try { document.removeEventListener('keydown', teardownRef.current.esc); } catch {}
+            teardownRef.current.esc = null;
+          }
+          if (teardownRef.current.overlay) {
+            try { document.querySelector('.driver-overlay')?.removeEventListener('click', teardownRef.current.overlay); } catch {}
+            teardownRef.current.overlay = null;
+          }
+          teardownRef.current.bound = new WeakSet();
         },
       });
+
+      // ESC to close
+      const onEsc = (e) => {
+        if (e.key === 'Escape') {
+          try { driverInstance?.destroy(); } catch {}
+        }
+      };
+      document.addEventListener('keydown', onEsc);
+      teardownRef.current.esc = onEsc;
+
+      // Overlay click to close on last step only
+      const overlayHandler = () => {
+        const pop = document.querySelector('.driver-popover');
+        const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
+        const curr = Number(pop?.getAttribute('data-current-step') || 1);
+        if (curr >= total) {
+          try { driverInstance?.destroy(); } catch {}
+        }
+      };
+      setTimeout(() => {
+        const overlay = document.querySelector('.driver-overlay');
+        if (overlay) {
+          overlay.addEventListener('click', overlayHandler, { passive: true });
+          teardownRef.current.overlay = overlayHandler;
+        }
+      }, 0);
 
       driverInstance.drive();
     }, 300);

@@ -14,6 +14,7 @@ export function WelcomeTour() {
   const { isAdmin } = useUserRole();
   const { completed, loading, markCompleted } = useOnboardingStatus();
   const driverRef = useRef(null);
+  const teardownRef = useRef({ esc: null, overlay: null, bound: new WeakSet() });
 
   const steps = useMemo(() => getTourSteps(isAdmin), [isAdmin]);
 
@@ -51,42 +52,88 @@ export function WelcomeTour() {
           if (popover && options.state) {
             popover.setAttribute('data-current-step', options.state.activeIndex + 1);
             popover.setAttribute('data-total-steps', steps.length);
+            // Defensive bindings: ensure X and Done always close; Next closes on last step
+            const bindClick = (el, fn) => {
+              if (!el) return;
+              const bound = teardownRef.current.bound;
+              if (bound.has(el)) return;
+              el.addEventListener('click', fn, { passive: true });
+              bound.add(el);
+            };
 
-            // Safety: ensure the Done button closes the tour when on the last step.
-            // Some environments may block the driver's default done handler; attach
-            // a click listener that forces destroy when activeIndex is last.
+            const forceDestroy = (reason) => {
+              try {
+                if (window.__TT_TOUR_DEBUG__) console.info('[tour] forceDestroy:', reason);
+                driverRef.current?.destroy();
+              } catch {}
+            };
+
+            const isLast = options?.state?.activeIndex === steps.length - 1;
             const nextBtn = popover.querySelector('.driver-popover-next-btn');
+            const doneBtn = popover.querySelector('.driver-popover-done-btn');
+            const closeBtn = popover.querySelector('.driver-popover-close-btn');
+
+            // Close button always destroys
+            bindClick(closeBtn, () => forceDestroy('close-btn'));
+
+            // Done button explicitly destroys
+            bindClick(doneBtn, () => forceDestroy('done-btn'));
+
+            // Next acts as Done on last step
             if (nextBtn) {
-              // Remove any previously attached handler we set (avoid duplicates)
-              nextBtn._tuttiud_onclick = nextBtn._tuttiud_onclick || null;
-              if (nextBtn._tuttiud_onclick) {
-                try { nextBtn.removeEventListener('click', nextBtn._tuttiud_onclick); } catch {}
-                nextBtn._tuttiud_onclick = null;
-              }
-
-              const handler = () => {
-                try {
-                  if (options?.state && options.state.activeIndex === steps.length - 1) {
-                    if (driverRef.current) {
-                      try { driverRef.current.destroy(); } catch { /* noop */ }
-                    }
-                  }
-                } catch (err) {
-                  // swallow - this is a non-critical safety handler
-                }
-              };
-
-              nextBtn._tuttiud_onclick = handler;
-              nextBtn.addEventListener('click', handler);
+              bindClick(nextBtn, () => {
+                const current = document.querySelector('.driver-popover');
+                const total = Number(current?.getAttribute('data-total-steps') || steps.length);
+                const curr = Number(current?.getAttribute('data-current-step') || (options?.state?.activeIndex ?? 0) + 1);
+                if (curr >= total) forceDestroy('next-on-last');
+              });
             }
           }
         },
         steps,
         onDestroyStarted: () => {
-          // Mark completed regardless of skip/finish to avoid nagging users
-          markCompleted();
+          // Clean document listeners
+          if (teardownRef.current.esc) {
+            try { document.removeEventListener('keydown', teardownRef.current.esc); } catch {}
+            teardownRef.current.esc = null;
+          }
+          if (teardownRef.current.overlay) {
+            try { document.querySelector('.driver-overlay')?.removeEventListener('click', teardownRef.current.overlay); } catch {}
+            teardownRef.current.overlay = null;
+          }
+          teardownRef.current.bound = new WeakSet();
+
+          // Mark completed for auto-tour; schedule to avoid racing unmount
+          Promise.resolve().then(() => markCompleted());
         },
       });
+
+      // ESC to close
+      const onEsc = (e) => {
+        if (e.key === 'Escape') {
+          try { driverRef.current?.destroy(); } catch {}
+        }
+      };
+      document.addEventListener('keydown', onEsc);
+      teardownRef.current.esc = onEsc;
+
+      // Overlay click: enabled only on last step
+      const overlayHandler = (e) => {
+        const pop = document.querySelector('.driver-popover');
+        const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
+        const curr = Number(pop?.getAttribute('data-current-step') || 1);
+        if (curr >= total) {
+          try { driverRef.current?.destroy(); } catch {}
+        }
+      };
+      // Bind lazily after driver draws overlay
+      setTimeout(() => {
+        const overlay = document.querySelector('.driver-overlay');
+        if (overlay) {
+          overlay.addEventListener('click', overlayHandler, { passive: true });
+          teardownRef.current.overlay = overlayHandler;
+        }
+      }, 0);
 
       // Start the multi-step tour
       driverRef.current.drive();
@@ -97,6 +144,15 @@ export function WelcomeTour() {
       if (driverRef.current) {
         try { driverRef.current.destroy(); } catch { /* noop */ }
       }
+      if (teardownRef.current.esc) {
+        try { document.removeEventListener('keydown', teardownRef.current.esc); } catch {}
+        teardownRef.current.esc = null;
+      }
+      if (teardownRef.current.overlay) {
+        try { document.querySelector('.driver-overlay')?.removeEventListener('click', teardownRef.current.overlay); } catch {}
+        teardownRef.current.overlay = null;
+      }
+      teardownRef.current.bound = new WeakSet();
     };
   }, [loading, completed, steps, markCompleted]);
 
