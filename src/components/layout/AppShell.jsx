@@ -16,6 +16,7 @@ import useKeyboardAwareBottomOffset from "@/hooks/useKeyboardAwareBottomOffset.j
 import OrgLogo from "@/components/layout/OrgLogo.jsx"
 import { WelcomeTour } from "@/features/onboarding/components/WelcomeTour.jsx"
 import CustomTourRenderer from "@/features/onboarding/components/CustomTourRenderer.jsx"
+import { useUserRole } from "@/features/onboarding/hooks/useUserRole.js"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
@@ -274,6 +275,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
 export default function AppShell({ children }) {
   const { signOut } = useAuth()
   const { activeOrg } = useOrg()
+  const { role } = useUserRole()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
   const [sessionModalState, setSessionModalState] = useState({
     isOpen: false,
@@ -281,8 +283,8 @@ export default function AppShell({ children }) {
     onCreated: null,
   })
 
-  const membershipRole = activeOrg?.membership?.role
-  const navItems = useMemo(() => buildNavItems(membershipRole), [membershipRole])
+  // Use the same role source used by the onboarding system to keep targets stable
+  const navItems = useMemo(() => buildNavItems(role), [role])
 
   const openSessionModal = useCallback((options = {}) => {
     const { studentId = '', onCreated = null } = options
