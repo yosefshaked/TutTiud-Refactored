@@ -42,21 +42,29 @@ export default function CustomTourRenderer() {
     const viewportW = window.innerWidth;
     
     // Calculate available space and choose best placement
+    // Add extra margin to ensure gap between popover and element
+    const minSpaceNeeded = 320; // Minimum space needed for popover + gap
     const spaceTop = rect.top;
     const spaceBottom = viewportH - rect.bottom;
     const spaceLeft = rect.left;
     const spaceRight = viewportW - rect.right;
     
-    // Prefer placement with most space
+    // Prefer placement with most space that doesn't overlap
     let placement = 'bottom';
-    if (spaceTop > spaceBottom && spaceTop > 200) {
+    
+    // Prioritize vertical placement (top/bottom) as it's usually clearer
+    if (spaceTop > minSpaceNeeded && spaceTop >= spaceBottom) {
       placement = 'top';
-    } else if (spaceBottom > 200) {
+    } else if (spaceBottom > minSpaceNeeded) {
       placement = 'bottom';
-    } else if (spaceRight > 400) {
+    } else if (spaceRight > 450) {
+      // Need more horizontal space for side placement
       placement = 'right';
-    } else if (spaceLeft > 400) {
+    } else if (spaceLeft > 450) {
       placement = 'left';
+    } else if (spaceTop > 200) {
+      // Fallback to top even with less space
+      placement = 'top';
     }
     
     setLayout({ rect, placement });
@@ -107,49 +115,68 @@ export default function CustomTourRenderer() {
   };
 
   if (!r) {
-    // Center when no target
-    popoverStyle.top = '50%';
+    // Center slightly high on screen for initial attention-grabbing position
+    popoverStyle.top = '35%';
     popoverStyle.left = '50%';
     popoverStyle.transform = 'translate(-50%, -50%)';
   } else {
-    const margin = 16;
+    const margin = 20;
     const isMobile = window.innerWidth < 640;
     
     // Use actual popover dimensions if available, otherwise estimate
     const popoverWidth = isMobile ? Math.min(window.innerWidth - 24, 420) : 420;
-    const popoverHeight = 280;
+    const popoverHeight = 300; // Slightly larger estimate for safety
+    const minGap = 16; // Minimum gap between popover and highlighted element
 
     if (isMobile) {
-      // On mobile, always position at bottom of screen for better UX
-      popoverStyle.bottom = '20px';
-      popoverStyle.left = '12px';
-      popoverStyle.right = '12px';
-      popoverStyle.transform = 'none';
-      popoverStyle.maxWidth = 'calc(100vw - 24px)';
+      // On mobile, check if element is near bottom - if so, position above it
+      const elementNearBottom = r && (window.innerHeight - r.bottom < 200);
+      
+      if (elementNearBottom && r.top > popoverHeight + 40) {
+        // Position above element on mobile if it's near bottom
+        popoverStyle.top = `${Math.max(20, r.top - popoverHeight - minGap)}px`;
+        popoverStyle.left = '12px';
+        popoverStyle.right = '12px';
+        popoverStyle.transform = 'none';
+        popoverStyle.maxWidth = 'calc(100vw - 24px)';
+      } else {
+        // Default mobile position at bottom
+        popoverStyle.bottom = '20px';
+        popoverStyle.left = '12px';
+        popoverStyle.right = '12px';
+        popoverStyle.transform = 'none';
+        popoverStyle.maxWidth = 'calc(100vw - 24px)';
+      }
     } else {
+      // Desktop: ensure popover never covers the highlighted element
       switch (layout.placement) {
         case 'top':
-          popoverStyle.top = `${Math.max(margin, r.top - popoverHeight - margin)}px`;
+          // Position above with gap
+          popoverStyle.top = `${Math.max(margin, r.top - popoverHeight - minGap)}px`;
           popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
           popoverStyle.transform = 'translateX(-50%)';
           break;
         case 'bottom':
-          popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
+          // Position below with gap
+          popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + minGap)}px`;
           popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
           popoverStyle.transform = 'translateX(-50%)';
           break;
         case 'left':
+          // Position to the left with gap
           popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
-          popoverStyle.left = `${Math.max(margin, r.left - popoverWidth - margin)}px`;
+          popoverStyle.left = `${Math.max(margin, r.left - popoverWidth - minGap)}px`;
           popoverStyle.transform = 'translateY(-50%)';
           break;
         case 'right':
+          // Position to the right with gap
           popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
-          popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, r.right + margin)}px`;
+          popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, r.right + minGap)}px`;
           popoverStyle.transform = 'translateY(-50%)';
           break;
         default:
-          popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
+          // Fallback to bottom
+          popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + minGap)}px`;
           popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
           popoverStyle.transform = 'translateX(-50%)';
       }
