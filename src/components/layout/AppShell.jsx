@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react"
-import { Link, NavLink, Outlet } from "react-router-dom"
+import { Link, NavLink, Outlet, useLocation, matchPath } from "react-router-dom"
 import { Plus, LayoutDashboard, Users, BarChart3, Settings, LogOut, Megaphone } from "lucide-react"
 import { Toaster, toast } from "sonner"
 
@@ -56,6 +56,15 @@ function buildNavItems(role) {
 
 function MobileNavigation({ navItems = [], onOpenSessionModal }) {
   const keyboardOffset = useKeyboardAwareBottomOffset()
+  const location = useLocation()
+  const studentsRouteActive = React.useMemo(() => {
+    const p = location.pathname
+    return Boolean(
+      matchPath('/admin/students/*', p) ||
+      matchPath('/my-students/*', p) ||
+      matchPath('/students/:id', p)
+    )
+  }, [location.pathname])
   return (
     <nav
       role="navigation"
@@ -91,12 +100,14 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               end={item.end}
               data-tour={item.tourKey}
               aria-label={item.label}
-                className={({ isActive }) =>
-                cn(
+              className={({ isActive }) => {
+                const isStudentsItem = item.tourKey === 'admin-students' || item.tourKey === 'my-students'
+                const active = isActive || (isStudentsItem && studentsRouteActive)
+                return cn(
                   "relative mobile-nav-item flex flex-col items-center gap-1 h-12 text-sm font-medium",
-                  isActive ? "text-primary" : "text-neutral-500",
+                  active ? "text-primary" : "text-neutral-500",
                 )
-              }
+              }}
             >
               <Icon className="h-6 w-6" aria-hidden="true" />
               <span>{item.label}</span>
@@ -144,12 +155,14 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               end={item.end}
               data-tour={item.tourKey}
               aria-label={item.label}
-                className={({ isActive }) =>
-                cn(
+              className={({ isActive }) => {
+                const isStudentsItem = item.tourKey === 'admin-students' || item.tourKey === 'my-students'
+                const active = isActive || (isStudentsItem && studentsRouteActive)
+                return cn(
                   "relative mobile-nav-item flex flex-col items-center gap-1 h-12 text-sm font-medium",
-                  isActive ? "text-primary" : "text-neutral-500",
+                  active ? "text-primary" : "text-neutral-500",
                 )
-              }
+              }}
             >
               <Icon className="h-6 w-6" aria-hidden="true" />
               <span>{item.label}</span>
@@ -162,6 +175,15 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
 }
 
 function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
+  const location = useLocation()
+  const studentsRouteActive = React.useMemo(() => {
+    const p = location.pathname
+    return Boolean(
+      matchPath('/admin/students/*', p) ||
+      matchPath('/my-students/*', p) ||
+      matchPath('/students/:id', p)
+    )
+  }, [location.pathname])
   return (
     <aside
       className="hidden md:flex md:h-screen md:w-72 md:flex-col md:border-l md:border-border md:bg-surface"
@@ -217,12 +239,14 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
                 to={item.to}
                 end={item.end}
                 data-tour={item.tourKey}
-                className={({ isActive }) =>
-                  cn(
+                className={({ isActive }) => {
+                  const isStudentsItem = item.tourKey === 'admin-students' || item.tourKey === 'my-students'
+                  const active = isActive || (isStudentsItem && studentsRouteActive)
+                  return cn(
                     "flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium transition",
-                    isActive ? "bg-primary/10 text-primary" : "text-neutral-600 hover:bg-neutral-100",
+                    active ? "bg-primary/10 text-primary" : "text-neutral-600 hover:bg-neutral-100",
                   )
-                }
+                }}
               >
                 <div className="flex items-center gap-sm">
                   <Icon className="h-5 w-5" aria-hidden="true" />

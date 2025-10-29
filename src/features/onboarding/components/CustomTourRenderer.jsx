@@ -32,6 +32,8 @@ export default function CustomTourRenderer() {
   const [tour, setTour] = React.useState(getState());
   const [layout, setLayout] = React.useState({ rect: null, placement: 'top' });
   const popRef = React.useRef(null);
+  // Persist chosen mobile anchor (above/below) per step to avoid flipping when viewport height changes
+  const mobileAnchorRef = React.useRef({ index: -1, anchor: 'auto' });
 
   React.useEffect(() => subscribe(setTour), []);
 
@@ -147,21 +149,22 @@ export default function CustomTourRenderer() {
     const minGap = 16; // Minimum gap between popover and highlighted element
 
     if (isMobile) {
-      // Mobile: keep the popover near the target element to avoid "jumping"
+      // Mobile: keep the popover near the target element to avoid flipping between above/below
       const viewportH = window.innerHeight;
-      const inLowerHalf = r.top > viewportH * 0.5;
 
-      // Preferred anchors
-      let topPx;
-      if (inLowerHalf) {
-        // Target is low on the screen (e.g., bottom tabs/FAB) → place popover above it
-        topPx = r.top - popoverHeight - minGap;
-      } else {
-        // Target is high/mid → place popover below it
-        topPx = r.bottom + minGap;
+      // Choose anchor once per step (above/below) and persist it while the step is active
+      if (mobileAnchorRef.current.index !== tour.stepIndex || mobileAnchorRef.current.anchor === 'auto') {
+        const inLowerHalf = r.top > viewportH * 0.55; // small hysteresis
+        mobileAnchorRef.current = {
+          index: tour.stepIndex,
+          anchor: inLowerHalf ? 'above' : 'below',
+        };
       }
 
-      // Clamp within viewport with margins
+      const anchor = mobileAnchorRef.current.anchor;
+      let topPx = anchor === 'above' ? (r.top - popoverHeight - minGap) : (r.bottom + minGap);
+
+      // Clamp within viewport with margins to avoid off-screen
       topPx = Math.max(margin, Math.min(viewportH - popoverHeight - margin, topPx));
 
       popoverStyle.top = `${topPx}px`;
