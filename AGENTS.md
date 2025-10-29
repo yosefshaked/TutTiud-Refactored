@@ -119,6 +119,7 @@
   - ESC key, X button, and Done button all close the tour
   - Overlay click closes only on the last step
   - Mobile-optimized with touch-friendly 44px minimum button heights
+  - Welcome/no-target steps position center-high (~35% viewport height) on both desktop and mobile
   - Progress bar with gradient fill and smooth transitions
   - Scroll/resize listeners update layout dynamically
   - Centers gracefully when target element not found

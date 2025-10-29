@@ -126,11 +126,11 @@ export default function CustomTourRenderer() {
   if (!r) {
     // Center slightly high on screen for initial attention-grabbing position
     if (isMobile) {
-      // On mobile, even for centered content, use bottom positioning
-      popoverStyle.bottom = '20px';
-      popoverStyle.left = '12px';
-      popoverStyle.right = '12px';
-      popoverStyle.transform = 'none';
+      // Mobile: match desktop behavior (centered slightly high)
+      popoverStyle.top = '35%';
+      popoverStyle.left = '50%';
+      popoverStyle.transform = 'translate(-50%, -50%)';
+      // Keep a responsive max-width so it doesn't overflow small screens
       popoverStyle.maxWidth = 'calc(100vw - 24px)';
     } else {
       // Desktop: center slightly high
@@ -147,24 +147,28 @@ export default function CustomTourRenderer() {
     const minGap = 16; // Minimum gap between popover and highlighted element
 
     if (isMobile) {
-      // On mobile, check if element is near bottom - if so, position above it
-      const elementNearBottom = r && (window.innerHeight - r.bottom < 200);
-      
-      if (elementNearBottom && r.top > popoverHeight + 40) {
-        // Position above element on mobile if it's near bottom
-        popoverStyle.top = `${Math.max(20, r.top - popoverHeight - minGap)}px`;
-        popoverStyle.left = '12px';
-        popoverStyle.right = '12px';
-        popoverStyle.transform = 'none';
-        popoverStyle.maxWidth = 'calc(100vw - 24px)';
+      // Mobile: keep the popover near the target element to avoid "jumping"
+      const viewportH = window.innerHeight;
+      const inLowerHalf = r.top > viewportH * 0.5;
+
+      // Preferred anchors
+      let topPx;
+      if (inLowerHalf) {
+        // Target is low on the screen (e.g., bottom tabs/FAB) → place popover above it
+        topPx = r.top - popoverHeight - minGap;
       } else {
-        // Default mobile position at bottom
-        popoverStyle.bottom = '20px';
-        popoverStyle.left = '12px';
-        popoverStyle.right = '12px';
-        popoverStyle.transform = 'none';
-        popoverStyle.maxWidth = 'calc(100vw - 24px)';
+        // Target is high/mid → place popover below it
+        topPx = r.bottom + minGap;
       }
+
+      // Clamp within viewport with margins
+      topPx = Math.max(margin, Math.min(viewportH - popoverHeight - margin, topPx));
+
+      popoverStyle.top = `${topPx}px`;
+      popoverStyle.left = '12px';
+      popoverStyle.right = '12px';
+      popoverStyle.transform = 'none';
+      popoverStyle.maxWidth = 'calc(100vw - 24px)';
     } else {
       // Desktop: ensure popover never covers the highlighted element
       switch (layout.placement) {

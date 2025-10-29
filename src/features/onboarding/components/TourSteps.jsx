@@ -60,7 +60,7 @@ export const adminTourSteps = [
     element: selectVisible('[data-tour="fab-button"]'),
     popover: {
       title: 'הוספת מפגש חדש',
-      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד את הפרטים, משך הזמן והערות.',
+      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד שם את פרטי המפגש.',
       side: 'top',
       align: 'center',
     },
@@ -117,7 +117,7 @@ export const memberTourSteps = [
     element: selectVisible('[data-tour="fab-button"]'),
     popover: {
       title: 'הוספת מפגש חדש',
-      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד פרטים, משך זמן והערות.',
+      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד שם את פרטי המפגש.',
       side: 'top',
       align: 'center',
     },
