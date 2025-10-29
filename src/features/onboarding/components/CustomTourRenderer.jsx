@@ -5,6 +5,13 @@ import '../styles/tour.css';
 
 function getElementFromStep(step) {
   if (!step) return null;
+  
+  // Special handling: if element is 'body', treat it as no target (centered display)
+  const elementValue = typeof step.element === 'function' ? step.element() : step.element;
+  if (elementValue === 'body' || elementValue === document.body) {
+    return null;
+  }
+  
   const target = typeof step.element === 'function' ? step.element() : (typeof step.element === 'string' ? document.querySelector(step.element) : step.element);
   if (!target || !(target instanceof Element)) return null;
   const rect = target.getBoundingClientRect();
@@ -109,6 +116,8 @@ export default function CustomTourRenderer() {
   };
 
   // Calculate popover position based on placement
+  const isMobile = window.innerWidth < 640;
+  
   let popoverStyle = {
     position: 'fixed',
     zIndex: 10001,
@@ -116,12 +125,21 @@ export default function CustomTourRenderer() {
 
   if (!r) {
     // Center slightly high on screen for initial attention-grabbing position
-    popoverStyle.top = '35%';
-    popoverStyle.left = '50%';
-    popoverStyle.transform = 'translate(-50%, -50%)';
+    if (isMobile) {
+      // On mobile, even for centered content, use bottom positioning
+      popoverStyle.bottom = '20px';
+      popoverStyle.left = '12px';
+      popoverStyle.right = '12px';
+      popoverStyle.transform = 'none';
+      popoverStyle.maxWidth = 'calc(100vw - 24px)';
+    } else {
+      // Desktop: center slightly high
+      popoverStyle.top = '35%';
+      popoverStyle.left = '50%';
+      popoverStyle.transform = 'translate(-50%, -50%)';
+    }
   } else {
     const margin = 20;
-    const isMobile = window.innerWidth < 640;
     
     // Use actual popover dimensions if available, otherwise estimate
     const popoverWidth = isMobile ? Math.min(window.innerWidth - 24, 420) : 420;
