@@ -105,6 +105,26 @@
 - The refreshed design system lives in `tailwind.config.js` (Nunito typography, primary/neutral/status palettes, spacing tokens) with base primitives in `src/components/ui/{Button,Card,Input,PageLayout}.jsx`. Prefer these when creating new mobile-first UI.
 - `src/components/layout/AppShell.jsx` is the new navigation shell. It renders the mobile bottom tabs + FAB and a desktop sidebar, so wrap future routes with it instead of the legacy `Layout.jsx`.
 
+### Onboarding Tour System (2025-10)
+- Custom tour implementation lives in `src/features/onboarding/`:
+  - `customTour.js`: Singleton tour bus with `openTour()`, `closeTour()`, `nextStep()`, `prevStep()`, `subscribe()`, `getState()`
+  - `components/CustomTourRenderer.jsx`: Portal-based overlay with SVG mask for spotlight effect, popover with RTL support, smart placement (top/bottom/left/right based on available space)
+  - `components/WelcomeTour.jsx`: Auto-launches tour for new users, marks onboarding completed on close
+  - `components/OnboardingCard.jsx`: Manual tour launcher in Settings (does NOT mark as completed)
+  - `components/TourSteps.jsx`: Tour step definitions with role-based steps (admin vs member)
+  - `styles/tour.css`: Custom tour styling with premium shadows, gradients, responsive breakpoints, RTL support
+- Tour features:
+  - SVG masking creates spotlight effect (grayed overlay with cutout around target element)
+  - Smart positioning algorithm chooses best placement based on available viewport space
+  - ESC key, X button, and Done button all close the tour
+  - Overlay click closes only on the last step
+  - Mobile-optimized with touch-friendly 44px minimum button heights
+  - Progress bar with gradient fill and smooth transitions
+  - Scroll/resize listeners update layout dynamically
+  - Centers gracefully when target element not found
+- Accessibility: ARIA roles, keyboard navigation (ESC), proper z-index layering, RTL text alignment
+- Note: Replaced driver.js dependency with custom implementation for better control and professional UX
+
 - Frontend API clients are being colocated under feature slices:
 	- Sessions: `src/features/sessions/api/work-sessions.js`
 	- Services: `src/features/services/api/index.js`

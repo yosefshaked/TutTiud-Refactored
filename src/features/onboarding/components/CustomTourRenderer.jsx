@@ -113,34 +113,46 @@ export default function CustomTourRenderer() {
     popoverStyle.transform = 'translate(-50%, -50%)';
   } else {
     const margin = 16;
-    const popoverWidth = 420;
+    const isMobile = window.innerWidth < 640;
+    
+    // Use actual popover dimensions if available, otherwise estimate
+    const popoverWidth = isMobile ? Math.min(window.innerWidth - 24, 420) : 420;
     const popoverHeight = 280;
 
-    switch (layout.placement) {
-      case 'top':
-        popoverStyle.top = `${Math.max(margin, r.top - popoverHeight - margin)}px`;
-        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
-        popoverStyle.transform = 'translateX(-50%)';
-        break;
-      case 'bottom':
-        popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
-        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
-        popoverStyle.transform = 'translateX(-50%)';
-        break;
-      case 'left':
-        popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
-        popoverStyle.left = `${Math.max(margin, r.left - popoverWidth - margin)}px`;
-        popoverStyle.transform = 'translateY(-50%)';
-        break;
-      case 'right':
-        popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
-        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, r.right + margin)}px`;
-        popoverStyle.transform = 'translateY(-50%)';
-        break;
-      default:
-        popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
-        popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
-        popoverStyle.transform = 'translateX(-50%)';
+    if (isMobile) {
+      // On mobile, always position at bottom of screen for better UX
+      popoverStyle.bottom = '20px';
+      popoverStyle.left = '12px';
+      popoverStyle.right = '12px';
+      popoverStyle.transform = 'none';
+      popoverStyle.maxWidth = 'calc(100vw - 24px)';
+    } else {
+      switch (layout.placement) {
+        case 'top':
+          popoverStyle.top = `${Math.max(margin, r.top - popoverHeight - margin)}px`;
+          popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
+          popoverStyle.transform = 'translateX(-50%)';
+          break;
+        case 'bottom':
+          popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
+          popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
+          popoverStyle.transform = 'translateX(-50%)';
+          break;
+        case 'left':
+          popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
+          popoverStyle.left = `${Math.max(margin, r.left - popoverWidth - margin)}px`;
+          popoverStyle.transform = 'translateY(-50%)';
+          break;
+        case 'right':
+          popoverStyle.top = `${Math.max(margin, Math.min(window.innerHeight - popoverHeight - margin, r.top + r.height / 2))}px`;
+          popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, r.right + margin)}px`;
+          popoverStyle.transform = 'translateY(-50%)';
+          break;
+        default:
+          popoverStyle.top = `${Math.min(window.innerHeight - popoverHeight - margin, r.bottom + margin)}px`;
+          popoverStyle.left = `${Math.min(window.innerWidth - popoverWidth - margin, Math.max(margin, r.left + r.width / 2))}px`;
+          popoverStyle.transform = 'translateX(-50%)';
+      }
     }
   }
 
