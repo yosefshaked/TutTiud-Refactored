@@ -16,6 +16,8 @@ export function WelcomeTour() {
   const driverRef = useRef(null);
   const teardownRef = useRef({ esc: null, overlay: null, doc: null, bound: new WeakSet() });
   const finalizedRef = useRef(false);
+  const activeIndexRef = useRef(0);
+  const totalStepsRef = useRef(0);
 
   const steps = useMemo(() => getTourSteps(isAdmin), [isAdmin]);
 
@@ -51,8 +53,12 @@ export function WelcomeTour() {
           // Add data attributes for progress gauge
           const popover = document.querySelector('.driver-popover');
           if (popover && options.state) {
-            popover.setAttribute('data-current-step', options.state.activeIndex + 1);
-            popover.setAttribute('data-total-steps', steps.length);
+            const current = options.state.activeIndex + 1;
+            const total = steps.length;
+            popover.setAttribute('data-current-step', current);
+            popover.setAttribute('data-total-steps', total);
+            activeIndexRef.current = options.state.activeIndex;
+            totalStepsRef.current = total;
             // Defensive bindings: ensure X and Done always close; Next closes on last step
             const bindClick = (el, fn) => {
               if (!el) return;
@@ -104,9 +110,8 @@ export function WelcomeTour() {
             // Next acts as Done on last step
             if (nextBtn) {
               bindClick(nextBtn, () => {
-                const current = document.querySelector('.driver-popover');
-                const total = Number(current?.getAttribute('data-total-steps') || steps.length);
-                const curr = Number(current?.getAttribute('data-current-step') || (options?.state?.activeIndex ?? 0) + 1);
+                const curr = activeIndexRef.current + 1;
+                const total = totalStepsRef.current || steps.length;
                 if (curr >= total) forceDestroy('next-on-last');
               });
             }
@@ -147,9 +152,8 @@ export function WelcomeTour() {
           return;
         }
         if (isNext) {
-          const pop = document.querySelector('.driver-popover');
-          const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
-          const curr = Number(pop?.getAttribute('data-current-step') || 1);
+          const curr = activeIndexRef.current + 1;
+          const total = totalStepsRef.current || steps.length;
           if (curr >= total) forceDestroy('doc-next-on-last');
         }
       };
@@ -167,9 +171,8 @@ export function WelcomeTour() {
 
       // Overlay click: enabled only on last step
       const overlayHandler = (e) => {
-        const pop = document.querySelector('.driver-popover');
-        const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
-        const curr = Number(pop?.getAttribute('data-current-step') || 1);
+        const curr = activeIndexRef.current + 1;
+        const total = totalStepsRef.current || steps.length;
         if (curr >= total) forceDestroy('overlay-last');
       };
       // Bind lazily after driver draws overlay

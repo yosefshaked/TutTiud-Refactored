@@ -19,6 +19,8 @@ export function OnboardingCard() {
   const [isStarting, setIsStarting] = useState(false);
   const teardownRef = React.useRef({ esc: null, overlay: null, doc: null, bound: new WeakSet() });
   const finalizedRef = React.useRef(false);
+  const activeIndexRef = React.useRef(0);
+  const totalStepsRef = React.useRef(0);
 
   const handleStartTour = async () => {
     setIsStarting(true);
@@ -73,8 +75,12 @@ export function OnboardingCard() {
           // Add data attributes for progress gauge
           const popover = document.querySelector('.driver-popover');
           if (popover && options.state) {
-            popover.setAttribute('data-current-step', options.state.activeIndex + 1);
-            popover.setAttribute('data-total-steps', steps.length);
+            const current = options.state.activeIndex + 1;
+            const total = steps.length;
+            popover.setAttribute('data-current-step', current);
+            popover.setAttribute('data-total-steps', total);
+            activeIndexRef.current = options.state.activeIndex;
+            totalStepsRef.current = total;
             // Defensive bindings: close/done/next(last)
             const bindClick = (el, fn) => {
               if (!el) return;
@@ -95,9 +101,8 @@ export function OnboardingCard() {
             bindClick(doneBtn, () => forceDestroy('done-btn'));
             if (nextBtn) {
               bindClick(nextBtn, () => {
-                const current = document.querySelector('.driver-popover');
-                const total = Number(current?.getAttribute('data-total-steps') || steps.length);
-                const curr = Number(current?.getAttribute('data-current-step') || (options?.state?.activeIndex ?? 0) + 1);
+                const curr = activeIndexRef.current + 1;
+                const total = totalStepsRef.current || steps.length;
                 if (curr >= total) forceDestroy('next-on-last');
               });
             }
@@ -137,9 +142,8 @@ export function OnboardingCard() {
           return;
         }
         if (isNext) {
-          const pop = document.querySelector('.driver-popover');
-          const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
-          const curr = Number(pop?.getAttribute('data-current-step') || 1);
+          const curr = activeIndexRef.current + 1;
+          const total = totalStepsRef.current || steps.length;
           if (curr >= total) forceDestroy('doc-next-on-last');
         }
       };
@@ -157,9 +161,8 @@ export function OnboardingCard() {
 
       // Overlay click to close on last step only
       const overlayHandler = () => {
-        const pop = document.querySelector('.driver-popover');
-        const total = Number(pop?.getAttribute('data-total-steps') || steps.length);
-        const curr = Number(pop?.getAttribute('data-current-step') || 1);
+        const curr = activeIndexRef.current + 1;
+        const total = totalStepsRef.current || steps.length;
         if (curr >= total) forceDestroy('overlay-last');
       };
       setTimeout(() => {
