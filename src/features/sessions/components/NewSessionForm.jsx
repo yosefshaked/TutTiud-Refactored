@@ -328,43 +328,60 @@ export default function NewSessionForm({
               const answerValue = answers[question.key];
 
               if (question.type === 'textarea') {
+                // Check for preanswers by both key and id
+                const preanswersByKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+                const preanswersById = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
+                const preanswers = preanswersByKey.length > 0 ? preanswersByKey : preanswersById;
+                const hasPreanswers = preanswers.length > 0;
+                
                 return (
                   <div key={question.key} className="space-y-xs">
                     <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <Textarea
-                      id={questionId}
-                      rows={4}
-                      value={answerValue ?? ''}
-                      onChange={(e) => handleAnswerChange(question.key, e)}
-                      disabled={isSubmitting}
-                      placeholder={placeholder}
-                      required={required}
-                    />
-                    {Array.isArray(suggestions?.[question.key]) && suggestions[question.key].length > 0 ? (
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {suggestions[question.key].map((sugg) => (
-                          <button
-                            key={`${question.key}-sugg-${sugg}`}
-                            type="button"
-                            className="rounded-full border px-2 py-0.5 text-xs hover:bg-neutral-50"
-                            onClick={() => updateAnswer(question.key, sugg)}
-                            disabled={isSubmitting}
-                            title="הכנס תשובה מוכנה"
-                          >
-                            {sugg}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
+                    <div className="relative">
+                      <Textarea
+                        id={questionId}
+                        rows={4}
+                        value={answerValue ?? ''}
+                        onChange={(e) => handleAnswerChange(question.key, e)}
+                        disabled={isSubmitting}
+                        placeholder={placeholder}
+                        required={required}
+                        className={hasPreanswers ? 'pl-12' : ''}
+                      />
+                      {hasPreanswers && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute left-1 top-1 h-8 px-2"
+                          onClick={() => {
+                            setActiveQuestionKey(question.key);
+                            setPreanswersDialogOpen(true);
+                          }}
+                          disabled={isSubmitting}
+                          title="בחר תשובה מוכנה"
+                        >
+                          <ListChecks className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {!hasPreanswers && (
+                      <p className="text-xs text-neutral-500 text-right">
+                        אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
+                      </p>
+                    )}
                   </div>
                 );
               }
 
               if (question.type === 'text') {
-                const preanswers = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+                // Check for preanswers by both key and id
+                const preanswersByKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+                const preanswersById = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
+                const preanswers = preanswersByKey.length > 0 ? preanswersByKey : preanswersById;
                 const hasPreanswers = preanswers.length > 0;
                 return (
                   <div key={question.key} className="space-y-xs">
@@ -622,7 +639,15 @@ export default function NewSessionForm({
           setPreanswersDialogOpen(false);
           setActiveQuestionKey(null);
         }}
-        answers={activeQuestionKey ? (suggestions?.[activeQuestionKey] || []) : []}
+        answers={(() => {
+          if (!activeQuestionKey) return [];
+          const question = questions.find((q) => q.key === activeQuestionKey);
+          if (!question) return [];
+          // Check by both key and id
+          const byKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+          const byId = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
+          return byKey.length > 0 ? byKey : byId;
+        })()}
         onSelect={(answer) => {
           if (activeQuestionKey) {
             updateAnswer(activeQuestionKey, answer);

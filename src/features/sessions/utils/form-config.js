@@ -101,6 +101,11 @@ function normalizeQuestion(entry, index) {
       ? entry.id.trim()
       : label;
   const key = createQuestionKey(keySource, index);
+  
+  // Preserve id field if it exists (needed for preconfigured answers lookup)
+  const id = typeof entry.id === 'string' && entry.id.trim()
+    ? entry.id.trim()
+    : null;
 
   const placeholder = typeof entry.placeholder === 'string' ? entry.placeholder : '';
   const required = Boolean(entry.required);
@@ -117,6 +122,11 @@ function normalizeQuestion(entry, index) {
     required,
     options,
   };
+  
+  // Add id if present
+  if (id) {
+    question.id = id;
+  }
 
   if (range) {
     question.range = range;

@@ -125,7 +125,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
             type="button"
             onClick={() => onOpenSessionModal?.()}
             data-tour="fab-button"
-            className="absolute -top-16 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-2 ring-background"
+            className="absolute -top-14 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-2 ring-background"
             aria-label="יצירת רישום פגישה חדש"
           >
             <Plus className="h-6 w-6" aria-hidden="true" />
