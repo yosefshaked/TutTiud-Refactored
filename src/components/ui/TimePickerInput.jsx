@@ -2,6 +2,7 @@ import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 function generateTimeOptions() {
   const times = [];
@@ -162,7 +163,7 @@ export default function TimePickerInput({ id, name, value, onChange, disabled, r
           onKeyDown={onKeyDown}
           disabled={disabled}
           required={required}
-          className={className}
+          className={cn('text-left placeholder:text-right', className)}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-controls={open ? `${id || name}-time-list` : undefined}

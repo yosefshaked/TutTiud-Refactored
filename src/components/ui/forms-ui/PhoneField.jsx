@@ -1,6 +1,7 @@
 import React from 'react';
 import FormField from './FormField';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export default function PhoneField({
   id,
@@ -29,7 +30,7 @@ export default function PhoneField({
         required={required}
         disabled={disabled}
         dir="ltr"
-        className={className}
+        className={cn('text-left placeholder:text-right', className)}
       />
     </FormField>
   );
