@@ -95,10 +95,12 @@ function normalizeTimeInputToLabel(input) {
   return `${String(hh).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`;
 }
 
-export default function TimePickerInput({ id, name, value, onChange, disabled, required, placeholder = 'בחר שעה', className }) {
+export default function TimePickerInput({ id, name, value, onChange, disabled, required, placeholder = 'בחר שעה', className, dir = 'rtl' }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState(toLabelFromValue(value));
   const lastCommittedRef = React.useRef(toLabelFromValue(value));
+  const selectedRef = React.useRef(null);
+  const hintRef = React.useRef(null);
 
   // Sync displayed text when value changes from outside
   React.useEffect(() => {
@@ -109,11 +111,9 @@ export default function TimePickerInput({ id, name, value, onChange, disabled, r
 
   const displayValue = toLabelFromValue(value);
 
-  const filtered = React.useMemo(() => {
-    const q = String(query || '').toLowerCase();
-    if (!q) return TIME_OPTIONS;
-    return TIME_OPTIONS.filter((t) => t.label.toLowerCase().includes(q.replace(/\s/g, '')));
-  }, [query]);
+  // Always show the full list; do not filter while typing. We'll scroll to the selected item instead.
+  const options = TIME_OPTIONS;
+  const highlightLabel = React.useMemo(() => normalizeTimeInputToLabel(query), [query]);
 
   const commit = (label) => {
     const lbl = normalizeTimeInputToLabel(label);
@@ -145,13 +145,25 @@ export default function TimePickerInput({ id, name, value, onChange, disabled, r
     }
   }, [open, query, onChange]);
 
+  // When the popover opens, scroll the current selection into view
+  React.useEffect(() => {
+    if (open) {
+      requestAnimationFrame(() => {
+        // Prefer scrolling to the selected row; otherwise, scroll to hint
+        try {
+          (selectedRef.current || hintRef.current)?.scrollIntoView({ block: 'center' });
+        } catch {}
+      });
+    }
+  }, [open, displayValue, highlightLabel]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div className="relative">
         <Input
           id={id}
           name={name}
-          dir="ltr"
+          dir={dir}
           inputMode="numeric"
           placeholder={placeholder}
           value={query}
@@ -163,7 +175,7 @@ export default function TimePickerInput({ id, name, value, onChange, disabled, r
           onKeyDown={onKeyDown}
           disabled={disabled}
           required={required}
-          className={cn('text-left placeholder:text-right', className)}
+          className={cn(dir === 'rtl' ? 'text-right' : 'text-left', 'placeholder:text-right', className)}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-controls={open ? `${id || name}-time-list` : undefined}
@@ -186,28 +198,34 @@ export default function TimePickerInput({ id, name, value, onChange, disabled, r
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
-        <ul id={`${id || name}-time-list`} role="listbox" className="py-1" dir="ltr">
-          {filtered.map((time) => (
-            <li
-              key={time.value}
-              role="option"
-              aria-selected={displayValue === time.label}
-              className="cursor-pointer select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-              onMouseDown={(e) => {
-                // Prevent Input blur before we handle selection
-                e.preventDefault();
-              }}
-              onClick={() => {
-                setQuery(time.label);
-                commit(time.label);
-              }}
-            >
-              {time.label}
-            </li>
-          ))}
-          {filtered.length === 0 && (
-            <li className="px-3 py-2 text-sm text-muted-foreground">לא נמצאו תוצאות</li>
-          )}
+        <ul id={`${id || name}-time-list`} role="listbox" className="py-1" dir={dir}>
+          {options.map((time) => {
+            const isSelected = displayValue === time.label;
+            const isHint = !isSelected && highlightLabel === time.label;
+            return (
+              <li
+                key={time.value}
+                role="option"
+                aria-selected={isSelected}
+                className={cn(
+                  "cursor-pointer select-none px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
+                  isSelected && "bg-accent text-accent-foreground",
+                  isHint && "bg-accent/10"
+                )}
+                ref={isSelected ? selectedRef : isHint ? hintRef : null}
+                onMouseDown={(e) => {
+                  // Prevent Input blur before we handle selection
+                  e.preventDefault();
+                }}
+                onClick={() => {
+                  setQuery(time.label);
+                  commit(time.label);
+                }}
+              >
+                {time.label}
+              </li>
+            );
+          })}
         </ul>
       </PopoverContent>
     </Popover>

@@ -24,7 +24,7 @@ export default function AccessibilityButton() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-neutral-100 p-2 text-neutral-700 transition hover:bg-neutral-200"
+          className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-primary text-primary-foreground p-2 transition hover:bg-primary/90"
           aria-label="אפשרויות נגישות"
           title="נגישות"
         >

@@ -14,6 +14,7 @@ export default function TimeField({
   description = '',
   error = '',
   className,
+  dir = 'rtl',
 }) {
   return (
     <FormField id={id} label={label} required={required} description={description} error={error}>
@@ -25,6 +26,7 @@ export default function TimeField({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        dir={dir}
         className={className}
       />
     </FormField>

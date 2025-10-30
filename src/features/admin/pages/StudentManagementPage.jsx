@@ -12,7 +12,8 @@ import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import AddStudentForm from '../components/AddStudentForm.jsx';
-import AssignInstructorModal from '../components/AssignInstructorModal.jsx';
+// Removed legacy instructor assignment modal; instructor is edited inside EditStudent now
+import EditStudentModal from '../components/EditStudentModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 import { includesDayQuery } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
@@ -34,10 +35,14 @@ export default function StudentManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isCreatingStudent, setIsCreatingStudent] = useState(false);
   const [createError, setCreateError] = useState('');
-  const [studentForAssignment, setStudentForAssignment] = useState(null);
+  // const [studentForAssignment, setStudentForAssignment] = useState(null);
+  const [studentForEdit, setStudentForEdit] = useState(null);
+  const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+  const [updateError, setUpdateError] = useState('');
   const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
   const [searchQuery, setSearchQuery] = useState('');
   const [dayFilter, setDayFilter] = useState(null);
+  const [instructorFilterId, setInstructorFilterId] = useState('');
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -186,24 +191,56 @@ export default function StudentManagementPage() {
     }
   };
 
-  const handleOpenAssignment = (student) => {
-    setStudentForAssignment(student);
+  // Legacy assignment handlers removed in favor of unified edit flow
+
+  const handleOpenEdit = (student) => {
+    setUpdateError('');
+    setStudentForEdit(student);
   };
 
-  const handleCloseAssignment = () => {
-    setStudentForAssignment(null);
+  const handleCloseEdit = () => {
+    if (!isUpdatingStudent) {
+      setStudentForEdit(null);
+      setUpdateError('');
+    }
   };
 
-  const handleAssignmentSuccess = async () => {
-    await refreshRoster();
+  const handleUpdateStudent = async (payload) => {
+    if (!payload?.id) return;
+    setIsUpdatingStudent(true);
+    setUpdateError('');
+    try {
+      const body = {
+        org_id: activeOrgId,
+        name: payload.name,
+        contact_name: payload.contactName,
+        contact_phone: payload.contactPhone,
+        assigned_instructor_id: payload.assignedInstructorId,
+        default_service: payload.defaultService,
+        default_day_of_week: payload.defaultDayOfWeek,
+        default_session_time: payload.defaultSessionTime,
+        notes: payload.notes,
+        tags: payload.tags,
+      };
+      await authenticatedFetch(`students/${payload.id}`, { session, method: 'PUT', body });
+      setStudentForEdit(null);
+      await refreshRoster(true);
+    } catch (error) {
+      console.error('Failed to update student', error);
+      setUpdateError(error?.message || 'עדכון התלמיד נכשל.');
+    } finally {
+      setIsUpdatingStudent(false);
+    }
   };
 
   // Compute filtered/sorted students before any early returns to satisfy hooks rules
   const displayedStudents = useMemo(() => {
     let filtered = students;
 
-    // Filter by instructor (mine vs all)
-    if (filterMode === 'mine' && user?.id) {
+    // Filter by instructor (explicit instructor takes precedence over mode)
+    if (instructorFilterId) {
+      filtered = filtered.filter((s) => s.assigned_instructor_id === instructorFilterId);
+    } else if (filterMode === 'mine' && user?.id) {
       filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
     }
     // Filter by day of week if selected
@@ -288,6 +325,18 @@ export default function StudentManagementPage() {
             >
               <option value="mine">התלמידים שלי</option>
               <option value="all">כל התלמידים</option>
+            </select>
+            <select
+              id="instructor-filter"
+              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+              value={instructorFilterId}
+              onChange={(e) => setInstructorFilterId(e.target.value)}
+              aria-label="סינון לפי מדריך"
+            >
+              <option value="">כל המדריכים</option>
+              {instructors.map((inst) => (
+                <option key={inst.id} value={inst.id}>{inst.name || inst.email || inst.id}</option>
+              ))}
             </select>
           </div>
           <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
@@ -459,7 +508,7 @@ export default function StudentManagementPage() {
                           variant="outline"
                           size="sm"
                           className="gap-xs text-xs sm:text-sm"
-                          onClick={() => handleOpenAssignment(student)}
+                          onClick={() => handleOpenEdit(student)}
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                           <span className="hidden sm:inline">עריכה</span>
@@ -490,13 +539,15 @@ export default function StudentManagementPage() {
         </DialogContent>
       </Dialog>
 
-      <AssignInstructorModal
-        open={Boolean(studentForAssignment)}
-        onClose={handleCloseAssignment}
-        student={studentForAssignment}
-        orgId={activeOrgId}
-        session={session}
-        onAssigned={handleAssignmentSuccess}
+      {/* Instructor assignment is now handled inside EditStudentModal */}
+
+      <EditStudentModal
+        open={Boolean(studentForEdit)}
+        onClose={handleCloseEdit}
+        student={studentForEdit}
+        onSubmit={handleUpdateStudent}
+        isSubmitting={isUpdatingStudent}
+        error={updateError}
       />
     </PageLayout>
   );
