@@ -424,7 +424,13 @@ export default function SessionFormManager({
     return JSON.stringify(payload);
   }, [questions]);
 
-  const isDirty = currentSignature !== lastSavedSignatureRef.current;
+  const currentPreanswersSignature = useMemo(() => {
+    return JSON.stringify(preanswersMap);
+  }, [preanswersMap]);
+
+  const questionsChanged = currentSignature !== lastSavedSignatureRef.current;
+  const preanswersChanged = currentPreanswersSignature !== JSON.stringify(lastSavedPreanswersRef.current);
+  const isDirty = questionsChanged || preanswersChanged;
   const isSaving = saveState === SAVE_STATE.saving;
   const isLoading = loadState === REQUEST_STATE.loading;
 

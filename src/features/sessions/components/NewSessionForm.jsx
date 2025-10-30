@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
+import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
 
 function todayIsoDate() {
   return format(new Date(), 'yyyy-MM-dd');
@@ -38,6 +39,8 @@ export default function NewSessionForm({
   const [sessionDate, setSessionDate] = useState(todayIsoDate());
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
+  const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
+  const [activeQuestionKey, setActiveQuestionKey] = useState(null);
   const [answers, setAnswers] = useState(() => {
     const initial = {};
     for (const question of questions) {
@@ -361,29 +364,46 @@ export default function NewSessionForm({
               }
 
               if (question.type === 'text') {
-                const datalistId = `${questionId}-datalist`;
+                const preanswers = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+                const hasPreanswers = preanswers.length > 0;
                 return (
                   <div key={question.key} className="space-y-xs">
                     <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <Input
-                      id={questionId}
-                      list={Array.isArray(suggestions?.[question.key]) && suggestions[question.key].length ? datalistId : undefined}
-                      value={answerValue ?? ''}
-                      onChange={(e) => handleAnswerChange(question.key, e)}
-                      disabled={isSubmitting}
-                      placeholder={placeholder}
-                      required={required}
-                    />
-                    {Array.isArray(suggestions?.[question.key]) && suggestions[question.key].length ? (
-                      <datalist id={datalistId}>
-                        {suggestions[question.key].map((sugg) => (
-                          <option key={`${question.key}-sugg-${sugg}`} value={sugg} />
-                        ))}
-                      </datalist>
-                    ) : null}
+                    <div className="relative">
+                      <Input
+                        id={questionId}
+                        value={answerValue ?? ''}
+                        onChange={(e) => handleAnswerChange(question.key, e)}
+                        disabled={isSubmitting}
+                        placeholder={placeholder}
+                        required={required}
+                        className={hasPreanswers ? 'pl-12' : ''}
+                      />
+                      {hasPreanswers && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute left-1 top-1/2 -translate-y-1/2 h-8 px-2"
+                          onClick={() => {
+                            setActiveQuestionKey(question.key);
+                            setPreanswersDialogOpen(true);
+                          }}
+                          disabled={isSubmitting}
+                          title="בחר תשובה מוכנה"
+                        >
+                          <ListChecks className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {!hasPreanswers && (
+                      <p className="text-xs text-neutral-500 text-right">
+                        אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
+                      </p>
+                    )}
                   </div>
                 );
               }
@@ -594,6 +614,26 @@ export default function NewSessionForm({
           </div>
         </div>
       )}
+
+      {/* Preconfigured Answers Picker Dialog */}
+      <PreanswersPickerDialog
+        open={preanswersDialogOpen}
+        onClose={() => {
+          setPreanswersDialogOpen(false);
+          setActiveQuestionKey(null);
+        }}
+        answers={activeQuestionKey ? (suggestions?.[activeQuestionKey] || []) : []}
+        onSelect={(answer) => {
+          if (activeQuestionKey) {
+            updateAnswer(activeQuestionKey, answer);
+          }
+        }}
+        questionLabel={
+          activeQuestionKey
+            ? questions.find((q) => q.key === activeQuestionKey)?.label || 'שאלה'
+            : 'שאלה'
+        }
+      />
     </form>
   );
 }

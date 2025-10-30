@@ -11,22 +11,22 @@ export default function LandingPage() {
     {
       icon: Users,
       title: 'ניהול תלמידים',
-      description: 'מעקב מלא אחר כל תלמיד ותלמידה, כולל פרטי קשר, מדריך מקצועי ולוח זמנים אישי',
+      description: 'מעקב מלא אחר כל תלמיד ותלמידה, כולל פרטי קשר, מדריך מקצועי ותזמון המפגשים האישי',
     },
     {
       icon: Calendar,
       title: 'תיעוד מפגשים',
-      description: 'רישום מהיר ונוח של מפגשי הדרכה עם טפסים מותאמים אישית לצרכי הארגון',
+      description: 'רישום מהיר ונוח של מפגשי הדרכה עם טפסים מותאמים אישית לצרכים שלכם',
     },
     {
       icon: BarChart3,
-      title: 'דוחות ותובנות',
+      title: 'דוחות ותובנות - בשלבי פיתוח',
       description: 'ניתוח נתונים מתקדם, דוחות מפורטים ומעקב אחר התקדמות לאורך זמן',
     },
     {
       icon: Shield,
       title: 'אבטחה ופרטיות',
-      description: 'הגנה מלאה על מידע רגיש עם הצפנה, גיבויים אוטומטיים ובקרת גישה מתקדמת',
+      description: 'הגנה מלאה על מידע רגיש עם הצפנה, גיבויים ובקרת גישה נוחה',
     },
     {
       icon: Sparkles,
@@ -35,8 +35,8 @@ export default function LandingPage() {
     },
     {
       icon: CheckCircle2,
-      title: 'תמיכה מלאה',
-      description: 'צוות תמיכה מסור וזמין לעזרה בכל שלב',
+      title: 'פיתוח מתמשך',
+      description: 'חסר לכם משהו במערכת? זה הזמן לשתף אותנו ולהשפיע על הכיוונים העתידיים',
     },
   ];
 
@@ -96,7 +96,7 @@ export default function LandingPage() {
             כל מה שצריך לניהול מוצלח
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-600">
-            מערכת מקיפה עם כלים מתקדמים לכל היבט של ההדרכה
+            מערכת מקיפה עם כלים מתקדמים לכל היבט של המפגשים
           </p>
         </div>
 
@@ -116,6 +116,126 @@ export default function LandingPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* Screenshots Section */}
+      <section className="container mx-auto px-4 py-16 sm:px-6 lg:px-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            הצצה למערכת
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-600">
+            המערכת שלנו נמצאת כרגע בשלבי בדיקות מוקדמים עם ארגונים נבחרים
+          </p>
+        </div>
+
+        <div className="mt-12 space-y-16">
+          {/* Dashboard Preview */}
+          <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+            <div className="order-2 text-right lg:order-1">
+              <h3 className="text-2xl font-bold text-foreground">לוח בקרה ראשי</h3>
+              <p className="mt-4 text-lg text-neutral-600">
+                נגישות נוחה לחלקיה המרכזיים של המערכת - מבט על התלמידים ותיעוד מפגש חדש.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-neutral-600">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>גישה מהירה לפונקציות הנפוצות ביותר</span>
+                </li>
+              </ul>
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="overflow-hidden rounded-lg border-2 border-primary/20 bg-neutral-100 shadow-2xl">
+                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+                  <div className="text-center">
+                    <BarChart3 className="mx-auto h-16 w-16 text-primary/40" />
+                    <p className="mt-4 text-sm text-neutral-500">תמונת מסך: לוח הבקרה הראשי</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Student Management Preview */}
+          <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+            <div className="order-2 text-right lg:order-2">
+              <h3 className="text-2xl font-bold text-foreground">ניהול תלמידים מתקדם</h3>
+              <p className="mt-4 text-lg text-neutral-600">
+                ממשק ניהול תלמידים אינטואיטיבי עם חיפוש מהיר, סינון לפי מדריך או יום בשבוע,
+                ותצוגה ברורה עם כל הפרטים החשובים.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-neutral-600">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>חיפוש וסינון מתקדמים לאיתור מהיר</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>עריכה והוספה פשוטה של תלמידים חדשים</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>שיוך מדריכים ולוחות זמנים מותאמים אישית</span>
+                </li>
+              </ul>
+            </div>
+            <div className="order-1 lg:order-1">
+              <div className="overflow-hidden rounded-lg border-2 border-primary/20 bg-neutral-100 shadow-2xl">
+                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+                  <div className="text-center">
+                    <Users className="mx-auto h-16 w-16 text-primary/40" />
+                    <p className="mt-4 text-sm text-neutral-500">תמונת מסך: ניהול תלמידים</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Session Recording Preview */}
+          <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+            <div className="order-2 text-right lg:order-1">
+              <h3 className="text-2xl font-bold text-foreground">תיעוד מפגשים מהיר ונוח</h3>
+              <p className="mt-4 text-lg text-neutral-600">
+                תיעוד מפגש בכמה קליקים - בחירת תלמיד, מילוי שאלות מותאמות אישית, ושמירה מיידית.
+                כל המידע במקום אחד ונגיש.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-neutral-600">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>טפסים מותאמים אישית לפי צרכי הארגון</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>שאלות מגוונות: טקסט חופשי, בחירה מרובה, דירוג ועוד</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                  <span>הכינו תשובות מוכנות מראש לחיסכון בזמן</span>
+                </li>
+              </ul>
+            </div>
+            <div className="order-1 lg:order-2">
+              <div className="overflow-hidden rounded-lg border-2 border-primary/20 bg-neutral-100 shadow-2xl">
+                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+                  <div className="text-center">
+                    <Calendar className="mx-auto h-16 w-16 text-primary/40" />
+                    <p className="mt-4 text-sm text-neutral-500">תמונת מסך: רישום מפגש חדש</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Beta Notice */}
+        <div className="mt-16 rounded-lg border border-primary/30 bg-primary/5 p-6 text-center">
+          <Shield className="mx-auto h-12 w-12 text-primary" />
+          <h3 className="mt-4 text-xl font-bold text-foreground">בדיקות מוקדמות בסביבה אמיתית</h3>
+          <p className="mx-auto mt-2 max-w-2xl text-neutral-600">
+            המערכת שלנו נמצאת כעת בשלבי פיילוט עם ארגונים נבחרים. אנחנו אוספים משוב, משפרים ומוסיפים תכונות חדשות באופן שוטף.
+            תמונות המסך הן הדמיות - הממשק האמיתי זמין עם כניסה למערכת.
+          </p>
         </div>
       </section>
 
@@ -173,7 +293,7 @@ export default function LandingPage() {
             <img src="/icon.svg" alt="TutTiud" className="h-6 w-6" />
             <span className="font-semibold">TutTiud</span>
             <span className="text-neutral-400">•</span>
-            <span className="text-sm">מערכת ניהול הדרכה מתקדמת</span>
+            <span className="text-sm">מערכת ניהול מפגשים מתקדמת</span>
           </div>
           <p className="mt-4 text-sm text-neutral-500">
             © {new Date().getFullYear()} TutTiud ThePCRunners. כל הזכויות שמורות.
