@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ComboBoxField, TimeField } from '@/components/ui/forms-ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
@@ -197,7 +198,10 @@ export default function NewSessionForm({
     <form className="space-y-lg" onSubmit={handleSubmit} dir="rtl">
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
-        <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className={cn(
+          'mb-2 grid grid-cols-1 gap-2',
+          canFilterByInstructor ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+        )}>
           <div className="relative">
             <Input
               type="text"
@@ -209,32 +213,36 @@ export default function NewSessionForm({
               aria-label="חיפוש תלמיד"
             />
           </div>
-          <div className="flex items-center gap-2">
-            {canFilterByInstructor ? (
-              <select
-                id="session-student-scope"
-                className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground flex-1"
+          {canFilterByInstructor ? (
+            <div>
+              <Select
                 value={studentScope}
-                onChange={(e) => onScopeChange?.(e.target.value)}
+                onValueChange={(v) => onScopeChange?.(v)}
                 disabled={isSubmitting}
-                aria-label="הצג תלמידים לפי מדריך"
               >
-                <option value="all">כל התלמידים</option>
-                {/* 'mine' option is still useful for admins who are also instructors */}
-                <option value="mine">התלמידים שלי</option>
-                {instructors.map((inst) => (
-                  <option key={inst.id} value={`inst:${inst.id}`}>התלמידים של {inst.name || inst.email || inst.id}</option>
-                ))}
-              </select>
-            ) : null}
-            <div className="flex-1">
-              <DayOfWeekSelect
-                value={studentDayFilter}
-                onChange={setStudentDayFilter}
-                disabled={isSubmitting || students.length === 0}
-                placeholder="סינון לפי יום"
-              />
+                <SelectTrigger>
+                  <SelectValue placeholder="כל התלמידים" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">כל התלמידים</SelectItem>
+                  {/* 'mine' option is still useful for admins who are also instructors */}
+                  <SelectItem value="mine">התלמידים שלי</SelectItem>
+                  {instructors.map((inst) => (
+                    <SelectItem key={inst.id} value={`inst:${inst.id}`}>
+                      התלמידים של {inst.name || inst.email || inst.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          ) : null}
+          <div>
+            <DayOfWeekSelect
+              value={studentDayFilter}
+              onChange={setStudentDayFilter}
+              disabled={isSubmitting || students.length === 0}
+              placeholder="סינון לפי יום"
+            />
           </div>
         </div>
         <select
