@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import ComboBoxInput from '@/components/ui/ComboBoxInput';
+import { ComboBoxField, TimeField } from '@/components/forms-ui';
 import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
@@ -252,21 +252,19 @@ export default function NewSessionForm({
             disabled={isSubmitting}
           />
         </div>
-        <div className="space-y-sm">
-          <Label htmlFor="session-service">שירות ברירת מחדל</Label>
-          <ComboBoxInput
-            id="session-service"
-            name="service"
-            value={serviceContext}
-            onChange={setServiceContext}
-            options={services}
-            placeholder="בחרו מהרשימה או הקלידו שירות"
-            disabled={isSubmitting}
-            dir="rtl"
-            emptyMessage="לא נמצאו שירותים תואמים"
-          />
-          <p className="text-xs text-neutral-500">הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה.</p>
-        </div>
+        <ComboBoxField
+          id="session-service"
+          name="service"
+          label="שירות ברירת מחדל"
+          value={serviceContext}
+          onChange={setServiceContext}
+          options={services}
+          placeholder="בחרו מהרשימה או הקלידו שירות"
+          disabled={isSubmitting}
+          dir="rtl"
+          emptyMessage="לא נמצאו שירותים תואמים"
+          description="הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה."
+        />
       </div>
 
       {questions.length ? (

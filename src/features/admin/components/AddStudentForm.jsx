@@ -8,8 +8,7 @@ import { Loader2 } from 'lucide-react';
 import IsraeliPhoneInput from '@/components/ui/IsraeliPhoneInput';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect';
-import TimePickerInput from '@/components/ui/TimePickerInput';
-import ComboBoxInput from '@/components/ui/ComboBoxInput';
+import { ComboBoxField, TimeField } from '@/components/forms-ui';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
@@ -240,23 +239,19 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="default-service">שירות ברירת מחדל</Label>
-        <ComboBoxInput
-          id="default-service"
-          name="defaultService"
-          value={values.defaultService}
-          onChange={(value) => handleSelectChange('defaultService', value)}
-          options={services}
-          placeholder={loadingServices ? 'טוען...' : 'בחרו מהרשימה או הקלידו שירות'}
-          disabled={isSubmitting || loadingServices}
-          dir="rtl"
-          emptyMessage="לא נמצאו שירותים תואמים"
-        />
-        <p className="text-xs text-slate-500">
-          ניתן להגדיר שירותים זמינים בעמוד ההגדרות.
-        </p>
-      </div>
+      <ComboBoxField
+        id="default-service"
+        name="defaultService"
+        label="שירות ברירת מחדל"
+        value={values.defaultService}
+        onChange={(value) => handleSelectChange('defaultService', value)}
+        options={services}
+        placeholder={loadingServices ? 'טוען...' : 'בחרו מהרשימה או הקלידו שירות'}
+        disabled={isSubmitting || loadingServices}
+        dir="rtl"
+        emptyMessage="לא נמצאו שירותים תואמים"
+        description="ניתן להגדיר שירותים זמינים בעמוד ההגדרות."
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -275,21 +270,16 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="default-time">שעת מפגש קבועה *</Label>
-          <TimePickerInput
-            id="default-time"
-            value={values.defaultSessionTime}
-            onChange={(value) => handleSelectChange('defaultSessionTime', value)}
-            disabled={isSubmitting}
-            required
-          />
-          {showTimeError && (
-            <p className="text-sm text-red-600" role="alert">
-              יש לבחור שעה.
-            </p>
-          )}
-        </div>
+        <TimeField
+          id="default-time"
+          name="defaultSessionTime"
+          label="שעת מפגש קבועה *"
+          value={values.defaultSessionTime}
+          onChange={(value) => handleSelectChange('defaultSessionTime', value)}
+          disabled={isSubmitting}
+          required
+          error={showTimeError ? 'יש לבחור שעה.' : ''}
+        />
       </div>
 
       <div className="space-y-2">

@@ -87,7 +87,8 @@ export default function ComboBoxInput({
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            // Don't toggle popover here to avoid mobile keyboards closing on first keystroke
+            // Open suggestions while typing without stealing focus (PopoverContent prevents auto-focus)
+            if (!open) setOpen(true);
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}

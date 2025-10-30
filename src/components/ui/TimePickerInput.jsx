@@ -179,7 +179,12 @@ export default function TimePickerInput({ id, name, value, onChange, disabled, r
           </button>
         </PopoverTrigger>
       </div>
-      <PopoverContent className="p-0 w-[260px] max-h-60 overflow-auto" align="end">
+      <PopoverContent
+        className="p-0 w-[260px] max-h-60 overflow-auto"
+        align="end"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <ul id={`${id || name}-time-list`} role="listbox" className="py-1" dir="ltr">
           {filtered.map((time) => (
             <li
