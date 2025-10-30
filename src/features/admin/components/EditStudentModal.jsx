@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import EditStudentForm from './EditStudentForm.jsx';
+import EditStudentForm, { EditStudentFormFooter } from './EditStudentForm.jsx';
 
 export default function EditStudentModal({ open, onClose, student, onSubmit, isSubmitting = false, error = '' }) {
   const handleCancel = () => {
@@ -9,7 +9,16 @@ export default function EditStudentModal({ open, onClose, student, onSubmit, isS
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
+      <DialogContent 
+        className="sm:max-w-xl"
+        footer={
+          <EditStudentFormFooter
+            onSubmit={() => document.getElementById('edit-student-form')?.requestSubmit()}
+            onCancel={handleCancel}
+            isSubmitting={isSubmitting}
+          />
+        }
+      >
         <DialogHeader>
           <DialogTitle>עריכת תלמיד</DialogTitle>
         </DialogHeader>
@@ -19,6 +28,7 @@ export default function EditStudentModal({ open, onClose, student, onSubmit, isS
           onCancel={handleCancel}
           isSubmitting={isSubmitting}
           error={error}
+          renderFooterOutside={true}
         />
       </DialogContent>
     </Dialog>

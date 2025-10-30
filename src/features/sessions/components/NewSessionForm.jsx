@@ -29,6 +29,8 @@ export default function NewSessionForm({
   onCancel,
   isSubmitting = false,
   error = '',
+  renderFooterOutside = false, // New prop to control footer rendering
+  onSelectedStudentChange, // Callback to notify parent of selection changes
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
@@ -141,6 +143,7 @@ export default function NewSessionForm({
   const handleStudentChange = (event) => {
     const value = event.target.value;
     setSelectedStudentId(value);
+    onSelectedStudentChange?.(value); // Notify parent
     setServiceTouched(false);
     const nextStudent = students.find((student) => student?.id === value);
     if (nextStudent?.default_service) {
@@ -195,7 +198,7 @@ export default function NewSessionForm({
   };
 
   return (
-    <form className="space-y-lg" onSubmit={handleSubmit} dir="rtl">
+    <form id="new-session-form" className="space-y-lg" onSubmit={handleSubmit} dir="rtl">
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
         <div className={cn(
@@ -578,18 +581,35 @@ export default function NewSessionForm({
         </div>
       ) : null}
 
-      <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 border-t bg-background p-3 sm:p-4">
-        <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
-        <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
-          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          שמירת מפגש
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
-          ביטול
-        </Button>
+      {!renderFooterOutside && (
+        <div className="border-t -mx-4 sm:-mx-6 mt-6 pt-3 sm:pt-4 px-4 sm:px-6">
+          <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
+            <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+              שמירת מפגש
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+              ביטול
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </form>
+  );
+}
+
+// Export footer component for external rendering
+export function NewSessionFormFooter({ onSubmit, onCancel, isSubmitting = false, selectedStudentId }) {
+  return (
+    <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
+      <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
+        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+        שמירת מפגש
+      </Button>
+      <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+        ביטול
+      </Button>
+    </div>
   );
 }
 

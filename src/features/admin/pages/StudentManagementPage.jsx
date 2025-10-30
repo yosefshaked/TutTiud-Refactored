@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
-import AddStudentForm from '../components/AddStudentForm.jsx';
+import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentForm.jsx';
 // Removed legacy instructor assignment modal; instructor is edited inside EditStudent now
 import EditStudentModal from '../components/EditStudentModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
@@ -560,7 +560,16 @@ export default function StudentManagementPage() {
       </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) handleCloseAddDialog(); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
+        <DialogContent 
+          className="sm:max-w-xl" 
+          footer={
+            <AddStudentFormFooter
+              onSubmit={() => document.getElementById('add-student-form')?.requestSubmit()}
+              onCancel={handleCloseAddDialog}
+              isSubmitting={isCreatingStudent}
+            />
+          }
+        >
           <DialogHeader>
             <DialogTitle>הוספת תלמיד חדש</DialogTitle>
           </DialogHeader>
@@ -569,6 +578,7 @@ export default function StudentManagementPage() {
             onCancel={handleCloseAddDialog}
             isSubmitting={isCreatingStudent}
             error={createError}
+            renderFooterOutside={true}
           />
         </DialogContent>
       </Dialog>

@@ -22,6 +22,7 @@ import AuthGuard from './auth/AuthGuard.jsx';
 import { OrgProvider } from './org/OrgContext.jsx';
 import OrgSelection from './pages/OrgSelection.jsx';
 import MyStudentsPage from './features/instructor/pages/MyStudentsPage.jsx';
+import LandingPage from './pages/LandingPage.jsx';
 
 function App({ config = null }) {
   console.log('[DEBUG 4] App component rendering.');
@@ -32,6 +33,7 @@ function App({ config = null }) {
           <OrgProvider>
             <HashRouter>
               <Routes>
+                <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/update-password" element={<UpdatePassword />} />
@@ -42,8 +44,8 @@ function App({ config = null }) {
                   <Route path="/select-org" element={<OrgSelection />} />
                   <Route element={<AppShell />}>
                     {/* הגדרת כל העמודים */}
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/Dashboard" element={<Navigate to="/" replace />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/Dashboard" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/Employees" element={<Navigate to="/admin/students" replace />} />
                     <Route path="/admin/students" element={<StudentManagementPage />} />
                     <Route path="/students/:id" element={<StudentDetailPage />} />

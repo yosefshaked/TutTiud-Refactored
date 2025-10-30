@@ -27,7 +27,7 @@ const INITIAL_STATE = {
   tags: '',
 };
 
-export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = false, error = '' }) {
+export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
   const [values, setValues] = useState(INITIAL_STATE);
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
@@ -161,7 +161,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" dir="rtl">
+    <form id="add-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
       <div className="space-y-5 divide-y divide-border">
         <div className="space-y-5 py-1">
           <TextField
@@ -290,18 +290,34 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         </div>
       )}
 
-      <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 border-t bg-background p-3 sm:p-4">
-        <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
-        <Button type="submit" disabled={isSubmitting} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
-          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          שמירת תלמיד חדש
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
-          ביטול
-        </Button>
+      {!renderFooterOutside && (
+        <div className="border-t -mx-4 sm:-mx-6 mt-6 pt-3 sm:pt-4 px-4 sm:px-6">
+          <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
+            <Button type="submit" disabled={isSubmitting} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              שמירת תלמיד חדש
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+              ביטול
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </form>
+  );
+}
+
+export function AddStudentFormFooter({ onSubmit, onCancel, isSubmitting = false }) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
+      <Button onClick={onSubmit} disabled={isSubmitting} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+        {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+        שמירת תלמיד חדש
+      </Button>
+      <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+        ביטול
+      </Button>
+    </div>
   );
 }
 

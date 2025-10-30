@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
-import NewSessionForm from './NewSessionForm.jsx';
+import NewSessionForm, { NewSessionFormFooter } from './NewSessionForm.jsx';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 
@@ -213,9 +213,24 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const isLoadingQuestions = questionsState === REQUEST_STATE.loading;
   const showLoading = isLoadingStudents || isLoadingQuestions;
 
+  // Track selected student for footer button state
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+
+  const footer = canFetchStudents && !showLoading && studentsState !== REQUEST_STATE.error ? (
+    <NewSessionFormFooter
+      onSubmit={() => {
+        // Trigger form submission via form id
+        document.getElementById('new-session-form')?.requestSubmit();
+      }}
+      onCancel={onClose}
+      isSubmitting={submitState === REQUEST_STATE.loading}
+      selectedStudentId={selectedStudentId}
+    />
+  ) : null;
+
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) { onClose?.(); } }}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl" footer={footer}>
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
@@ -248,6 +263,8 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
             onCancel={onClose}
             isSubmitting={submitState === REQUEST_STATE.loading}
             error={submitError || (questionsState === REQUEST_STATE.error ? questionError : '')}
+            renderFooterOutside={true}
+            onSelectedStudentChange={setSelectedStudentId}
           />
         )}
       </DialogContent>

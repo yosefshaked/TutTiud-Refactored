@@ -72,6 +72,17 @@
 - Render the summary information in the base `<TableRow>` and immediately follow it with a conditional second `<TableRow>` that holds the drawer content inside a single spanning `<TableCell>` (e.g., `colSpan={totalColumns}`).
 - Place the toggle affordance (e.g., a chevron button) inside the summary row; avoid wrapping table semantics in `<Collapsible>` primitives so the DOM remains a valid `<table>` composed of sibling `<tr>` elements.
 
+### Dialog Footer Pattern (2025-10)
+- `DialogContent` accepts an optional `footer` prop to render sticky footer buttons outside the scrollable content area.
+- Forms inside dialogs should:
+  - Accept a `renderFooterOutside` prop (default `false` for backward compatibility).
+  - Export a separate `*FormFooter` component that renders the action buttons.
+  - Add an `id` attribute to the `<form>` element for programmatic submission.
+  - Conditionally render the inline footer when `renderFooterOutside={false}`.
+- Parent dialogs pass the footer to `DialogContent` via the `footer` prop and trigger submission using `document.getElementById('form-id')?.requestSubmit()`.
+- This pattern ensures footers remain visible at the bottom of the dialog on both mobile and desktop without being hidden by scrolling content.
+- Examples: `NewSessionForm`/`NewSessionFormFooter`, `AddStudentForm`/`AddStudentFormFooter`, `EditStudentForm`/`EditStudentFormFooter`.
+
 ## Documentation
 - When editing files in `ProjectDoc/`, keep `Eng.md` and `Heb.md` in sync and update their version and last-updated fields.
 
