@@ -131,6 +131,51 @@ export default function StudentManagementPage() {
     }
   }, [user, instructors]);
 
+  // Ensure instructor-specific filter is cleared when viewing "my students"
+  useEffect(() => {
+    if (filterMode === 'mine' && instructorFilterId) {
+      setInstructorFilterId('');
+    }
+  }, [filterMode, instructorFilterId]);
+
+  // Combined filter options for the control: mine, all, and per-instructor
+  const combinedFilterOptions = useMemo(() => {
+    const base = [
+      { value: 'mine', label: 'התלמידים שלי' },
+      { value: 'all', label: 'כל התלמידים' },
+    ];
+    if (!Array.isArray(instructors) || instructors.length === 0) return base;
+    const instructorOptions = instructors.map((inst) => ({
+      value: `inst:${inst.id}`,
+      label: `התלמידים של ${inst.name || inst.email || inst.id}`,
+    }));
+    return base.concat(instructorOptions);
+  }, [instructors]);
+
+  const combinedFilterValue = useMemo(() => {
+    if (instructorFilterId) return `inst:${instructorFilterId}`;
+    return filterMode; // 'mine' or 'all'
+  }, [filterMode, instructorFilterId]);
+
+  const handleCombinedFilterChange = (e) => {
+    const value = e.target.value;
+    if (value === 'mine') {
+      setFilterMode('mine');
+      setInstructorFilterId('');
+      return;
+    }
+    if (value === 'all') {
+      setFilterMode('all');
+      setInstructorFilterId('');
+      return;
+    }
+    if (value.startsWith('inst:')) {
+      const id = value.slice(5);
+      setFilterMode('all');
+      setInstructorFilterId(id);
+    }
+  };
+
   const handleOpenAddDialog = () => {
     setCreateError('');
     setIsAddDialogOpen(true);
@@ -281,7 +326,7 @@ export default function StudentManagementPage() {
     }
 
     return filtered;
-  }, [students, filterMode, user?.id, searchQuery, dayFilter]);
+  }, [students, filterMode, user?.id, searchQuery, dayFilter, instructorFilterId]);
 
   if (supabaseLoading) {
     return (
@@ -316,26 +361,15 @@ export default function StudentManagementPage() {
       actions={(
         <div className="flex items-center gap-3 self-start">
           <div className="flex items-center gap-2 text-sm">
-            <label htmlFor="students-filter" className="text-neutral-600">הצג:</label>
+            <label htmlFor="students-filter-combined" className="text-neutral-600">הצג:</label>
             <select
-              id="students-filter"
+              id="students-filter-combined"
               className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
-              value={filterMode}
-              onChange={(e) => setFilterMode(e.target.value)}
+              value={combinedFilterValue}
+              onChange={handleCombinedFilterChange}
             >
-              <option value="mine">התלמידים שלי</option>
-              <option value="all">כל התלמידים</option>
-            </select>
-            <select
-              id="instructor-filter"
-              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
-              value={instructorFilterId}
-              onChange={(e) => setInstructorFilterId(e.target.value)}
-              aria-label="סינון לפי מדריך"
-            >
-              <option value="">כל המדריכים</option>
-              {instructors.map((inst) => (
-                <option key={inst.id} value={inst.id}>{inst.name || inst.email || inst.id}</option>
+              {combinedFilterOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>
@@ -453,7 +487,7 @@ export default function StudentManagementPage() {
                                 ) : student.assigned_instructor_id ? (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenAssignment(student)}
+                                    onClick={() => handleOpenEdit(student)}
                                     className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
                                     title="שיוך מדריך מחדש"
                                   >
