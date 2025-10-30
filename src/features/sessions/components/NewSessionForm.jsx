@@ -302,7 +302,7 @@ export default function NewSessionForm({
                       id={questionId}
                       rows={4}
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting}
                       placeholder={placeholder}
                       required={required}
@@ -339,7 +339,7 @@ export default function NewSessionForm({
                       id={questionId}
                       list={Array.isArray(suggestions?.[question.key]) && suggestions[question.key].length ? datalistId : undefined}
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting}
                       placeholder={placeholder}
                       required={required}
@@ -366,7 +366,7 @@ export default function NewSessionForm({
                       id={questionId}
                       type="number"
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting}
                       placeholder={placeholder}
                       required={required}
@@ -386,7 +386,7 @@ export default function NewSessionForm({
                       id={questionId}
                       type="date"
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting}
                       required={required}
                     />
@@ -405,7 +405,7 @@ export default function NewSessionForm({
                       id={questionId}
                       className="w-full rounded-lg border border-border bg-white p-sm text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting || questionOptions.length === 0}
                       required={required}
                     >
@@ -530,7 +530,7 @@ export default function NewSessionForm({
                   <Input
                     id={questionId}
                     value={answerValue ?? ''}
-                    onChange={handleAnswerChange(question.key)}
+                    onChange={(e) => handleAnswerChange(question.key, e)}
                     disabled={isSubmitting}
                     placeholder={placeholder}
                     required={required}

@@ -87,7 +87,7 @@ export default function ComboBoxInput({
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            if (!open) setOpen(true);
+            // Don't toggle popover here to avoid mobile keyboards closing on first keystroke
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
@@ -110,7 +110,12 @@ export default function ComboBoxInput({
           </button>
         </PopoverTrigger>
       </div>
-      <PopoverContent className="p-0 w-[260px] max-h-60 overflow-auto" align="end">
+      <PopoverContent
+        className="p-0 w-[min(260px,80vw)] max-h-[60vh] overflow-auto"
+        align="end"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <ul id={`${id || name}-list`} role="listbox" className="py-1" dir={dir}>
           {filtered.map((option) => (
             <li
