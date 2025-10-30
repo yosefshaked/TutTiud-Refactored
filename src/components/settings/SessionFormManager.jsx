@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import QuestionTypePreview from './QuestionTypePreview.jsx';
 import { fetchSessionFormConfig } from '@/features/settings/api/index.js';
 import { upsertSetting } from '@/features/settings/api/settings.js';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -854,7 +855,10 @@ export default function SessionFormManager({
 
                         <div className="grid w-full gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
-                          <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
+                          <div className="flex items-center gap-2 justify-end">
+                            <QuestionTypePreview questionType={question.type} />
+                            <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
+                          </div>
                           <select
                             id={`question-type-${question.id}`}
                             className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 sm:text-sm"
