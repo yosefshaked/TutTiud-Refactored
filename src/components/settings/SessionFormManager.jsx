@@ -879,7 +879,7 @@ export default function SessionFormManager({
 
                         <div className="grid w-full gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
-                          <div className="flex items-center gap-2 justify-end">
+                          <div className="flex items-center gap-2">
                             <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
                             <QuestionTypePreview questionType={question.type} />
                           </div>
@@ -965,7 +965,7 @@ export default function SessionFormManager({
                             </div>
                             <div className="space-y-3">
                               {options.map((option, optIndex) => (
-                                <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto,auto,auto] sm:items-end">
+                                <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto,auto,auto] sm:items-start">
                                   <div className="space-y-2">
                                     <Label htmlFor={`option-label-${option.id}`} className="text-xs sm:text-sm">תווית להצגה</Label>
                                     <Input
@@ -975,6 +975,7 @@ export default function SessionFormManager({
                                       placeholder="לדוגמה: הושלם במלואו"
                                       className="text-sm h-9"
                                     />
+                                    <p className="text-[10px] text-slate-400 sm:text-xs invisible">יופיע בתוצאות ולוגים.</p>
                                   </div>
                                   <div className="space-y-2">
                                     <Label htmlFor={`option-value-${option.id}`} className="text-xs sm:text-sm">ערך לשמירה</Label>
