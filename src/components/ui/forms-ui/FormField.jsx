@@ -10,19 +10,19 @@ export default function FormField({
   children,
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" dir="rtl">
       {label ? (
-        <Label htmlFor={id}>
+        <Label htmlFor={id} className="block text-right">
           {label}
           {required ? ' *' : ''}
         </Label>
       ) : null}
       {children}
       {description ? (
-        <p className="text-xs text-neutral-500">{description}</p>
+        <p className="text-xs text-neutral-500 text-right">{description}</p>
       ) : null}
       {error ? (
-        <p className="text-sm text-red-600" role="alert">{error}</p>
+        <p className="text-sm text-red-600 text-right" role="alert">{error}</p>
       ) : null}
     </div>
   );

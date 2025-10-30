@@ -1,6 +1,6 @@
 import React from 'react';
 import FormField from './FormField';
-import IsraeliPhoneInput from '@/components/ui/IsraeliPhoneInput';
+import { Input } from '@/components/ui/input';
 
 export default function PhoneField({
   id,
@@ -9,26 +9,27 @@ export default function PhoneField({
   value,
   onChange,
   onBlur,
-  placeholder,
+  placeholder = '05X-XXXXXXX',
   required = false,
   disabled = false,
-  description = '',
+  description = 'פורמט: 05X-XXXXXXX או 972-5X-XXXXXXX',
   error = '',
   className,
 }) {
   return (
     <FormField id={id} label={label} required={required} description={description} error={error}>
-      <IsraeliPhoneInput
+      <Input
         id={id}
         name={name}
+        type="tel"
         value={value}
         onChange={onChange}
         onBlur={onBlur}
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        dir="ltr"
         className={className}
-        error={error}
       />
     </FormField>
   );

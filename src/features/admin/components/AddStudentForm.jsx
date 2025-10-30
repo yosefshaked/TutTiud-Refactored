@@ -161,7 +161,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5" dir="rtl">
       <TextField
         id="student-name"
         name="name"
@@ -278,18 +278,18 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       />
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 text-right" role="alert">
           {error}
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          ביטול
-        </Button>
+      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
         <Button type="submit" disabled={isSubmitting} className="gap-2">
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
           שמירת תלמיד חדש
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          ביטול
         </Button>
       </div>
     </form>

@@ -189,9 +189,9 @@ export default function NewSessionForm({
   };
 
   return (
-    <form className="space-y-lg" onSubmit={handleSubmit}>
+    <form className="space-y-lg" onSubmit={handleSubmit} dir="rtl">
       <div className="space-y-sm">
-        <Label htmlFor="session-student">בחרו תלמיד *</Label>
+        <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
         <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <div className="relative">
             <Input
@@ -234,15 +234,15 @@ export default function NewSessionForm({
           })}
         </select>
         {students.length === 0 ? (
-          <p className="text-xs text-neutral-500">אין תלמידים זמינים לשיוך מפגש חדש.</p>
+          <p className="text-xs text-neutral-500 text-right">אין תלמידים זמינים לשיוך מפגש חדש.</p>
         ) : filteredStudents.length === 0 ? (
-          <p className="text-xs text-neutral-500">לא נמצאו תלמידים התואמים את החיפוש.</p>
+          <p className="text-xs text-neutral-500 text-right">לא נמצאו תלמידים התואמים את החיפוש.</p>
         ) : null}
       </div>
 
       <div className="grid gap-md sm:grid-cols-2">
         <div className="space-y-sm">
-          <Label htmlFor="session-date">תאריך המפגש *</Label>
+          <Label htmlFor="session-date" className="block text-right">תאריך המפגש *</Label>
           <Input
             id="session-date"
             type="date"
@@ -269,7 +269,7 @@ export default function NewSessionForm({
 
       {questions.length ? (
         <div className="space-y-md">
-          <h3 className="text-base font-semibold text-foreground">שאלות המפגש</h3>
+          <h3 className="text-base font-semibold text-foreground text-right">שאלות המפגש</h3>
           <div className="space-y-md">
             {questions.map((question) => {
               const questionId = `question-${question.key}`;
@@ -292,7 +292,7 @@ export default function NewSessionForm({
               if (question.type === 'textarea') {
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -329,7 +329,7 @@ export default function NewSessionForm({
                 const datalistId = `${questionId}-datalist`;
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -356,7 +356,7 @@ export default function NewSessionForm({
               if (question.type === 'number') {
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -376,7 +376,7 @@ export default function NewSessionForm({
               if (question.type === 'date') {
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -395,7 +395,7 @@ export default function NewSessionForm({
               if (question.type === 'select') {
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -495,7 +495,7 @@ export default function NewSessionForm({
                   : min;
                 return (
                   <div key={question.key} className="space-y-2">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -521,7 +521,7 @@ export default function NewSessionForm({
 
               return (
                 <div key={question.key} className="space-y-xs">
-                  <Label htmlFor={questionId}>
+                  <Label htmlFor={questionId} className="block text-right">
                     {question.label}
                     {required ? ' *' : ''}
                   </Label>
@@ -541,20 +541,21 @@ export default function NewSessionForm({
       ) : null}
 
       {error ? (
-        <div className="rounded-lg bg-red-50 p-md text-sm text-red-700" role="alert">
+        <div className="rounded-lg bg-red-50 p-md text-sm text-red-700 text-right" role="alert">
           {error}
         </div>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          ביטול
-        </Button>
+      <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
         <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs">
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
           שמירת מפגש
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          ביטול
         </Button>
       </div>
     </form>
   );
 }
+
