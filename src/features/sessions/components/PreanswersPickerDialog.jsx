@@ -127,7 +127,7 @@ export default function PreanswersPickerDialog({
           </div>
 
           {filteredAnswers.length > 0 && (
-            <p className="text-xs text-neutral-500 text-center">
+            <p className="text-xs text-neutral-500 text-center hidden sm:block">
               לחצו פעמיים על תשובה להכנסה מהירה
             </p>
           )}
