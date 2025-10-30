@@ -136,6 +136,32 @@
   filter: contrast(1.1) saturate(1.05);
 }
 
+/* Custom scrollbar for dialog content - RTL natural appearance */
+@layer components {
+  .dialog-scroll-content {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }

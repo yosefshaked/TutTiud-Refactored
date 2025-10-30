@@ -133,6 +133,28 @@
 	- Settings: `src/features/settings/api/{settings.js,index.js}` (server API + client helpers)
 	Legacy files under `src/api/` now re-export from the new paths to ease migration. Prefer importing from the feature locations going forward.
 
+### Forms UI Layer (2025-10)
+- Centralized form field components live in `src/components/ui/forms-ui/` to provide consistent RTL-first design, error handling, and labeling across all forms.
+- Available field components:
+  - **`FormField`**: Base wrapper that handles label, description, and error display. All other field components use this internally.
+  - **`TextField`**: Text input with support for various types (text, email, number, date, etc.). Includes dir prop for RTL/LTR control.
+  - **`TextAreaField`**: Multi-line text input with configurable rows.
+  - **`SelectField`**: Dropdown using Radix Select with options array `[{ value, label }]`.
+  - **`PhoneField`**: Israeli phone input with built-in validation and formatting.
+  - **`DayOfWeekField`**: Day-of-week selector using DayOfWeekSelect component.
+  - **`ComboBoxField`**: Free text + suggestions dropdown (service selection, etc.).
+  - **`TimeField`**: Time picker with 15-min snapping and HH:MM display.
+- All field components accept consistent props: `id`, `label`, `value`, `onChange`, `required`, `disabled`, `description`, `error`, `placeholder`.
+- Import from barrel: `import { TextField, SelectField, ... } from '@/components/ui/forms-ui';`
+- Dialog components (`src/components/ui/dialog.jsx`) updated for RTL:
+  - Close button positioned on left (RTL standard).
+  - DialogHeader text aligned right.
+  - DialogFooter uses flex-row-reverse with gap for proper RTL button ordering.
+  - Content scrolling contained within dialog body using `.dialog-scroll-content` class with custom scrollbar styling (thin, natural appearance, hover feedback).
+- Custom scrollbar styles in `src/index.css` under `.dialog-scroll-content` class provide thin, semi-transparent scrollbars that match design system colors.
+- Forms using the new layer: `AddStudentForm`, `NewSessionForm` (partial - service/time fields migrated).
+- Migration strategy: Gradually replace inline field structures with forms-ui components to reduce boilerplate and ensure consistent UX.
+
 ### Session Form Question Types (2025-10)
 - Session form questions are managed via `SessionFormManager.jsx` (Settings page) and rendered in `NewSessionForm.jsx`.
 - Question type definitions in `QUESTION_TYPE_OPTIONS`:

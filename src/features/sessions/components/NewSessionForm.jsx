@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ComboBoxField, TimeField } from '@/components/forms-ui';
+import { ComboBoxField, TimeField } from '@/components/ui/forms-ui';
 import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
