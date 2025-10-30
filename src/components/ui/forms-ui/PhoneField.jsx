@@ -9,7 +9,7 @@ export default function PhoneField({
   value,
   onChange,
   onBlur,
-  placeholder = '05X-XXXXXXX',
+  placeholder = 'הזינו מספר טלפון',
   required = false,
   disabled = false,
   description = 'פורמט: 05X-XXXXXXX או 972-5X-XXXXXXX',

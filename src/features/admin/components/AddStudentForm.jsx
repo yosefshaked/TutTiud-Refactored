@@ -162,7 +162,9 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" dir="rtl">
-      <TextField
+      <div className="space-y-5 divide-y divide-border">
+        <div className="space-y-5 py-1">
+          <TextField
         id="student-name"
         name="name"
         label="שם התלמיד"
@@ -216,6 +218,9 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         disabled={isSubmitting}
         error={showContactPhoneError ? 'יש להזין מספר טלפון ישראלי תקין.' : ''}
       />
+        </div>
+
+        <div className="space-y-5 py-4">
 
       <ComboBoxField
         id="default-service"
@@ -276,6 +281,8 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         rows={3}
         disabled={isSubmitting}
       />
+        </div>
+      </div>
 
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 text-right" role="alert">
@@ -283,14 +290,16 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
-        <Button type="submit" disabled={isSubmitting} className="gap-2">
+      <div className="sticky bottom-0 -mx-1 sm:mx-0 border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60 pt-3">
+        <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
+        <Button type="submit" disabled={isSubmitting} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
           {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
           שמירת תלמיד חדש
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
           ביטול
         </Button>
+        </div>
       </div>
     </form>
   );
