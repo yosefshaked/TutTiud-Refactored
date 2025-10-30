@@ -163,6 +163,20 @@
 - Our Select/Popover primitives use classes like `bg-popover` and `text-popover-foreground`. Ensure Tailwind maps these tokens to CSS variables. We extended `tailwind.config.js` colors to include `popover`, `popover-foreground`, `muted`, `accent`, `secondary`, `destructive`, and `card` using `hsl(var(--token))` so dropdown lists render with a visible background.
 - CSS variables are defined in `src/index.css` under `:root` and `.dark`. If adding new shadcn tokens, update both `index.css` and `tailwind.config.js` accordingly.
 
+### Popover/Select scroll and input patterns (2025-10)
+- When using overlays inside `Dialog`, body scroll is locked by react-remove-scroll. To allow dropdowns to scroll:
+  - Add `data-scroll-lock-ignore` and/or `data-rs-scroll` on the overlay content element.
+  - Add `pointer-events-auto` and `overscroll-behavior: contain` to the content.
+  - Prefer the scroll container (`Viewport` or list wrapper) with `max-height` and `overflow-y-auto`.
+- Do not wrap editable `<Input>` controls in `PopoverTrigger`. It makes the field behave like a button and can block typing.
+  - Preferred structure: render `<Input>` normally; wrap only the chevron button with `PopoverTrigger asChild`.
+  - Use an "auto-commit on close" pattern to save free text:
+    - Track `query` (typed text) and `lastCommitted` via ref.
+    - Commit on Enter and in a `useEffect` that runs when `open` goes false.
+- Components aligned to this pattern:
+  - `src/components/ui/ComboBoxInput.jsx` (generic string combobox; suggestions + free text)
+  - `src/components/ui/TimePickerInput.jsx` (HH:MM snapping to 15-min increments; persists as `HH:MM:SS`)
+
 ### Accessibility Controls (2025-10)
 - In-app Accessibility menu adds persistent controls for:
   - Font scale (90%–140%) via `--a11y-font-scale` (applied on `html`).
