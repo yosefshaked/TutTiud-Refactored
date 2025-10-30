@@ -24,6 +24,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionError, setQuestionError] = useState('');
   const [questions, setQuestions] = useState([]);
+  const [suggestions, setSuggestions] = useState({});
   const [services, setServices] = useState([]);
   const [submitState, setSubmitState] = useState(REQUEST_STATE.idle);
   const [submitError, setSubmitError] = useState('');
@@ -147,8 +148,6 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setServices([]);
     }
   }, [open, canFetchStudents, activeOrgId]);
-
-  const [suggestions, setSuggestions] = useState({});
 
   useEffect(() => {
     if (open) {
