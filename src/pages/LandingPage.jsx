@@ -43,9 +43,9 @@ export default function LandingPage() {
   const benefits = [
     'חיסכון משמעותי בזמן ניהול',
     'מעקב אחר כל מפגש והתקדמות',
-    'דוחות מפורטים למנהלים ולהנהלה',
+    'עמידה בתנאים מקצועיים ורגולטוריים',
     'גישה מכל מקום ומכל מכשיר',
-    'התאמה אישית מלאה לצרכי הארגון',
+    'התאמה אישית לצרכי הארגון',
     'עדכונים ושיפורים רציפים',
   ];
 
@@ -127,7 +127,7 @@ export default function LandingPage() {
               למה לבחור ב-TutTiud?
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-600">
-              הצטרפו לעשרות ארגונים שכבר משתמשים במערכת שלנו
+              הצטרפו לארגונים שכבר משתמשים במערכת שלנו
             </p>
           </div>
 
@@ -176,7 +176,7 @@ export default function LandingPage() {
             <span className="text-sm">מערכת ניהול הדרכה מתקדמת</span>
           </div>
           <p className="mt-4 text-sm text-neutral-500">
-            © {new Date().getFullYear()} TutTiud. כל הזכויות שמורות.
+            © {new Date().getFullYear()} TutTiud ThePCRunners. כל הזכויות שמורות.
           </p>
         </div>
       </footer>
