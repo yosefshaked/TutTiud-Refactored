@@ -25,7 +25,8 @@ function isSchemaOrPolicyError(error) {
     return false;
   }
   const code = error.code || error.details;
-  if (code === '42P01' || code === '42501') {
+  // 42P01: undefined_table, 42501: insufficient_privilege, 42703: undefined_column
+  if (code === '42P01' || code === '42501' || code === '42703') {
     return true;
   }
   const message = String(error.message || error.details || '').toLowerCase();
@@ -36,6 +37,10 @@ function isSchemaOrPolicyError(error) {
     return true;
   }
   if (message.includes('permission denied') && message.includes('settings')) {
+    return true;
+  }
+  // Catch missing column metadata on Settings
+  if (message.includes('column') && message.includes('metadata') && message.includes('settings')) {
     return true;
   }
   return false;
@@ -52,6 +57,8 @@ async function verifySettingsInfrastructure(context, tenantClient) {
       body: {
         message: 'settings_schema_unverified',
         reason: 'diagnostics_failed',
+        hint: 'Make sure the tenant setup SQL has been applied. If only the metadata column is missing, you can run the idempotent SQL in sql_hint.',
+        sql_hint: 'ALTER TABLE tuttiud."Settings" ADD COLUMN IF NOT EXISTS metadata jsonb;'
       },
     };
   }
@@ -71,6 +78,8 @@ async function verifySettingsInfrastructure(context, tenantClient) {
           check: entry.check_name,
           details: entry.details,
         })),
+        hint: 'Make sure the tenant setup SQL has been applied. If only the metadata column is missing, you can run the idempotent SQL in sql_hint.',
+        sql_hint: 'ALTER TABLE tuttiud."Settings" ADD COLUMN IF NOT EXISTS metadata jsonb;'
       },
     };
   }
