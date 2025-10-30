@@ -636,6 +636,19 @@ export default function SessionFormManager({
     }));
   };
 
+  const handleMoveOption = (questionId, optionIndex, direction) => {
+    setQuestions((prev) => prev.map((question) => {
+      if (question.id !== questionId) return question;
+      const options = Array.isArray(question.options) ? [...question.options] : [];
+      const targetIndex = direction === 'up' ? optionIndex - 1 : optionIndex + 1;
+      if (optionIndex < 0 || optionIndex >= options.length) return question;
+      if (targetIndex < 0 || targetIndex >= options.length) return question;
+      const [item] = options.splice(optionIndex, 1);
+      options.splice(targetIndex, 0, item);
+      return { ...question, options };
+    }));
+  };
+
   const handleRangeChange = (questionId, field, value) => {
     setQuestions((prev) => prev.map((question) => {
       if (question.id !== questionId) {
@@ -807,6 +820,17 @@ export default function SessionFormManager({
                           </Button>
                           <Button
                             type="button"
+                            variant={question.required ? 'default' : 'ghost'}
+                            size="sm"
+                            aria-pressed={Boolean(question.required)}
+                            onClick={() => handleQuestionChange(question.id, { required: !question.required })}
+                            className="h-8 px-3"
+                            aria-label="שדה חובה"
+                          >
+                            חובה
+                          </Button>
+                          <Button
+                            type="button"
                             variant="ghost"
                             size="icon"
                             onClick={() => handleMoveQuestion(question.id, 'down')}
@@ -856,8 +880,8 @@ export default function SessionFormManager({
                         <div className="grid w-full gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 justify-end">
-                            <QuestionTypePreview questionType={question.type} />
                             <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
+                            <QuestionTypePreview questionType={question.type} />
                           </div>
                           <select
                             id={`question-type-${question.id}`}
@@ -882,29 +906,11 @@ export default function SessionFormManager({
                             />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 sm:col-span-2">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={Boolean(question.required)}
-                                onCheckedChange={(next) => handleQuestionChange(question.id, { required: next })}
-                                id={`question-required-${question.id}`}
-                              />
-                              <Label htmlFor={`question-required-${question.id}`} className="text-xs sm:text-sm">שדה חובה</Label>
-                            </div>
-                          </div>
+                          <div className="sm:col-span-2" />
                         )}
                         </div>
 
-                        {supportsPlaceholder ? (
-                          <div className="flex items-center gap-3">
-                            <Switch
-                              checked={Boolean(question.required)}
-                              onCheckedChange={(next) => handleQuestionChange(question.id, { required: next })}
-                              id={`question-required-${question.id}`}
-                            />
-                            <Label htmlFor={`question-required-${question.id}`} className="text-sm">שדה חובה</Label>
-                          </div>
-                        ) : null}
+                        {/* Required toggle moved to header actions */}
 
                           {(question.type === 'text' || question.type === 'textarea') ? (
                             <div className="space-y-2">
@@ -958,8 +964,8 @@ export default function SessionFormManager({
                               </Button>
                             </div>
                             <div className="space-y-3">
-                              {options.map((option) => (
-                                <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto] sm:items-end">
+                              {options.map((option, optIndex) => (
+                                <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto,auto,auto] sm:items-end">
                                   <div className="space-y-2">
                                     <Label htmlFor={`option-label-${option.id}`} className="text-xs sm:text-sm">תווית להצגה</Label>
                                     <Input
@@ -967,7 +973,7 @@ export default function SessionFormManager({
                                       value={option.label}
                                       onChange={(event) => handleOptionChange(question.id, option.id, { label: event.target.value })}
                                       placeholder="לדוגמה: הושלם במלואו"
-                                      className="text-sm"
+                                      className="text-sm h-9"
                                     />
                                   </div>
                                   <div className="space-y-2">
@@ -977,7 +983,7 @@ export default function SessionFormManager({
                                       value={option.value}
                                       onChange={(event) => handleOptionChange(question.id, option.id, { value: event.target.value })}
                                       placeholder="לדוגמה: completed"
-                                      className="text-sm"
+                                      className="text-sm h-9"
                                     />
                                     <p className="text-[10px] text-slate-400 sm:text-xs">יופיע בתוצאות ולוגים.</p>
                                   </div>
@@ -985,8 +991,30 @@ export default function SessionFormManager({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
+                                    onClick={() => handleMoveOption(question.id, optIndex, 'up')}
+                                    disabled={optIndex === 0}
+                                    className="self-center h-9 w-9"
+                                    aria-label="העבר אפשרות מעלה"
+                                  >
+                                    <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleMoveOption(question.id, optIndex, 'down')}
+                                    disabled={optIndex === options.length - 1}
+                                    className="self-center h-9 w-9"
+                                    aria-label="העבר אפשרות מטה"
+                                  >
+                                    <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => handleRemoveOption(question.id, option.id)}
-                                    className="self-center text-red-600 hover:bg-red-50"
+                                    className="self-center text-red-600 hover:bg-red-50 h-9 w-9"
                                     aria-label="מחק אפשרות"
                                   >
                                     <Trash2 className="h-4 w-4" aria-hidden="true" />
