@@ -9,6 +9,7 @@ import IsraeliPhoneInput from '@/components/ui/IsraeliPhoneInput';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect';
 import TimePickerInput from '@/components/ui/TimePickerInput';
+import ComboBoxInput from '@/components/ui/ComboBoxInput';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
@@ -241,22 +242,17 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
 
       <div className="space-y-2">
         <Label htmlFor="default-service">שירות ברירת מחדל</Label>
-        <Select
+        <ComboBoxInput
+          id="default-service"
+          name="defaultService"
           value={values.defaultService}
-          onValueChange={(value) => handleSelectChange('defaultService', value)}
+          onChange={(value) => handleSelectChange('defaultService', value)}
+          options={services}
+          placeholder={loadingServices ? 'טוען...' : 'בחרו מהרשימה או הקלידו שירות'}
           disabled={isSubmitting || loadingServices}
-        >
-          <SelectTrigger id="default-service">
-            <SelectValue placeholder={loadingServices ? 'טוען...' : 'בחר שירות'} />
-          </SelectTrigger>
-          <SelectContent>
-            {services.map((service) => (
-              <SelectItem key={service} value={service}>
-                {service}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          dir="rtl"
+          emptyMessage="לא נמצאו שירותים תואמים"
+        />
         <p className="text-xs text-slate-500">
           ניתן להגדיר שירותים זמינים בעמוד ההגדרות.
         </p>
