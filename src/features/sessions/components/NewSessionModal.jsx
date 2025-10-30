@@ -7,7 +7,7 @@ import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import NewSessionForm from './NewSessionForm.jsx';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
-import { buildStudentsEndpoint, normalizeMembershipRole } from '@/features/students/utils/endpoints.js';
+import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -27,6 +27,8 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const [services, setServices] = useState([]);
   const [submitState, setSubmitState] = useState(REQUEST_STATE.idle);
   const [submitError, setSubmitError] = useState('');
+  const [instructors, setInstructors] = useState([]);
+  const [studentScope, setStudentScope] = useState('all'); // 'all' | 'mine' | `inst:<id>`
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
@@ -56,7 +58,25 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     setStudentsError('');
 
     try {
-      const endpoint = buildStudentsEndpoint(activeOrgId, membershipRole);
+      // Determine endpoint and optional server-side filter based on scope and role
+      const baseEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole);
+      let endpoint = baseEndpoint;
+      const isAdmin = isAdminRole(membershipRole);
+      if (isAdmin) {
+        if (studentScope === 'mine') {
+          // Admin viewing their own assigned students -> use my-students
+          const searchParams = new URLSearchParams();
+          if (activeOrgId) searchParams.set('org_id', activeOrgId);
+          endpoint = searchParams.toString() ? `my-students?${searchParams}` : 'my-students';
+        } else if (studentScope.startsWith('inst:')) {
+          const instructorId = studentScope.slice(5);
+          const searchParams = new URLSearchParams();
+          if (activeOrgId) searchParams.set('org_id', activeOrgId);
+          if (instructorId) searchParams.set('assigned_instructor_id', instructorId);
+          endpoint = searchParams.toString() ? `students?${searchParams}` : 'students';
+        }
+      }
+
       const payload = await authenticatedFetch(endpoint);
       setStudents(Array.isArray(payload) ? payload : []);
       setStudentsState(REQUEST_STATE.idle);
@@ -66,7 +86,21 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setStudentsState(REQUEST_STATE.error);
       setStudentsError(error?.message || 'טעינת רשימת התלמידים נכשלה.');
     }
-  }, [activeOrgId, canFetchStudents, membershipRole]);
+  }, [activeOrgId, canFetchStudents, membershipRole, studentScope]);
+
+  const loadInstructors = useCallback(async () => {
+    if (!open || !canFetchStudents) return;
+    if (!isAdminRole(membershipRole)) return;
+    try {
+      const searchParams = new URLSearchParams();
+      if (activeOrgId) searchParams.set('org_id', activeOrgId);
+      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`);
+      setInstructors(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      console.error('Failed to load instructors', error);
+      setInstructors([]);
+    }
+  }, [open, canFetchStudents, membershipRole, activeOrgId]);
 
   const loadQuestions = useCallback(async () => {
     if (!open || !canFetchStudents) {
@@ -121,6 +155,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       void loadStudents();
       void loadQuestions();
       void loadServices();
+      void loadInstructors();
     } else {
       setStudentsState(REQUEST_STATE.idle);
       setStudentsError('');
@@ -130,8 +165,10 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setQuestions([]);
       setSuggestions({});
       setServices([]);
+      setInstructors([]);
+      setStudentScope('all');
     }
-  }, [open, loadQuestions, loadStudents, loadServices]);
+  }, [open, loadQuestions, loadStudents, loadServices, loadInstructors]);
 
   const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
     setSubmitState(REQUEST_STATE.loading);
@@ -202,6 +239,10 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
             questions={questions}
             suggestions={suggestions}
             services={services}
+            instructors={instructors}
+            canFilterByInstructor={isAdminRole(membershipRole)}
+            studentScope={studentScope}
+            onScopeChange={(next) => setStudentScope(next)}
             initialStudentId={initialStudentId}
             onSubmit={handleSubmit}
             onCancel={onClose}

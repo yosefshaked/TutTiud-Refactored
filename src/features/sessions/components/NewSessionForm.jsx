@@ -19,6 +19,10 @@ export default function NewSessionForm({
   questions = [],
   suggestions = {},
   services = [],
+  instructors = [],
+  canFilterByInstructor = false,
+  studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
+  onScopeChange,
   initialStudentId = '',
   onSubmit,
   onCancel,
@@ -85,7 +89,8 @@ export default function NewSessionForm({
   const filteredStudents = useMemo(() => {
     const q = studentQuery.trim().toLowerCase();
 
-    // Always apply day filter first
+    // Server already filtered by scope (admin). For non-admin, list is already scoped to 'mine'.
+    // We still apply day filter and text query locally for responsiveness.
     const byDay = students.filter((s) => dayMatches(s?.default_day_of_week, studentDayFilter));
 
     if (!q) return byDay;
@@ -204,13 +209,32 @@ export default function NewSessionForm({
               aria-label="חיפוש תלמיד"
             />
           </div>
-          <div>
-            <DayOfWeekSelect
-              value={studentDayFilter}
-              onChange={setStudentDayFilter}
-              disabled={isSubmitting || students.length === 0}
-              placeholder="סינון לפי יום"
-            />
+          <div className="flex items-center gap-2">
+            {canFilterByInstructor ? (
+              <select
+                id="session-student-scope"
+                className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground flex-1"
+                value={studentScope}
+                onChange={(e) => onScopeChange?.(e.target.value)}
+                disabled={isSubmitting}
+                aria-label="הצג תלמידים לפי מדריך"
+              >
+                <option value="all">כל התלמידים</option>
+                {/* 'mine' option is still useful for admins who are also instructors */}
+                <option value="mine">התלמידים שלי</option>
+                {instructors.map((inst) => (
+                  <option key={inst.id} value={`inst:${inst.id}`}>התלמידים של {inst.name || inst.email || inst.id}</option>
+                ))}
+              </select>
+            ) : null}
+            <div className="flex-1">
+              <DayOfWeekSelect
+                value={studentDayFilter}
+                onChange={setStudentDayFilter}
+                disabled={isSubmitting || students.length === 0}
+                placeholder="סינון לפי יום"
+              />
+            </div>
           </div>
         </div>
         <select
