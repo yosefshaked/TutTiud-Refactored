@@ -578,7 +578,7 @@ export default function NewSessionForm({
         </div>
       ) : null}
 
-      <div className="sticky bottom-0 -mx-1 sm:mx-0 border-t bg-background pt-3">
+      <div className="sticky bottom-0 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 border-t bg-background p-3 sm:p-4">
         <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
         <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
