@@ -215,6 +215,16 @@ function normalizeExpirationInput(value) {
   return { value: null, valid: false };
 }
 
+function parseBooleanLike(input) {
+  if (input === true || input === false) return Boolean(input);
+  if (typeof input === 'number') return input !== 0;
+  if (typeof input === 'string') {
+    const t = input.trim().toLowerCase();
+    return t === '1' || t === 'true' || t === 'yes' || t === 'y' || t === 'on';
+  }
+  return false;
+}
+
 function isAdminRole(role) {
   if (typeof role !== 'string') {
     return false;
@@ -780,9 +790,28 @@ async function revokeInvitation(context, req, supabase, invitationId) {
     return;
   }
 
+  // If "hard" flag is passed (query or body), remove the row entirely; otherwise revoke and nullify token.
+  const hard = parseBooleanLike(req?.query?.hard ?? req?.body?.hard);
+  if (hard) {
+    const del = await supabase
+      .from('org_invitations')
+      .delete()
+      .eq('id', invitation.id);
+    if (del.error) {
+      context.log?.error?.('invitations failed to hard-delete', {
+        invitationId,
+        message: del.error.message,
+      });
+      respond(context, 500, { message: 'failed to remove invitation' });
+      return;
+    }
+    respond(context, 200, { message: 'invitation removed' });
+    return;
+  }
+
   const updateResult = await supabase
     .from('org_invitations')
-    .update({ status: STATUS_REVOKED })
+    .update({ status: STATUS_REVOKED, token: null })
     .eq('id', invitation.id);
 
   if (updateResult.error) {
