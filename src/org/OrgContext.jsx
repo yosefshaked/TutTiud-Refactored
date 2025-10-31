@@ -98,6 +98,7 @@ function normalizeInvite(record, organizationOverride) {
     id: record.id,
     org_id: record.org_id || organization?.id || null,
     email: (record.email || '').toLowerCase(),
+    token: record.token || null,
     status: record.status || 'pending',
     invited_by: record.invited_by || null,
     created_at: record.created_at,
@@ -303,7 +304,7 @@ export function OrgProvider({ children }) {
       const invitesPromise = user.email
         ? client
             .from('org_invitations')
-            .select('id, org_id, email, status, invited_by, created_at, expires_at, organization:organizations(id, name)')
+            .select('id, org_id, email, token, status, invited_by, created_at, expires_at, organization:organizations(id, name)')
             .eq('email', user.email.toLowerCase())
             .in('status', ['pending', 'sent'])
             .order('created_at', { ascending: true })

@@ -9,6 +9,7 @@ import { AlertCircle, Building2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { mapSupabaseError } from '@/org/errors.js';
+import { buildInvitationSearch } from '@/lib/invite-tokens.js';
 
 function LoadingState() {
   return (
@@ -62,7 +63,7 @@ function InviteList({ invites, onAccept }) {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50">מוזמן</Badge>
-              <Button onClick={() => onAccept(invite.id)} className="gap-2" size="sm">
+              <Button onClick={() => onAccept(invite)} className="gap-2" size="sm">
                 <Users className="w-4 h-4" />
                 הצטרף
               </Button>
@@ -182,7 +183,7 @@ function CreateOrgDialog({ open, onClose, onCreate }) {
 }
 
 export default function OrgSelection() {
-  const { organizations, incomingInvites, status, selectOrg, createOrganization, acceptInvite } = useOrg();
+  const { organizations, incomingInvites, status, selectOrg, createOrganization } = useOrg();
   const navigate = useNavigate();
   const location = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -204,14 +205,18 @@ export default function OrgSelection() {
     }
   };
 
-  const handleAcceptInvite = async (inviteId) => {
+  const handleAcceptInvite = async (invite) => {
     try {
-      await acceptInvite(inviteId);
-      // After accepting invitation, land on dashboard. AuthGuard will handle any setup redirects.
-      navigate('/dashboard', { replace: true });
+      const token = invite?.token || '';
+      if (!token) {
+        toast.error('קישור ההזמנה חסר אסימון. בקש הזמנה חדשה מהארגון.');
+        return;
+      }
+      const search = buildInvitationSearch(token);
+      navigate(`/accept-invite${search}`, { replace: true });
     } catch (error) {
-      console.error('Failed to accept invite', error);
-      toast.error('לא ניתן להצטרף לארגון. נסה שוב או בקש הזמנה חדשה.');
+      console.error('Failed to open accept invite page', error);
+      toast.error('לא ניתן לפתוח את דף ההצטרפות.');
     }
   };
 
