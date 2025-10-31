@@ -250,13 +250,6 @@ export function OrgProvider({ children }) {
   const configRequestRef = useRef(0);
   const tenantClientReady = Boolean(dataClient);
   const hasRuntimeConfig = Boolean(runtimeConfig?.supabaseUrl && runtimeConfig?.supabaseAnonKey);
-  const activeOrgConfigReady = Boolean(
-    activeOrgId &&
-      configStatus === 'success' &&
-      activeOrgConfig?.orgId === activeOrgId &&
-      activeOrgConfig?.supabaseUrl &&
-      activeOrgConfig?.supabaseAnonKey,
-  );
 
   const resetState = useCallback(() => {
     setStatus('idle');
@@ -667,6 +660,7 @@ export function OrgProvider({ children }) {
   ]);
 
   useEffect(() => {
+    // Directory (members + invites) lives in the control DB and does not depend on tenant runtime config
     if (!hasRuntimeConfig) {
       return;
     }
@@ -678,12 +672,6 @@ export function OrgProvider({ children }) {
     }
 
     if (!session) {
-      return;
-    }
-
-    if (!activeOrgConfigReady) {
-      setOrgMembers([]);
-      setOrgInvites([]);
       return;
     }
 
@@ -705,7 +693,7 @@ export function OrgProvider({ children }) {
     return () => {
       abortController.abort();
     };
-  }, [activeOrgId, session, loadOrgDirectory, hasRuntimeConfig, activeOrgConfigReady]);
+  }, [activeOrgId, session, loadOrgDirectory, hasRuntimeConfig]);
 
   useEffect(() => {
     if (!activeOrgId) return;
@@ -1038,18 +1026,32 @@ export function OrgProvider({ children }) {
   const removeMember = useCallback(
     async (membershipId) => {
       if (!membershipId) return;
-      const client = requireAuthClient();
-      const { error } = await client
-        .from('org_memberships')
-        .delete()
-        .eq('id', membershipId);
-      if (error) throw error;
+      // Use server endpoint (service role) to bypass RLS and enforce admin checks
+      await authenticatedFetch(`/api/org-memberships/${membershipId}`, { method: 'DELETE' });
       if (activeOrgId) {
         await loadOrgDirectory(activeOrgId);
         await refreshOrganizations();
       }
     },
-    [requireAuthClient, activeOrgId, loadOrgDirectory, refreshOrganizations],
+    [activeOrgId, loadOrgDirectory, refreshOrganizations],
+  );
+
+  const updateMemberRole = useCallback(
+    async (membershipId, role) => {
+      if (!membershipId) throw new Error('membership id required');
+      const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
+      if (!normalized || (normalized !== 'member' && normalized !== 'admin')) {
+        throw new Error('תפקיד לא חוקי');
+      }
+      await authenticatedFetch(`/api/org-memberships/${membershipId}`, {
+        method: 'PATCH',
+        body: { role: normalized },
+      });
+      if (activeOrgId) {
+        await loadOrgDirectory(activeOrgId);
+      }
+    },
+    [activeOrgId, loadOrgDirectory],
   );
 
   const acceptInvite = useCallback(
@@ -1125,6 +1127,7 @@ export function OrgProvider({ children }) {
       inviteMember,
       revokeInvite,
       removeMember,
+      updateMemberRole,
       acceptInvite,
       activeOrgHasConnection: Boolean(
         (activeOrgConnection?.supabaseUrl || activeOrgConfig?.supabaseUrl) &&
@@ -1153,6 +1156,7 @@ export function OrgProvider({ children }) {
       inviteMember,
       revokeInvite,
       removeMember,
+      updateMemberRole,
       acceptInvite,
       configStatus,
       activeOrgConfig,

@@ -69,11 +69,19 @@ export async function decryptBackup(encryptedData, password) {
 
 /**
  * Export all tenant tables to a structured manifest
++ * 
++ * Backed up tables and columns (as of 2025-10):
++ * - Instructors: id, name, email, phone, is_active, notes, metadata
++ * - Students: id, name, contact_info, contact_name, contact_phone, assigned_instructor_id, default_day_of_week, default_session_time, default_service, tags, notes, metadata
++ * - SessionRecords: id, date, student_id, instructor_id, service_context, content, created_at, updated_at, deleted, deleted_at, metadata
++ * - Settings: id, key, settings_value, metadata
++ * 
  * @param {object} tenantClient - Supabase tenant client
  * @returns {Promise<object>} - Backup manifest
  */
 export async function exportTenantData(tenantClient, orgId) {
-  const tables = ['Students', 'Instructors', 'SessionRecords', 'Settings', 'Services'];
+  // Only include tables that actually exist in the tuttiud schema
+  const tables = ['Students', 'Instructors', 'SessionRecords', 'Settings'];
   const manifest = {
     version: '1.0',
     schema_version: 'tuttiud_v1',
@@ -141,7 +149,8 @@ export async function restoreTenantData(tenantClient, manifest, { clearExisting 
     errors: [],
   };
 
-  const tables = ['Settings', 'Services', 'Instructors', 'Students', 'SessionRecords'];
+  // Restore in dependency order: Settings first (no FK deps), then Instructors, then Students (FK to Instructors), then SessionRecords (FK to Students and Instructors)
+  const tables = ['Settings', 'Instructors', 'Students', 'SessionRecords'];
 
   for (const table of tables) {
     const rows = manifest.tables[table] || [];

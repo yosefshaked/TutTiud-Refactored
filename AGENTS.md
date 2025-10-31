@@ -32,9 +32,9 @@
 - Shared backup utilities in `api/_shared/backup-utils.js`:
   - `encryptBackup(data, password)`: AES-256-GCM + gzip compression, returns encrypted Buffer
   - `decryptBackup(encryptedData, password)`: reverses encryption, returns manifest object
-  - `exportTenantData(tenantClient, orgId)`: queries all tenant tables (Students, Instructors, SessionRecords, Settings, Services), returns manifest v1.0
+  - `exportTenantData(tenantClient, orgId)`: queries all tenant tables (Students, Instructors, SessionRecords, Settings), returns manifest v1.0
   - `validateBackupManifest(manifest)`: checks version/schema compatibility
-  - `restoreTenantData(tenantClient, manifest, options)`: transactional restore with optional `clearExisting` flag
+  - `restoreTenantData(tenantClient, manifest, options)`: transactional restore with optional `clearExisting` flag in dependency order
 - Backup manifests are JSON with structure: `{ version: '1.0', schema_version: 'tuttiud_v1', org_id, created_at, metadata: { total_records }, tables: [{ name, records }] }`
 - Password generation: System auto-generates a human-friendly product-key style password (e.g., ABCD-EF12-3456-7890-ABCD, ~80-bit entropy). The user must save it from the response to decrypt later.
 - Cooldown enforcement: checks `org_settings.backup_history` array for last successful backup within 7 days; 429 response includes `next_allowed_at` and `days_remaining`. Can be bypassed once by setting `permissions.backup_cooldown_override = true` in control DB; the flag is automatically reset to `false` after a successful backup.
@@ -142,7 +142,6 @@
 
 - Frontend API clients are being colocated under feature slices:
 	- Sessions: `src/features/sessions/api/work-sessions.js`
-	- Services: `src/features/services/api/index.js`
 	- Settings: `src/features/settings/api/{settings.js,index.js}` (server API + client helpers)
 	Legacy files under `src/api/` now re-export from the new paths to ease migration. Prefer importing from the feature locations going forward.
 
@@ -193,7 +192,7 @@
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.
-- Supabase tenant clients must set `db: { schema: 'tuttiud' }`. Existing endpoints that used default schema have been updated accordingly (`/api/services`, `/api/work-sessions`).
+- Supabase tenant clients must set `db: { schema: 'tuttiud' }`. Existing endpoints that used default schema have been updated accordingly.
 
 ### Legacy: WorkSessions vs SessionRecords
 - WorkSessions is a legacy construct kept temporarily for compatibility with existing import and payroll flows.
