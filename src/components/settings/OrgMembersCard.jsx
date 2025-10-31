@@ -24,7 +24,7 @@ function formatDate(isoString) {
 }
 
 export default function OrgMembersCard() {
-  const { activeOrg, members, removeMember } = useOrg();
+  const { activeOrg, members, removeMember, updateMemberRole } = useOrg();
   const { user, session } = useAuth();
   const [email, setEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
@@ -157,6 +157,9 @@ export default function OrgMembersCard() {
           <div className="space-y-3">
             {(members || []).map((member) => {
               const isCurrentUser = member.user_id === user?.id;
+              const roleNorm = typeof member.role === 'string' ? member.role.toLowerCase() : '';
+              const isOwner = roleNorm === 'owner';
+              const roleLabel = roleNorm === 'owner' ? 'בעלים' : roleNorm === 'admin' ? 'מנהל' : 'מדריך';
               return (
                 <div
                   key={member.id || member.user_id}
@@ -173,21 +176,53 @@ export default function OrgMembersCard() {
                       <span>הצטרף: {formatDate(member.joined_at)}</span>
                       {member.role ? (
                         <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50">
-                          {member.role === 'admin' ? 'מנהל' : 'חבר'}
+                          {roleLabel}
                         </Badge>
                       ) : null}
                     </div>
                   </div>
                   {canManageOrgMembers && !isCurrentUser ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="text-red-600 hover:bg-red-50 gap-2"
-                      onClick={() => handleRemoveMember(member.id)}
-                    >
-                      <UserMinus className="w-4 h-4" />
-                      הסר מהארגון
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      <select
+                        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        value={roleNorm || 'member'}
+                        disabled={isOwner}
+                        onChange={async (e) => {
+                          const nextRole = e.target.value;
+                          const nextLabel = nextRole === 'admin' ? 'מנהל' : 'מדריך';
+                          const confirmed = window.confirm(`האם לשנות את התפקיד של ${member.name || member.email || 'המשתמש'} ל"${nextLabel}"?`);
+                          if (!confirmed) {
+                            e.target.value = roleNorm || 'member';
+                            return;
+                          }
+                          try {
+                            await updateMemberRole(member.id, nextRole);
+                            toast.success('תפקיד עודכן');
+                          } catch (error) {
+                            console.error('Failed to update role', error);
+                            toast.error(error?.message || 'עדכון התפקיד נכשל');
+                            e.target.value = roleNorm || 'member';
+                          }
+                        }}
+                      >
+                        <option value="member">מדריך</option>
+                        <option value="admin">מנהל</option>
+                      </select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="text-red-600 hover:bg-red-50 gap-2"
+                        disabled={isOwner}
+                        onClick={() => {
+                          const confirmed = window.confirm(`האם להסיר את ${member.name || member.email || 'המשתמש'} מהארגון?`);
+                          if (!confirmed) return;
+                          void handleRemoveMember(member.id);
+                        }}
+                      >
+                        <UserMinus className="w-4 h-4" />
+                        הסר מהארגון
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
               );

@@ -147,6 +147,46 @@ function normalizeRedirectUrl(value) {
   }
 }
 
+function tryParseUrl(candidate) {
+  try {
+    return new URL(candidate);
+  } catch {
+    return null;
+  }
+}
+
+function resolveSiteBaseHref(context, req) {
+  // Prefer explicit env configuration for public app URL
+  const env = readEnv(context);
+  const fallbackEnv = process.env ?? {};
+  const envCandidates = [
+    env.VITE_PUBLIC_APP_URL,
+    env.VITE_APP_BASE_URL,
+    env.VITE_SITE_URL,
+    fallbackEnv.VITE_PUBLIC_APP_URL,
+    fallbackEnv.VITE_APP_BASE_URL,
+    fallbackEnv.VITE_SITE_URL,
+  ].filter(Boolean);
+
+  for (const candidate of envCandidates) {
+    const parsed = tryParseUrl(String(candidate));
+    if (parsed) {
+      const basePath = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname.replace(/\/$/, '') : '';
+      return `${parsed.origin}${basePath}`;
+    }
+  }
+
+  // Fallback: infer from request headers (Azure Static Web Apps/Proxies usually set x-forwarded-* headers)
+  const headers = req?.headers || {};
+  const xfProto = headers['x-forwarded-proto'] || headers['X-Forwarded-Proto'] || null;
+  const xfHost = headers['x-forwarded-host'] || headers['X-Forwarded-Host'] || headers.host || headers.Host || null;
+  const proto = typeof xfProto === 'string' && xfProto ? xfProto : (headers['x-arr-ssl'] ? 'https' : 'https');
+  if (typeof xfHost === 'string' && xfHost) {
+    return `${proto}://${xfHost}`;
+  }
+  return 'https://tuttiud.thepcrunners.com';
+}
+
 function normalizeExpirationInput(value) {
   if (value === undefined || value === null || value === '') {
     return { value: null, valid: true };
@@ -357,7 +397,11 @@ async function handleCreateInvitation(context, req, supabase) {
     return;
   }
 
-  const redirectTo = normalizeRedirectUrl(body.redirectTo ?? body.redirect_to);
+  // If client didn't provide a redirect, default to the site's complete-registration route
+  const providedRedirect = normalizeRedirectUrl(body.redirectTo ?? body.redirect_to);
+  const defaultBase = resolveSiteBaseHref(context, req);
+  const defaultRedirect = `${defaultBase}/#/complete-registration`;
+  const redirectTo = providedRedirect || defaultRedirect;
   const emailData = body.emailData && typeof body.emailData === 'object' ? { ...body.emailData } : {};
 
   if (!orgId) {

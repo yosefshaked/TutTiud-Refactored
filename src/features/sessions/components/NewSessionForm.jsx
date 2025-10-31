@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ComboBoxField, TimeField } from '@/components/ui/forms-ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
+import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
 
 function todayIsoDate() {
   return format(new Date(), 'yyyy-MM-dd');
@@ -16,12 +19,19 @@ function todayIsoDate() {
 export default function NewSessionForm({
   students = [],
   questions = [],
+  suggestions = {},
   services = [],
+  instructors = [],
+  canFilterByInstructor = false,
+  studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
+  onScopeChange,
   initialStudentId = '',
   onSubmit,
   onCancel,
   isSubmitting = false,
   error = '',
+  renderFooterOutside = false, // New prop to control footer rendering
+  onSelectedStudentChange, // Callback to notify parent of selection changes
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
@@ -29,6 +39,8 @@ export default function NewSessionForm({
   const [sessionDate, setSessionDate] = useState(todayIsoDate());
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
+  const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
+  const [activeQuestionKey, setActiveQuestionKey] = useState(null);
   const [answers, setAnswers] = useState(() => {
     const initial = {};
     for (const question of questions) {
@@ -83,7 +95,8 @@ export default function NewSessionForm({
   const filteredStudents = useMemo(() => {
     const q = studentQuery.trim().toLowerCase();
 
-    // Always apply day filter first
+    // Server already filtered by scope (admin). For non-admin, list is already scoped to 'mine'.
+    // We still apply day filter and text query locally for responsiveness.
     const byDay = students.filter((s) => dayMatches(s?.default_day_of_week, studentDayFilter));
 
     if (!q) return byDay;
@@ -133,6 +146,7 @@ export default function NewSessionForm({
   const handleStudentChange = (event) => {
     const value = event.target.value;
     setSelectedStudentId(value);
+    onSelectedStudentChange?.(value); // Notify parent
     setServiceTouched(false);
     const nextStudent = students.find((student) => student?.id === value);
     if (nextStudent?.default_service) {
@@ -149,15 +163,10 @@ export default function NewSessionForm({
     }));
   }, []);
 
-  const handleAnswerChange = useCallback((questionKey) => (event) => {
+  const handleAnswerChange = useCallback((questionKey, event) => {
     const value = event.target.value;
     updateAnswer(questionKey, value);
   }, [updateAnswer]);
-
-  const handleServiceChange = (event) => {
-    setServiceTouched(true);
-    setServiceContext(event.target.value);
-  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -192,10 +201,13 @@ export default function NewSessionForm({
   };
 
   return (
-    <form className="space-y-lg" onSubmit={handleSubmit}>
+    <form id="new-session-form" className="space-y-lg" onSubmit={handleSubmit} dir="rtl">
       <div className="space-y-sm">
-        <Label htmlFor="session-student">בחרו תלמיד *</Label>
-        <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
+        <div className={cn(
+          'mb-2 grid grid-cols-1 gap-2',
+          canFilterByInstructor ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+        )}>
           <div className="relative">
             <Input
               type="text"
@@ -207,6 +219,29 @@ export default function NewSessionForm({
               aria-label="חיפוש תלמיד"
             />
           </div>
+          {canFilterByInstructor ? (
+            <div>
+              <Select
+                value={studentScope}
+                onValueChange={(v) => onScopeChange?.(v)}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="כל התלמידים" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">כל התלמידים</SelectItem>
+                  {/* 'mine' option is still useful for admins who are also instructors */}
+                  <SelectItem value="mine">התלמידים שלי</SelectItem>
+                  {instructors.map((inst) => (
+                    <SelectItem key={inst.id} value={`inst:${inst.id}`}>
+                      התלמידים של {inst.name || inst.email || inst.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div>
             <DayOfWeekSelect
               value={studentDayFilter}
@@ -237,15 +272,15 @@ export default function NewSessionForm({
           })}
         </select>
         {students.length === 0 ? (
-          <p className="text-xs text-neutral-500">אין תלמידים זמינים לשיוך מפגש חדש.</p>
+          <p className="text-xs text-neutral-500 text-right">אין תלמידים זמינים לשיוך מפגש חדש.</p>
         ) : filteredStudents.length === 0 ? (
-          <p className="text-xs text-neutral-500">לא נמצאו תלמידים התואמים את החיפוש.</p>
+          <p className="text-xs text-neutral-500 text-right">לא נמצאו תלמידים התואמים את החיפוש.</p>
         ) : null}
       </div>
 
       <div className="grid gap-md sm:grid-cols-2">
         <div className="space-y-sm">
-          <Label htmlFor="session-date">תאריך המפגש *</Label>
+          <Label htmlFor="session-date" className="block text-right">תאריך המפגש *</Label>
           <Input
             id="session-date"
             type="date"
@@ -255,40 +290,24 @@ export default function NewSessionForm({
             disabled={isSubmitting}
           />
         </div>
-        <div className="space-y-sm">
-          <Label htmlFor="session-service">שירות ברירת מחדל</Label>
-          {Array.isArray(services) && services.length > 0 ? (
-            <>
-              <Input
-                id="session-service"
-                list="available-services"
-                value={serviceContext}
-                onChange={handleServiceChange}
-                placeholder="בחרו מהרשימה או הקלידו שירות"
-                disabled={isSubmitting}
-              />
-              <datalist id="available-services">
-                {services.map((svc) => (
-                  <option key={svc} value={svc} />
-                ))}
-              </datalist>
-            </>
-          ) : (
-            <Input
-              id="session-service"
-              value={serviceContext}
-              onChange={handleServiceChange}
-              placeholder="לדוגמה: שיעור פסנתר"
-              disabled={isSubmitting}
-            />
-          )}
-          <p className="text-xs text-neutral-500">הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה.</p>
-        </div>
+        <ComboBoxField
+          id="session-service"
+          name="service"
+          label="שירות ברירת מחדל"
+          value={serviceContext}
+          onChange={setServiceContext}
+          options={services}
+          placeholder="בחרו מהרשימה או הקלידו שירות"
+          disabled={isSubmitting}
+          dir="rtl"
+          emptyMessage="לא נמצאו שירותים תואמים"
+          description="הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה."
+        />
       </div>
 
       {questions.length ? (
         <div className="space-y-md">
-          <h3 className="text-base font-semibold text-foreground">שאלות המפגש</h3>
+          <h3 className="text-base font-semibold text-foreground text-right">שאלות המפגש</h3>
           <div className="space-y-md">
             {questions.map((question) => {
               const questionId = `question-${question.key}`;
@@ -309,40 +328,99 @@ export default function NewSessionForm({
               const answerValue = answers[question.key];
 
               if (question.type === 'textarea') {
+                // Check for preanswers by both key and id
+                const preanswersByKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+                const preanswersById = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
+                const preanswers = preanswersByKey.length > 0 ? preanswersByKey : preanswersById;
+                const hasPreanswers = preanswers.length > 0;
+                
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <Textarea
-                      id={questionId}
-                      rows={4}
-                      value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
-                      disabled={isSubmitting}
-                      placeholder={placeholder}
-                      required={required}
-                    />
+                    <div className="relative">
+                      <Textarea
+                        id={questionId}
+                        rows={4}
+                        value={answerValue ?? ''}
+                        onChange={(e) => handleAnswerChange(question.key, e)}
+                        disabled={isSubmitting}
+                        placeholder={placeholder}
+                        required={required}
+                        className={hasPreanswers ? 'pl-12' : ''}
+                      />
+                      {hasPreanswers && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute left-1 top-1 h-8 px-2"
+                          onClick={() => {
+                            setActiveQuestionKey(question.key);
+                            setPreanswersDialogOpen(true);
+                          }}
+                          disabled={isSubmitting}
+                          title="בחר תשובה מוכנה"
+                        >
+                          <ListChecks className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {!hasPreanswers && (
+                      <p className="text-xs text-neutral-500 text-right">
+                        אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
+                      </p>
+                    )}
                   </div>
                 );
               }
 
               if (question.type === 'text') {
+                // Check for preanswers by both key and id
+                const preanswersByKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+                const preanswersById = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
+                const preanswers = preanswersByKey.length > 0 ? preanswersByKey : preanswersById;
+                const hasPreanswers = preanswers.length > 0;
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <Input
-                      id={questionId}
-                      value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
-                      disabled={isSubmitting}
-                      placeholder={placeholder}
-                      required={required}
-                    />
+                    <div className="relative">
+                      <Input
+                        id={questionId}
+                        value={answerValue ?? ''}
+                        onChange={(e) => handleAnswerChange(question.key, e)}
+                        disabled={isSubmitting}
+                        placeholder={placeholder}
+                        required={required}
+                        className={hasPreanswers ? 'pl-12' : ''}
+                      />
+                      {hasPreanswers && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute left-1 top-1/2 -translate-y-1/2 h-8 px-2"
+                          onClick={() => {
+                            setActiveQuestionKey(question.key);
+                            setPreanswersDialogOpen(true);
+                          }}
+                          disabled={isSubmitting}
+                          title="בחר תשובה מוכנה"
+                        >
+                          <ListChecks className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {!hasPreanswers && (
+                      <p className="text-xs text-neutral-500 text-right">
+                        אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
+                      </p>
+                    )}
                   </div>
                 );
               }
@@ -350,7 +428,7 @@ export default function NewSessionForm({
               if (question.type === 'number') {
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -358,7 +436,7 @@ export default function NewSessionForm({
                       id={questionId}
                       type="number"
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting}
                       placeholder={placeholder}
                       required={required}
@@ -370,7 +448,7 @@ export default function NewSessionForm({
               if (question.type === 'date') {
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -378,7 +456,7 @@ export default function NewSessionForm({
                       id={questionId}
                       type="date"
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting}
                       required={required}
                     />
@@ -389,7 +467,7 @@ export default function NewSessionForm({
               if (question.type === 'select') {
                 return (
                   <div key={question.key} className="space-y-xs">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -397,7 +475,7 @@ export default function NewSessionForm({
                       id={questionId}
                       className="w-full rounded-lg border border-border bg-white p-sm text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                       value={answerValue ?? ''}
-                      onChange={handleAnswerChange(question.key)}
+                      onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting || questionOptions.length === 0}
                       required={required}
                     >
@@ -418,26 +496,43 @@ export default function NewSessionForm({
               }
 
               if (question.type === 'radio' || question.type === 'buttons') {
+                const isButtonStyle = question.type === 'buttons';
                 return (
                   <div key={question.key} className="space-y-xs">
                     <Label>
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <div className="space-y-2" role="radiogroup" aria-required={required}>
+                    <div 
+                      className={cn(
+                        'gap-2',
+                        isButtonStyle ? 'flex flex-wrap' : 'space-y-2'
+                      )} 
+                      role="radiogroup" 
+                      aria-required={required}
+                    >
                       {questionOptions.length === 0 ? (
                         <p className="text-xs text-neutral-500">אין אפשרויות זמינות לשאלה זו.</p>
                       ) : null}
                       {questionOptions.map((option, optionIndex) => {
                         const checked = answerValue === option.value;
                         const labelClass = cn(
-                          'flex items-center gap-xs rounded-lg border px-sm py-xs text-sm transition-colors',
-                          question.type === 'buttons'
-                            ? 'cursor-pointer'
-                            : 'cursor-pointer',
-                          checked
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border bg-white text-foreground'
+                          'flex items-center gap-xs text-sm transition-all',
+                          isButtonStyle
+                            ? cn(
+                                // Button style: hide radio, make whole area clickable
+                                'cursor-pointer rounded-lg border-2 px-md py-sm font-medium shadow-sm hover:shadow-md',
+                                checked
+                                  ? 'border-primary bg-primary text-white shadow-md'
+                                  : 'border-neutral-300 bg-white text-foreground hover:border-primary/50 hover:bg-primary/5'
+                              )
+                            : cn(
+                                // Traditional radio style: visible radio button
+                                'cursor-pointer rounded-lg border px-sm py-xs',
+                                checked
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border bg-white text-foreground hover:bg-neutral-50'
+                              )
                         );
                         return (
                           <label key={option.value} className={labelClass}>
@@ -449,7 +544,10 @@ export default function NewSessionForm({
                               onChange={() => updateAnswer(question.key, option.value)}
                               required={required && optionIndex === 0}
                               disabled={isSubmitting}
-                              className="h-4 w-4"
+                              className={cn(
+                                'h-4 w-4',
+                                isButtonStyle && 'sr-only' // Hide radio button for button style
+                              )}
                             />
                             <span>{option.label}</span>
                           </label>
@@ -469,7 +567,7 @@ export default function NewSessionForm({
                   : min;
                 return (
                   <div key={question.key} className="space-y-2">
-                    <Label htmlFor={questionId}>
+                    <Label htmlFor={questionId} className="block text-right">
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
@@ -495,14 +593,14 @@ export default function NewSessionForm({
 
               return (
                 <div key={question.key} className="space-y-xs">
-                  <Label htmlFor={questionId}>
+                  <Label htmlFor={questionId} className="block text-right">
                     {question.label}
                     {required ? ' *' : ''}
                   </Label>
                   <Input
                     id={questionId}
                     value={answerValue ?? ''}
-                    onChange={handleAnswerChange(question.key)}
+                    onChange={(e) => handleAnswerChange(question.key, e)}
                     disabled={isSubmitting}
                     placeholder={placeholder}
                     required={required}
@@ -515,20 +613,68 @@ export default function NewSessionForm({
       ) : null}
 
       {error ? (
-        <div className="rounded-lg bg-red-50 p-md text-sm text-red-700" role="alert">
+        <div className="rounded-lg bg-red-50 p-md text-sm text-red-700 text-right" role="alert">
           {error}
         </div>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-sm sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          ביטול
-        </Button>
-        <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs">
-          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          שמירת מפגש
-        </Button>
-      </div>
+      {!renderFooterOutside && (
+        <div className="border-t -mx-4 sm:-mx-6 mt-6 pt-3 sm:pt-4 px-4 sm:px-6">
+          <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
+            <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+              שמירת מפגש
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+              ביטול
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Preconfigured Answers Picker Dialog */}
+      <PreanswersPickerDialog
+        open={preanswersDialogOpen}
+        onClose={() => {
+          setPreanswersDialogOpen(false);
+          setActiveQuestionKey(null);
+        }}
+        answers={(() => {
+          if (!activeQuestionKey) return [];
+          const question = questions.find((q) => q.key === activeQuestionKey);
+          if (!question) return [];
+          // Check by both key and id
+          const byKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+          const byId = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
+          return byKey.length > 0 ? byKey : byId;
+        })()}
+        onSelect={(answer) => {
+          if (activeQuestionKey) {
+            updateAnswer(activeQuestionKey, answer);
+          }
+        }}
+        questionLabel={
+          activeQuestionKey
+            ? questions.find((q) => q.key === activeQuestionKey)?.label || 'שאלה'
+            : 'שאלה'
+        }
+      />
     </form>
   );
 }
+
+// Export footer component for external rendering
+export function NewSessionFormFooter({ onSubmit, onCancel, isSubmitting = false, selectedStudentId }) {
+  return (
+    <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
+      <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
+        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+        שמירת מפגש
+      </Button>
+      <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+        ביטול
+      </Button>
+    </div>
+  );
+}
+

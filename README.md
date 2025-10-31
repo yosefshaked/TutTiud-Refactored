@@ -15,7 +15,7 @@ The refactored codebase focuses on four launch stories:
 
 The onboarding wizard (`Settings → Supabase Setup`) leads every new organization through three steps:
 
-1. **Run the canonical SQL** – copy the script exported from [`src/lib/setup-sql.js`](src/lib/setup-sql.js) into the Supabase SQL editor and execute it. Version 2.3 extends the diagnostics to cover RLS, policies, and required indexes.
+1. **Run the canonical SQL** – copy the script exported from [`src/lib/setup-sql.js`](src/lib/setup-sql.js) into the Supabase SQL editor and execute it. Version 2.4 adds the `metadata` jsonb column to the `Settings` table for auxiliary configuration storage.
 2. **Paste the dedicated key** – grab the `APP_DEDICATED_KEY` JWT produced by the script and drop it into the wizard.
 3. **Validate & store** – the wizard runs `tuttiud.setup_assistant_diagnostics()` (schema/RLS/policy/index checks), encrypts the JWT through `/api/save-org-credentials`, and the API now persists `dedicated_key_saved_at`, `verified_at`, and `setup_completed` before the UI records verification and unlocks the rest of the app.
    - If the diagnostics still flag missing tables or policies, `/api/settings` answers with HTTP 424 (`settings_schema_incomplete` / `settings_schema_unverified`) and echoes the failing checks so admins can rerun the SQL script before retrying writes.

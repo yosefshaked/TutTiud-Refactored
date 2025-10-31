@@ -3,185 +3,136 @@
  * Each step targets a specific UI element and provides contextual help
  */
 
+function findVisibleElement(selector) {
+  if (!selector) return null;
+
+  const candidates = document.querySelectorAll(selector);
+  for (const element of candidates) {
+    if (!element) continue;
+
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    const hasSize = rect.width > 0 && rect.height > 0;
+    const isHidden =
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      parseFloat(style.opacity || '1') === 0;
+
+    if (!isHidden && hasSize) {
+      return element;
+    }
+  }
+
+  return null;
+}
+
+const selectVisible = (selector) => () => findVisibleElement(selector);
+
 export const adminTourSteps = [
   {
-    target: 'body',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 'bold' }}>
-          ברוכים הבאים לתותיעוד! 👋
-        </h3>
-        <p style={{ lineHeight: '1.6', marginBottom: '12px' }}>
-          מערכת לניהול ותיעוד מפגשים עם תלמידים.
-        </p>
-        <p style={{ lineHeight: '1.6' }}>
-          בואו נעשה סיור קצר כדי להכיר את התכונות העיקריות.
-        </p>
-      </div>
-    ),
-    placement: 'center',
-    disableBeacon: true,
+    element: 'body',
+    popover: {
+      title: 'ברוכים הבאים לתותיעוד! 👋',
+      description: 'מערכת לניהול ותיעוד מפגשים עם תלמידים. בואו נעשה סיור קצר כדי להכיר את התכונות העיקריות.',
+      side: 'over',
+      align: 'center',
+    },
   },
   {
-    target: '[data-tour="fab-button"]',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: 'bold' }}>
-          הוספת מפגש חדש
-        </h3>
-        <p style={{ lineHeight: '1.6' }}>
-          לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד את הפרטים, משך הזמן והערות.
-        </p>
-      </div>
-    ),
-    placement: 'left',
+    element: selectVisible('[data-tour="dashboard"]'),
+    popover: {
+      title: 'מסך ראשי',
+      description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים.',
+      side: 'top',
+      align: 'center',
+    },
   },
   {
-    target: '[data-tour="admin-students"]',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: 'bold' }}>
-          ניהול תלמידים
-        </h3>
-        <p style={{ lineHeight: '1.6' }}>
-          כאן תוכלו לנהל את רשימת התלמידים, להוסיף תלמידים חדשים ולצפות בפרטיהם.
-        </p>
-      </div>
-    ),
-    placement: 'left',
+    element: selectVisible('[data-tour="admin-students"]'),
+    popover: {
+      title: 'ניהול תלמידים',
+      description: 'כאן תוכלו לנהל את רשימת התלמידים, להוסיף תלמידים חדשים ולצפות בפרטיהם.',
+      side: 'top',
+      align: 'center',
+    },
   },
   {
-    target: '[data-tour="dashboard"]',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: 'bold' }}>
-          לוח הבקרה
-        </h3>
-        <p style={{ lineHeight: '1.6' }}>
-          כאן תוכלו לראות סיכום של כל המפגשים, דוחות וסטטיסטיקות מהירות.
-        </p>
-      </div>
-    ),
-    placement: 'left',
+    element: selectVisible('[data-tour="fab-button"]'),
+    popover: {
+      title: 'הוספת מפגש חדש',
+      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש. תוכלו לתעד שם את פרטי המפגש.',
+      side: 'top',
+      align: 'center',
+    },
   },
   {
-    target: '[data-tour="settings"]',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: 'bold' }}>
-          הגדרות ארגון
-        </h3>
-        <p style={{ lineHeight: '1.6' }}>
-          בהגדרות תוכלו לנהל משתמשים, להזמין מדריכים חדשים, ולהגדיר העדפות ארגוניות.
-        </p>
-      </div>
-    ),
-    placement: 'left',
+    element: selectVisible('[data-tour="settings"]'),
+    popover: {
+      title: 'הגדרות ארגון',
+      description: 'בהגדרות תוכלו לנהל משתמשים, להזמין מדריכים חדשים, ולהגדיר העדפות ארגוניות.',
+      side: 'top',
+      align: 'center',
+    },
   },
   {
-    target: 'body',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 'bold' }}>
-          מוכנים להתחיל! 🚀
-        </h3>
-        <p style={{ lineHeight: '1.6', marginBottom: '12px' }}>
-          זהו! אתם מוכנים להתחיל לתעד מפגשים.
-        </p>
-        <p style={{ lineHeight: '1.6', fontSize: '14px', color: '#666' }}>
-          תמיד תוכלו לחזור למדריך דרך ההגדרות → "הצג מדריך שוב"
-        </p>
-      </div>
-    ),
-    placement: 'center',
+    element: 'body',
+    popover: {
+      title: 'מוכנים להתחיל! 🚀',
+      description: 'זהו! אתם מוכנים להתחיל לתעד מפגשים. תמיד תוכלו לחזור למדריך דרך ההגדרות → "סיור מודרך במערכת"',
+      side: 'over',
+      align: 'center',
+    },
   },
 ];
 
 export const memberTourSteps = [
   {
-    target: 'body',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 'bold' }}>
-          ברוכים הבאים לתותיעוד! 👋
-        </h3>
-        <p style={{ lineHeight: '1.6', marginBottom: '12px' }}>
-          מערכת לתיעוד ומעקב אחר המפגשים שלכם עם תלמידים.
-        </p>
-        <p style={{ lineHeight: '1.6' }}>
-          בואו נעשה סיור קצר כדי להכיר את המערכת.
-        </p>
-      </div>
-    ),
-    placement: 'center',
-    disableBeacon: true,
+    element: 'body',
+    popover: {
+      title: 'ברוכים הבאים לתותיעוד! 👋',
+      description: 'מערכת לתיעוד ומעקב אחר המפגשים שלכם עם תלמידים. בואו נעשה סיור קצר כדי להכיר את המערכת.',
+      side: 'over',
+      align: 'center',
+    },
   },
   {
-    target: '[data-tour="fab-button"]',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: 'bold' }}>
-          הוספת מפגש חדש
-        </h3>
-        <p style={{ lineHeight: '1.6' }}>
-          לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד פרטים, משך זמן והערות.
-        </p>
-      </div>
-    ),
-    placement: 'left',
+    element: selectVisible('[data-tour="dashboard"]'),
+    popover: {
+      title: 'מסך ראשי',
+      description: 'מסך הבית שלכם - מכאן תוכלו להתחיל לתעד מפגשים ולגשת לרשימת התלמידים שלכם.',
+      side: 'top',
+      align: 'center',
+    },
   },
   {
-    target: '[data-tour="my-students"]',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: 'bold' }}>
-          התלמידים שלי
-        </h3>
-        <p style={{ lineHeight: '1.6' }}>
-          כאן תוכלו לצפות ברשימת התלמידים שלכם ולמעקב אחר ההתקדמות שלהם.
-        </p>
-      </div>
-    ),
-    placement: 'left',
+    element: selectVisible('[data-tour="my-students"]'),
+    popover: {
+      title: 'התלמידים שלי',
+      description: 'כאן תוכלו לצפות ברשימת התלמידים שלכם ולמעקב אחר ההתקדמות שלהם.',
+      side: 'top',
+      align: 'center',
+    },
   },
   {
-    target: '[data-tour="dashboard"]',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '16px', fontWeight: 'bold' }}>
-          לוח הבקרה
-        </h3>
-        <p style={{ lineHeight: '1.6' }}>
-          כאן תוכלו לראות סיכום של המפגשים שלכם והיסטוריה עדכנית.
-        </p>
-      </div>
-    ),
-    placement: 'left',
+    element: selectVisible('[data-tour="fab-button"]'),
+    popover: {
+      title: 'הוספת מפגש חדש',
+      description: 'לחצו על כפתור ה-"+" כדי להוסיף מפגש חדש עם תלמיד. תוכלו לתעד שם את פרטי המפגש.',
+      side: 'top',
+      align: 'center',
+    },
   },
   {
-    target: 'body',
-    content: (
-      <div style={{ textAlign: 'right', direction: 'rtl' }}>
-        <h3 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 'bold' }}>
-          מוכנים להתחיל! 🚀
-        </h3>
-        <p style={{ lineHeight: '1.6', marginBottom: '12px' }}>
-          זהו! אתם מוכנים להתחיל לתעד מפגשים עם התלמידים שלכם.
-        </p>
-        <p style={{ lineHeight: '1.6', fontSize: '14px', color: '#666' }}>
-          תמיד תוכלו לחזור למדריך דרך ההגדרות → "הצג מדריך שוב"
-        </p>
-      </div>
-    ),
-    placement: 'center',
+    element: 'body',
+    popover: {
+      title: 'מוכנים להתחיל! 🚀',
+      description: 'זהו! אתם מוכנים להתחיל לתעד מפגשים עם התלמידים שלכם. תמיד תוכלו לחזור למדריך דרך ההגדרות → "סיור מודרך במערכת"',
+      side: 'over',
+      align: 'center',
+    },
   },
 ];
 
-/**
- * Get appropriate tour steps based on user role
- * @param {boolean} isAdmin - Whether user has admin/owner role
- * @returns {Array} Array of tour step objects
- */
 export function getTourSteps(isAdmin) {
   return isAdmin ? adminTourSteps : memberTourSteps;
 }

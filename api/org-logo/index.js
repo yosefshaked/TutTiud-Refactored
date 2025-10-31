@@ -74,7 +74,7 @@ export default async function (context, req) {
   if (req.method === 'GET') {
     const { data: orgSettings, error } = await supabase
       .from('org_settings')
-      .select('logo_url')
+      .select('logo_url, permissions')
       .eq('org_id', orgId)
       .maybeSingle();
 
@@ -83,8 +83,18 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_load_logo' });
     }
 
+    let permissions = orgSettings?.permissions;
+    if (typeof permissions === 'string') {
+      try {
+        permissions = JSON.parse(permissions);
+      } catch {
+        permissions = {};
+      }
+    }
+    const enabled = permissions && permissions.logo_enabled === true;
+
     return respond(context, 200, {
-      logo_url: orgSettings?.logo_url || null,
+      logo_url: enabled ? (orgSettings?.logo_url || null) : null,
     }, { 'Cache-Control': 'private, max-age=300' });
   }
 

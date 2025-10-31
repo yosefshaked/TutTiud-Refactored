@@ -12,12 +12,13 @@ import ServiceManager from '@/components/settings/ServiceManager.jsx';
 import InstructorManager from '@/components/settings/InstructorManager.jsx';
 import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
+import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 
 export default function Settings() {
-  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgId } = useOrg();
+  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgId, enableDirectory, disableDirectory } = useOrg();
   const { authClient, user, loading, session } = useSupabase();
   const membershipRole = activeOrg?.membership?.role ?? null;
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
@@ -116,6 +117,18 @@ export default function Settings() {
     }
   };
 
+  // Wake control DB directory fetch only while Team Members dialog is open
+  useEffect(() => {
+    if (selectedModule === 'orgMembers') {
+      enableDirectory?.();
+    } else {
+      disableDirectory?.();
+    }
+    return () => {
+      disableDirectory?.();
+    };
+  }, [selectedModule, enableDirectory, disableDirectory]);
+
   if (loading || !authClient) {
     return (
       <div className="p-6 text-center text-slate-500">
@@ -163,6 +176,11 @@ export default function Settings() {
             </dl>
           </CardContent>
         </Card>
+
+        {/* Onboarding Tour Card - Available to all users */}
+        <div className="w-full" dir="rtl">
+          <OnboardingCard />
+        </div>
 
         {/* Selector grid - only visible to admin/owner */}
         {canManageSessionForm && (

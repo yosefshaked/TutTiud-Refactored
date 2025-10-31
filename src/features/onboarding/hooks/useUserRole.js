@@ -6,10 +6,10 @@ import { useOrg } from '@/org/OrgContext.jsx';
  * @returns {{ isAdmin: boolean, isOwner: boolean, isMember: boolean, role: string }}
  */
 export function useUserRole() {
-  const { activeOrgMembership } = useOrg();
+  const { activeOrg } = useOrg();
 
   return useMemo(() => {
-    const role = activeOrgMembership?.role || 'member';
+    const role = activeOrg?.membership?.role || 'member';
     const normalizedRole = String(role).trim().toLowerCase();
 
     return {
@@ -18,5 +18,5 @@ export function useUserRole() {
       isAdmin: normalizedRole === 'admin' || normalizedRole === 'owner',
       isMember: normalizedRole === 'member' || normalizedRole === 'instructor',
     };
-  }, [activeOrgMembership]);
+  }, [activeOrg]);
 }

@@ -348,10 +348,19 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
-    const { data, error } = await tenantClient
+    // Optional server-side filter: assigned_instructor_id (admins only)
+    const assignedInstructorId = normalizeString(req?.query?.assigned_instructor_id);
+
+    let builder = tenantClient
       .from('Students')
       .select('*')
       .order('name', { ascending: true });
+
+    if (assignedInstructorId) {
+      builder = builder.eq('assigned_instructor_id', assignedInstructorId);
+    }
+
+    const { data, error } = await builder;
 
     if (error) {
       context.log?.error?.('students failed to fetch roster', { message: error.message });

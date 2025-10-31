@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, Phone, Calendar, Clock, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ArrowRight, Phone, Calendar, Clock, User, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -13,6 +13,7 @@ import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/f
 import { useSessionModal } from '@/features/sessions/context/SessionModalContext.jsx';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
+import EditStudentModal from '@/features/admin/components/EditStudentModal.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -109,7 +110,7 @@ function buildAnswerList(content, questions) {
 export default function StudentDetailPage() {
   const { id: studentIdParam } = useParams();
   const studentId = typeof studentIdParam === 'string' ? studentIdParam : '';
-  const { loading: supabaseLoading } = useSupabase();
+  const { loading: supabaseLoading, session } = useSupabase();
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { openSessionModal } = useSessionModal();
 
@@ -125,6 +126,11 @@ export default function StudentDetailPage() {
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionsError, setQuestionsError] = useState('');
   const [questions, setQuestions] = useState([]);
+
+  // Edit student modal state
+  const [studentForEdit, setStudentForEdit] = useState(null);
+  const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+  const [updateError, setUpdateError] = useState('');
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
@@ -269,6 +275,50 @@ export default function StudentDetailPage() {
   }, [openSessionModal, studentId, loadSessions]);
 
   const backDestination = isAdminRole(membershipRole) ? '/admin/students' : '/my-students';
+  const canEdit = isAdminRole(membershipRole);
+
+  const handleOpenEdit = () => {
+    if (student && canEdit) {
+      setUpdateError('');
+      setStudentForEdit(student);
+    }
+  };
+
+  const handleCloseEdit = () => {
+    if (!isUpdatingStudent) {
+      setStudentForEdit(null);
+      setUpdateError('');
+    }
+  };
+
+  const handleUpdateStudent = async (payload) => {
+    if (!payload?.id || !activeOrgId) return;
+    setIsUpdatingStudent(true);
+    setUpdateError('');
+    try {
+      const body = {
+        org_id: activeOrgId,
+        name: payload.name,
+        contact_name: payload.contactName,
+        contact_phone: payload.contactPhone,
+        assigned_instructor_id: payload.assignedInstructorId,
+        default_service: payload.defaultService,
+        default_day_of_week: payload.defaultDayOfWeek,
+        default_session_time: payload.defaultSessionTime,
+        notes: payload.notes,
+        tags: payload.tags,
+      };
+      await authenticatedFetch(`students/${payload.id}`, { method: 'PUT', body, session });
+      setStudentForEdit(null);
+      // Refresh the header info
+      await loadStudent();
+    } catch (error) {
+      console.error('Failed to update student', error);
+      setUpdateError(error?.message || 'עדכון התלמיד נכשל.');
+    } finally {
+      setIsUpdatingStudent(false);
+    }
+  };
 
   if (!studentId) {
     return (
@@ -329,12 +379,27 @@ export default function StudentDetailPage() {
   const scheduleDescription = describeSchedule(student?.default_day_of_week, student?.default_session_time);
 
   return (
+    <>
     <div className="space-y-md md:space-y-lg">
       <div className="flex flex-col gap-sm sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-xs">
           <h1 className="text-xl font-semibold text-foreground sm:text-2xl">פרטי תלמיד</h1>
           <p className="text-xs text-neutral-600 sm:text-sm">סקירת הפרטים והמפגשים של {student?.name || 'תלמיד ללא שם'}.</p>
         </div>
+        <div className="flex gap-2 self-start">
+        {canEdit ? (
+          <Button
+            type="button"
+            className="self-start text-sm"
+            size="sm"
+            onClick={handleOpenEdit}
+            disabled={studentLoadError || isStudentLoading || !student}
+            variant="outline"
+          >
+            <Pencil className="h-4 w-4" />
+            <span className="ml-1">עריכת תלמיד</span>
+          </Button>
+        ) : null}
         <Button
           type="button"
           className="self-start text-sm"
@@ -344,6 +409,7 @@ export default function StudentDetailPage() {
         >
           תעד מפגש חדש
         </Button>
+        </div>
       </div>
 
       <Card>
@@ -496,5 +562,14 @@ export default function StudentDetailPage() {
         )}
       </div>
     </div>
+    <EditStudentModal
+      open={Boolean(studentForEdit)}
+      onClose={handleCloseEdit}
+      student={studentForEdit}
+      onSubmit={handleUpdateStudent}
+      isSubmitting={isUpdatingStudent}
+      error={updateError}
+    />
+    </>
   );
 }

@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import IsraeliPhoneInput from '@/components/ui/IsraeliPhoneInput';
+import { 
+  TextField, 
+  TextAreaField, 
+  SelectField, 
+  PhoneField, 
+  DayOfWeekField, 
+  ComboBoxField, 
+  TimeField 
+} from '@/components/ui/forms-ui';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
-import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect';
-import TimePickerInput from '@/components/ui/TimePickerInput';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
@@ -25,7 +27,7 @@ const INITIAL_STATE = {
   tags: '',
 };
 
-export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = false, error = '' }) {
+export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
   const [values, setValues] = useState(INITIAL_STATE);
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
@@ -159,187 +161,163 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="student-name">שם התלמיד *</Label>
-        <Input
-          id="student-name"
-          name="name"
-          value={values.name}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          required
-          placeholder="הקלד את שם התלמיד"
-          disabled={isSubmitting}
-        />
-        {showNameError && (
-          <p className="text-sm text-red-600" role="alert">
-            יש להזין שם תלמיד.
-          </p>
-        )}
-      </div>
+    <form id="add-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
+      <div className="space-y-5 divide-y divide-border">
+        <div className="space-y-5 py-1">
+          <TextField
+        id="student-name"
+        name="name"
+        label="שם התלמיד"
+        value={values.name}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        required
+        placeholder="הקלד את שם התלמיד"
+        disabled={isSubmitting}
+        error={showNameError ? 'יש להזין שם תלמיד.' : ''}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="assigned-instructor">מדריך משויך *</Label>
-        <Select
-          value={values.assignedInstructorId}
-          onValueChange={(value) => handleSelectChange('assignedInstructorId', value)}
-          disabled={isSubmitting || loadingInstructors}
-          required
-        >
-          <SelectTrigger id="assigned-instructor">
-            <SelectValue placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'} />
-          </SelectTrigger>
-          <SelectContent>
-            {instructors.map((inst) => (
-              <SelectItem key={inst.id} value={inst.id}>
-                {inst.name || inst.email || inst.id}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {showInstructorError && (
-          <p className="text-sm text-red-600" role="alert">
-            יש לבחור מדריך.
-          </p>
-        )}
-        <p className="text-xs text-slate-500">מוצגים רק מדריכים פעילים.</p>
-      </div>
+      <SelectField
+        id="assigned-instructor"
+        name="assignedInstructorId"
+        label="מדריך משויך"
+        value={values.assignedInstructorId}
+        onChange={(value) => handleSelectChange('assignedInstructorId', value)}
+        options={instructors.map((inst) => ({
+          value: inst.id,
+          label: inst.name || inst.email || inst.id,
+        }))}
+        placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'}
+        required
+        disabled={isSubmitting || loadingInstructors}
+        description="מוצגים רק מדריכים פעילים."
+        error={showInstructorError ? 'יש לבחור מדריך.' : ''}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="contact-name">שם איש קשר *</Label>
-        <Input
-          id="contact-name"
-          name="contactName"
-          value={values.contactName}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          required
-          placeholder="שם הורה או אפוטרופוס"
-          disabled={isSubmitting}
-        />
-        {showContactNameError && (
-          <p className="text-sm text-red-600" role="alert">
-            יש להזין שם איש קשר.
-          </p>
-        )}
-      </div>
+      <TextField
+        id="contact-name"
+        name="contactName"
+        label="שם איש קשר"
+        value={values.contactName}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        required
+        placeholder="שם הורה או אפוטרופוס"
+        disabled={isSubmitting}
+        error={showContactNameError ? 'יש להזין שם איש קשר.' : ''}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="contact-phone">טלפון איש קשר *</Label>
-        <IsraeliPhoneInput
-          id="contact-phone"
-          name="contactPhone"
-          value={values.contactPhone}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          required
-          disabled={isSubmitting}
-          error={showContactPhoneError ? 'יש להזין מספר טלפון ישראלי תקין.' : ''}
-        />
-      </div>
+      <PhoneField
+        id="contact-phone"
+        name="contactPhone"
+        label="טלפון איש קשר"
+        value={values.contactPhone}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        required
+        disabled={isSubmitting}
+        error={showContactPhoneError ? 'יש להזין מספר טלפון ישראלי תקין.' : ''}
+      />
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="default-service">שירות ברירת מחדל</Label>
-        <Select
-          value={values.defaultService}
-          onValueChange={(value) => handleSelectChange('defaultService', value)}
-          disabled={isSubmitting || loadingServices}
-        >
-          <SelectTrigger id="default-service">
-            <SelectValue placeholder={loadingServices ? 'טוען...' : 'בחר שירות'} />
-          </SelectTrigger>
-          <SelectContent>
-            {services.map((service) => (
-              <SelectItem key={service} value={service}>
-                {service}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-slate-500">
-          ניתן להגדיר שירותים זמינים בעמוד ההגדרות.
-        </p>
-      </div>
+        <div className="space-y-5 py-4">
+
+      <ComboBoxField
+        id="default-service"
+        name="defaultService"
+        label="שירות ברירת מחדל"
+        value={values.defaultService}
+        onChange={(value) => handleSelectChange('defaultService', value)}
+        options={services}
+        placeholder={loadingServices ? 'טוען...' : 'בחרו מהרשימה או הקלידו שירות'}
+        disabled={isSubmitting || loadingServices}
+        dir="rtl"
+        emptyMessage="לא נמצאו שירותים תואמים"
+        description="ניתן להגדיר שירותים זמינים בעמוד ההגדרות."
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="default-day">יום קבוע *</Label>
-          <DayOfWeekSelect
-            id="default-day"
-            value={values.defaultDayOfWeek}
-            onChange={(value) => handleSelectChange('defaultDayOfWeek', value)}
-            disabled={isSubmitting}
-            required
-          />
-          {showDayError && (
-            <p className="text-sm text-red-600" role="alert">
-              יש לבחור יום.
-            </p>
-          )}
-        </div>
+        <DayOfWeekField
+          id="default-day"
+          name="defaultDayOfWeek"
+          label="יום קבוע"
+          value={values.defaultDayOfWeek}
+          onChange={(value) => handleSelectChange('defaultDayOfWeek', value)}
+          required
+          disabled={isSubmitting}
+          error={showDayError ? 'יש לבחור יום.' : ''}
+        />
 
-        <div className="space-y-2">
-          <Label htmlFor="default-time">שעת מפגש קבועה *</Label>
-          <TimePickerInput
-            id="default-time"
-            value={values.defaultSessionTime}
-            onChange={(value) => handleSelectChange('defaultSessionTime', value)}
-            disabled={isSubmitting}
-            required
-          />
-          {showTimeError && (
-            <p className="text-sm text-red-600" role="alert">
-              יש לבחור שעה.
-            </p>
-          )}
-        </div>
+        <TimeField
+          id="default-time"
+          name="defaultSessionTime"
+          label="שעת מפגש קבועה"
+          value={values.defaultSessionTime}
+          onChange={(value) => handleSelectChange('defaultSessionTime', value)}
+          disabled={isSubmitting}
+          required
+          error={showTimeError ? 'יש לבחור שעה.' : ''}
+        />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="tags">תגיות</Label>
-        <Input
-          id="tags"
-          name="tags"
-          value={values.tags}
-          onChange={handleChange}
-          placeholder="הפרד בפסיקים: תגית1, תגית2"
-          disabled={isSubmitting}
-        />
-        <p className="text-xs text-slate-500">
-          תגיות לסינון וארגון תלמידים.
-        </p>
-      </div>
+      <TextField
+        id="tags"
+        name="tags"
+        label="תגיות"
+        value={values.tags}
+        onChange={handleChange}
+        placeholder="הפרד בפסיקים: תגית1, תגית2"
+        disabled={isSubmitting}
+        description="תגיות לסינון וארגון תלמידים."
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="notes">הערות</Label>
-        <Textarea
-          id="notes"
-          name="notes"
-          value={values.notes}
-          onChange={handleChange}
-          placeholder="הערות נוספות על התלמיד"
-          rows={3}
-          disabled={isSubmitting}
-        />
+      <TextAreaField
+        id="notes"
+        name="notes"
+        label="הערות"
+        value={values.notes}
+        onChange={handleChange}
+        placeholder="הערות נוספות על התלמיד"
+        rows={3}
+        disabled={isSubmitting}
+      />
+        </div>
       </div>
 
       {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700" role="alert">
+        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 text-right" role="alert">
           {error}
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          ביטול
-        </Button>
-        <Button type="submit" disabled={isSubmitting} className="gap-2">
-          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-          שמירת תלמיד חדש
-        </Button>
-      </div>
+      {!renderFooterOutside && (
+        <div className="border-t -mx-4 sm:-mx-6 mt-6 pt-3 sm:pt-4 px-4 sm:px-6">
+          <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
+            <Button type="submit" disabled={isSubmitting} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              שמירת תלמיד חדש
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+              ביטול
+            </Button>
+          </div>
+        </div>
+      )}
     </form>
+  );
+}
+
+export function AddStudentFormFooter({ onSubmit, onCancel, isSubmitting = false }) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
+      <Button onClick={onSubmit} disabled={isSubmitting} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+        {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+        שמירת תלמיד חדש
+      </Button>
+      <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting} className="hover:shadow-sm">
+        ביטול
+      </Button>
+    </div>
   );
 }
 

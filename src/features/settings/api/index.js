@@ -1,4 +1,4 @@
-import { fetchSettingsValue as fetchSettingsValueApi } from '@/features/settings/api/settings.js';
+import { fetchSettingsValue as fetchSettingsValueApi, fetchSettingsValueWithMeta } from '@/features/settings/api/settings.js';
 
 function normalizeOrgId(options) {
   if (!options) {
@@ -62,5 +62,6 @@ export async function fetchEmploymentScopePolicySettings(options) {
 }
 
 export async function fetchSessionFormConfig(options) {
-  return fetchSettingsValueInternal(options, 'session_form_config');
+  const normalized = normalizeOptions(options);
+  return fetchSettingsValueWithMeta({ ...normalized, key: 'session_form_config' });
 }

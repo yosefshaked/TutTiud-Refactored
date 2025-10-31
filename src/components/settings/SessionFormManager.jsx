@@ -8,8 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import QuestionTypePreview from './QuestionTypePreview.jsx';
 import { fetchSessionFormConfig } from '@/features/settings/api/index.js';
 import { upsertSetting } from '@/features/settings/api/settings.js';
+import { useSupabase } from '@/context/SupabaseContext.jsx';
+import { useOrg } from '@/org/OrgContext.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -409,6 +412,11 @@ export default function SessionFormManager({
   const [validationErrors, setValidationErrors] = useState([]);
   const lastSavedSignatureRef = useRef('[]');
   const lastSavedPayloadRef = useRef([]);
+  const [preanswersMap, setPreanswersMap] = useState({}); // { [questionId]: string[] }
+  const lastSavedPreanswersRef = useRef({});
+  const { authClient } = useSupabase();
+  const { activeOrgId } = useOrg();
+  const [cap, setCap] = useState(50);
 
   const canLoad = Boolean(session && orgId && activeOrgHasConnection && tenantClientReady);
 
@@ -417,11 +425,17 @@ export default function SessionFormManager({
     return JSON.stringify(payload);
   }, [questions]);
 
-  const isDirty = currentSignature !== lastSavedSignatureRef.current;
+  const currentPreanswersSignature = useMemo(() => {
+    return JSON.stringify(preanswersMap);
+  }, [preanswersMap]);
+
+  const questionsChanged = currentSignature !== lastSavedSignatureRef.current;
+  const preanswersChanged = currentPreanswersSignature !== JSON.stringify(lastSavedPreanswersRef.current);
+  const isDirty = questionsChanged || preanswersChanged;
   const isSaving = saveState === SAVE_STATE.saving;
   const isLoading = loadState === REQUEST_STATE.loading;
 
-  const applyLoadedQuestions = useCallback((rawValue) => {
+  const applyLoadedQuestions = useCallback((rawValue, metadata = null) => {
     const rawQuestions = extractRawQuestions(rawValue);
     const normalized = deserializeQuestions(rawQuestions);
     setQuestions(normalized);
@@ -432,6 +446,12 @@ export default function SessionFormManager({
     const payload = buildPayloadFromQuestions(normalized);
     lastSavedPayloadRef.current = payload;
     lastSavedSignatureRef.current = JSON.stringify(payload);
+    // load preconfigured answers from metadata
+    const incomingMap = metadata && typeof metadata === 'object' && metadata.preconfigured_answers && typeof metadata.preconfigured_answers === 'object'
+      ? metadata.preconfigured_answers
+      : {};
+    setPreanswersMap(incomingMap);
+    lastSavedPreanswersRef.current = incomingMap;
   }, []);
 
   const loadQuestions = useCallback(async () => {
@@ -444,8 +464,8 @@ export default function SessionFormManager({
     setLoadState(REQUEST_STATE.loading);
     setLoadError('');
     try {
-      const { value } = await fetchSessionFormConfig({ session, orgId });
-      applyLoadedQuestions(value);
+      const { value, metadata } = await fetchSessionFormConfig({ session, orgId });
+      applyLoadedQuestions(value, metadata);
       setValidationErrors([]);
       setSaveError('');
       setLoadState(REQUEST_STATE.idle);
@@ -458,6 +478,28 @@ export default function SessionFormManager({
       setLoadError(error?.message || 'טעינת שאלות המפגש נכשלה.');
     }
   }, [applyLoadedQuestions, canLoad, orgId, session]);
+
+  // Load cap from control DB org permissions (fallback 50)
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!authClient || !activeOrgId) return;
+        const { data: orgSettings, error } = await authClient
+          .from('org_settings')
+          .select('permissions')
+          .eq('org_id', activeOrgId)
+          .single();
+        if (error) return;
+        const perms = orgSettings?.permissions || {};
+        const capRaw = perms.session_form_preanswers_cap;
+        const parsed = Number.parseInt(String(capRaw ?? '50'), 10);
+        setCap(Number.isFinite(parsed) && parsed > 0 ? parsed : 50);
+      } catch {
+        setCap(50);
+      }
+    };
+    run();
+  }, [authClient, activeOrgId]);
 
   useEffect(() => {
     if (!canLoad) {
@@ -506,6 +548,34 @@ export default function SessionFormManager({
       }
       return nextQuestion;
     }));
+  };
+
+  const handleAddPreanswer = (questionId) => {
+    setPreanswersMap((prev) => {
+      const current = Array.isArray(prev[questionId]) ? prev[questionId] : [];
+      if (current.length >= cap) {
+        toast.error(`לא ניתן להוסיף יותר מ-${cap} תשובות מוכנות לשאלה זו.`);
+        return prev;
+      }
+      return { ...prev, [questionId]: [...current, ''] };
+    });
+  };
+
+  const handlePreanswerChange = (questionId, index, value) => {
+    setPreanswersMap((prev) => {
+      const current = Array.isArray(prev[questionId]) ? [...prev[questionId]] : [];
+      if (!current[index] && value.trim() === '') return prev;
+      current[index] = value;
+      return { ...prev, [questionId]: current };
+    });
+  };
+
+  const handleRemovePreanswer = (questionId, index) => {
+    setPreanswersMap((prev) => {
+      const current = Array.isArray(prev[questionId]) ? [...prev[questionId]] : [];
+      current.splice(index, 1);
+      return { ...prev, [questionId]: current };
+    });
   };
 
   const toggleExpanded = (id) => {
@@ -566,6 +636,19 @@ export default function SessionFormManager({
     }));
   };
 
+  const handleMoveOption = (questionId, optionIndex, direction) => {
+    setQuestions((prev) => prev.map((question) => {
+      if (question.id !== questionId) return question;
+      const options = Array.isArray(question.options) ? [...question.options] : [];
+      const targetIndex = direction === 'up' ? optionIndex - 1 : optionIndex + 1;
+      if (optionIndex < 0 || optionIndex >= options.length) return question;
+      if (targetIndex < 0 || targetIndex >= options.length) return question;
+      const [item] = options.splice(optionIndex, 1);
+      options.splice(targetIndex, 0, item);
+      return { ...question, options };
+    }));
+  };
+
   const handleRangeChange = (questionId, field, value) => {
     setQuestions((prev) => prev.map((question) => {
       if (question.id !== questionId) {
@@ -584,6 +667,7 @@ export default function SessionFormManager({
     const payload = lastSavedPayloadRef.current;
     const normalized = deserializeQuestions(payload);
     setQuestions(normalized);
+    setPreanswersMap(lastSavedPreanswersRef.current || {});
   };
 
   const handleSave = async () => {
@@ -593,6 +677,15 @@ export default function SessionFormManager({
     }
     setSaveError('');
     const errors = validateQuestions(questions);
+    // Validate preanswers cap
+    for (const q of questions) {
+      if (q.type === 'text' || q.type === 'textarea') {
+        const list = Array.isArray(preanswersMap[q.id]) ? preanswersMap[q.id] : [];
+        if (list.length > cap) {
+          errors.push(`לשאלה "${q.label}" יש יותר מ-${cap} תשובות מוכנות. נא להסיר חלק מהן.`);
+        }
+      }
+    }
     setValidationErrors(errors);
     if (errors.length) {
       toast.error('נא להשלים את הערכים החסרים לפני שמירה.');
@@ -601,14 +694,35 @@ export default function SessionFormManager({
     setSaveState(SAVE_STATE.saving);
     try {
       const payload = buildPayloadFromQuestions(questions);
+      // Build metadata: only include text/textarea preanswers, trim/unique up to cap
+      const preconfigured = {};
+      for (const q of questions) {
+        if (q.type !== 'text' && q.type !== 'textarea') continue;
+        const list = Array.isArray(preanswersMap[q.id]) ? preanswersMap[q.id] : [];
+        const unique = [];
+        const seen = new Set();
+        for (const raw of list) {
+          if (typeof raw !== 'string') continue;
+          const t = raw.trim();
+          if (!t || seen.has(t)) continue;
+          seen.add(t);
+          unique.push(t);
+          if (unique.length >= cap) break;
+        }
+        if (unique.length) {
+          preconfigured[q.id] = unique;
+        }
+      }
+
       await upsertSetting({
         session,
         orgId,
         key: 'session_form_config',
-        value: payload,
+        value: { value: payload, metadata: { preconfigured_answers: preconfigured } },
       });
       lastSavedPayloadRef.current = payload;
       lastSavedSignatureRef.current = JSON.stringify(payload);
+      lastSavedPreanswersRef.current = preanswersMap;
       setSaveState(SAVE_STATE.idle);
       toast.success('שאלות המפגש נשמרו בהצלחה.');
     } catch (error) {
@@ -706,6 +820,17 @@ export default function SessionFormManager({
                           </Button>
                           <Button
                             type="button"
+                            variant={question.required ? 'default' : 'ghost'}
+                            size="sm"
+                            aria-pressed={Boolean(question.required)}
+                            onClick={() => handleQuestionChange(question.id, { required: !question.required })}
+                            className="h-8 px-3"
+                            aria-label="שדה חובה"
+                          >
+                            חובה
+                          </Button>
+                          <Button
+                            type="button"
                             variant="ghost"
                             size="icon"
                             onClick={() => handleMoveQuestion(question.id, 'down')}
@@ -754,7 +879,10 @@ export default function SessionFormManager({
 
                         <div className="grid w-full gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
-                          <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
+                            <QuestionTypePreview questionType={question.type} />
+                          </div>
                           <select
                             id={`question-type-${question.id}`}
                             className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 sm:text-sm"
@@ -778,29 +906,47 @@ export default function SessionFormManager({
                             />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 sm:col-span-2">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={Boolean(question.required)}
-                                onCheckedChange={(next) => handleQuestionChange(question.id, { required: next })}
-                                id={`question-required-${question.id}`}
-                              />
-                              <Label htmlFor={`question-required-${question.id}`} className="text-xs sm:text-sm">שדה חובה</Label>
-                            </div>
-                          </div>
+                          <div className="sm:col-span-2" />
                         )}
                         </div>
 
-                        {supportsPlaceholder ? (
-                          <div className="flex items-center gap-3">
-                            <Switch
-                              checked={Boolean(question.required)}
-                              onCheckedChange={(next) => handleQuestionChange(question.id, { required: next })}
-                              id={`question-required-${question.id}`}
-                            />
-                            <Label htmlFor={`question-required-${question.id}`} className="text-sm">שדה חובה</Label>
-                          </div>
-                        ) : null}
+                        {/* Required toggle moved to header actions */}
+
+                          {(question.type === 'text' || question.type === 'textarea') ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold text-slate-800">תשובות מוכנות (עד {cap})</h4>
+                                <Button type="button" variant="outline" size="sm" onClick={() => handleAddPreanswer(question.id)} className="gap-2">
+                                  <Plus className="h-4 w-4" aria-hidden="true" /> הוסף תשובה
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {(Array.isArray(preanswersMap[question.id]) ? preanswersMap[question.id] : []).map((ans, idx) => (
+                                  <div key={`${question.id}-pa-${idx}`} className="grid w-full gap-2 sm:grid-cols-[1fr,auto] sm:items-center">
+                                    <Input
+                                      value={ans}
+                                      onChange={(e) => handlePreanswerChange(question.id, idx, e.target.value)}
+                                      placeholder="תשובה מוכנה"
+                                      className="text-sm"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleRemovePreanswer(question.id, idx)}
+                                      className="text-red-600 hover:bg-red-50"
+                                      aria-label="מחק תשובה"
+                                    >
+                                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                {(!Array.isArray(preanswersMap[question.id]) || preanswersMap[question.id].length === 0) ? (
+                                  <p className="text-xs text-slate-500">לא הוגדרו תשובות מוכנות לשאלה זו.</p>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
 
                         {requiresOptions ? (
                           <div className="space-y-3">
@@ -818,8 +964,8 @@ export default function SessionFormManager({
                               </Button>
                             </div>
                             <div className="space-y-3">
-                              {options.map((option) => (
-                                <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto] sm:items-end">
+                              {options.map((option, optIndex) => (
+                                <div key={option.id} className="grid w-full gap-3 sm:grid-cols-[2fr,2fr,auto,auto,auto] sm:items-start">
                                   <div className="space-y-2">
                                     <Label htmlFor={`option-label-${option.id}`} className="text-xs sm:text-sm">תווית להצגה</Label>
                                     <Input
@@ -827,8 +973,9 @@ export default function SessionFormManager({
                                       value={option.label}
                                       onChange={(event) => handleOptionChange(question.id, option.id, { label: event.target.value })}
                                       placeholder="לדוגמה: הושלם במלואו"
-                                      className="text-sm"
+                                      className="text-sm h-9"
                                     />
+                                    <p className="text-[10px] text-slate-400 sm:text-xs invisible">יופיע בתוצאות ולוגים.</p>
                                   </div>
                                   <div className="space-y-2">
                                     <Label htmlFor={`option-value-${option.id}`} className="text-xs sm:text-sm">ערך לשמירה</Label>
@@ -837,7 +984,7 @@ export default function SessionFormManager({
                                       value={option.value}
                                       onChange={(event) => handleOptionChange(question.id, option.id, { value: event.target.value })}
                                       placeholder="לדוגמה: completed"
-                                      className="text-sm"
+                                      className="text-sm h-9"
                                     />
                                     <p className="text-[10px] text-slate-400 sm:text-xs">יופיע בתוצאות ולוגים.</p>
                                   </div>
@@ -845,8 +992,30 @@ export default function SessionFormManager({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
+                                    onClick={() => handleMoveOption(question.id, optIndex, 'up')}
+                                    disabled={optIndex === 0}
+                                    className="self-center h-9 w-9"
+                                    aria-label="העבר אפשרות מעלה"
+                                  >
+                                    <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleMoveOption(question.id, optIndex, 'down')}
+                                    disabled={optIndex === options.length - 1}
+                                    className="self-center h-9 w-9"
+                                    aria-label="העבר אפשרות מטה"
+                                  >
+                                    <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
                                     onClick={() => handleRemoveOption(question.id, option.id)}
-                                    className="self-center text-red-600 hover:bg-red-50"
+                                    className="self-center text-red-600 hover:bg-red-50 h-9 w-9"
                                     aria-label="מחק אפשרות"
                                   >
                                     <Trash2 className="h-4 w-4" aria-hidden="true" />

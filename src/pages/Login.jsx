@@ -13,7 +13,8 @@ export default function Login() {
   const [loginError, setLoginError] = useState(null);
   const location = useLocation();
 
-  const redirectPath = location.state?.from?.pathname || '/';
+  // If already authenticated, send users to the dashboard instead of the landing page
+  const redirectPath = location.state?.from?.pathname || '/dashboard';
   const redirectMessage = location.state?.message || null;
 
   if (status === 'ready' && session) {

@@ -84,4 +84,85 @@
   body {
     @apply bg-background text-foreground;
   }
+  html { font-size: calc(16px * var(--a11y-font-scale, 1)); }
+}
+
+/* Mobile nav invisible hit-area — expands touch target without visual change */
+@layer components {
+  .mobile-nav-item {
+    position: relative;
+  }
+
+  @media (max-width: 768px) {
+    .mobile-nav-item::before {
+      content: '';
+      position: absolute;
+      inset: -6px; /* expands tappable area by 12px in both dimensions */
+      pointer-events: auto; /* ensures the hit area receives taps */
+      /* invisible - no visual impact */
+      background: transparent;
+    }
+  }
+}
+
+/* High-contrast accessibility mode overrides */
+@layer base {
+  .a11y-hc {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 220 100% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 15%;
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 84% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 70%;
+    --input: 0 0% 70%;
+    --ring: 220 100% 30%;
+  }
+}
+
+/* Make high-contrast visually stronger even when components use fixed palette classes */
+.a11y-hc {
+  /* Slight global contrast/saturation boost */
+  filter: contrast(1.1) saturate(1.05);
+}
+
+/* Custom scrollbar for dialog content - RTL natural appearance */
+@layer components {
+  .dialog-scroll-content {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .dialog-scroll-content::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 }

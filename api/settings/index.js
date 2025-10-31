@@ -11,6 +11,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { normalizeSessionFormConfigValue } from '../_shared/settings-utils.js';
+import { ensureOrgPermissions } from '../_shared/permissions-utils.js';
 import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 
 const SETTINGS_DIAGNOSTIC_CHECKS = new Set([
@@ -24,7 +25,8 @@ function isSchemaOrPolicyError(error) {
     return false;
   }
   const code = error.code || error.details;
-  if (code === '42P01' || code === '42501') {
+  // 42P01: undefined_table, 42501: insufficient_privilege, 42703: undefined_column
+  if (code === '42P01' || code === '42501' || code === '42703') {
     return true;
   }
   const message = String(error.message || error.details || '').toLowerCase();
@@ -35,6 +37,10 @@ function isSchemaOrPolicyError(error) {
     return true;
   }
   if (message.includes('permission denied') && message.includes('settings')) {
+    return true;
+  }
+  // Catch missing column metadata on Settings
+  if (message.includes('column') && message.includes('metadata') && message.includes('settings')) {
     return true;
   }
   return false;
@@ -51,6 +57,8 @@ async function verifySettingsInfrastructure(context, tenantClient) {
       body: {
         message: 'settings_schema_unverified',
         reason: 'diagnostics_failed',
+        hint: 'Make sure the tenant setup SQL has been applied. If only the metadata column is missing, you can run the idempotent SQL in sql_hint.',
+        sql_hint: 'ALTER TABLE tuttiud."Settings" ADD COLUMN IF NOT EXISTS metadata jsonb;'
       },
     };
   }
@@ -70,6 +78,8 @@ async function verifySettingsInfrastructure(context, tenantClient) {
           check: entry.check_name,
           details: entry.details,
         })),
+        hint: 'Make sure the tenant setup SQL has been applied. If only the metadata column is missing, you can run the idempotent SQL in sql_hint.',
+        sql_hint: 'ALTER TABLE tuttiud."Settings" ADD COLUMN IF NOT EXISTS metadata jsonb;'
       },
     };
   }
@@ -105,7 +115,18 @@ function normalizeSettingsObject(raw) {
     if (!normalizedKey) {
       continue;
     }
-    payload.push({ key: normalizedKey, settings_value: value ?? null });
+    // Support extended shape: { key: { value, metadata } }
+    if (value && typeof value === 'object' && !Array.isArray(value) && (Object.prototype.hasOwnProperty.call(value, 'value') || Object.prototype.hasOwnProperty.call(value, 'metadata'))) {
+      const val = Object.prototype.hasOwnProperty.call(value, 'value') ? value.value : null;
+      const meta = Object.prototype.hasOwnProperty.call(value, 'metadata') ? value.metadata : undefined;
+      const entry = { key: normalizedKey, settings_value: val ?? null };
+      if (meta !== undefined) {
+        entry.metadata = meta;
+      }
+      payload.push(entry);
+    } else {
+      payload.push({ key: normalizedKey, settings_value: value ?? null });
+    }
   }
 
   if (!payload.length) {
@@ -356,10 +377,18 @@ export default async function (context, req) {
   const query = req?.query ?? {};
 
   if (method === 'GET') {
+    // Ensure org permissions exist and backfill any missing keys from the registry
+    try {
+      await ensureOrgPermissions(supabase, orgId);
+    } catch (e) {
+      context.log?.warn?.('settings GET: ensureOrgPermissions failed (non-fatal)', { message: e?.message });
+    }
+
     const requestedKeys = collectKeysFromQuery(query);
+    const includeMeta = query.include_metadata === '1' || query.include_metadata === 'true';
     let builder = tenantClient
       .from('Settings')
-      .select('key, settings_value');
+      .select(includeMeta ? 'key, settings_value, metadata' : 'key, settings_value');
 
     if (requestedKeys.length) {
       builder = builder.in('key', requestedKeys);
@@ -382,7 +411,9 @@ export default async function (context, req) {
       if (!key) {
         continue;
       }
-      settingsMap[key] = entry.settings_value ?? null;
+      settingsMap[key] = includeMeta
+        ? { value: entry.settings_value ?? null, metadata: entry.metadata ?? null }
+        : (entry.settings_value ?? null);
     }
 
     if (requestedKeys.length) {
@@ -426,6 +457,58 @@ export default async function (context, req) {
     }
 
     payload = sessionFormResult.entries;
+
+    // If metadata provided for session_form_config, enforce cap and merge existing metadata
+    try {
+      const target = payload.find((p) => p.key === 'session_form_config' && Object.prototype.hasOwnProperty.call(p, 'metadata'));
+      if (target) {
+        // Read org permissions (from control DB)
+        const permissions = await ensureOrgPermissions(supabase, orgId);
+        const enabled = permissions && (permissions.session_form_preanswers_enabled === true || permissions.session_form_preanswers_enabled === 'true');
+        const capRaw = permissions && permissions.session_form_preanswers_cap;
+        const cap = Number.parseInt(String(capRaw ?? '50'), 10);
+        const effectiveCap = Number.isFinite(cap) && cap > 0 ? cap : 50;
+
+        const incoming = target.metadata && typeof target.metadata === 'object' ? target.metadata : {};
+        const incomingMap = incoming.preconfigured_answers && typeof incoming.preconfigured_answers === 'object' ? incoming.preconfigured_answers : {};
+
+        // Fetch existing metadata to merge
+        const { data: existingRow } = await tenantClient
+          .from('Settings')
+          .select('metadata')
+          .eq('key', 'session_form_config')
+          .maybeSingle();
+        const existingMeta = existingRow?.metadata && typeof existingRow.metadata === 'object' ? existingRow.metadata : {};
+
+        const merged = { ...existingMeta };
+        if (enabled) {
+          const normalizedMap = {};
+          for (const [qid, list] of Object.entries(incomingMap)) {
+            if (!qid || !Array.isArray(list)) continue;
+            const unique = [];
+            const seen = new Set();
+            for (const raw of list) {
+              if (typeof raw !== 'string') continue;
+              const t = raw.trim();
+              if (!t) continue;
+              if (seen.has(t)) continue;
+              seen.add(t);
+              unique.push(t);
+              if (unique.length >= effectiveCap) break;
+            }
+            normalizedMap[qid] = unique;
+          }
+          merged.preconfigured_answers = normalizedMap;
+        } else {
+          // Feature disabled: preserve existing metadata; do not write incoming preanswers
+        }
+
+        target.metadata = merged;
+      }
+    } catch (metaError) {
+      context.log?.error?.('settings metadata processing failed', { message: metaError?.message });
+      // continue without blocking the update
+    }
 
     const { error } = await tenantClient
       .from('Settings')
@@ -501,6 +584,52 @@ export default async function (context, req) {
     }
 
     payload = sessionFormResult.entries;
+
+    // If metadata provided for session_form_config, enforce cap and merge existing metadata
+    try {
+      const target = payload.find((p) => p.key === 'session_form_config' && Object.prototype.hasOwnProperty.call(p, 'metadata'));
+      if (target) {
+        const permissions = await ensureOrgPermissions(supabase, orgId);
+        const enabled = permissions && (permissions.session_form_preanswers_enabled === true || permissions.session_form_preanswers_enabled === 'true');
+        const capRaw = permissions && permissions.session_form_preanswers_cap;
+        const cap = Number.parseInt(String(capRaw ?? '50'), 10);
+        const effectiveCap = Number.isFinite(cap) && cap > 0 ? cap : 50;
+
+        const incoming = target.metadata && typeof target.metadata === 'object' ? target.metadata : {};
+        const incomingMap = incoming.preconfigured_answers && typeof incoming.preconfigured_answers === 'object' ? incoming.preconfigured_answers : {};
+
+        const { data: existingRow } = await tenantClient
+          .from('Settings')
+          .select('metadata')
+          .eq('key', 'session_form_config')
+          .maybeSingle();
+        const existingMeta = existingRow?.metadata && typeof existingRow.metadata === 'object' ? existingRow.metadata : {};
+
+        const merged = { ...existingMeta };
+        if (enabled) {
+          const normalizedMap = {};
+          for (const [qid, list] of Object.entries(incomingMap)) {
+            if (!qid || !Array.isArray(list)) continue;
+            const unique = [];
+            const seen = new Set();
+            for (const raw of list) {
+              if (typeof raw !== 'string') continue;
+              const t = raw.trim();
+              if (!t) continue;
+              if (seen.has(t)) continue;
+              seen.add(t);
+              unique.push(t);
+              if (unique.length >= effectiveCap) break;
+            }
+            normalizedMap[qid] = unique;
+          }
+          merged.preconfigured_answers = normalizedMap;
+        }
+        target.metadata = merged;
+      }
+    } catch (metaError) {
+      context.log?.error?.('settings metadata processing failed', { message: metaError?.message });
+    }
 
     const { error } = await tenantClient
       .from('Settings')

@@ -5,9 +5,9 @@ import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
-import NewSessionForm from './NewSessionForm.jsx';
+import NewSessionForm, { NewSessionFormFooter } from './NewSessionForm.jsx';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
-import { buildStudentsEndpoint, normalizeMembershipRole } from '@/features/students/utils/endpoints.js';
+import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -24,9 +24,12 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionError, setQuestionError] = useState('');
   const [questions, setQuestions] = useState([]);
+  const [suggestions, setSuggestions] = useState({});
   const [services, setServices] = useState([]);
   const [submitState, setSubmitState] = useState(REQUEST_STATE.idle);
   const [submitError, setSubmitError] = useState('');
+  const [instructors, setInstructors] = useState([]);
+  const [studentScope, setStudentScope] = useState('all'); // 'all' | 'mine' | `inst:<id>`
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
@@ -56,7 +59,25 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     setStudentsError('');
 
     try {
-      const endpoint = buildStudentsEndpoint(activeOrgId, membershipRole);
+      // Determine endpoint and optional server-side filter based on scope and role
+      const baseEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole);
+      let endpoint = baseEndpoint;
+      const isAdmin = isAdminRole(membershipRole);
+      if (isAdmin) {
+        if (studentScope === 'mine') {
+          // Admin viewing their own assigned students -> use my-students
+          const searchParams = new URLSearchParams();
+          if (activeOrgId) searchParams.set('org_id', activeOrgId);
+          endpoint = searchParams.toString() ? `my-students?${searchParams}` : 'my-students';
+        } else if (studentScope.startsWith('inst:')) {
+          const instructorId = studentScope.slice(5);
+          const searchParams = new URLSearchParams();
+          if (activeOrgId) searchParams.set('org_id', activeOrgId);
+          if (instructorId) searchParams.set('assigned_instructor_id', instructorId);
+          endpoint = searchParams.toString() ? `students?${searchParams}` : 'students';
+        }
+      }
+
       const payload = await authenticatedFetch(endpoint);
       setStudents(Array.isArray(payload) ? payload : []);
       setStudentsState(REQUEST_STATE.idle);
@@ -66,7 +87,21 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setStudentsState(REQUEST_STATE.error);
       setStudentsError(error?.message || 'טעינת רשימת התלמידים נכשלה.');
     }
-  }, [activeOrgId, canFetchStudents, membershipRole]);
+  }, [activeOrgId, canFetchStudents, membershipRole, studentScope]);
+
+  const loadInstructors = useCallback(async () => {
+    if (!open || !canFetchStudents) return;
+    if (!isAdminRole(membershipRole)) return;
+    try {
+      const searchParams = new URLSearchParams();
+      if (activeOrgId) searchParams.set('org_id', activeOrgId);
+      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`);
+      setInstructors(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      console.error('Failed to load instructors', error);
+      setInstructors([]);
+    }
+  }, [open, canFetchStudents, membershipRole, activeOrgId]);
 
   const loadQuestions = useCallback(async () => {
     if (!open || !canFetchStudents) {
@@ -77,14 +112,20 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
     setQuestionError('');
 
     try {
-      const searchParams = new URLSearchParams({ keys: 'session_form_config' });
+      const searchParams = new URLSearchParams({ keys: 'session_form_config', include_metadata: '1' });
       if (activeOrgId) {
         searchParams.set('org_id', activeOrgId);
       }
       const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
-      const settingsValue = payload?.settings?.session_form_config ?? null;
+      const entry = payload?.settings?.session_form_config ?? null;
+      const settingsValue = entry && typeof entry === 'object' && Object.prototype.hasOwnProperty.call(entry, 'value') ? entry.value : entry;
       const normalized = ensureSessionFormFallback(parseSessionFormConfig(settingsValue));
+      const metadata = entry && typeof entry === 'object' && Object.prototype.hasOwnProperty.call(entry, 'metadata') ? entry.metadata : null;
+      const preanswers = metadata && typeof metadata === 'object' && metadata.preconfigured_answers && typeof metadata.preconfigured_answers === 'object'
+        ? metadata.preconfigured_answers
+        : {};
       setQuestions(normalized);
+      setSuggestions(preanswers);
       setQuestionsState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to load session form configuration', error);
@@ -113,6 +154,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       void loadStudents();
       void loadQuestions();
       void loadServices();
+      void loadInstructors();
     } else {
       setStudentsState(REQUEST_STATE.idle);
       setStudentsError('');
@@ -120,9 +162,12 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setQuestionsState(REQUEST_STATE.idle);
       setQuestionError('');
       setQuestions([]);
+      setSuggestions({});
       setServices([]);
+      setInstructors([]);
+      setStudentScope('all');
     }
-  }, [open, loadQuestions, loadStudents, loadServices]);
+  }, [open, loadQuestions, loadStudents, loadServices, loadInstructors]);
 
   const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
     setSubmitState(REQUEST_STATE.loading);
@@ -167,9 +212,24 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const isLoadingQuestions = questionsState === REQUEST_STATE.loading;
   const showLoading = isLoadingStudents || isLoadingQuestions;
 
+  // Track selected student for footer button state
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+
+  const footer = canFetchStudents && !showLoading && studentsState !== REQUEST_STATE.error ? (
+    <NewSessionFormFooter
+      onSubmit={() => {
+        // Trigger form submission via form id
+        document.getElementById('new-session-form')?.requestSubmit();
+      }}
+      onCancel={onClose}
+      isSubmitting={submitState === REQUEST_STATE.loading}
+      selectedStudentId={selectedStudentId}
+    />
+  ) : null;
+
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) { onClose?.(); } }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
+      <DialogContent className="sm:max-w-xl" footer={footer}>
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
@@ -191,12 +251,19 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
           <NewSessionForm
             students={students}
             questions={questions}
+            suggestions={suggestions}
             services={services}
+            instructors={instructors}
+            canFilterByInstructor={isAdminRole(membershipRole)}
+            studentScope={studentScope}
+            onScopeChange={(next) => setStudentScope(next)}
             initialStudentId={initialStudentId}
             onSubmit={handleSubmit}
             onCancel={onClose}
             isSubmitting={submitState === REQUEST_STATE.loading}
             error={submitError || (questionsState === REQUEST_STATE.error ? questionError : '')}
+            renderFooterOutside={true}
+            onSelectedStudentChange={setSelectedStudentId}
           />
         )}
       </DialogContent>

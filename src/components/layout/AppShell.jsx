@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react"
-import { Link, NavLink, Outlet } from "react-router-dom"
+import { Link, NavLink, Outlet, useLocation, matchPath } from "react-router-dom"
 import { Plus, LayoutDashboard, Users, BarChart3, Settings, LogOut, Megaphone } from "lucide-react"
 import { Toaster, toast } from "sonner"
 
@@ -15,19 +15,24 @@ import { SessionModalContext } from "@/features/sessions/context/SessionModalCon
 import useKeyboardAwareBottomOffset from "@/hooks/useKeyboardAwareBottomOffset.js"
 import OrgLogo from "@/components/layout/OrgLogo.jsx"
 import { WelcomeTour } from "@/features/onboarding/components/WelcomeTour.jsx"
+import CustomTourRenderer from "@/features/onboarding/components/CustomTourRenderer.jsx"
+import { useUserRole } from "@/features/onboarding/hooks/useUserRole.js"
+import { AccessibilityProvider } from "@/features/accessibility/AccessibilityProvider.jsx"
+import AccessibilityButton from "@/features/accessibility/AccessibilityButton.jsx"
+import SkipLink from "@/features/accessibility/SkipLink.jsx"
 
 const REPORTS_COMING_SOON_MESSAGE = "יכולות דוחות וסטטיסטיקה יגיעו בקרוב!"
 
 function buildNavItems(role) {
-  const normalizedRole = typeof role === "string" ? role.toLowerCase() : "member"
-  const isAdminRole = normalizedRole === "admin" || normalizedRole === "owner"
+  // role is already normalized (lowercase) from useUserRole
+  const isAdminRole = role === "admin" || role === "owner"
 
   const studentsDestination = isAdminRole ? "/admin/students" : "/my-students"
 
   return [
     {
       label: "ראשי",
-      to: "/",
+      to: "/dashboard",
       icon: LayoutDashboard,
       end: true,
   tourKey: "dashboard",
@@ -55,15 +60,24 @@ function buildNavItems(role) {
 
 function MobileNavigation({ navItems = [], onOpenSessionModal }) {
   const keyboardOffset = useKeyboardAwareBottomOffset()
+  const location = useLocation()
+  const studentsRouteActive = React.useMemo(() => {
+    const p = location.pathname
+    return Boolean(
+      matchPath('/admin/students/*', p) ||
+      matchPath('/my-students/*', p) ||
+      matchPath('/students/:id', p)
+    )
+  }, [location.pathname])
   return (
     <nav
       role="navigation"
       aria-label="ניווט ראשי"
-  className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
       style={keyboardOffset > 0 ? { transform: `translateY(-${keyboardOffset}px)` } : undefined}
     >
-      <div className="relative mx-auto flex max-w-md items-center justify-between gap-md">
-        {navItems.map((item) => {
+      <div className="relative mx-auto grid max-w-md grid-cols-5 items-center gap-md">
+        {navItems.slice(0, 2).map((item) => {
           const Icon = item.icon
 
           if (item.disabled) {
@@ -75,9 +89,9 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
                 aria-disabled="true"
                 title={item.tooltip}
                 onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
-                className="flex flex-1 cursor-not-allowed flex-col items-center gap-1 text-xs font-medium text-neutral-400 opacity-70"
+                className="relative mobile-nav-item flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
               >
-                <Icon className="h-5 w-5" aria-hidden="true" />
+                  <Icon className="h-6 w-6" aria-hidden="true" />
                 <span>{item.label}</span>
               </button>
             )
@@ -90,34 +104,90 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
               end={item.end}
               data-tour={item.tourKey}
               aria-label={item.label}
-              className={({ isActive }) =>
-                cn(
-                  "flex flex-1 flex-col items-center gap-1 text-xs font-medium",
-                  isActive ? "text-primary" : "text-neutral-500",
+              className={({ isActive }) => {
+                const isStudentsItem = item.tourKey === 'admin-students' || item.tourKey === 'my-students'
+                const active = isActive || (isStudentsItem && studentsRouteActive)
+                return cn(
+                  "relative mobile-nav-item flex flex-col items-center gap-1 h-12 text-sm font-medium",
+                  active ? "text-primary" : "text-neutral-500",
                 )
-              }
+              }}
             >
-              <Icon className="h-5 w-5" aria-hidden="true" />
+              <Icon className="h-6 w-6" aria-hidden="true" />
               <span>{item.label}</span>
             </NavLink>
           )
         })}
+        
+        {/* Middle column placeholder for FAB button */}
+        <div className="relative flex items-center justify-center" aria-hidden="true">
+          <button
+            type="button"
+            onClick={() => onOpenSessionModal?.()}
+            data-tour="fab-button"
+            className="absolute -top-12 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-2 ring-background"
+            aria-label="יצירת רישום פגישה חדש"
+          >
+            <Plus className="h-6 w-6" aria-hidden="true" />
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => onOpenSessionModal?.()}
-          data-tour="fab-button"
-          className="absolute -top-7 left-1/2 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl ring-4 ring-background"
-          aria-label="יצירת רישום פגישה חדש"
-        >
-          <Plus className="h-6 w-6" aria-hidden="true" />
-        </button>
+        {navItems.slice(2).map((item) => {
+          const Icon = item.icon
+
+          if (item.disabled) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                aria-label={item.label}
+                aria-disabled="true"
+                title={item.tooltip}
+                onClick={() => toast.info(item.tooltip ?? REPORTS_COMING_SOON_MESSAGE)}
+                className="relative mobile-nav-item flex cursor-not-allowed flex-col items-center gap-1 h-12 text-sm font-medium text-neutral-400 opacity-70"
+              >
+                  <Icon className="h-6 w-6" aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
+            )
+          }
+
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              data-tour={item.tourKey}
+              aria-label={item.label}
+              className={({ isActive }) => {
+                const isStudentsItem = item.tourKey === 'admin-students' || item.tourKey === 'my-students'
+                const active = isActive || (isStudentsItem && studentsRouteActive)
+                return cn(
+                  "relative mobile-nav-item flex flex-col items-center gap-1 h-12 text-sm font-medium",
+                  active ? "text-primary" : "text-neutral-500",
+                )
+              }}
+            >
+              <Icon className="h-6 w-6" aria-hidden="true" />
+              <span>{item.label}</span>
+            </NavLink>
+          )
+        })}
       </div>
     </nav>
   )
 }
 
 function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
+  const location = useLocation()
+  const studentsRouteActive = React.useMemo(() => {
+    const p = location.pathname
+    return Boolean(
+      matchPath('/admin/students/*', p) ||
+      matchPath('/my-students/*', p) ||
+      matchPath('/students/:id', p)
+    )
+  }, [location.pathname])
   return (
     <aside
       className="hidden md:flex md:h-screen md:w-72 md:flex-col md:border-l md:border-border md:bg-surface"
@@ -125,7 +195,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
     >
       <div className="flex h-full flex-col">
         <div className="flex flex-col gap-md px-lg pt-lg">
-          <Link to="/" className="flex items-center justify-end gap-sm text-right flex-row-reverse">
+          <Link to="/dashboard" className="flex items-center justify-end gap-sm text-right flex-row-reverse">
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground">תותיעוד</p>
               <p className="text-xs text-neutral-500">פלטפורמת תלמידים</p>
@@ -137,6 +207,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
           <button
             type="button"
             onClick={() => onOpenSessionModal?.()}
+            data-tour="fab-button"
             className="inline-flex items-center justify-center gap-sm rounded-full bg-primary px-lg py-sm text-sm font-semibold text-primary-foreground shadow-lg transition hover:shadow-xl"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -171,12 +242,15 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                className={({ isActive }) =>
-                  cn(
+                data-tour={item.tourKey}
+                className={({ isActive }) => {
+                  const isStudentsItem = item.tourKey === 'admin-students' || item.tourKey === 'my-students'
+                  const active = isActive || (isStudentsItem && studentsRouteActive)
+                  return cn(
                     "flex items-center justify-between gap-sm rounded-xl px-md py-sm text-sm font-medium transition",
-                    isActive ? "bg-primary/10 text-primary" : "text-neutral-600 hover:bg-neutral-100",
+                    active ? "bg-primary/10 text-primary" : "text-neutral-600 hover:bg-neutral-100",
                   )
-                }
+                }}
               >
                 <div className="flex items-center gap-sm">
                   <Icon className="h-5 w-5" aria-hidden="true" />
@@ -204,6 +278,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
 export default function AppShell({ children }) {
   const { signOut } = useAuth()
   const { activeOrg } = useOrg()
+  const { role } = useUserRole()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
   const [sessionModalState, setSessionModalState] = useState({
     isOpen: false,
@@ -211,8 +286,8 @@ export default function AppShell({ children }) {
     onCreated: null,
   })
 
-  const membershipRole = activeOrg?.membership?.role
-  const navItems = useMemo(() => buildNavItems(membershipRole), [membershipRole])
+  // Use the same role source used by the onboarding system to keep targets stable
+  const navItems = useMemo(() => buildNavItems(role), [role])
 
   const openSessionModal = useCallback((options = {}) => {
     const { studentId = '', onCreated = null } = options
@@ -256,7 +331,9 @@ export default function AppShell({ children }) {
 
   return (
     <SessionModalContext.Provider value={sessionModalContextValue}>
+      <AccessibilityProvider>
       <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden" dir="rtl">
+        <SkipLink />
         <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
         <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
@@ -273,6 +350,7 @@ export default function AppShell({ children }) {
                 </button>
               </div>
               <div className="flex items-center gap-xs">
+                <AccessibilityButton />
                 <button
                   type="button"
                   onClick={() => setIsChangelogOpen(true)}
@@ -296,7 +374,7 @@ export default function AppShell({ children }) {
           <OrgSelectionBanner />
           <OrgConfigBanner />
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <main id="main-content" role="main" className="flex-1 overflow-y-auto overflow-x-hidden">
             <PageLayout
               fullHeight={false}
               className="min-h-full pb-0"
@@ -305,10 +383,11 @@ export default function AppShell({ children }) {
             >
               {content}
             </PageLayout>
-          </div>
+          </main>
         </div>
         <MobileNavigation navItems={navItems} onOpenSessionModal={openSessionModal} />
-  <WelcomeTour />
+        <WelcomeTour />
+        <CustomTourRenderer />
 
         <ChangelogModal open={isChangelogOpen} onClose={() => setIsChangelogOpen(false)} />
         <Toaster richColors position="top-right" closeButton />
@@ -319,6 +398,7 @@ export default function AppShell({ children }) {
           onCreated={sessionModalState.onCreated}
         />
       </div>
+      </AccessibilityProvider>
     </SessionModalContext.Provider>
   )
 }

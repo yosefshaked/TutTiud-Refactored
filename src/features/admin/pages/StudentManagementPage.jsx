@@ -11,8 +11,9 @@ import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
-import AddStudentForm from '../components/AddStudentForm.jsx';
-import AssignInstructorModal from '../components/AssignInstructorModal.jsx';
+import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentForm.jsx';
+// Removed legacy instructor assignment modal; instructor is edited inside EditStudent now
+import EditStudentModal from '../components/EditStudentModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 import { includesDayQuery } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
@@ -34,10 +35,14 @@ export default function StudentManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isCreatingStudent, setIsCreatingStudent] = useState(false);
   const [createError, setCreateError] = useState('');
-  const [studentForAssignment, setStudentForAssignment] = useState(null);
+  // const [studentForAssignment, setStudentForAssignment] = useState(null);
+  const [studentForEdit, setStudentForEdit] = useState(null);
+  const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+  const [updateError, setUpdateError] = useState('');
   const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
   const [searchQuery, setSearchQuery] = useState('');
   const [dayFilter, setDayFilter] = useState(null);
+  const [instructorFilterId, setInstructorFilterId] = useState('');
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -126,6 +131,51 @@ export default function StudentManagementPage() {
     }
   }, [user, instructors]);
 
+  // Ensure instructor-specific filter is cleared when viewing "my students"
+  useEffect(() => {
+    if (filterMode === 'mine' && instructorFilterId) {
+      setInstructorFilterId('');
+    }
+  }, [filterMode, instructorFilterId]);
+
+  // Combined filter options for the control: mine, all, and per-instructor
+  const combinedFilterOptions = useMemo(() => {
+    const base = [
+      { value: 'mine', label: 'התלמידים שלי' },
+      { value: 'all', label: 'כל התלמידים' },
+    ];
+    if (!Array.isArray(instructors) || instructors.length === 0) return base;
+    const instructorOptions = instructors.map((inst) => ({
+      value: `inst:${inst.id}`,
+      label: `התלמידים של ${inst.name || inst.email || inst.id}`,
+    }));
+    return base.concat(instructorOptions);
+  }, [instructors]);
+
+  const combinedFilterValue = useMemo(() => {
+    if (instructorFilterId) return `inst:${instructorFilterId}`;
+    return filterMode; // 'mine' or 'all'
+  }, [filterMode, instructorFilterId]);
+
+  const handleCombinedFilterChange = (e) => {
+    const value = e.target.value;
+    if (value === 'mine') {
+      setFilterMode('mine');
+      setInstructorFilterId('');
+      return;
+    }
+    if (value === 'all') {
+      setFilterMode('all');
+      setInstructorFilterId('');
+      return;
+    }
+    if (value.startsWith('inst:')) {
+      const id = value.slice(5);
+      setFilterMode('all');
+      setInstructorFilterId(id);
+    }
+  };
+
   const handleOpenAddDialog = () => {
     setCreateError('');
     setIsAddDialogOpen(true);
@@ -186,24 +236,56 @@ export default function StudentManagementPage() {
     }
   };
 
-  const handleOpenAssignment = (student) => {
-    setStudentForAssignment(student);
+  // Legacy assignment handlers removed in favor of unified edit flow
+
+  const handleOpenEdit = (student) => {
+    setUpdateError('');
+    setStudentForEdit(student);
   };
 
-  const handleCloseAssignment = () => {
-    setStudentForAssignment(null);
+  const handleCloseEdit = () => {
+    if (!isUpdatingStudent) {
+      setStudentForEdit(null);
+      setUpdateError('');
+    }
   };
 
-  const handleAssignmentSuccess = async () => {
-    await refreshRoster();
+  const handleUpdateStudent = async (payload) => {
+    if (!payload?.id) return;
+    setIsUpdatingStudent(true);
+    setUpdateError('');
+    try {
+      const body = {
+        org_id: activeOrgId,
+        name: payload.name,
+        contact_name: payload.contactName,
+        contact_phone: payload.contactPhone,
+        assigned_instructor_id: payload.assignedInstructorId,
+        default_service: payload.defaultService,
+        default_day_of_week: payload.defaultDayOfWeek,
+        default_session_time: payload.defaultSessionTime,
+        notes: payload.notes,
+        tags: payload.tags,
+      };
+      await authenticatedFetch(`students/${payload.id}`, { session, method: 'PUT', body });
+      setStudentForEdit(null);
+      await refreshRoster(true);
+    } catch (error) {
+      console.error('Failed to update student', error);
+      setUpdateError(error?.message || 'עדכון התלמיד נכשל.');
+    } finally {
+      setIsUpdatingStudent(false);
+    }
   };
 
   // Compute filtered/sorted students before any early returns to satisfy hooks rules
   const displayedStudents = useMemo(() => {
     let filtered = students;
 
-    // Filter by instructor (mine vs all)
-    if (filterMode === 'mine' && user?.id) {
+    // Filter by instructor (explicit instructor takes precedence over mode)
+    if (instructorFilterId) {
+      filtered = filtered.filter((s) => s.assigned_instructor_id === instructorFilterId);
+    } else if (filterMode === 'mine' && user?.id) {
       filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
     }
     // Filter by day of week if selected
@@ -244,7 +326,7 @@ export default function StudentManagementPage() {
     }
 
     return filtered;
-  }, [students, filterMode, user?.id, searchQuery, dayFilter]);
+  }, [students, filterMode, user?.id, searchQuery, dayFilter, instructorFilterId]);
 
   if (supabaseLoading) {
     return (
@@ -279,15 +361,16 @@ export default function StudentManagementPage() {
       actions={(
         <div className="flex items-center gap-3 self-start">
           <div className="flex items-center gap-2 text-sm">
-            <label htmlFor="students-filter" className="text-neutral-600">הצג:</label>
+            <label htmlFor="students-filter-combined" className="text-neutral-600">הצג:</label>
             <select
-              id="students-filter"
+              id="students-filter-combined"
               className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
-              value={filterMode}
-              onChange={(e) => setFilterMode(e.target.value)}
+              value={combinedFilterValue}
+              onChange={handleCombinedFilterChange}
             >
-              <option value="mine">התלמידים שלי</option>
-              <option value="all">כל התלמידים</option>
+              {combinedFilterOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
           <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
@@ -404,7 +487,7 @@ export default function StudentManagementPage() {
                                 ) : student.assigned_instructor_id ? (
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenAssignment(student)}
+                                    onClick={() => handleOpenEdit(student)}
                                     className="text-amber-700 underline underline-offset-2 hover:text-amber-800"
                                     title="שיוך מדריך מחדש"
                                   >
@@ -459,7 +542,7 @@ export default function StudentManagementPage() {
                           variant="outline"
                           size="sm"
                           className="gap-xs text-xs sm:text-sm"
-                          onClick={() => handleOpenAssignment(student)}
+                          onClick={() => handleOpenEdit(student)}
                         >
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                           <span className="hidden sm:inline">עריכה</span>
@@ -477,7 +560,16 @@ export default function StudentManagementPage() {
       </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) handleCloseAddDialog(); }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl pb-28 sm:pb-6">
+        <DialogContent 
+          className="sm:max-w-xl" 
+          footer={
+            <AddStudentFormFooter
+              onSubmit={() => document.getElementById('add-student-form')?.requestSubmit()}
+              onCancel={handleCloseAddDialog}
+              isSubmitting={isCreatingStudent}
+            />
+          }
+        >
           <DialogHeader>
             <DialogTitle>הוספת תלמיד חדש</DialogTitle>
           </DialogHeader>
@@ -486,17 +578,20 @@ export default function StudentManagementPage() {
             onCancel={handleCloseAddDialog}
             isSubmitting={isCreatingStudent}
             error={createError}
+            renderFooterOutside={true}
           />
         </DialogContent>
       </Dialog>
 
-      <AssignInstructorModal
-        open={Boolean(studentForAssignment)}
-        onClose={handleCloseAssignment}
-        student={studentForAssignment}
-        orgId={activeOrgId}
-        session={session}
-        onAssigned={handleAssignmentSuccess}
+      {/* Instructor assignment is now handled inside EditStudentModal */}
+
+      <EditStudentModal
+        open={Boolean(studentForEdit)}
+        onClose={handleCloseEdit}
+        student={studentForEdit}
+        onSubmit={handleUpdateStudent}
+        isSubmitting={isUpdatingStudent}
+        error={updateError}
       />
     </PageLayout>
   );

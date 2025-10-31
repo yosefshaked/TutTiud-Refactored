@@ -5,35 +5,34 @@ Implement a comprehensive onboarding system to guide new users through the TutTi
 
 ## Phases
 
-### Phase 1: Welcome Tour ✅ (In Progress)
+### Phase 1: Welcome Tour ✅ (Complete)
 **Goal**: Interactive step-by-step tour on first login
 
-**Library**: `react-joyride` - lightweight, customizable tour library
+**Library**: `driver.js` - framework-agnostic, works with React 19
 
 **Features**:
-- Role-aware tours (Admin/Owner vs Instructor/Member)
-- Skip/dismiss functionality
-- "Show me again" option in settings
-- Persistent state (user metadata or localStorage)
-- RTL support for Hebrew interface
+✅ Role-aware tours (Admin/Owner vs Instructor/Member)
+✅ Skip/dismiss functionality
+✅ "Show me again" option in settings
+✅ Persistent state (user metadata or localStorage)
+✅ RTL support for Hebrew interface
 
 **Admin/Owner Tour Steps** (5-6 steps):
-1. Welcome to TutTiud Dashboard
-2. Add sessions via FAB button
-3. Manage students (admin panel)
-4. View reports and analytics
-5. Organization settings
-6. Help resources location
+✅ 1. Welcome to TutTiud Dashboard
+✅ 2. Add sessions via FAB button
+✅ 3. Manage students (admin panel)
+✅ 4. View reports and analytics
+✅ 5. Organization settings
+✅ 6. Help resources location
 
 **Instructor/Member Tour Steps** (4-5 steps):
-1. Welcome to TutTiud Dashboard
-2. Add sessions via FAB button
-3. View your students
-4. Track session history
-5. Help resources location
+✅ 1. Welcome to TutTiud Dashboard
+✅ 2. Add sessions via FAB button
+✅ 3. View your students
+✅ 4. Track session history
+✅ 5. Help resources location
 
 **Implementation Structure**:
-```
 src/
   features/
     onboarding/
@@ -46,23 +45,36 @@ src/
       utils/
         tourConfig.js              # Joyride configuration
 ```
+src/
+  features/
+    onboarding/
+      hooks/
+        useOnboardingStatus.js     # Track completion state
+        useUserRole.js             # Determine user role for tour variants
+      components/
+        WelcomeTour.jsx            # Main tour orchestrator
+        TourSteps.jsx              # Role-based step definitions
+      styles/
+        tour.css                   # Custom tour styling
+```
 
 **Tracking**:
-- Store completion in Supabase user metadata: `{ onboarding_completed: true, onboarding_completed_at: timestamp }`
-- Fallback to localStorage for offline scenarios
-- Reset option in settings for re-watching
+✅ Store completion in Supabase user metadata: `{ onboarding_completed: true, onboarding_completed_at: timestamp }`
+✅ Fallback to localStorage for offline scenarios
+✅ Reset option in settings for re-watching
 
 **UI Considerations**:
-- Use brand colors (#2563EB primary)
-- RTL-aware positioning
-- Mobile-responsive tooltips
-- Skip button always visible
-- Progress indicator (Step X of Y)
+✅ Use brand colors (#2563EB primary)
+✅ RTL-aware positioning
+✅ Mobile-responsive tooltips
+✅ Skip button always visible
+✅ Progress indicator (Step X of Y)
 
 ---
 
 ### Phase 2: Empty State Components
 **Goal**: Replace blank screens with actionable guidance
+*Planned*
 
 **Components to Create**:
 1. `EmptySessionsState.jsx` - Dashboard when no sessions
@@ -92,6 +104,7 @@ src/
 
 ### Phase 3: Contextual Help System
 **Goal**: In-app help resources and documentation
+*Planned*
 
 **Components**:
 1. Help icon in AppShell header
@@ -128,6 +141,7 @@ src/
 
 ### Phase 4: Enhanced Tooltips
 **Goal**: Contextual inline help for complex features
+*Planned*
 
 **Enhancements to Existing `InfoTooltip`**:
 - Add "Learn more" links
@@ -173,11 +187,10 @@ src/
 ## Dependencies to Install
 
 ```bash
-npm install react-joyride
+npm install driver.js
 ```
 
-Alternative lightweight options if needed:
-- `driver.js` - More customizable, no React dependency
+Alternative options if needed:
 - `intro.js` - Classic option, larger bundle
 - `shepherd.js` - Modern, accessible, medium size
 
@@ -227,10 +240,10 @@ Alternative lightweight options if needed:
 
 ## Implementation Timeline
 
-**Phase 1**: 2-3 days
-- Day 1: Setup, basic tour structure, role detection
-- Day 2: Tour steps, content, styling
-- Day 3: Testing, refinement, state persistence
+**Phase 1**: 2-3 days (Complete)
+  - Setup, basic tour structure, role detection
+  - Tour steps, content, styling
+  - Testing, refinement, state persistence
 
 **Phase 2**: 1-2 days
 - Empty state components and integration

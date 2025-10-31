@@ -1,60 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import Joyride, { STATUS } from 'react-joyride';
+import React, { useEffect, useMemo } from 'react';
+import { openTour } from '../customTour.js';
 import { useUserRole } from '../hooks/useUserRole.js';
 import { useOnboardingStatus } from '../hooks/useOnboardingStatus.js';
 import { getTourSteps } from './TourSteps.jsx';
-import { tourConfig } from '../utils/tourConfig.js';
 
 /**
- * WelcomeTour - Interactive onboarding tour for new users
+ * WelcomeTour - Custom onboarding tour for new users (auto-run)
  * Automatically shows on first login, adapts to user role
  */
 export function WelcomeTour() {
   const { isAdmin } = useUserRole();
   const { completed, loading, markCompleted } = useOnboardingStatus();
-  const [run, setRun] = useState(false);
 
-  // Start tour when user is loaded and hasn't completed it
+  const steps = useMemo(() => getTourSteps(isAdmin), [isAdmin]);
+
   useEffect(() => {
-    if (!loading && !completed) {
-      // Small delay to ensure UI is rendered
-      const timer = setTimeout(() => {
-        setRun(true);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, completed]);
+    if (loading || completed) return undefined;
 
-  const handleJoyrideCallback = (data) => {
-    const { status, action } = data;
-    const finishedStatuses = [STATUS.FINISHED, STATUS.SKIPPED];
+    const timer = setTimeout(() => {
+      openTour(steps, { onClose: () => Promise.resolve().then(() => markCompleted()) });
+    }, 500);
 
-    if (finishedStatuses.includes(status)) {
-      setRun(false);
+    return () => clearTimeout(timer);
+  }, [loading, completed, steps, markCompleted]);
 
-      // Mark as completed if tour finished (not skipped)
-      if (status === STATUS.FINISHED) {
-        markCompleted();
-      } else if (status === STATUS.SKIPPED && action === 'skip') {
-        // User explicitly skipped, still mark as completed
-        markCompleted();
-      }
-    }
-  };
-
-  // Don't render if loading or already completed
-  if (loading || completed) {
-    return null;
-  }
-
-  const steps = getTourSteps(isAdmin);
-
-  return (
-    <Joyride
-      steps={steps}
-      run={run}
-      callback={handleJoyrideCallback}
-      {...tourConfig}
-    />
-  );
+  return null;
 }
