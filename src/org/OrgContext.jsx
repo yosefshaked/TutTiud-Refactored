@@ -246,6 +246,16 @@ export function OrgProvider({ children }) {
   const [configStatus, setConfigStatus] = useState('idle');
   const [activeOrgConfig, setActiveOrgConfig] = useState(null);
   const [directoryEnabled, setDirectoryEnabled] = useState(false);
+
+  // Stable toggles for directory fetching lifecycle
+  const enableDirectory = useCallback(() => {
+    setDirectoryEnabled((prev) => (prev ? prev : true));
+  }, []);
+  const disableDirectory = useCallback(() => {
+    setDirectoryEnabled((prev) => (prev ? false : prev));
+    setOrgMembers([]);
+    setOrgInvites([]);
+  }, []);
   const loadingRef = useRef(false);
   const lastUserIdRef = useRef(null);
   const configRequestRef = useRef(0);
@@ -1136,8 +1146,8 @@ export function OrgProvider({ children }) {
       removeMember,
       updateMemberRole,
       acceptInvite,
-      enableDirectory: () => setDirectoryEnabled(true),
-      disableDirectory: () => { setDirectoryEnabled(false); setOrgMembers([]); setOrgInvites([]); },
+      enableDirectory,
+      disableDirectory,
       activeOrgHasConnection: Boolean(
         (activeOrgConnection?.supabaseUrl || activeOrgConfig?.supabaseUrl) &&
           (activeOrgConnection?.supabaseAnonKey || activeOrgConfig?.supabaseAnonKey),
@@ -1167,6 +1177,8 @@ export function OrgProvider({ children }) {
       removeMember,
       updateMemberRole,
       acceptInvite,
+      enableDirectory,
+      disableDirectory,
       configStatus,
       activeOrgConfig,
       activeOrgConnection,
