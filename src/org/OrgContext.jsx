@@ -245,6 +245,7 @@ export function OrgProvider({ children }) {
   const [error, setError] = useState(null);
   const [configStatus, setConfigStatus] = useState('idle');
   const [activeOrgConfig, setActiveOrgConfig] = useState(null);
+  const [directoryEnabled, setDirectoryEnabled] = useState(false);
   const loadingRef = useRef(false);
   const lastUserIdRef = useRef(null);
   const configRequestRef = useRef(0);
@@ -263,6 +264,7 @@ export function OrgProvider({ children }) {
     setError(null);
     setActiveOrgConfig(null);
     setConfigStatus('idle');
+    setDirectoryEnabled(false);
     setSupabaseActiveOrg(null);
   }, [setSupabaseActiveOrg]);
 
@@ -675,6 +677,11 @@ export function OrgProvider({ children }) {
       return;
     }
 
+    // Only fetch directory when explicitly enabled (e.g., Settings → Team Members open)
+    if (!directoryEnabled) {
+      return;
+    }
+
     const abortController = new AbortController();
 
     const run = async () => {
@@ -693,7 +700,7 @@ export function OrgProvider({ children }) {
     return () => {
       abortController.abort();
     };
-  }, [activeOrgId, session, loadOrgDirectory, hasRuntimeConfig]);
+  }, [activeOrgId, session, loadOrgDirectory, hasRuntimeConfig, directoryEnabled]);
 
   useEffect(() => {
     if (!activeOrgId) return;
@@ -1129,6 +1136,8 @@ export function OrgProvider({ children }) {
       removeMember,
       updateMemberRole,
       acceptInvite,
+      enableDirectory: () => setDirectoryEnabled(true),
+      disableDirectory: () => { setDirectoryEnabled(false); setOrgMembers([]); setOrgInvites([]); },
       activeOrgHasConnection: Boolean(
         (activeOrgConnection?.supabaseUrl || activeOrgConfig?.supabaseUrl) &&
           (activeOrgConnection?.supabaseAnonKey || activeOrgConfig?.supabaseAnonKey),

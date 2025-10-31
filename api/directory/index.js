@@ -16,8 +16,6 @@ const ADMIN_CLIENT_OPTIONS = {
   },
 };
 
-let cachedAdminClient = null;
-let cachedAdminConfig = null;
 
 function readEnv(context) {
   if (context?.env && typeof context.env === 'object') {
@@ -58,16 +56,9 @@ function getAdminClient(context) {
   if (!config.url || !config.key) {
     return { client: null, error: new Error('missing_admin_credentials') };
   }
-  if (
-    !cachedAdminClient ||
-    !cachedAdminConfig ||
-    cachedAdminConfig.url !== config.url ||
-    cachedAdminConfig.key !== config.key
-  ) {
-    cachedAdminClient = createAdminClient(config.url, config.key);
-    cachedAdminConfig = config;
-  }
-  return { client: cachedAdminClient, error: null };
+  // Create a fresh admin client per request to avoid lingering connections
+  const client = createAdminClient(config.url, config.key);
+  return { client, error: null };
 }
 
 function respond(context, status, body, extraHeaders = {}) {

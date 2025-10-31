@@ -8,8 +8,6 @@ const ADMIN_CLIENT_OPTIONS = {
   global: { headers: { Accept: 'application/json' } },
 };
 
-let cachedAdminClient = null;
-let cachedAdminConfig = null;
 
 function readEnv(context) {
   return (context?.env && typeof context.env === 'object') ? context.env : (process.env ?? {});
@@ -28,11 +26,9 @@ function resolveAdminConfig(context) {
 function getAdminClient(context) {
   const cfg = resolveAdminConfig(context);
   if (!cfg.url || !cfg.key) return { client: null, error: new Error('missing_admin_credentials') };
-  if (!cachedAdminClient || !cachedAdminConfig || cachedAdminConfig.url !== cfg.url || cachedAdminConfig.key !== cfg.key) {
-    cachedAdminClient = createClient(cfg.url, cfg.key, ADMIN_CLIENT_OPTIONS);
-    cachedAdminConfig = cfg;
-  }
-  return { client: cachedAdminClient, error: null };
+  // Create a fresh admin client per request
+  const client = createClient(cfg.url, cfg.key, ADMIN_CLIENT_OPTIONS);
+  return { client, error: null };
 }
 function respond(context, status, body, extraHeaders = {}) {
   const response = json(status, body, { 'Cache-Control': 'no-store', ...extraHeaders });
