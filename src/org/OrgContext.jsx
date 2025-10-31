@@ -303,7 +303,7 @@ export function OrgProvider({ children }) {
       const invitesPromise = user.email
         ? client
             .from('org_invitations')
-            .select('id, org_id, email, status, invited_by, created_at, expires_at')
+            .select('id, org_id, email, status, invited_by, created_at, expires_at, organization:organizations(id, name)')
             .eq('email', user.email.toLowerCase())
             .in('status', ['pending', 'sent'])
             .order('created_at', { ascending: true })
@@ -384,7 +384,7 @@ export function OrgProvider({ children }) {
       setOrgConnections(connectionMap);
 
       const normalizedInvites = inviteData
-        .map((invite) => normalizeInvite(invite, organizationMap?.get(invite.org_id)))
+        .map((invite) => normalizeInvite(invite, organizationMap?.get(invite.org_id) || invite.organization))
         .filter(Boolean);
 
       setOrganizations(normalizedOrganizations);

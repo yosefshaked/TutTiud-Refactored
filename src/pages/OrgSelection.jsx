@@ -196,7 +196,8 @@ export default function OrgSelection() {
   const handleSelect = async (orgId) => {
     try {
       await selectOrg(orgId);
-      navigate(returnTo, { replace: true });
+      // Always go to dashboard; AuthGuard will redirect to Settings if needed
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Failed to select organization', error);
       toast.error('בחירת הארגון נכשלה. נסה שוב.');
@@ -206,7 +207,8 @@ export default function OrgSelection() {
   const handleAcceptInvite = async (inviteId) => {
     try {
       await acceptInvite(inviteId);
-      navigate(returnTo, { replace: true });
+      // After accepting invitation, land on dashboard. AuthGuard will handle any setup redirects.
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Failed to accept invite', error);
       toast.error('לא ניתן להצטרף לארגון. נסה שוב או בקש הזמנה חדשה.');
