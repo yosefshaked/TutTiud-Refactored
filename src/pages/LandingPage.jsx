@@ -295,6 +295,21 @@ export default function LandingPage() {
             <span className="text-neutral-400">•</span>
             <span className="text-sm">מערכת ניהול מפגשים מתקדמת</span>
           </div>
+          <li className="mt-4">
+            <a href="https://thepcrunners.com/he/privacy-policy" aria-label='מדיניות הפרטיות' className="mt-4 text-sm text-neutral-600 underline hover:text-neutral-800">
+                מדיניות פרטיות
+            </a>
+          </li>
+          <li className="mt-4">
+            <a href="https://thepcrunners.com/he/usage-policy" aria-label='תנאי השימוש' className="mt-4 text-sm text-neutral-600 underline hover:text-neutral-800">
+                תנאי שימוש
+            </a>
+          </li>
+          <li className="mt-4">
+            <a href="https://thepcrunners.com/he/accessibility-policy" aria-label='מדיניות נגישות' className="mt-4 text-sm text-neutral-600 underline hover:text-neutral-800">
+                מדיניות נגישות
+            </a>
+          </li>
           <p className="mt-4 text-sm text-neutral-500">
             © {new Date().getFullYear()} TutTiud ThePCRunners. כל הזכויות שמורות.
           </p>
