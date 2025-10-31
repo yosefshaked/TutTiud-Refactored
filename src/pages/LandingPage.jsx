@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Calendar, BarChart3, Shield, Sparkles, CheckCircle2 } from 'lucide-react';
+import { AccessibilityProvider } from '@/features/accessibility/AccessibilityProvider.jsx';
+import AccessibilityButton from '@/features/accessibility/AccessibilityButton.jsx';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -50,19 +52,25 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background" dir="rtl">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <img src="/icon.svg" alt="TutTiud" className="h-8 w-8" />
-            <span className="text-xl font-bold text-primary">TutTiud</span>
-          </div>
-          <Button onClick={() => navigate('/login')} className="gap-2">
-            <span>כניסה למערכת</span>
-          </Button>
+    <AccessibilityProvider>
+      <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background" dir="rtl">
+        {/* Accessibility Button */}
+        <div className="fixed bottom-4 left-4 z-50">
+          <AccessibilityButton />
         </div>
-      </header>
+
+        {/* Header */}
+        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-2">
+              <img src="/icon.svg" alt="TutTiud" className="h-8 w-8" />
+              <span className="text-xl font-bold text-primary">TutTiud</span>
+            </div>
+            <Button onClick={() => navigate('/login')} className="gap-2">
+              <span>כניסה למערכת</span>
+            </Button>
+          </div>
+        </header>
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
@@ -315,6 +323,7 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
-    </div>
+      </div>
+    </AccessibilityProvider>
   );
 }
