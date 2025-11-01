@@ -1,5 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
+import {
+  extractSupabaseParams,
+  removeSupabaseParams,
+  splitHash,
+} from './bootstrapSupabaseCallback.js';
 
 const AuthContext = createContext(null);
 
@@ -32,9 +37,32 @@ function resolveRedirectUrl() {
     const { location } = window;
     if (location?.origin) {
       const pathname = typeof location.pathname === 'string' ? location.pathname : '/';
-      const search = typeof location.search === 'string' ? location.search : '';
-      const hash = typeof location.hash === 'string' ? location.hash : '';
-      return `${location.origin}${pathname}${search}${hash}`;
+      const originPath = `${location.origin}${pathname}`;
+      const searchExtraction = extractSupabaseParams(location.search || '');
+      const { path: hashPath, query: hashQuery } = splitHash(location.hash || '');
+      const hashExtraction = extractSupabaseParams(hashQuery);
+
+      const sanitizedSearchParams = removeSupabaseParams(new URLSearchParams(searchExtraction.params));
+      const sanitizedHashParams = removeSupabaseParams(new URLSearchParams(hashExtraction.params));
+
+      const mergedParams = new URLSearchParams();
+      sanitizedHashParams.forEach((value, key) => {
+        mergedParams.append(key, value);
+      });
+      sanitizedSearchParams.forEach((value, key) => {
+        mergedParams.append(key, value);
+      });
+
+      const mergedQuery = mergedParams.toString();
+      const hasSupabasePayload = searchExtraction.hasSupabaseParams || hashExtraction.hasSupabaseParams;
+
+      const shouldForceLoginHash = !hashPath || hashPath.startsWith('#/login') || hasSupabasePayload;
+      const normalizedHashPath = shouldForceLoginHash
+        ? '#/login/'
+        : hashPath;
+      const canonicalHash = `${normalizedHashPath}${mergedQuery ? `?${mergedQuery}` : ''}`;
+
+      return `${originPath}${canonicalHash}`;
     }
   }
   if (FALLBACK_REDIRECT_URL) {

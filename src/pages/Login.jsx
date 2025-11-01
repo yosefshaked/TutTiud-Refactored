@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { LogIn, Mail, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  clearStoredSupabaseOAuthError,
+  extractSupabaseParams,
+  readStoredSupabaseOAuthError,
+  removeSupabaseParams,
+  splitHash,
+} from '@/auth/bootstrapSupabaseCallback.js';
 import { useAuth } from '@/auth/AuthContext.jsx';
 
 export default function Login() {
@@ -16,6 +23,93 @@ export default function Login() {
   // If already authenticated, send users to the dashboard instead of the landing page
   const redirectPath = location.state?.from?.pathname || '/dashboard';
   const redirectMessage = location.state?.message || null;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const {
+      location: browserLocation,
+      history,
+    } = window;
+    if (!browserLocation) {
+      return;
+    }
+
+    const storedPayload = readStoredSupabaseOAuthError();
+    const searchExtraction = extractSupabaseParams(browserLocation.search || '');
+    const { query: hashQuery } = splitHash(browserLocation.hash || '');
+    const hashExtraction = extractSupabaseParams(hashQuery);
+
+    let supabasePayload = storedPayload;
+    if (!supabasePayload && searchExtraction.hasSupabaseParams) {
+      supabasePayload = searchExtraction.payload;
+    }
+    if (!supabasePayload && hashExtraction.hasSupabaseParams) {
+      supabasePayload = hashExtraction.payload;
+    }
+
+    if (!supabasePayload) {
+      return;
+    }
+
+    const sanitizedSearchParams = removeSupabaseParams(new URLSearchParams(searchExtraction.params));
+    const sanitizedHashParams = removeSupabaseParams(new URLSearchParams(hashExtraction.params));
+
+    const remainingParams = new URLSearchParams();
+    sanitizedHashParams.forEach((value, key) => {
+      remainingParams.append(key, value);
+    });
+    sanitizedSearchParams.forEach((value, key) => {
+      remainingParams.append(key, value);
+    });
+
+    const remainingQuery = remainingParams.toString();
+    const canonicalHash = `#/login/${remainingQuery ? `?${remainingQuery}` : ''}`;
+    const canonicalUrl = browserLocation.origin
+      ? `${browserLocation.origin}${browserLocation.pathname}${canonicalHash}`
+      : null;
+
+    const hasErrorDetails = Boolean(
+      supabasePayload.error
+      || supabasePayload.error_code
+      || supabasePayload.error_description,
+    );
+
+    if (!hasErrorDetails) {
+      if (canonicalUrl && typeof history?.replaceState === 'function') {
+        history.replaceState({}, document.title, canonicalUrl);
+      } else if (typeof browserLocation.hash === 'string') {
+        browserLocation.hash = canonicalHash;
+      }
+      clearStoredSupabaseOAuthError();
+      return;
+    }
+
+    const friendlyMessages = {
+      signup_disabled: 'ארגון זה מאפשר כניסה רק למשתמשים שהוזמנו מראש. ודאו שקיבלתם הזמנה תקפה או פנו למנהל הארגון.',
+      access_denied: 'הבקשה נדחתה על ידי ספק ההזדהות. נסו שוב עם משתמש אחר או פנו לתמיכה.',
+    };
+
+    const errorCode = supabasePayload.error_code || supabasePayload.error || '';
+    const errorDescription = supabasePayload.error_description;
+    const normalizedCode = errorCode.toLowerCase();
+    const friendlyMessage = friendlyMessages[normalizedCode];
+    const fallbackMessage = errorDescription
+      || 'התחברות באמצעות ספק זהות חיצוני נכשלה. נסו שוב או פנו למנהל המערכת.';
+
+    setLoginError(friendlyMessage || fallbackMessage);
+    setOauthInFlight(null);
+
+    if (canonicalUrl && typeof history?.replaceState === 'function') {
+      history.replaceState({}, document.title, canonicalUrl);
+    } else if (typeof browserLocation.hash === 'string') {
+      browserLocation.hash = canonicalHash;
+    }
+
+    clearStoredSupabaseOAuthError();
+  }, []);
 
   if (status === 'ready' && session) {
     return <Navigate to={redirectPath} replace />;
@@ -40,6 +134,7 @@ export default function Login() {
   };
 
   const handleOAuth = async (provider) => {
+    setLoginError(null);
     setOauthInFlight(provider);
     try {
       await signInWithOAuth(provider);
@@ -49,7 +144,6 @@ export default function Login() {
       setOauthInFlight(null);
     }
   };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 flex items-center justify-center px-4" dir="rtl">
       <div className="max-w-md w-full bg-white shadow-xl rounded-3xl overflow-hidden border border-slate-100">
