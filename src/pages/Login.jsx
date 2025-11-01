@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { LogIn, Mail, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,6 +16,48 @@ export default function Login() {
   // If already authenticated, send users to the dashboard instead of the landing page
   const redirectPath = location.state?.from?.pathname || '/dashboard';
   const redirectMessage = location.state?.message || null;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const { location: browserLocation, history } = window;
+    const rawSearch = browserLocation?.search || '';
+    if (!rawSearch) {
+      return;
+    }
+
+    const searchParams = new URLSearchParams(rawSearch);
+    const supabaseKeys = ['code', 'error', 'error_code', 'error_description'];
+    const hasSupabaseParams = supabaseKeys.some((key) => searchParams.has(key));
+    if (!hasSupabaseParams) {
+      return;
+    }
+
+    const errorCode = searchParams.get('error_code') || searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
+
+    if (errorCode || errorDescription) {
+      const friendlyMessages = {
+        signup_disabled: 'ארגון זה מאפשר כניסה רק למשתמשים שהוזמנו מראש. ודאו שקיבלתם הזמנה תקפה או פנו למנהל הארגון.',
+        access_denied: 'הבקשה נדחתה על ידי ספק ההזדהות. נסו שוב עם משתמש אחר או פנו לתמיכה.',
+      };
+
+      const normalizedCode = (errorCode || '').toLowerCase();
+      const friendlyMessage = friendlyMessages[normalizedCode];
+      const fallbackMessage = errorDescription
+        || 'התחברות סושלה נכשלה. נסו שוב או פנו למנהל המערכת.';
+
+      setLoginError(friendlyMessage || fallbackMessage);
+      setOauthInFlight(null);
+    }
+
+    if (browserLocation?.origin && typeof history?.replaceState === 'function') {
+      const sanitizedUrl = `${browserLocation.origin}${browserLocation.pathname}${browserLocation.hash || ''}`;
+      history.replaceState({}, document.title, sanitizedUrl);
+    }
+  }, []);
 
   if (status === 'ready' && session) {
     return <Navigate to={redirectPath} replace />;
@@ -40,6 +82,7 @@ export default function Login() {
   };
 
   const handleOAuth = async (provider) => {
+    setLoginError(null);
     setOauthInFlight(provider);
     try {
       await signInWithOAuth(provider);
@@ -49,7 +92,6 @@ export default function Login() {
       setOauthInFlight(null);
     }
   };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 flex items-center justify-center px-4" dir="rtl">
       <div className="max-w-md w-full bg-white shadow-xl rounded-3xl overflow-hidden border border-slate-100">

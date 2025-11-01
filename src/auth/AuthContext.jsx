@@ -34,7 +34,20 @@ function resolveRedirectUrl() {
       const pathname = typeof location.pathname === 'string' ? location.pathname : '/';
       const search = typeof location.search === 'string' ? location.search : '';
       const hash = typeof location.hash === 'string' ? location.hash : '';
-      return `${location.origin}${pathname}${search}${hash}`;
+      let sanitizedQuery = '';
+      if (search) {
+        const params = new URLSearchParams(search);
+        ['code', 'error', 'error_code', 'error_description'].forEach((key) => {
+          if (params.has(key)) {
+            params.delete(key);
+          }
+        });
+        const serialized = params.toString();
+        if (serialized) {
+          sanitizedQuery = `?${serialized}`;
+        }
+      }
+      return `${location.origin}${pathname}${sanitizedQuery}${hash}`;
     }
   }
   if (FALLBACK_REDIRECT_URL) {
