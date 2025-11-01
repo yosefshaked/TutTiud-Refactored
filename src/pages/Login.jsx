@@ -47,14 +47,22 @@ export default function Login() {
       const normalizedCode = (errorCode || '').toLowerCase();
       const friendlyMessage = friendlyMessages[normalizedCode];
       const fallbackMessage = errorDescription
-        || 'התחברות סושלה נכשלה. נסו שוב או פנו למנהל המערכת.';
+        || 'התחברות באמצעות ספק זהות חיצוני נכשלה. נסו שוב או פנו למנהל המערכת.';
 
       setLoginError(friendlyMessage || fallbackMessage);
       setOauthInFlight(null);
     }
 
     if (browserLocation?.origin && typeof history?.replaceState === 'function') {
-      const sanitizedUrl = `${browserLocation.origin}${browserLocation.pathname}${browserLocation.hash || ''}`;
+      const sanitizedParams = new URLSearchParams(searchParams);
+      supabaseKeys.forEach((key) => {
+        if (sanitizedParams.has(key)) {
+          sanitizedParams.delete(key);
+        }
+      });
+      const sanitizedQuery = sanitizedParams.toString();
+      const hashToPreserve = browserLocation.hash || '#/login';
+      const sanitizedUrl = `${browserLocation.origin}${browserLocation.pathname}${sanitizedQuery ? `?${sanitizedQuery}` : ''}${hashToPreserve}`;
       history.replaceState({}, document.title, sanitizedUrl);
     }
   }, []);
