@@ -3,6 +3,7 @@ export const SUPABASE_CALLBACK_KEYS = Object.freeze([
   'error',
   'error_code',
   'error_description',
+  'state',
 ]);
 
 export const SUPABASE_OAUTH_ERROR_STORAGE_KEY = 'supabase-oauth-error';
