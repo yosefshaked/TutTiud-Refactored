@@ -71,16 +71,17 @@ export default function Login() {
 
     const sanitizedSearchParams = removeSupabaseParams(new URLSearchParams(searchExtraction.params));
     const sanitizedHashParams = removeSupabaseParams(new URLSearchParams(hashExtraction.params));
-    const aggregatedParams = new URLSearchParams();
+
+    const remainingParams = new URLSearchParams();
     sanitizedHashParams.forEach((value, key) => {
-      aggregatedParams.append(key, value);
+      remainingParams.append(key, value);
     });
     sanitizedSearchParams.forEach((value, key) => {
-      aggregatedParams.append(key, value);
+      remainingParams.append(key, value);
     });
 
-    const serializedQuery = aggregatedParams.toString();
-    const canonicalHash = `#/login/${serializedQuery ? `?${serializedQuery}` : ''}`;
+    const remainingQuery = remainingParams.toString();
+    const canonicalHash = `#/login/${remainingQuery ? `?${remainingQuery}` : ''}`;
     const canonicalUrl = browserLocation.origin
       ? `${browserLocation.origin}${browserLocation.pathname}${canonicalHash}`
       : null;

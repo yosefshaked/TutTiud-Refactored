@@ -56,21 +56,13 @@ function resolveRedirectUrl() {
       const mergedQuery = mergedParams.toString();
       const hasSupabasePayload = searchExtraction.hasSupabaseParams || hashExtraction.hasSupabaseParams;
 
-      if (!hashPath || hashPath.startsWith('#/login')) {
-        return `${originPath}#/login/${mergedQuery ? `?${mergedQuery}` : ''}`;
-      }
+      const shouldForceLoginHash = !hashPath || hashPath.startsWith('#/login') || hasSupabasePayload;
+      const normalizedHashPath = shouldForceLoginHash
+        ? '#/login/'
+        : hashPath;
+      const canonicalHash = `${normalizedHashPath}${mergedQuery ? `?${mergedQuery}` : ''}`;
 
-      if (hasSupabasePayload) {
-        return `${originPath}#/login/${mergedQuery ? `?${mergedQuery}` : ''}`;
-      }
-
-      const sanitizedSearch = sanitizedSearchParams.toString();
-      const sanitizedHashQuery = sanitizedHashParams.toString();
-      const hashSegment = hashPath
-        ? `${hashPath}${sanitizedHashQuery ? `?${sanitizedHashQuery}` : ''}`
-        : '';
-
-      return `${originPath}${sanitizedSearch ? `?${sanitizedSearch}` : ''}${hashSegment}`;
+      return `${originPath}${canonicalHash}`;
     }
   }
   if (FALLBACK_REDIRECT_URL) {
