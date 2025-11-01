@@ -49,6 +49,17 @@ export function storeSupabaseOAuthError(payload) {
     return;
   }
 
+  const hasErrorDetails = Boolean(payload.error || payload.error_code);
+
+  if (!hasErrorDetails) {
+    try {
+      window.sessionStorage?.removeItem(SUPABASE_OAUTH_ERROR_STORAGE_KEY);
+    } catch (error) {
+      console.error('Failed to clear stale Supabase OAuth payload', error);
+    }
+    return;
+  }
+
   try {
     window.sessionStorage?.setItem(
       SUPABASE_OAUTH_ERROR_STORAGE_KEY,

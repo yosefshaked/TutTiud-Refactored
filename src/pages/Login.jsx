@@ -54,21 +54,6 @@ export default function Login() {
       return;
     }
 
-    const friendlyMessages = {
-      signup_disabled: 'ארגון זה מאפשר כניסה רק למשתמשים שהוזמנו מראש. ודאו שקיבלתם הזמנה תקפה או פנו למנהל הארגון.',
-      access_denied: 'הבקשה נדחתה על ידי ספק ההזדהות. נסו שוב עם משתמש אחר או פנו לתמיכה.',
-    };
-
-    const errorCode = supabasePayload.error_code || supabasePayload.error || '';
-    const errorDescription = supabasePayload.error_description;
-    const normalizedCode = errorCode.toLowerCase();
-    const friendlyMessage = friendlyMessages[normalizedCode];
-    const fallbackMessage = errorDescription
-      || 'התחברות באמצעות ספק זהות חיצוני נכשלה. נסו שוב או פנו למנהל המערכת.';
-
-    setLoginError(friendlyMessage || fallbackMessage);
-    setOauthInFlight(null);
-
     const sanitizedSearchParams = removeSupabaseParams(new URLSearchParams(searchExtraction.params));
     const sanitizedHashParams = removeSupabaseParams(new URLSearchParams(hashExtraction.params));
 
@@ -85,6 +70,37 @@ export default function Login() {
     const canonicalUrl = browserLocation.origin
       ? `${browserLocation.origin}${browserLocation.pathname}${canonicalHash}`
       : null;
+
+    const hasErrorDetails = Boolean(
+      supabasePayload.error
+      || supabasePayload.error_code
+      || supabasePayload.error_description,
+    );
+
+    if (!hasErrorDetails) {
+      if (canonicalUrl && typeof history?.replaceState === 'function') {
+        history.replaceState({}, document.title, canonicalUrl);
+      } else if (typeof browserLocation.hash === 'string') {
+        browserLocation.hash = canonicalHash;
+      }
+      clearStoredSupabaseOAuthError();
+      return;
+    }
+
+    const friendlyMessages = {
+      signup_disabled: 'ארגון זה מאפשר כניסה רק למשתמשים שהוזמנו מראש. ודאו שקיבלתם הזמנה תקפה או פנו למנהל הארגון.',
+      access_denied: 'הבקשה נדחתה על ידי ספק ההזדהות. נסו שוב עם משתמש אחר או פנו לתמיכה.',
+    };
+
+    const errorCode = supabasePayload.error_code || supabasePayload.error || '';
+    const errorDescription = supabasePayload.error_description;
+    const normalizedCode = errorCode.toLowerCase();
+    const friendlyMessage = friendlyMessages[normalizedCode];
+    const fallbackMessage = errorDescription
+      || 'התחברות באמצעות ספק זהות חיצוני נכשלה. נסו שוב או פנו למנהל המערכת.';
+
+    setLoginError(friendlyMessage || fallbackMessage);
+    setOauthInFlight(null);
 
     if (canonicalUrl && typeof history?.replaceState === 'function') {
       history.replaceState({}, document.title, canonicalUrl);

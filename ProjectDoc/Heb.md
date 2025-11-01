@@ -102,6 +102,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 - `bootstrapSupabaseCallback()` (`src/auth/bootstrapSupabaseCallback.js`) רץ לפני ש-`<HashRouter>` נטען, מעביר את פרמטרי Supabase לתבנית `#/login/?…` ושומר את המטען ב-`sessionStorage` כדי שהמשתמש יגיע ישירות למסך הכניסה ולא לדף הנחיתה.
 - `src/pages/Login.jsx` קורא קודם את המטען שנשמר (או את פרמטרי ה-Hash), מציג הודעות שגיאה ידידותיות בעברית, משחרר את מצב הטעינה ומנקה את כתובת הדפדפן לפורמט הקנוני `#/login/?…` ללא פרמטרים של Supabase.
 - `resolveRedirectUrl()` בתוך `src/auth/AuthContext.jsx` מסיר את פרמטרי Supabase, מאחד פרמטרים נוספים ומחזיר תמיד כתובת `#/login/` כאשר זוהו פרמטרי CallBack כדי שבקשות OAuth עתידיות יהיו נקיות משגיאות עבר.
+- **צ'ק ליסט QA ידני – הפניית OAuth**: הדמיה של הפניה חזרה עם `code` בלבד צריכה להעלות את מסך הכניסה ללא הודעת שגיאה; הפניה עם `error=access_denied` צריכה להציג את ההתרעה המתורגמת ולנרמל את ה-URL ל-`#/login/?error=access_denied` לפני ניסיון נוסף.
 - זרימת איפוס הסיסמה בנויה משני שלבים: `/Pages/ForgotPassword.jsx` מזניק את `resetPasswordForEmail` עם הפניה אל `/#/update-password`, ו-`/Pages/UpdatePassword.jsx` מוודא שסיסמאות תואמות לפני שהוא קורא לפעולת `updatePassword` החדשה מ-`AuthContext`. שני העמודים עושים שימוש בקומפוננטות מערכת העיצוב המעודכנת ומציגים מצבי טעינה, הצלחה ושגיאה ידידותיים ל-RTL.
 - טופס הכניסה מציג כשלי אימות של Supabase בתוך התראה אדומה כדי שהמשתמשים יבינו מיד כשהפרטים שגויים.
 
