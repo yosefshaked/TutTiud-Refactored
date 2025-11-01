@@ -148,5 +148,17 @@ export function bootstrapSupabaseCallback() {
     return;
   }
 
-  window.location.replace(`${location.origin}${location.pathname}${desiredHash}`);
+  const currentUrl = `${location.origin}${location.pathname}${location.search}${currentHash}`;
+  const desiredUrl = `${location.origin}${location.pathname}${location.search}${desiredHash}`;
+
+  if (currentUrl === desiredUrl) {
+    return;
+  }
+
+  if (typeof window.history?.replaceState === 'function') {
+    window.history.replaceState(window.history.state, '', desiredUrl);
+    return;
+  }
+
+  window.location.hash = desiredHash;
 }
