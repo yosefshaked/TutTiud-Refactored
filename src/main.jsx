@@ -23,6 +23,9 @@ import { OrgProvider } from './org/OrgContext.jsx';
 import OrgSelection from './pages/OrgSelection.jsx';
 import MyStudentsPage from './features/instructor/pages/MyStudentsPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
+import { bootstrapSupabaseCallback } from './auth/bootstrapSupabaseCallback.js';
+
+bootstrapSupabaseCallback();
 
 function App({ config = null }) {
   console.log('[DEBUG 4] App component rendering.');

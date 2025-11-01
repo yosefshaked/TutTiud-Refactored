@@ -99,8 +99,9 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 - בעת השלמת האשף חובה לקרוא ל-`recordVerification(orgId, timestamp)` כדי לעדכן את `setup_completed` / `verified_at` ב-Control DB.
 - יש לשמור על תאימות מלאה בין מסמך זה לבין התרגום האנגלי ועל עדכון ה-README עם רשימת הצעדים.
 - זרימות OAuth קוראות ל-`supabase.auth.signInWithOAuth` עם `options.redirectTo`, שמחושב ככתובת הדפדפן המלאה (`origin + pathname + search + hash`) כאשר `window.location` זמין, או נופל למשתנים `VITE_PUBLIC_APP_URL` / `VITE_APP_BASE_URL` / `VITE_SITE_URL`, כך שהמשתמש חוזר בדיוק לעמוד שבו התחיל את כניסת Tuttiud לאחר ההזדהות מול ספק חיצוני.
-- `src/pages/Login.jsx` קורא את פרמטרי השגיאה מההפניה של Supabase, מציג הודעות ברורות בעברית (כולל תמיכה בארגונים עם הזמנות בלבד), משחרר את מצב הטעינה ומנקה את כתובת ה-URL כדי שניסיונות התחברות נוספים יתחילו ללא שגיאה תלויה.
-- `resolveRedirectUrl()` בתוך `src/auth/AuthContext.jsx` מסיר את פרמטרי Supabase לפני יצירת כתובת ההפניה, כך ששגיאות קודמות אינן מזהמות בקשות OAuth עתידיות.
+- `bootstrapSupabaseCallback()` (`src/auth/bootstrapSupabaseCallback.js`) רץ לפני ש-`<HashRouter>` נטען, מעביר את פרמטרי Supabase לתבנית `#/login/?…` ושומר את המטען ב-`sessionStorage` כדי שהמשתמש יגיע ישירות למסך הכניסה ולא לדף הנחיתה.
+- `src/pages/Login.jsx` קורא קודם את המטען שנשמר (או את פרמטרי ה-Hash), מציג הודעות שגיאה ידידותיות בעברית, משחרר את מצב הטעינה ומנקה את כתובת הדפדפן לפורמט הקנוני `#/login/?…` ללא פרמטרים של Supabase.
+- `resolveRedirectUrl()` בתוך `src/auth/AuthContext.jsx` מסיר את פרמטרי Supabase, מאחד פרמטרים נוספים ומחזיר תמיד כתובת `#/login/` כאשר זוהו פרמטרי CallBack כדי שבקשות OAuth עתידיות יהיו נקיות משגיאות עבר.
 - זרימת איפוס הסיסמה בנויה משני שלבים: `/Pages/ForgotPassword.jsx` מזניק את `resetPasswordForEmail` עם הפניה אל `/#/update-password`, ו-`/Pages/UpdatePassword.jsx` מוודא שסיסמאות תואמות לפני שהוא קורא לפעולת `updatePassword` החדשה מ-`AuthContext`. שני העמודים עושים שימוש בקומפוננטות מערכת העיצוב המעודכנת ומציגים מצבי טעינה, הצלחה ושגיאה ידידותיים ל-RTL.
 - טופס הכניסה מציג כשלי אימות של Supabase בתוך התראה אדומה כדי שהמשתמשים יבינו מיד כשהפרטים שגויים.
 

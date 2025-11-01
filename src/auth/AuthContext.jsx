@@ -1,5 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
+import {
+  extractSupabaseParams,
+  removeSupabaseParams,
+  splitHash,
+} from './bootstrapSupabaseCallback.js';
 
 const AuthContext = createContext(null);
 
@@ -32,22 +37,40 @@ function resolveRedirectUrl() {
     const { location } = window;
     if (location?.origin) {
       const pathname = typeof location.pathname === 'string' ? location.pathname : '/';
-      const search = typeof location.search === 'string' ? location.search : '';
-      const hash = typeof location.hash === 'string' ? location.hash : '';
-      let sanitizedQuery = '';
-      if (search) {
-        const params = new URLSearchParams(search);
-        ['code', 'error', 'error_code', 'error_description'].forEach((key) => {
-          if (params.has(key)) {
-            params.delete(key);
-          }
-        });
-        const serialized = params.toString();
-        if (serialized) {
-          sanitizedQuery = `?${serialized}`;
-        }
+      const originPath = `${location.origin}${pathname}`;
+      const searchExtraction = extractSupabaseParams(location.search || '');
+      const { path: hashPath, query: hashQuery } = splitHash(location.hash || '');
+      const hashExtraction = extractSupabaseParams(hashQuery);
+
+      const sanitizedSearchParams = removeSupabaseParams(new URLSearchParams(searchExtraction.params));
+      const sanitizedHashParams = removeSupabaseParams(new URLSearchParams(hashExtraction.params));
+
+      const mergedParams = new URLSearchParams();
+      sanitizedHashParams.forEach((value, key) => {
+        mergedParams.append(key, value);
+      });
+      sanitizedSearchParams.forEach((value, key) => {
+        mergedParams.append(key, value);
+      });
+
+      const mergedQuery = mergedParams.toString();
+      const hasSupabasePayload = searchExtraction.hasSupabaseParams || hashExtraction.hasSupabaseParams;
+
+      if (!hashPath || hashPath.startsWith('#/login')) {
+        return `${originPath}#/login/${mergedQuery ? `?${mergedQuery}` : ''}`;
       }
-      return `${location.origin}${pathname}${sanitizedQuery}${hash}`;
+
+      if (hasSupabasePayload) {
+        return `${originPath}#/login/${mergedQuery ? `?${mergedQuery}` : ''}`;
+      }
+
+      const sanitizedSearch = sanitizedSearchParams.toString();
+      const sanitizedHashQuery = sanitizedHashParams.toString();
+      const hashSegment = hashPath
+        ? `${hashPath}${sanitizedHashQuery ? `?${sanitizedHashQuery}` : ''}`
+        : '';
+
+      return `${originPath}${sanitizedSearch ? `?${sanitizedSearch}` : ''}${hashSegment}`;
     }
   }
   if (FALLBACK_REDIRECT_URL) {

@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { LogIn, Mail, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  clearStoredSupabaseOAuthError,
+  extractSupabaseParams,
+  readStoredSupabaseOAuthError,
+  removeSupabaseParams,
+  splitHash,
+} from '@/auth/bootstrapSupabaseCallback.js';
 import { useAuth } from '@/auth/AuthContext.jsx';
 
 export default function Login() {
@@ -22,49 +29,69 @@ export default function Login() {
       return;
     }
 
-    const { location: browserLocation, history } = window;
-    const rawSearch = browserLocation?.search || '';
-    if (!rawSearch) {
+    const {
+      location: browserLocation,
+      history,
+    } = window;
+    if (!browserLocation) {
       return;
     }
 
-    const searchParams = new URLSearchParams(rawSearch);
-    const supabaseKeys = ['code', 'error', 'error_code', 'error_description'];
-    const hasSupabaseParams = supabaseKeys.some((key) => searchParams.has(key));
-    if (!hasSupabaseParams) {
+    const storedPayload = readStoredSupabaseOAuthError();
+    const searchExtraction = extractSupabaseParams(browserLocation.search || '');
+    const { query: hashQuery } = splitHash(browserLocation.hash || '');
+    const hashExtraction = extractSupabaseParams(hashQuery);
+
+    let supabasePayload = storedPayload;
+    if (!supabasePayload && searchExtraction.hasSupabaseParams) {
+      supabasePayload = searchExtraction.payload;
+    }
+    if (!supabasePayload && hashExtraction.hasSupabaseParams) {
+      supabasePayload = hashExtraction.payload;
+    }
+
+    if (!supabasePayload) {
       return;
     }
 
-    const errorCode = searchParams.get('error_code') || searchParams.get('error');
-    const errorDescription = searchParams.get('error_description');
+    const friendlyMessages = {
+      signup_disabled: 'ארגון זה מאפשר כניסה רק למשתמשים שהוזמנו מראש. ודאו שקיבלתם הזמנה תקפה או פנו למנהל הארגון.',
+      access_denied: 'הבקשה נדחתה על ידי ספק ההזדהות. נסו שוב עם משתמש אחר או פנו לתמיכה.',
+    };
 
-    if (errorCode || errorDescription) {
-      const friendlyMessages = {
-        signup_disabled: 'ארגון זה מאפשר כניסה רק למשתמשים שהוזמנו מראש. ודאו שקיבלתם הזמנה תקפה או פנו למנהל הארגון.',
-        access_denied: 'הבקשה נדחתה על ידי ספק ההזדהות. נסו שוב עם משתמש אחר או פנו לתמיכה.',
-      };
+    const errorCode = supabasePayload.error_code || supabasePayload.error || '';
+    const errorDescription = supabasePayload.error_description;
+    const normalizedCode = errorCode.toLowerCase();
+    const friendlyMessage = friendlyMessages[normalizedCode];
+    const fallbackMessage = errorDescription
+      || 'התחברות באמצעות ספק זהות חיצוני נכשלה. נסו שוב או פנו למנהל המערכת.';
 
-      const normalizedCode = (errorCode || '').toLowerCase();
-      const friendlyMessage = friendlyMessages[normalizedCode];
-      const fallbackMessage = errorDescription
-        || 'התחברות באמצעות ספק זהות חיצוני נכשלה. נסו שוב או פנו למנהל המערכת.';
+    setLoginError(friendlyMessage || fallbackMessage);
+    setOauthInFlight(null);
 
-      setLoginError(friendlyMessage || fallbackMessage);
-      setOauthInFlight(null);
+    const sanitizedSearchParams = removeSupabaseParams(new URLSearchParams(searchExtraction.params));
+    const sanitizedHashParams = removeSupabaseParams(new URLSearchParams(hashExtraction.params));
+    const aggregatedParams = new URLSearchParams();
+    sanitizedHashParams.forEach((value, key) => {
+      aggregatedParams.append(key, value);
+    });
+    sanitizedSearchParams.forEach((value, key) => {
+      aggregatedParams.append(key, value);
+    });
+
+    const serializedQuery = aggregatedParams.toString();
+    const canonicalHash = `#/login/${serializedQuery ? `?${serializedQuery}` : ''}`;
+    const canonicalUrl = browserLocation.origin
+      ? `${browserLocation.origin}${browserLocation.pathname}${canonicalHash}`
+      : null;
+
+    if (canonicalUrl && typeof history?.replaceState === 'function') {
+      history.replaceState({}, document.title, canonicalUrl);
+    } else if (typeof browserLocation.hash === 'string') {
+      browserLocation.hash = canonicalHash;
     }
 
-    if (browserLocation?.origin && typeof history?.replaceState === 'function') {
-      const sanitizedParams = new URLSearchParams(searchParams);
-      supabaseKeys.forEach((key) => {
-        if (sanitizedParams.has(key)) {
-          sanitizedParams.delete(key);
-        }
-      });
-      const sanitizedQuery = sanitizedParams.toString();
-      const hashToPreserve = browserLocation.hash || '#/login';
-      const sanitizedUrl = `${browserLocation.origin}${browserLocation.pathname}${sanitizedQuery ? `?${sanitizedQuery}` : ''}${hashToPreserve}`;
-      history.replaceState({}, document.title, sanitizedUrl);
-    }
+    clearStoredSupabaseOAuthError();
   }, []);
 
   if (status === 'ready' && session) {
