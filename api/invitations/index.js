@@ -631,16 +631,11 @@ async function handleGetByToken(context, supabase, token) {
   }
 
   const invitation = result.data;
+  let resolvedStatus = invitation.status || STATUS_PENDING;
 
-  if (invitation.status !== STATUS_PENDING) {
-    respond(context, 409, { message: `invitation ${invitation.status}` });
-    return;
-  }
-
-  if (isExpiredTimestamp(invitation.expires_at)) {
+  if (resolvedStatus === STATUS_PENDING && isExpiredTimestamp(invitation.expires_at)) {
     await markInvitationExpired(supabase, invitation.id);
-    respond(context, 410, { message: 'invitation expired' });
-    return;
+    resolvedStatus = STATUS_EXPIRED;
   }
 
   const organization = await fetchOrganization(context, supabase, invitation.org_id);
@@ -654,7 +649,7 @@ async function handleGetByToken(context, supabase, token) {
       orgId: invitation.org_id,
       orgName: organization.name ?? null,
       email: invitation.email,
-      status: invitation.status,
+      status: resolvedStatus,
       createdAt: invitation.created_at ?? null,
       expiresAt: invitation.expires_at ?? null,
     },

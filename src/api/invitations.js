@@ -44,6 +44,12 @@ function normalizeInvitationRecord(record) {
   return {
     id: record.id || null,
     orgId: record.orgId || record.org_id || null,
+    orgName:
+      typeof record.orgName === 'string' && record.orgName.trim()
+        ? record.orgName.trim()
+        : typeof record.org_name === 'string' && record.org_name.trim()
+          ? record.org_name.trim()
+          : null,
     email,
     status: record.status || 'pending',
     invitedBy: record.invitedBy || record.invited_by || null,

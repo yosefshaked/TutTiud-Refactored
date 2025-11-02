@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, Building2, Check, Loader2, LogIn, LogOut, ShieldCheck, UserPlus, XCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  Building2,
+  Check,
+  CheckCircle2,
+  Home,
+  Loader2,
+  LogOut,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { acceptInvitation, declineInvitation, getInvitationByToken } from '@/api/invitations.js';
 import { buildInvitationSearch, extractRegistrationTokens } from '@/lib/invite-tokens.js';
@@ -10,13 +20,15 @@ const STATUS_LOADING = 'loading';
 const STATUS_ERROR = 'error';
 const STATUS_READY = 'ready';
 
+const FINALIZED_STATUSES = new Set(['revoked', 'declined', 'expired', 'failed']);
+
 export default function AcceptInvitePage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { status: authStatus, session, user, signOut } = useAuth();
   const { refreshOrganizations, selectOrg } = useOrg();
 
-  const { tokenHash, invitationTokenKey, invitationTokenValue } = useMemo(
+  const { invitationTokenKey, invitationTokenValue } = useMemo(
     () => extractRegistrationTokens(location.search),
     [location.search],
   );
@@ -27,62 +39,70 @@ export default function AcceptInvitePage() {
   const [actionError, setActionError] = useState('');
   const [actionState, setActionState] = useState('idle');
   const [signingOut, setSigningOut] = useState(false);
-  const [decision, setDecision] = useState(null);
 
   useEffect(() => {
-    const controller = new AbortController();
-
     if (!invitationTokenValue) {
       setStatus(STATUS_ERROR);
       setLoadError('קישור ההזמנה חסר אסימון זיהוי. בקש הזמנה חדשה מהארגון.');
-      return () => controller.abort();
+      return;
     }
+
+    const controller = new AbortController();
+    let isActive = true;
 
     setStatus(STATUS_LOADING);
     setLoadError('');
 
     getInvitationByToken(invitationTokenValue, { signal: controller.signal })
       .then((record) => {
+        if (!isActive) {
+          return;
+        }
         setInvitation(record);
         setStatus(STATUS_READY);
       })
       .catch((error) => {
-        if (error?.name === 'AbortError') {
+        if (!isActive) {
           return;
         }
         console.error('Failed to load invitation by token', error);
-        setLoadError(error?.message || 'טעינת ההזמנה נכשלה. נסה שוב מאוחר יותר.');
+        const message = error?.message || 'טעינת ההזמנה נכשלה. נסה שוב מאוחר יותר.';
+        setLoadError(message);
         setStatus(STATUS_ERROR);
       });
 
-    return () => controller.abort();
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
   }, [invitationTokenValue]);
 
-  const handleLogin = () => {
+  useEffect(() => {
+    if (authStatus !== 'ready') {
+      return;
+    }
+    if (session) {
+      return;
+    }
     const search = buildInvitationSearch(invitationTokenValue, invitationTokenKey);
     navigate(`/login${search}`, {
+      replace: true,
       state: {
         from: { pathname: '/accept-invite', search },
-        message: 'התחבר כדי להשלים את הצטרפותך לארגון.',
+        message: 'התחבר כדי לאשר את ההזמנה לארגון.',
       },
     });
-  };
+  }, [authStatus, session, invitationTokenKey, invitationTokenValue, navigate]);
 
-  const handleRegistration = () => {
-    const params = new URLSearchParams();
-    if (tokenHash) {
-      params.set('token_hash', tokenHash);
-    }
-    if (invitationTokenValue) {
-      params.set(invitationTokenKey ?? 'invitation_token', invitationTokenValue);
-    }
-    const search = params.toString();
-    navigate(`/complete-registration${search ? `?${search}` : ''}`);
-  };
+  const invitationEmail = invitation?.email || '';
+  const normalizedInvitationEmail = invitationEmail.toLowerCase();
+  const activeEmail = session?.user?.email ? session.user.email.toLowerCase() : '';
+  const emailMatches = Boolean(session && normalizedInvitationEmail && normalizedInvitationEmail === activeEmail);
+  const organizationName = invitation?.orgName || 'ארגון חדש';
 
   const handleAccept = async () => {
-    if (!session || !invitation) {
-      setActionError('אין חיבור פעיל. התחבר ונסה שוב.');
+    if (!session || !invitation || invitation.status !== 'pending') {
+      setActionError('ההזמנה אינה זמינה לאישור. רענן את הדף או בקש הזמנה חדשה.');
       return;
     }
 
@@ -99,8 +119,7 @@ export default function AcceptInvitePage() {
       } catch (refreshError) {
         console.error('Failed to refresh organizations after accepting invite', refreshError);
       }
-      setDecision('accepted');
-      navigate('/', { replace: true });
+      setInvitation((previous) => (previous ? { ...previous, status: 'accepted' } : previous));
     } catch (error) {
       console.error('Failed to accept invitation', error);
       setActionError(error?.message || 'אישור ההזמנה נכשל. נסה שוב מאוחר יותר.');
@@ -110,8 +129,8 @@ export default function AcceptInvitePage() {
   };
 
   const handleDecline = async () => {
-    if (!session || !invitation) {
-      setActionError('אין חיבור פעיל. התחבר ונסה שוב.');
+    if (!session || !invitation || invitation.status !== 'pending') {
+      setActionError('ההזמנה אינה זמינה לדחייה. רענן את הדף או בקש הזמנה חדשה.');
       return;
     }
 
@@ -119,7 +138,7 @@ export default function AcceptInvitePage() {
     setActionState('declining');
     try {
       await declineInvitation(invitation.id, { session });
-      setDecision('declined');
+      setInvitation((previous) => (previous ? { ...previous, status: 'declined' } : previous));
     } catch (error) {
       console.error('Failed to decline invitation', error);
       setActionError(error?.message || 'דחיית ההזמנה נכשלה. נסה שוב מאוחר יותר.');
@@ -147,6 +166,10 @@ export default function AcceptInvitePage() {
     } finally {
       setSigningOut(false);
     }
+  };
+
+  const handleGoToDashboard = () => {
+    navigate('/', { replace: true });
   };
 
   const renderLoading = () => (
@@ -177,43 +200,6 @@ export default function AcceptInvitePage() {
     </div>
   );
 
-  const authReady = authStatus === 'ready';
-  const hasSession = authReady && Boolean(session);
-  const invitationEmail = invitation?.email || '';
-  const normalizedInvitationEmail = invitationEmail.toLowerCase();
-  const activeEmail = session?.user?.email ? session.user.email.toLowerCase() : '';
-  const emailMatches = hasSession && normalizedInvitationEmail && normalizedInvitationEmail === activeEmail;
-
-  const renderNoSession = () => (
-    <div className="p-8 space-y-6 text-right">
-      <div className="space-y-2">
-        <p className="text-sm text-blue-500 font-medium">הזמנה ממתינה לאישור</p>
-        <h2 className="text-2xl font-bold text-slate-900">{invitation?.orgName || 'ארגון חדש'} מחכה לך</h2>
-        <p className="text-sm text-slate-600 leading-relaxed">
-          קיבלנו בקשה לצרף את {invitation?.email} לארגון. התחבר או השלם הרשמה כדי לאשר את ההזמנה.
-        </p>
-      </div>
-      <div className="space-y-3">
-        <button
-          type="button"
-          onClick={handleLogin}
-          className="w-full bg-gradient-to-l from-blue-600 to-indigo-500 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
-        >
-          <LogIn className="w-5 h-5" />
-          <span>כניסה לחשבון קיים</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleRegistration}
-          className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-semibold shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
-        >
-          <UserPlus className="w-5 h-5" />
-          <span>השלמת הרשמה חדשה</span>
-        </button>
-      </div>
-    </div>
-  );
-
   const renderMismatch = () => (
     <div className="p-8 space-y-6 text-right">
       <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-2xl px-4 py-3 flex items-start gap-3" role="alert">
@@ -237,21 +223,10 @@ export default function AcceptInvitePage() {
     </div>
   );
 
-  const renderDecisionNotice = () => {
-    if (decision === 'declined') {
-      return (
-        <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-2xl px-4 py-3" role="status">
-          דחית את ההזמנה. תוכל לבקש הזמנה חדשה מהמנהל בכל עת.
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const renderMatch = () => (
+  const renderPending = () => (
     <div className="p-8 space-y-6 text-right">
       <div className="space-y-2">
-        <p className="text-sm text-blue-500 font-medium">{invitation?.orgName || 'ארגון חדש'}</p>
+        <p className="text-sm text-blue-500 font-medium">{organizationName}</p>
         <h2 className="text-2xl font-bold text-slate-900">ברוך הבא{user?.name ? `, ${user.name}` : ''}!</h2>
         <p className="text-sm text-slate-600 leading-relaxed">
           באמצעות אישור ההזמנה תזכה לגישה מלאה למשאבי הארגון. אם אינך מצפה להזמנה הזו, ניתן לדחות אותה.
@@ -262,7 +237,6 @@ export default function AcceptInvitePage() {
           {actionError}
         </div>
       ) : null}
-      {renderDecisionNotice()}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <button
           type="button"
@@ -286,8 +260,44 @@ export default function AcceptInvitePage() {
     </div>
   );
 
+  const renderAccepted = () => (
+    <div className="p-8 space-y-6 text-right">
+      <div className="flex items-center justify-end gap-3 text-green-600">
+        <CheckCircle2 className="w-8 h-8" aria-hidden="true" />
+        <div>
+          <p className="text-lg font-bold text-slate-900">אתה כבר חבר בארגון</p>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            סיימנו לעדכן את החברות שלך. תוכל להמשיך ללוח הבקרה כדי להתחיל לעבוד.
+          </p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={handleGoToDashboard}
+        className="w-full bg-gradient-to-l from-blue-600 to-indigo-500 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+      >
+        <Home className="w-5 h-5" />
+        <span>מעבר ללוח הבקרה</span>
+      </button>
+    </div>
+  );
+
+  const renderInvalid = () => (
+    <div className="p-8 space-y-6 text-right">
+      <div className="bg-slate-100 border border-slate-200 text-slate-700 rounded-2xl px-4 py-3 flex items-start gap-3" role="status">
+        <AlertCircle className="w-5 h-5 mt-0.5" aria-hidden="true" />
+        <div className="space-y-1">
+          <p className="text-sm font-semibold">ההזמנה אינה זמינה</p>
+          <p className="text-sm leading-relaxed">
+            ההזמנה הזו כבר עובדה או בוטלה ולכן לא ניתן להשתמש בה. בקש מהמנהל לשלוח קישור חדש במידת הצורך.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderContent = () => {
-    if (status === STATUS_LOADING || !authReady) {
+    if (status === STATUS_LOADING || authStatus !== 'ready') {
       return renderLoading();
     }
 
@@ -295,15 +305,27 @@ export default function AcceptInvitePage() {
       return renderError();
     }
 
-    if (!hasSession) {
-      return renderNoSession();
+    if (!session) {
+      return renderLoading();
+    }
+
+    if (!invitation) {
+      return renderError();
+    }
+
+    if (invitation.status === 'accepted') {
+      return renderAccepted();
+    }
+
+    if (FINALIZED_STATUSES.has(invitation.status) && invitation.status !== 'pending' && invitation.status !== 'accepted') {
+      return renderInvalid();
     }
 
     if (!emailMatches) {
       return renderMismatch();
     }
 
-    return renderMatch();
+    return renderPending();
   };
 
   return (
@@ -317,7 +339,7 @@ export default function AcceptInvitePage() {
               <h1 className="text-2xl font-bold">אישור הצטרפות לארגון</h1>
               <p className="text-sm text-blue-100 mt-1 flex items-center gap-1 justify-end">
                 <Building2 className="w-4 h-4" />
-                <span>{invitation?.orgName || 'קישור הזמנה'}</span>
+                <span>{organizationName}</span>
               </p>
             </div>
           </div>
