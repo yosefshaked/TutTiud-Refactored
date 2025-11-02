@@ -169,7 +169,7 @@ export default function AcceptInvitePage() {
   };
 
   const handleGoToDashboard = () => {
-    navigate('/', { replace: true });
+    navigate('/dashboard', { replace: true });
   };
 
   const renderLoading = () => (
