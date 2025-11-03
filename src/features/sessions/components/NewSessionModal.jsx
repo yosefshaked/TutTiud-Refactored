@@ -186,10 +186,11 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
         body,
       });
       toast.success('המפגש נשמר בהצלחה.');
-      setSubmitState(REQUEST_STATE.idle);
       // Wait for the onCreated callback to complete before closing
       // This ensures any data refresh in the parent component completes
       await Promise.resolve(onCreated?.(record));
+      // Set idle state only after callback completes to prevent duplicate submissions
+      setSubmitState(REQUEST_STATE.idle);
       onClose?.();
     } catch (error) {
       console.error('Failed to save session record', error);
