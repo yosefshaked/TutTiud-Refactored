@@ -52,6 +52,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - `PUT /api/students/{studentId}` – admin/owner updates to student metadata (name, contact info, instructor).
 - `GET /api/my-students` – member/admin/owner view of students whose `assigned_instructor_id` equals the caller.
 - `POST /api/sessions` – member/admin/owner insertion of `SessionRecords` with assignment verification for members.
+- `GET /api/user-context` – authenticated fetch that returns the caller's organization memberships and pending invitations (with organization names) via the Supabase admin client so invitees bypass RLS limitations.
 
 ## 📚 Documentation
 

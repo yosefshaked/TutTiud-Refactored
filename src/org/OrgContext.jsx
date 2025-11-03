@@ -61,36 +61,6 @@ function writeStoredOrgId(userId, orgId) {
 
 const OrgContext = createContext(null);
 
-function normalizeOrgRecord(record, organizationOverride, connectionOverride) {
-  if (!record) return null;
-  const organization = organizationOverride || record.organizations;
-  if (!organization) return null;
-  const membership = {
-    id: record.id,
-    org_id: record.org_id,
-    role: record.role || 'member',
-    user_id: record.user_id,
-    created_at: record.created_at,
-  };
-
-  return {
-    id: organization.id,
-    name: organization.name,
-    slug: organization.slug || null,
-    policy_links: Array.isArray(organization.policy_links) ? organization.policy_links : [],
-    legal_settings: organization.legal_settings || {},
-    setup_completed: Boolean(organization.setup_completed),
-    verified_at: organization.verified_at || null,
-    created_at: organization.created_at,
-    updated_at: organization.updated_at,
-    dedicated_key_saved_at: organization.dedicated_key_saved_at || null,
-    has_connection: Boolean(
-      connectionOverride?.supabaseUrl && connectionOverride?.supabaseAnonKey,
-    ),
-    membership,
-  };
-}
-
 function normalizeInvite(record, organizationOverride) {
   if (!record) return null;
   const organization = organizationOverride || record.organizations || record.organization;
@@ -289,119 +259,63 @@ export function OrgProvider({ children }) {
       return { organizations: [], invites: [] };
     }
 
+    if (!session) {
+      return { organizations: [], invites: [] };
+    }
+
     loadingRef.current = true;
     setStatus((prev) => (prev === 'idle' ? 'loading' : prev));
     setError(null);
 
     try {
-      const client = authClient;
-      const membershipPromise = client
-        .from('org_memberships')
-        .select('id, role, org_id, user_id, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+      const payload = await authenticatedFetch('/api/user-context');
 
-      const invitesPromise = user.email
-        ? client
-            .from('org_invitations')
-            .select('id, org_id, email, token, status, invited_by, created_at, expires_at, organization:organizations(id, name)')
-            .eq('email', user.email.toLowerCase())
-            .in('status', ['pending', 'sent'])
-            .order('created_at', { ascending: true })
-        : Promise.resolve({ data: [], error: null });
+      const connectionEntries = payload?.connections && typeof payload.connections === 'object'
+        ? Object.entries(payload.connections)
+        : [];
 
-      const [membershipResponse, inviteResponse] = await Promise.all([membershipPromise, invitesPromise]);
-
-      if (membershipResponse.error) throw membershipResponse.error;
-      if (inviteResponse.error) throw inviteResponse.error;
-
-      const membershipData = membershipResponse.data || [];
-      const inviteData = inviteResponse.data || [];
-
-      const orgIds = Array.from(
-        new Set([
-          ...membershipData.map((record) => record.org_id).filter(Boolean),
-          ...inviteData.map((record) => record.org_id).filter(Boolean),
-        ]),
+      const connectionMap = new Map(
+        connectionEntries
+          .map(([orgId, connection]) => {
+            if (!orgId) return null;
+            const normalized = connection && typeof connection === 'object' ? connection : {};
+            return [
+              orgId,
+              {
+                supabaseUrl: normalized.supabaseUrl || normalized.supabase_url || '',
+                supabaseAnonKey: normalized.supabaseAnonKey || normalized.supabase_anon_key || '',
+                metadata: normalized.metadata ?? null,
+                updatedAt: normalized.updatedAt || normalized.updated_at || null,
+              },
+            ];
+          })
+          .filter(Boolean),
       );
 
-      let organizationMap = null;
-      const connectionMap = new Map();
+      const organizationsPayload = Array.isArray(payload?.organizations)
+        ? payload.organizations.filter((org) => org && org.id)
+        : [];
 
-      if (orgIds.length) {
-        const { data: organizationsData, error: organizationsError } = await client
-          .from('organizations')
-          .select(
-            'id, name, slug, policy_links, legal_settings, setup_completed, verified_at, created_at, updated_at, dedicated_key_saved_at',
-          )
-          .in('id', orgIds);
-
-        if (organizationsError) throw organizationsError;
-
-        organizationMap = new Map((organizationsData || []).map((org) => [org.id, org]));
-      }
-
-      let normalizedOrganizations = membershipData
-        .map((membership) =>
-          normalizeOrgRecord(
-            membership,
-            organizationMap?.get(membership.org_id),
-            connectionMap.get(membership.org_id),
-          ),
-        )
-        .filter(Boolean);
-
-      if (orgIds.length) {
-        const { data: settingsData, error: settingsError } = await client
-          .from('org_settings')
-          .select('org_id, supabase_url, anon_key, metadata, updated_at')
-          .in('org_id', orgIds);
-
-        if (settingsError) {
-          console.warn('Failed to load org settings snapshot', settingsError);
-        } else if (settingsData?.length) {
-          settingsData.forEach((item) => {
-            connectionMap.set(item.org_id, {
-              supabaseUrl: item.supabase_url || '',
-              supabaseAnonKey: item.anon_key || '',
-              metadata: item.metadata || null,
-              updatedAt: item.updated_at || null,
-            });
-          });
-
-          normalizedOrganizations = normalizedOrganizations.map((org) => {
-            const settings = connectionMap.get(org.id);
-            if (!settings) return org;
-            return {
-              ...org,
-              has_connection: Boolean(settings.supabaseUrl && settings.supabaseAnonKey),
-              org_settings_metadata: settings.metadata,
-              org_settings_updated_at: settings.updatedAt,
-            };
-          });
-        }
-      }
+      const invitesPayload = Array.isArray(payload?.incomingInvites)
+        ? payload.incomingInvites.filter(Boolean)
+        : [];
 
       setOrgConnections(connectionMap);
+      setOrganizations(organizationsPayload);
+      setIncomingInvites(invitesPayload);
 
-      const normalizedInvites = inviteData
-        .map((invite) => normalizeInvite(invite, organizationMap?.get(invite.org_id) || invite.organization))
-        .filter(Boolean);
-
-      setOrganizations(normalizedOrganizations);
-      setIncomingInvites(normalizedInvites);
-
-      return { organizations: normalizedOrganizations, invites: normalizedInvites };
+      return { organizations: organizationsPayload, invites: invitesPayload };
     } catch (loadError) {
       console.error('Failed to load organization memberships', loadError);
       setError(loadError);
       setOrganizations([]);
       setIncomingInvites([]);
+      setOrgConnections(new Map());
       throw loadError;
     } finally {
       loadingRef.current = false;
     }
-  }, [authClient, user, resetState]);
+  }, [authClient, session, user, resetState]);
 
   const loadOrgDirectory = useCallback(
     async (orgId, { signal } = {}) => {
