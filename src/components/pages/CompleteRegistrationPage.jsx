@@ -321,10 +321,9 @@ export default function CompleteRegistrationPage() {
   return (
     <AuthLayout>
       <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-right text-white">
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-center gap-3">
           <ShieldCheck className="w-10 h-10" />
-          <div>
-            <p className="text-sm text-blue-100">מערכת ניהול עובדים</p>
+          <div className="text-center">
             <h1 className="text-2xl font-bold">השלמת הרשמה מאובטחת</h1>
             <p className="text-sm text-blue-100 mt-1">צעד אחרון לפני הצטרפות לארגון</p>
           </div>

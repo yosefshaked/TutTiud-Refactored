@@ -146,11 +146,11 @@ export default function Login() {
     }
   };
   return (
-    <AuthLayout cardClassName="max-w-xl">
-      <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-right text-white">
-        <div className="flex items-center justify-end gap-3">
+    <AuthLayout cardClassName="max-w-xl ">
+      <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-white">
+        <div className="flex items-center justify-center gap-3">
           <ShieldCheck className="w-10 h-10" />
-          <div>
+          <div className="text-center">
             <p className="text-sm text-blue-100">תותיעוד • פלטפורמת ניהול עובדים</p>
             <h1 className="text-2xl font-bold">כניסה לחשבון</h1>
           </div>
