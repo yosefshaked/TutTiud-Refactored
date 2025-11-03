@@ -44,6 +44,12 @@ function normalizeInvitationRecord(record) {
   return {
     id: record.id || null,
     orgId: record.orgId || record.org_id || null,
+    orgName:
+      typeof record.orgName === 'string' && record.orgName.trim()
+        ? record.orgName.trim()
+        : typeof record.org_name === 'string' && record.org_name.trim()
+          ? record.org_name.trim()
+          : null,
     email,
     status: record.status || 'pending',
     invitedBy: record.invitedBy || record.invited_by || null,
@@ -86,11 +92,14 @@ export async function createInvitation(orgId, email, { session, expiresAt, redir
       signal,
       body: payload,
     });
-    const normalized = normalizeInvitationRecord(response?.invitation);
-    if (!normalized) {
+    const normalizedInvitation = normalizeInvitationRecord(response?.invitation);
+    if (!normalizedInvitation) {
       throw new Error('השרת לא החזיר נתוני הזמנה תקינים.');
     }
-    return normalized;
+    return {
+      ...response,
+      invitation: normalizedInvitation,
+    };
   } catch (error) {
     if (!error?.message) {
       error.message = 'שליחת ההזמנה נכשלה. נסה שוב מאוחר יותר.';

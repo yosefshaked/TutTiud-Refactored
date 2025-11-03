@@ -10,6 +10,7 @@ import {
   splitHash,
 } from '@/auth/bootstrapSupabaseCallback.js';
 import { useAuth } from '@/auth/AuthContext.jsx';
+import AuthLayout from '@/components/layouts/AuthLayout.jsx';
 
 export default function Login() {
   const { status, session, signInWithEmail, signInWithOAuth } = useAuth();
@@ -145,19 +146,18 @@ export default function Login() {
     }
   };
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 flex items-center justify-center px-4" dir="rtl">
-      <div className="max-w-md w-full bg-white shadow-xl rounded-3xl overflow-hidden border border-slate-100">
-        <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-right text-white">
-          <div className="flex items-center justify-end gap-3">
-            <ShieldCheck className="w-10 h-10" />
-            <div>
-              <p className="text-sm text-blue-100">תותיעוד • פלטפורמת ניהול עובדים</p>
-              <h1 className="text-2xl font-bold">כניסה לחשבון</h1>
-            </div>
+    <AuthLayout cardClassName="max-w-xl ">
+      <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-white">
+        <div className="flex items-center justify-center gap-3">
+          <ShieldCheck className="w-10 h-10" />
+          <div className="text-center">
+            <p className="text-sm text-blue-100">תותיעוד • פלטפורמת ניהול עובדים</p>
+            <h1 className="text-2xl font-bold">כניסה לחשבון</h1>
           </div>
         </div>
+      </div>
 
-        <div className="p-8 space-y-6">
+      <div className="p-8 space-y-6">
           {redirectMessage ? (
             <div
               className="bg-blue-50 border border-blue-100 text-blue-900 text-right rounded-2xl px-4 py-3 shadow-sm"
@@ -259,8 +259,7 @@ export default function Login() {
               <span>{isSubmitting ? 'מתחבר...' : 'כניסה'}</span>
             </button>
           </form>
-        </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

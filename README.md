@@ -31,6 +31,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - **Instructor My Students** (`src/features/instructor/pages/MyStudentsPage.jsx`) presents members with only their assigned students. It composes `PageLayout`, loads `/api/my-students`, and surfaces loading, error, and empty cards before rendering each student inside a `Card` with name and contact details.
 - **Password reset experience** (`src/pages/ForgotPassword.jsx` and `src/pages/UpdatePassword.jsx`) delivers the full Supabase Auth recovery flow. The request page sends `resetPasswordForEmail` links that target `/#/update-password`, and the update page verifies matching passwords before calling `AuthContext.updatePassword` and redirecting to the dashboard with success feedback.
 - **Login feedback** (`src/pages/Login.jsx`) now surfaces Supabase authentication errors inline with the design system's error alert so users immediately understand when credentials are invalid.
+- **Invitation confirmation** (`src/components/pages/CompleteRegistrationPage.jsx` & `AcceptInvitePage.jsx`) now asks invitees to explicitly confirm the Supabase invite token before redirecting to a state-aware acceptance screen. The acceptance page requires an authenticated session, reloads invitation status (`pending`, `accepted`, `revoked`, etc.), and responds with contextual messaging (accept/decline actions, dashboard shortcut, or invalid-link notice).
 - **Reports navigation state** – the "דוחות" link is intentionally disabled (with a tooltip) until reporting ships, preventing dead ends in the main navigation.
 - **Feature-sliced admin components** live in `src/features/admin/components/`. Each component is scoped to the admin feature (forms, modals) while shared primitives stay in `src/components/ui`.
 - **Org context** (`src/org/OrgContext.jsx`) stores the encrypted dedicated key timestamp (`dedicated_key_saved_at`) and still toggles `setup_completed` after verification, complementing the server-side persistence added to `/api/save-org-credentials`.
@@ -51,6 +52,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - `PUT /api/students/{studentId}` – admin/owner updates to student metadata (name, contact info, instructor).
 - `GET /api/my-students` – member/admin/owner view of students whose `assigned_instructor_id` equals the caller.
 - `POST /api/sessions` – member/admin/owner insertion of `SessionRecords` with assignment verification for members.
+- `GET /api/user-context` – authenticated fetch that returns the caller's organization memberships and pending invitations (with organization names) via the Supabase admin client so invitees bypass RLS limitations.
 
 ## 📚 Documentation
 

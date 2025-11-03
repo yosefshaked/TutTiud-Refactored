@@ -78,12 +78,26 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.id` (Supabase auth UUID), supporting the instructor dashboard. |
 | `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry (JSON answer payload + optional service context) after confirming members only write for students assigned to them. |
 | `/api/settings` | GET/POST/PUT/PATCH/DELETE | Admin/Owner (read allowed to members) | Provides full CRUD for tenant settings, supporting creation of new keys like `session_form_config`. |
+| `/api/user-context` | GET | Authenticated users | Returns the caller's organization memberships (with connection flags) and pending invitations, using the Supabase admin client to bypass RLS so invitees can still see organization names. |
 
 > **Schema guardrails:** `/api/settings` now inspects `tuttiud.setup_assistant_diagnostics()` whenever Supabase reports missing tables or insufficient permissions. Schema or policy gaps surface as HTTP 424 with `settings_schema_incomplete` / `settings_schema_unverified` and include the failing diagnostic rows so admins can rerun the setup script before retrying.
 
 All endpoints expect the tenant identifier (`org_id`) in the request body or query string. Authentication is enforced with the Supabase JWT provided by the desktop/web client, and every handler builds the tenant Supabase client through `api/_shared/org-bff.js` to reuse encryption, membership, and error handling routines.
 
-### 7.2 User Story Mapping
+### 7.2 Invitation onboarding flow (2025-11 update)
+
+1. **Azure Function invite (`POST /api/invitations`)** – Admins trigger an invite email that embeds the Supabase `token_hash` and the control-plane `invitation_token` inside the redirect URL.
+   - If the Supabase admin client finds an existing auth user for the requested email, the function still creates the control-plane invitation but skips `inviteUserByEmail`, returning `{ userExists: true }` so the UI can confirm the member may sign in immediately.
+2. **Manual confirmation (`CompleteRegistrationPage.jsx`)** – When invitees open the email link the SPA loads `/complete-registration`, fetches the control-plane invitation by token, shows the target email in a read-only field, and only calls `supabase.auth.verifyOtp({ type: 'invite', token_hash })` after the user clicks “Confirm and Continue”. Failed lookups or expired tokens surface an inline red alert.
+3. **State-aware acceptance (`AcceptInvitePage.jsx`)** – Successful verification redirects to `/accept-invite?invitation_token=…`. The page requires an active Supabase session; unauthenticated visitors are redirected to `/login` with the invitation token preserved.
+4. **Status-driven UI** – The acceptance page fetches `/api/invitations/token/:token` which now returns `{ status: 'pending' | 'accepted' | 'revoked' | 'declined' | 'expired' | 'failed', ... }`. The UI renders:
+   - `pending`: accept/decline buttons with mismatch handling and API-backed actions.
+   - `accepted`: success message + “Go to dashboard” shortcut.
+   - Any other status: non-blocking info panel explaining that the link is no longer valid.
+5. **Email guardrails** – If the logged-in Supabase account email does not match the invitation email the page blocks actions and offers a “Sign out and switch accounts” CTA.
+6. **Org selection context (`GET /api/user-context`)** – After authentication the `OrgProvider` calls the new endpoint to retrieve both accepted memberships and pending invitations with organization names, avoiding client-side RLS denials that previously produced “ארגון ללא שם”.
+
+### 7.3 User Story Mapping
 
 | User Story | Implementation Notes |
 | :--------- | :------------------- |
@@ -103,6 +117,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - `src/pages/Login.jsx` reads the stored payload (or hash query), surfaces friendly Hebrew error messages, clears loading states, and normalizes the browser URL to the canonical `#/login/?…` pattern without Supabase-specific parameters.
 - `resolveRedirectUrl()` in `src/auth/AuthContext.jsx` strips Supabase callback parameters, merges any remaining query values, and always returns a hash-first `#/login/` redirect when callbacks are present so failed attempts do not pollute future OAuth requests.
 - **Manual QA checklist – OAuth callbacks**: simulate a Supabase redirect with only `code` and confirm the login screen loads without an error banner; repeat with `error=access_denied` to verify the translated alert appears and the URL normalizes to `#/login/?error=access_denied` before retrying.
+- `AuthLayout` (`src/components/layouts/AuthLayout.jsx`) standardizes the visual shell for every auth flow (login, password reset, registration completion) by applying the TutTiud background, linked logo header, and centered card container. Each page renders only its specific form content inside the shared wrapper.
 - Password reset is a two-step Supabase Auth flow: `/Pages/ForgotPassword.jsx` calls `resetPasswordForEmail` with a redirect to `/#/update-password`, and `/Pages/UpdatePassword.jsx` verifies matching credentials before calling the new `updatePassword` helper exposed by `AuthContext`. Both views use the refreshed design system components and RTL-friendly alerts for loading, success, and error states.
 - The login form surfaces Supabase authentication failures inline using the red error alert pattern so users immediately see when credentials are invalid.
 

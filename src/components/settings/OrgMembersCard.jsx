@@ -99,8 +99,12 @@ export default function OrgMembersCard() {
 
     setIsInviting(true);
     try {
-      await createInvitation(activeOrgId, email.trim(), { session });
-      toast.success('ההזמנה נשלחה בהצלחה.');
+      const result = await createInvitation(activeOrgId, email.trim(), { session });
+      if (result?.userExists) {
+        toast.success('ההזמנה נוצרה בהצלחה. למשתמש זה כבר קיים חשבון, והוא יכול להתחבר כדי לאשר את ההזמנה.');
+      } else {
+        toast.success('ההזמנה נשלחה בהצלחה.');
+      }
       setEmail('');
       await refreshInvitations({ suppressToast: true });
     } catch (error) {

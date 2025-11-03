@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { Loader2, MailCheck } from 'lucide-react';
 
 import { useAuth } from '@/auth/AuthContext.jsx';
+import AuthLayout from '@/components/layouts/AuthLayout.jsx';
 import Button from '@/components/ui/CustomButton.jsx';
 import Input from '@/components/ui/CustomInput.jsx';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
 
 const REQUEST_STATUS = Object.freeze({
@@ -49,18 +49,17 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 flex items-center justify-center px-4 py-10" dir="rtl">
-      <Card className="w-full max-w-lg border-slate-200 shadow-xl">
-        <CardHeader className="bg-gradient-to-l from-blue-500 to-indigo-500 text-white rounded-t-lg space-y-2 text-right">
-          <CardTitle className="flex items-center justify-end gap-2 text-2xl font-bold">
-            <span>איפוס סיסמה</span>
-            <MailCheck className="h-7 w-7" aria-hidden="true" />
-          </CardTitle>
-          <CardDescription className="text-blue-100 text-sm leading-relaxed">
-            הזינו את כתובת הדוא"ל שלכם ונשלח אליכם קישור לעדכון הסיסמה.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-6">
+    <AuthLayout>
+      <div className="bg-gradient-to-l from-blue-500 to-indigo-500 px-6 py-6 text-right text-white">
+        <div className="flex items-center justify-end gap-2 text-2xl font-bold">
+          <span>איפוס סיסמה</span>
+          <MailCheck className="h-7 w-7" aria-hidden="true" />
+        </div>
+        <p className="mt-2 text-sm text-blue-100 leading-relaxed">
+          הזינו את כתובת הדוא"ל שלכם ונשלח אליכם קישור לעדכון הסיסמה.
+        </p>
+      </div>
+      <div className="space-y-6 px-6 pb-8 pt-6">
           {isSuccess ? (
             <Alert className="bg-emerald-50 border-emerald-200 text-emerald-800" role="status">
               <AlertTitle>בקשה התקבלה</AlertTitle>
@@ -108,8 +107,7 @@ export default function ForgotPassword() {
               </Link>
             </div>
           </form>
-        </CardContent>
-      </Card>
-    </div>
+      </div>
+    </AuthLayout>
   );
 }

@@ -26,8 +26,32 @@ function selectToken(params) {
   };
 }
 
+function mergeSearchParams(primarySearch, fallbackSearch) {
+  const primary = new URLSearchParams(primarySearch);
+  if (!fallbackSearch || typeof fallbackSearch !== 'string') {
+    return primary;
+  }
+  const fallback = new URLSearchParams(fallbackSearch);
+  for (const [key, value] of fallback.entries()) {
+    if (!primary.has(key) && typeof value === 'string') {
+      primary.set(key, value);
+    }
+  }
+  return primary;
+}
+
 export function extractRegistrationTokens(search) {
-  const params = new URLSearchParams(search);
+  let params = new URLSearchParams(search);
+  const missingTokenHash = !(params.has('token_hash') || params.has('tokenHash'));
+  const missingInviteToken = !INVITATION_TOKEN_KEYS.some((key) => params.has(key));
+
+  if ((missingTokenHash || missingInviteToken) && typeof window !== 'undefined') {
+    const globalSearch = window.location?.search ?? '';
+    if (globalSearch && globalSearch !== search) {
+      params = mergeSearchParams(params, globalSearch);
+    }
+  }
+
   const tokenHash = params.get('token_hash') ?? params.get('tokenHash') ?? '';
   const { tokenKey, tokenValue } = selectToken(params);
   return {
