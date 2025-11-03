@@ -278,7 +278,7 @@ export default function NewSessionForm({
                 title="נקה מסנני תלמיד"
               >
                 <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                נקה מסננים
+                <span className="hidden sm:inline">נקה מסננים</span>
               </Button>
             </div>
           )}
