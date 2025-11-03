@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { Loader2, Users, Search, X, User } from "lucide-react"
+import { Loader2, Users, Search, X, User, RotateCcw } from "lucide-react"
 
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
@@ -8,6 +8,7 @@ import { authenticatedFetch } from "@/lib/api-client.js"
 import PageLayout from "@/components/ui/PageLayout.jsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
 import { includesDayQuery } from "@/features/students/utils/schedule.js"
@@ -141,6 +142,16 @@ export default function MyStudentsPage() {
     })
   }, [students, searchQuery, dayFilter])
 
+  const handleResetFilters = () => {
+    setSearchQuery('')
+    setDayFilter(null)
+  }
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return searchQuery.trim() !== '' || dayFilter !== null
+  }, [searchQuery, dayFilter])
+
   const hasNoResults = isSuccess && filteredStudents.length === 0
 
   return (
@@ -177,36 +188,51 @@ export default function MyStudentsPage() {
         </div>
       ) : isSuccess ? (
             <>
-              <div className="mb-md grid grid-cols-1 gap-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                <div className="relative w-full">
-                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-                  <Input
-                    type="text"
-                    placeholder="חיפוש לפי שם, הורה, יום או שעה..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pr-10 text-sm"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-                      aria-label="נקה חיפוש"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-                <div>
-                  <DayOfWeekSelect
-                    value={dayFilter}
-                    onChange={setDayFilter}
-                    placeholder="סינון לפי יום"
-                  />
+              <div className="mb-md">
+                <div className="grid grid-cols-1 gap-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <div className="relative w-full">
+                    <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+                    <Input
+                      type="text"
+                      placeholder="חיפוש לפי שם, הורה, יום או שעה..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pr-10 text-sm"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+                        aria-label="נקה חיפוש"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-sm items-center">
+                    <DayOfWeekSelect
+                      value={dayFilter}
+                      onChange={setDayFilter}
+                      placeholder="סינון לפי יום"
+                    />
+                    {hasActiveFilters && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResetFilters}
+                        className="gap-xs"
+                        title="נקה כל המסננים"
+                      >
+                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                        <span className="hidden sm:inline">נקה מסננים</span>
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {searchQuery && (
-                  <div className="sm:col-span-2 text-xs text-neutral-600">
+                  <div className="mt-sm text-xs text-neutral-600">
                     נמצאו {filteredStudents.length} תלמידים
                   </div>
                 )}
