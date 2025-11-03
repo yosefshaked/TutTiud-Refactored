@@ -86,7 +86,8 @@ export default function NewSessionForm({
       return;
     }
     setSelectedStudentId(initialStudentId);
-  }, [initialStudentId]);
+    onSelectedStudentChange?.(initialStudentId);
+  }, [initialStudentId, onSelectedStudentChange]);
 
   const selectedStudent = useMemo(() => {
     return students.find((student) => student?.id === selectedStudentId) || null;
@@ -127,12 +128,15 @@ export default function NewSessionForm({
 
   useEffect(() => {
     // If the currently selected student is filtered out, clear the selection
+    // EXCEPTION: Don't clear if the student was pre-selected via initialStudentId
+    // to prevent clearing the selection before the students list fully loads
     if (!selectedStudentId) return;
+    if (selectedStudentId === initialStudentId) return;
     const stillVisible = filteredStudents.some((s) => s?.id === selectedStudentId);
     if (!stillVisible) {
       setSelectedStudentId('');
     }
-  }, [filteredStudents, selectedStudentId]);
+  }, [filteredStudents, selectedStudentId, initialStudentId]);
 
   useEffect(() => {
     if (!selectedStudent || serviceTouched) {
