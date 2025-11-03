@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Plus, Loader2, Pencil, Search, X, User } from 'lucide-react';
+import { Plus, Loader2, Pencil, Search, X, User, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -175,6 +175,18 @@ export default function StudentManagementPage() {
       setInstructorFilterId(id);
     }
   };
+
+  const handleResetFilters = () => {
+    setFilterMode('all');
+    setInstructorFilterId('');
+    setSearchQuery('');
+    setDayFilter(null);
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return searchQuery.trim() !== '' || dayFilter !== null || instructorFilterId !== '' || filterMode !== 'all';
+  }, [searchQuery, dayFilter, instructorFilterId, filterMode]);
 
   const handleOpenAddDialog = () => {
     setCreateError('');
@@ -418,6 +430,19 @@ export default function StudentManagementPage() {
                 placeholder="סינון לפי יום"
               />
             </div>
+            {hasActiveFilters && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleResetFilters}
+                className="gap-xs"
+                title="נקה כל המסננים"
+              >
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">נקה מסננים</span>
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>

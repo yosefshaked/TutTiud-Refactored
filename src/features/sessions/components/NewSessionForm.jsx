@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Loader2, ListChecks } from 'lucide-react';
+import { Loader2, ListChecks, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -160,6 +160,16 @@ export default function NewSessionForm({
     }
   };
 
+  const handleResetFilters = () => {
+    setStudentQuery('');
+    setStudentDayFilter(null);
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return studentQuery.trim() !== '' || studentDayFilter !== null;
+  }, [studentQuery, studentDayFilter]);
+
   const updateAnswer = useCallback((questionKey, value) => {
     setAnswers((previous) => ({
       ...previous,
@@ -208,52 +218,70 @@ export default function NewSessionForm({
     <form id="new-session-form" className="space-y-lg" onSubmit={handleSubmit} dir="rtl">
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
-        <div className={cn(
-          'mb-2 grid grid-cols-1 gap-2',
-          canFilterByInstructor ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
-        )}>
-          <div className="relative">
-            <Input
-              type="text"
-              placeholder="חיפוש לפי שם, יום או שעה..."
-              value={studentQuery}
-              onChange={(e) => setStudentQuery(e.target.value)}
-              className="w-full pr-3 text-sm"
-              disabled={isSubmitting || students.length === 0}
-              aria-label="חיפוש תלמיד"
-            />
-          </div>
-          {canFilterByInstructor ? (
-            <div>
-              <Select
-                value={studentScope}
-                onValueChange={(v) => onScopeChange?.(v)}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="כל התלמידים" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">כל התלמידים</SelectItem>
-                  {/* 'mine' option is still useful for admins who are also instructors */}
-                  <SelectItem value="mine">התלמידים שלי</SelectItem>
-                  {instructors.map((inst) => (
-                    <SelectItem key={inst.id} value={`inst:${inst.id}`}>
-                      התלמידים של {inst.name || inst.email || inst.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="mb-2 space-y-2">
+          <div className={cn(
+            'grid grid-cols-1 gap-2',
+            canFilterByInstructor ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+          )}>
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="חיפוש לפי שם, יום או שעה..."
+                value={studentQuery}
+                onChange={(e) => setStudentQuery(e.target.value)}
+                className="w-full pr-3 text-sm"
+                disabled={isSubmitting || students.length === 0}
+                aria-label="חיפוש תלמיד"
+              />
             </div>
-          ) : null}
-          <div>
-            <DayOfWeekSelect
-              value={studentDayFilter}
-              onChange={setStudentDayFilter}
-              disabled={isSubmitting || students.length === 0}
-              placeholder="סינון לפי יום"
-            />
+            {canFilterByInstructor ? (
+              <div>
+                <Select
+                  value={studentScope}
+                  onValueChange={(v) => onScopeChange?.(v)}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="כל התלמידים" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל התלמידים</SelectItem>
+                    {/* 'mine' option is still useful for admins who are also instructors */}
+                    <SelectItem value="mine">התלמידים שלי</SelectItem>
+                    {instructors.map((inst) => (
+                      <SelectItem key={inst.id} value={`inst:${inst.id}`}>
+                        התלמידים של {inst.name || inst.email || inst.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            <div>
+              <DayOfWeekSelect
+                value={studentDayFilter}
+                onChange={setStudentDayFilter}
+                disabled={isSubmitting || students.length === 0}
+                placeholder="סינון לפי יום"
+              />
+            </div>
           </div>
+          {hasActiveFilters && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleResetFilters}
+                className="gap-xs"
+                disabled={isSubmitting}
+                title="נקה מסנני תלמיד"
+              >
+                <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">נקה מסננים</span>
+              </Button>
+            </div>
+          )}
         </div>
         <select
           id="session-student"
