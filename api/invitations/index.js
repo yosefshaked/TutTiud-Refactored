@@ -440,6 +440,19 @@ async function handleCreateInvitation(context, req, supabase) {
     return;
   }
 
+  const existingAuthResult = await supabase.auth.admin.getUserByEmail(email);
+  if (existingAuthResult.error && existingAuthResult.error.status !== 404) {
+    context.log?.error?.('invitations failed to check existing auth user', {
+      orgId,
+      email,
+      message: existingAuthResult.error.message,
+    });
+    respond(context, 500, { message: 'failed to verify auth user' });
+    return;
+  }
+
+  const authUserExists = Boolean(existingAuthResult.data?.user?.id);
+
   const { error: pendingError, invitation: pendingInvitation } = await findPendingInvitation(supabase, orgId, email);
   if (pendingError) {
     context.log?.error?.('invitations failed to verify pending invitation', {
@@ -485,6 +498,14 @@ async function handleCreateInvitation(context, req, supabase) {
   }
 
   const invitation = insertResult.data;
+  if (authUserExists) {
+    respond(context, 200, {
+      invitation: sanitizeInvitation(invitation),
+      userExists: true,
+    });
+    return;
+  }
+
   const redirectUrl = redirectTo || null;
   const inviterResult = await supabase.auth.admin.getUserById(authUser.id);
   if (inviterResult.error || !inviterResult.data?.user) {

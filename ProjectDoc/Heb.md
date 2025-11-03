@@ -86,6 +86,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 ### 7.2 זרימת הזמנות (עדכון 2025-11)
 
 1. **שליחת הזמנה בפונקציית Azure (`POST /api/invitations`)** – מנהלי המערכת מזניקים אימייל הזמנה שמטמיע בכתובת ההפניה את `token_hash` של Supabase ואת `invitation_token` של בקרת הארגון.
+   - אם לקוח Supabase כבר קיים עבור כתובת האימייל, הפונקציה עדיין יוצרת את ההזמנה בטבלת השליטה אך מדלגת על `inviteUserByEmail`, ומחזירה `{ userExists: true }` כדי שהממשק יציג הודעת הצלחה מתאימה ויזהיר שניתן פשוט להתחבר.
 2. **אישור ידני (`CompleteRegistrationPage.jsx`)** – בעת פתיחת הקישור הלקוח טוען את `/complete-registration`, מושך את ההזמנה לפי הטוקן, מציג את כתובת האימייל בשדה לקריאה בלבד, ורק בלחיצה על "אישור והמשך" מפעיל `supabase.auth.verifyOtp({ type: 'invite', token_hash })`. שגיאות או פקיעת תוקף מוצגות כהתרעה אדומה.
 3. **עמוד קבלה מודע-מצב (`AcceptInvitePage.jsx`)** – אימות מוצלח מפנה אל `/accept-invite?invitation_token=…`. העמוד מחייב סשן Supabase פעיל; משתמשים ללא סשן מנותבים ל-`/login` כשהטוקן נשמר.
 4. **ממשק מונחה סטטוס** – העמוד קורא אל `/api/invitations/token/:token` שמחזיר כעת `{ status: 'pending' | 'accepted' | 'revoked' | 'declined' | 'expired' | 'failed', ... }`. ה-UI מציג:

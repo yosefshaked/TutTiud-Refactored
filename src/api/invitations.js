@@ -92,11 +92,14 @@ export async function createInvitation(orgId, email, { session, expiresAt, redir
       signal,
       body: payload,
     });
-    const normalized = normalizeInvitationRecord(response?.invitation);
-    if (!normalized) {
+    const normalizedInvitation = normalizeInvitationRecord(response?.invitation);
+    if (!normalizedInvitation) {
       throw new Error('השרת לא החזיר נתוני הזמנה תקינים.');
     }
-    return normalized;
+    return {
+      ...response,
+      invitation: normalizedInvitation,
+    };
   } catch (error) {
     if (!error?.message) {
       error.message = 'שליחת ההזמנה נכשלה. נסה שוב מאוחר יותר.';
