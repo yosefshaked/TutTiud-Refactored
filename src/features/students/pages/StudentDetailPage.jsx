@@ -268,8 +268,8 @@ export default function StudentDetailPage() {
     }
     openSessionModal?.({
       studentId,
-      onCreated: () => {
-        void loadSessions();
+      onCreated: async () => {
+        await loadSessions();
       },
     });
   }, [openSessionModal, studentId, loadSessions]);
