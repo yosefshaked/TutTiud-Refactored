@@ -131,7 +131,7 @@ export default function NewSessionForm({
     // EXCEPTION: Don't clear if the student was pre-selected via initialStudentId
     // to prevent clearing the selection before the students list fully loads
     if (!selectedStudentId) return;
-    if (selectedStudentId === initialStudentId) return;
+    if (String(selectedStudentId) === String(initialStudentId)) return;
     const stillVisible = filteredStudents.some((s) => s?.id === selectedStudentId);
     if (!stillVisible) {
       setSelectedStudentId('');
