@@ -82,7 +82,8 @@
   - Conditionally render the inline footer when `renderFooterOutside={false}`.
 - Parent dialogs pass the footer to `DialogContent` via the `footer` prop and trigger submission using `document.getElementById('form-id')?.requestSubmit()`.
 - This pattern ensures footers remain visible at the bottom of the dialog on both mobile and desktop without being hidden by scrolling content.
-- Footer styling: `sm:rounded-b-lg` matches dialog's bottom corners on desktop; mobile dialogs reserve space for bottom navigation (`max-h-[calc(100vh-8rem)]`).
+- Footer styling: `sm:rounded-b-lg` matches dialog's bottom corners on desktop; mobile dialogs reserve space for mobile browser chrome and bottom navigation (`max-h-[calc(100vh-16rem)]`).
+- Mobile browser compatibility (2025-11): The 16rem (256px) vertical reserve accounts for mobile browser UI chrome (address bar, bottom menu) plus the app's bottom navigation to prevent buttons from being hidden on browsers like Samsung Galaxy.
 - FAB button (mobile navigation): positioned at `-top-8` to float above the bottom nav bar.
 - Examples: `NewSessionForm`/`NewSessionFormFooter`, `AddStudentForm`/`AddStudentFormFooter`, `EditStudentForm`/`EditStudentFormFooter`.
 
