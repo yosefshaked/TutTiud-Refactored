@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
+import AuthLayout from '@/components/layouts/AuthLayout.jsx';
 import { buildInvitationSearch, extractRegistrationTokens } from '@/lib/invite-tokens.js';
 import { getInvitationByToken } from '@/api/invitations.js';
 
@@ -191,6 +192,13 @@ export default function CompleteRegistrationPage() {
           <p className="text-sm text-slate-600 leading-relaxed">
             אם ההזמנה אינה זמינה, פנה למנהל הארגון בבקשה לקבל קישור חדש.
           </p>
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-blue-600 to-indigo-500 px-4 py-3 text-base font-semibold text-white shadow-lg transition hover:shadow-xl"
+          >
+            כניסה למערכת
+          </button>
         </div>
       );
     }
@@ -311,20 +319,18 @@ export default function CompleteRegistrationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-slate-200 flex items-center justify-center px-4 py-12" dir="rtl">
-      <div className="max-w-md w-full bg-white shadow-xl rounded-3xl overflow-hidden border border-slate-100">
-        <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-right text-white">
-          <div className="flex items-center justify-end gap-3">
-            <ShieldCheck className="w-10 h-10" />
-            <div>
-              <p className="text-sm text-blue-100">מערכת ניהול עובדים</p>
-              <h1 className="text-2xl font-bold">השלמת הרשמה מאובטחת</h1>
-              <p className="text-sm text-blue-100 mt-1">צעד אחרון לפני הצטרפות לארגון</p>
-            </div>
+    <AuthLayout>
+      <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-right text-white">
+        <div className="flex items-center justify-end gap-3">
+          <ShieldCheck className="w-10 h-10" />
+          <div>
+            <p className="text-sm text-blue-100">מערכת ניהול עובדים</p>
+            <h1 className="text-2xl font-bold">השלמת הרשמה מאובטחת</h1>
+            <p className="text-sm text-blue-100 mt-1">צעד אחרון לפני הצטרפות לארגון</p>
           </div>
         </div>
-        {renderContent()}
       </div>
-    </div>
+      {renderContent()}
+    </AuthLayout>
   );
 }
