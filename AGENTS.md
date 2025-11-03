@@ -87,6 +87,15 @@
 - FAB button (mobile navigation): positioned at `-top-8` to float above the bottom nav bar.
 - Examples: `NewSessionForm`/`NewSessionFormFooter`, `AddStudentForm`/`AddStudentFormFooter`, `EditStudentForm`/`EditStudentFormFooter`.
 
+### Mobile Bottom Navigation (2025-11)
+- The mobile navigation bar (`MobileNavigation` in `AppShell.jsx`) uses `position: fixed` with `bottom-0` and `inset-x-0` to stay anchored at the bottom.
+- Performance optimizations for smooth scrolling on mobile browsers:
+  - Uses solid `bg-surface` (100% opacity) instead of translucent to avoid rendering issues during fast scrolling.
+  - Removed `backdrop-blur` which can cause performance issues on some mobile devices.
+  - Added `willChange: 'transform'` CSS hint to optimize browser rendering and prevent jitter/jumping during scroll.
+- The navigation responds to keyboard visibility via `useKeyboardAwareBottomOffset` which translates it upward when the virtual keyboard is shown.
+- Z-index is set to `z-[60]` to ensure it stays above dialogs and other UI elements.
+
 ## Documentation
 - When editing files in `ProjectDoc/`, keep `Eng.md` and `Heb.md` in sync and update their version and last-updated fields.
 
