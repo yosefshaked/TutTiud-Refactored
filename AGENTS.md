@@ -82,8 +82,8 @@
   - Conditionally render the inline footer when `renderFooterOutside={false}`.
 - Parent dialogs pass the footer to `DialogContent` via the `footer` prop and trigger submission using `document.getElementById('form-id')?.requestSubmit()`.
 - This pattern ensures footers remain visible at the bottom of the dialog on both mobile and desktop without being hidden by scrolling content.
-- Footer styling: `sm:rounded-b-lg` matches dialog's bottom corners on desktop; mobile dialogs reserve space for mobile browser chrome and bottom navigation (`max-h-[calc(100vh-16rem)]`).
-- Mobile browser compatibility (2025-11): The 16rem (256px) vertical reserve accounts for mobile browser UI chrome (address bar, bottom menu) plus the app's bottom navigation to prevent buttons from being hidden on browsers like Samsung Galaxy.
+- Footer styling: `sm:rounded-b-lg` matches dialog's bottom corners on desktop; mobile dialogs are positioned from top with proper spacing (`top-[2rem]`) and reserve space for bottom navigation (`max-h-[calc(100vh-10rem)]`).
+- Mobile browser compatibility (2025-11): The 10rem (160px) vertical reserve (2rem top + 8rem bottom) accounts for mobile browser UI chrome and app's bottom navigation. Dialog is anchored from top to maximize usable space while keeping buttons visible on browsers like Samsung Galaxy.
 - FAB button (mobile navigation): positioned at `-top-8` to float above the bottom nav bar.
 - Examples: `NewSessionForm`/`NewSessionFormFooter`, `AddStudentForm`/`AddStudentFormFooter`, `EditStudentForm`/`EditStudentFormFooter`.
 
@@ -93,6 +93,7 @@
   - Uses solid `bg-surface` (100% opacity) instead of translucent to avoid rendering issues during fast scrolling.
   - Removed `backdrop-blur` which can cause performance issues on some mobile devices.
   - Added `willChange: 'transform'` CSS hint to optimize browser rendering and prevent jitter/jumping during scroll.
+  - Added `translateZ(0)` transform to force GPU acceleration and keep navigation in its own compositing layer, preventing scroll jank.
 - The navigation responds to keyboard visibility via `useKeyboardAwareBottomOffset` which translates it upward when the virtual keyboard is shown.
 - Z-index is set to `z-[60]` to ensure it stays above dialogs and other UI elements.
 
