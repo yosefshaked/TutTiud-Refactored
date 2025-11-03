@@ -73,8 +73,10 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
     <nav
       role="navigation"
       aria-label="ניווט ראשי"
-      className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface/95 px-lg pb-sm pt-xs shadow-lg backdrop-blur md:hidden"
-      style={keyboardOffset > 0 ? { transform: `translateY(-${keyboardOffset}px)` } : undefined}
+      className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-surface px-lg pb-sm pt-xs shadow-lg md:hidden"
+      style={keyboardOffset > 0 
+        ? { position: 'fixed', transform: `translateY(-${keyboardOffset}px) translateZ(0)`, willChange: 'transform', isolation: 'isolate' } 
+        : { position: 'fixed', transform: 'translateZ(0)', willChange: 'transform', isolation: 'isolate' }}
     >
       <div className="relative mx-auto grid max-w-md grid-cols-5 items-center gap-md">
         {navItems.slice(0, 2).map((item) => {
