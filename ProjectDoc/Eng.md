@@ -87,6 +87,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 ### 7.2 Invitation onboarding flow (2025-11 update)
 
 1. **Azure Function invite (`POST /api/invitations`)** – Admins trigger an invite email that embeds the Supabase `token_hash` and the control-plane `invitation_token` inside the redirect URL.
+   - The handler now resolves existing accounts via `supabase.auth.admin.getUserByEmail(email)` and treats a thrown “User not found” (or 404) as confirmation that no auth record exists yet.
    - If the Supabase admin client finds an existing auth user for the requested email, the function still creates the control-plane invitation but skips `inviteUserByEmail`, returning `{ userExists: true }` so the UI can confirm the member may sign in immediately.
 2. **Manual confirmation (`CompleteRegistrationPage.jsx`)** – When invitees open the email link the SPA loads `/complete-registration`, fetches the control-plane invitation by token, shows the target email in a read-only field, and only calls `supabase.auth.verifyOtp({ type: 'invite', token_hash })` after the user clicks “Confirm and Continue”. Failed lookups or expired tokens surface an inline red alert.
 3. **State-aware acceptance (`AcceptInvitePage.jsx`)** – Successful verification redirects to `/accept-invite?invitation_token=…`. The page requires an active Supabase session; unauthenticated visitors are redirected to `/login` with the invitation token preserved.
