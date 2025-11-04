@@ -133,6 +133,8 @@ export default function StudentDetailPage() {
   const [tagsState, setTagsState] = useState(REQUEST_STATE.idle);
   const [tagsError, setTagsError] = useState('');
 
+  const [instructors, setInstructors] = useState([]);
+
   // Edit student modal state
   const [studentForEdit, setStudentForEdit] = useState(null);
   const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
@@ -250,11 +252,27 @@ export default function StudentDetailPage() {
     }
   }, [canFetch, studentId, activeOrgId]);
 
+  const loadInstructors = useCallback(async () => {
+    if (!canFetch) {
+      return;
+    }
+
+    try {
+      const searchParams = new URLSearchParams({ org_id: activeOrgId });
+      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`);
+      setInstructors(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      console.error('Failed to load instructors', error);
+      setInstructors([]);
+    }
+  }, [canFetch, activeOrgId]);
+
   useEffect(() => {
     if (canFetch) {
       void loadStudent();
       void loadQuestions();
       void loadSessions();
+      void loadInstructors();
     } else {
       setStudentState(REQUEST_STATE.idle);
       setStudentError('');
@@ -265,8 +283,9 @@ export default function StudentDetailPage() {
       setSessionState(REQUEST_STATE.idle);
       setSessionError('');
       setSessions([]);
+      setInstructors([]);
     }
-  }, [canFetch, loadStudent, loadQuestions, loadSessions]);
+  }, [canFetch, loadStudent, loadQuestions, loadSessions, loadInstructors]);
 
   const hasStudentTags = Array.isArray(student?.tags) && student.tags.length > 0;
   const studentIdentifier = student?.id || '';
@@ -435,6 +454,9 @@ export default function StudentDetailPage() {
   const tagDisplayList = buildTagDisplayList(student?.tags, tagCatalog);
   const isTagsLoading = tagsState === REQUEST_STATE.loading;
   const tagsLoadError = tagsState === REQUEST_STATE.error;
+  
+  const assignedInstructor = instructors.find((inst) => inst?.id === student?.assigned_instructor_id);
+  const instructorName = assignedInstructor?.name || (student?.assigned_instructor_id ? 'מדריך לא זמין' : 'לא הוקצה מדריך');
 
   return (
     <>
@@ -502,6 +524,13 @@ export default function StudentDetailPage() {
                 {contactPhone ? (
                   <dd className="text-xs text-neutral-600 sm:text-sm">טלפון: {contactPhone}</dd>
                 ) : null}
+              </div>
+              <div className="space-y-xs">
+                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  מדריך מוקצה
+                </dt>
+                <dd className="text-sm text-foreground sm:text-base">{instructorName}</dd>
               </div>
               <div className="space-y-xs">
                 <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
