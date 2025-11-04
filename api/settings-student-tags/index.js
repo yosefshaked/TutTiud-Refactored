@@ -183,7 +183,7 @@ export default async function (context, req) {
 
   const { error: upsertError } = await tenantClient
     .from('Settings')
-    .upsert({ id: SETTINGS_KEY, key: SETTINGS_KEY, settings_value: updated }, { onConflict: 'key' });
+    .upsert({ key: SETTINGS_KEY, settings_value: updated }, { onConflict: 'key' });
 
   if (upsertError) {
     context.log?.error?.('settings-student-tags: failed to save tag', { message: upsertError.message });
