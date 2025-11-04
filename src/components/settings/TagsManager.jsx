@@ -135,7 +135,7 @@ export default function TagsManager() {
         setTags(updatedTags);
       } else {
         // Create new tag
-        const body = { org_id: activeOrgId, tag_name: trimmedName };
+        const body = { org_id: activeOrgId, name: trimmedName };
         const response = await authenticatedFetch('settings/student-tags', { method: 'POST', body, session });
         const newTag = response?.created;
         if (newTag) {
