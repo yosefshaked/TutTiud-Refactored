@@ -15,6 +15,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
 import StudentTagsField from './StudentTagsField.jsx';
+import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 
 const INITIAL_STATE = {
   name: '',
@@ -143,8 +144,6 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       return;
     }
 
-    const tagsArray = values.tagId ? [values.tagId] : [];
-
     onSubmit({
       name: trimmedName,
       contactName: trimmedContactName,
@@ -154,7 +153,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       defaultDayOfWeek: values.defaultDayOfWeek,
       defaultSessionTime: values.defaultSessionTime,
       notes: values.notes.trim() || null,
-      tags: tagsArray.length > 0 ? tagsArray : null,
+      tags: normalizeTagIdsForWrite(values.tagId),
     });
   };
 

@@ -3,43 +3,9 @@ import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
 import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { normalizeTagCatalog } from '@/features/students/utils/tags.js';
 
 const EMPTY_ARRAY = [];
-
-function normalizeTags(candidate) {
-  if (!Array.isArray(candidate)) {
-    return [];
-  }
-
-  const normalized = [];
-  const seen = new Set();
-
-  for (const entry of candidate) {
-    if (!entry) {
-      continue;
-    }
-
-    if (typeof entry === 'object') {
-      const id = typeof entry.id === 'string' ? entry.id.trim() : '';
-      const name = typeof entry.name === 'string' ? entry.name.trim() : '';
-      if (id && name && !seen.has(id)) {
-        seen.add(id);
-        normalized.push({ id, name });
-      }
-      continue;
-    }
-
-    if (typeof entry === 'string') {
-      const value = entry.trim();
-      if (value && !seen.has(value)) {
-        seen.add(value);
-        normalized.push({ id: value, name: value });
-      }
-    }
-  }
-
-  return normalized;
-}
 
 export function useStudentTags() {
   const { session } = useAuth();
@@ -65,7 +31,7 @@ export function useStudentTags() {
     try {
       const searchParams = new URLSearchParams({ org_id: activeOrgId });
       const payload = await authenticatedFetch(`settings/student-tags?${searchParams.toString()}`, { session });
-      const normalized = normalizeTags(payload?.tags ?? payload);
+      const normalized = normalizeTagCatalog(payload?.tags ?? payload);
       setTagOptions(normalized);
       return normalized;
     } catch (error) {

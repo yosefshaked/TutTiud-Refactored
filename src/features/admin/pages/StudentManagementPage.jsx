@@ -17,6 +17,7 @@ import EditStudentModal from '../components/EditStudentModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 import { includesDayQuery } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
+import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -219,7 +220,7 @@ export default function StudentManagementPage() {
     setCreateError('');
 
     try {
-      const normalizedTags = Array.isArray(tags) && tags.length > 0 ? tags : null;
+      const normalizedTags = normalizeTagIdsForWrite(tags);
       const body = {
         org_id: activeOrgId,
         name,
@@ -278,7 +279,7 @@ export default function StudentManagementPage() {
         default_day_of_week: payload.defaultDayOfWeek,
         default_session_time: payload.defaultSessionTime,
         notes: payload.notes,
-        tags: Array.isArray(payload.tags) && payload.tags.length > 0 ? payload.tags : null,
+        tags: normalizeTagIdsForWrite(payload.tags),
       };
       await authenticatedFetch(`students/${payload.id}`, { session, method: 'PUT', body });
       setStudentForEdit(null);

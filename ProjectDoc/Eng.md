@@ -167,7 +167,19 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **NewSessionModal.jsx** – orchestrates data dependencies: loads the student roster (admin vs. instructor scope), fetches `session_form_config`, and surfaces loading/error states. On submit it posts to `/api/sessions` with `{ student_id, date, service_context, content }` and triggers any supplied `onCreated` callback before closing.
 - **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, and collects answers for every configured question (text, textarea, select, radio/button groups, numeric fields, and range scales). Empty responses are stripped before sending the payload.
 - **Shared utilities** – `src/features/students/utils/schedule.js` centralizes day/time formatting, `src/features/students/utils/endpoints.js` standardizes roster endpoint selection, and `src/features/sessions/utils/form-config.js` parses question configs so both the modal and detail view stay in sync.
-- **Student tags catalog** – tenant-wide tag definitions now live in the `tuttiud."Settings"` row keyed by `student_tags`. The Azure Functions endpoint `GET /api/settings/student-tags` returns the normalized catalog for any member of the active organization, while `POST /api/settings/student-tags` (admin/owner only) appends a `{ id, name }` entry with a generated UUID. Front-end consumers use `useStudentTags()` (`src/features/students/hooks/useStudentTags.js`) to load the catalog and `StudentTagsField.jsx` to render the select + modal combo inside both add/edit student forms. Each student stores an array of tag IDs (`Students.tags`), preserving backward compatibility with legacy comma-delimited strings.
+- **Student tags catalog** – tenant-wide tag definitions now live in the `tuttiud."Settings"` row keyed by `student_tags`. The Azure Functions endpoint `GET /api/settings/student-tags` returns the normalized catalog for any member of the active organization, while `POST /api/settings/student-tags` (admin/owner only) appends a `{ id, name }` entry with a generated UUID. Front-end consumers use `useStudentTags()` (`src/features/students/hooks/useStudentTags.js`) to load the catalog and `StudentTagsField.jsx` to render the select + modal combo inside both add/edit student forms. Each student stores an array of tag UUIDs in the `Students.tags` column (`uuid[]` type). To migrate legacy tenants run:
+  ```sql
+  ALTER TABLE tuttiud."Students"
+    ALTER COLUMN tags TYPE uuid[]
+    USING CASE
+      WHEN tags IS NULL THEN NULL
+      ELSE ARRAY(
+        SELECT value::uuid
+        FROM unnest(tags) AS value
+      )
+    END;
+  ```
+  The student detail page resolves tag IDs against the catalog and displays the names as badges. When the catalog entry is missing the badge falls back to the raw UUID with an outline style so admins can reconcile stale data.
 
 ## 14. Session Form Management in Settings
 
