@@ -1,6 +1,7 @@
 /**
  * Normalizes a time string to HH:MM:SS format for backend compatibility.
- * Handles various input formats: HH:MM, HH:MM:SS, or null/undefined.
+ * Handles various input formats: HH:MM, HH:MM:SS, HH:MM:SS+TZ, or null/undefined.
+ * Strips timezone suffixes that PostgreSQL may append.
  * 
  * @param {string|null|undefined} time - Time string to normalize
  * @returns {string|null} Normalized time in HH:MM:SS format or null
@@ -8,8 +9,12 @@
 function normalizeTimeValue(time) {
   if (!time) return null;
   
-  const timeStr = String(time).trim();
+  let timeStr = String(time).trim();
   if (!timeStr) return null;
+  
+  // Strip timezone suffix if present (e.g., "+00", "+00:00", "Z", "+03:00")
+  // PostgreSQL may return time with timezone like "18:30:00+00"
+  timeStr = timeStr.replace(/([+-]\d{2}:?\d{0,2}|Z)$/, '').trim();
   
   // If already in HH:MM:SS format, return as-is
   if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
@@ -27,8 +32,15 @@ function normalizeTimeValue(time) {
     return `${h.padStart(2, '0')}:${m}:00`;
   }
   
-  // Return original value if format is unrecognized (let backend validate)
-  return timeStr;
+  // If we still have something with colons, try to extract just HH:MM:SS
+  const match = timeStr.match(/^(\d{1,2}):(\d{2}):(\d{2})/);
+  if (match) {
+    const [, h, m, s] = match;
+    return `${h.padStart(2, '0')}:${m}:${s}`;
+  }
+  
+  // Return null if format is completely unrecognized
+  return null;
 }
 
 /**
