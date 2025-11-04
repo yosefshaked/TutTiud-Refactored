@@ -1,34 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { 
-  TextField, 
-  TextAreaField, 
-  SelectField, 
-  PhoneField, 
-  DayOfWeekField, 
-  ComboBoxField, 
-  TimeField 
+import {
+  TextField,
+  TextAreaField,
+  SelectField,
+  PhoneField,
+  DayOfWeekField,
+  ComboBoxField,
+  TimeField
 } from '@/components/ui/forms-ui';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
+import StudentTagsField from './StudentTagsField.jsx';
+import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
+import { createStudentFormState } from '@/features/students/utils/form-state.js';
 
 export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
-  const initial = {
-    name: student?.name || '',
-    contactName: student?.contact_name || '',
-    contactPhone: student?.contact_phone || '',
-    assignedInstructorId: student?.assigned_instructor_id || '',
-    defaultService: student?.default_service || '',
-    defaultDayOfWeek: student?.default_day_of_week || null,
-    defaultSessionTime: student?.default_session_time || null,
-    notes: student?.notes || '',
-    tags: Array.isArray(student?.tags) ? student.tags.join(', ') : (student?.tags || ''),
-  };
-
-  const [values, setValues] = useState(initial);
+  const [values, setValues] = useState(() => createStudentFormState(student));
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -36,12 +27,21 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
   const [loadingInstructors, setLoadingInstructors] = useState(true);
   const { session } = useAuth();
   const { activeOrgId } = useOrg();
+  
+  // Track the ID of the student currently being edited
+  const currentStudentIdRef = useRef(student?.id);
 
   useEffect(() => {
-    setValues(initial);
-    setTouched({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [student?.id]);
+    const incomingStudentId = student?.id;
+    
+    // Only reset the form if we're switching to a different student
+    // If it's the same student (background refresh), preserve user's unsaved changes
+    if (incomingStudentId !== currentStudentIdRef.current) {
+      currentStudentIdRef.current = incomingStudentId;
+      setValues(createStudentFormState(student));
+      setTouched({});
+    }
+  }, [student]);
 
   useEffect(() => {
     async function loadServices() {
@@ -78,19 +78,26 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
     loadInstructors();
   }, [session, activeOrgId]);
 
-  const handleChange = (event) => {
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target;
     setValues((previous) => ({ ...previous, [name]: value }));
-  };
+  }, []);
 
-  const handleSelectChange = (name, value) => {
+  const handleSelectChange = useCallback((name, value) => {
     setValues((previous) => ({ ...previous, [name]: value }));
-  };
+  }, []);
 
-  const handleBlur = (event) => {
+  const handleBlur = useCallback((event) => {
     const { name } = event.target;
     setTouched((previous) => ({ ...previous, [name]: true }));
-  };
+  }, []);
+
+  const handleTagChange = useCallback((nextTagId) => {
+    setValues((previous) => ({
+      ...previous,
+      tagId: nextTagId,
+    }));
+  }, []);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -118,11 +125,6 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
       return;
     }
 
-    const tagsArray = values.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(Boolean);
-
     onSubmit({
       id: student?.id,
       name: trimmedName,
@@ -133,7 +135,7 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
       defaultDayOfWeek: values.defaultDayOfWeek,
       defaultSessionTime: values.defaultSessionTime,
       notes: values.notes.trim() || null,
-      tags: tagsArray.length > 0 ? tagsArray : null,
+      tags: normalizeTagIdsForWrite(values.tagId),
     });
   };
 
@@ -240,13 +242,9 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
             />
           </div>
 
-          <TextField
-            id="tags"
-            name="tags"
-            label="תגיות"
-            value={values.tags}
-            onChange={handleChange}
-            placeholder="הפרד בפסיקים: תגית1, תגית2"
+          <StudentTagsField
+            value={values.tagId}
+            onChange={handleTagChange}
             disabled={isSubmitting}
             description="תגיות לסינון וארגון תלמידים."
           />

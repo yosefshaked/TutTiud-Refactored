@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Loader2, ArrowRight, Phone, Calendar, Clock, User, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -14,6 +15,7 @@ import { useSessionModal } from '@/features/sessions/context/SessionModalContext
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import EditStudentModal from '@/features/admin/components/EditStudentModal.jsx';
+import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } from '@/features/students/utils/tags.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -126,6 +128,10 @@ export default function StudentDetailPage() {
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionsError, setQuestionsError] = useState('');
   const [questions, setQuestions] = useState([]);
+
+  const [tagCatalog, setTagCatalog] = useState([]);
+  const [tagsState, setTagsState] = useState(REQUEST_STATE.idle);
+  const [tagsError, setTagsError] = useState('');
 
   // Edit student modal state
   const [studentForEdit, setStudentForEdit] = useState(null);
@@ -262,6 +268,54 @@ export default function StudentDetailPage() {
     }
   }, [canFetch, loadStudent, loadQuestions, loadSessions]);
 
+  const hasStudentTags = Array.isArray(student?.tags) && student.tags.length > 0;
+  const studentIdentifier = student?.id || '';
+
+  useEffect(() => {
+    if (!hasStudentTags) {
+      setTagCatalog([]);
+      setTagsState(REQUEST_STATE.idle);
+      setTagsError('');
+      return;
+    }
+
+    let isMounted = true;
+    async function loadTagCatalog() {
+      setTagsState(REQUEST_STATE.loading);
+      setTagsError('');
+      try {
+        const searchParams = new URLSearchParams();
+        if (activeOrgId) {
+          searchParams.set('org_id', activeOrgId);
+        }
+        const endpoint = searchParams.toString()
+          ? `settings/student-tags?${searchParams.toString()}`
+          : 'settings/student-tags';
+        const payload = await authenticatedFetch(endpoint);
+        if (!isMounted) {
+          return;
+        }
+        const normalized = normalizeTagCatalog(payload?.tags ?? payload);
+        setTagCatalog(normalized);
+        setTagsState(REQUEST_STATE.idle);
+      } catch (error) {
+        console.error('Failed to load student tag catalog', error);
+        if (!isMounted) {
+          return;
+        }
+        setTagCatalog([]);
+        setTagsState(REQUEST_STATE.error);
+        setTagsError(error?.message || 'טעינת התגיות נכשלה.');
+      }
+    }
+
+    void loadTagCatalog();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hasStudentTags, activeOrgId, studentIdentifier]);
+
   const handleOpenSessionModal = useCallback(() => {
     if (!studentId) {
       return;
@@ -296,6 +350,7 @@ export default function StudentDetailPage() {
     setIsUpdatingStudent(true);
     setUpdateError('');
     try {
+      const normalizedTags = normalizeTagIdsForWrite(payload.tags);
       const body = {
         org_id: activeOrgId,
         name: payload.name,
@@ -306,7 +361,7 @@ export default function StudentDetailPage() {
         default_day_of_week: payload.defaultDayOfWeek,
         default_session_time: payload.defaultSessionTime,
         notes: payload.notes,
-        tags: payload.tags,
+        tags: normalizedTags,
       };
       await authenticatedFetch(`students/${payload.id}`, { method: 'PUT', body, session });
       setStudentForEdit(null);
@@ -377,6 +432,9 @@ export default function StudentDetailPage() {
   const contactInfo = student?.contact_info || '';
   const defaultService = student?.default_service || 'לא הוגדר';
   const scheduleDescription = describeSchedule(student?.default_day_of_week, student?.default_session_time);
+  const tagDisplayList = buildTagDisplayList(student?.tags, tagCatalog);
+  const isTagsLoading = tagsState === REQUEST_STATE.loading;
+  const tagsLoadError = tagsState === REQUEST_STATE.error;
 
   return (
     <>
@@ -462,6 +520,33 @@ export default function StudentDetailPage() {
                 </dt>
                 <dd className="text-sm text-foreground sm:text-base">{defaultService}</dd>
               </div>
+              {hasStudentTags ? (
+                <div className="space-y-xs sm:col-span-2">
+                  <dt className="text-xs font-medium text-neutral-600 sm:text-sm">תגיות</dt>
+                  <dd>
+                    {isTagsLoading ? (
+                      <span className="text-xs text-neutral-500 sm:text-sm">טוען תגיות...</span>
+                    ) : tagsLoadError ? (
+                      <span className="text-xs text-red-600 sm:text-sm">{tagsError}</span>
+                    ) : tagDisplayList.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {tagDisplayList.map((tag) => (
+                          <Badge
+                            key={tag.id}
+                            variant={tag.missing ? 'outline' : 'secondary'}
+                            title={tag.missing ? 'תגית זו אינה קיימת עוד בקטלוג' : undefined}
+                            className="text-xs sm:text-sm"
+                          >
+                            {tag.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-neutral-500 sm:text-sm">לא נמצאו תגיות תואמות.</span>
+                    )}
+                  </dd>
+                </div>
+              ) : null}
               {contactInfo ? (
                 <div className="space-y-xs sm:col-span-2">
                   <dt className="text-xs font-medium text-neutral-600 sm:text-sm">פרטי קשר נוספים</dt>

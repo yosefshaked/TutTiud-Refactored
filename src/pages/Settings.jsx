@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EnhancedDialogHeader } from '@/components/ui/DialogHeader';
-import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck } from 'lucide-react';
+import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
@@ -12,6 +12,7 @@ import ServiceManager from '@/components/settings/ServiceManager.jsx';
 import InstructorManager from '@/components/settings/InstructorManager.jsx';
 import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
+import TagsManager from '@/components/settings/TagsManager.jsx';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -24,7 +25,7 @@ export default function Settings() {
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags'
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
 
@@ -401,6 +402,34 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Tags Manager Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-teal-100 p-2 text-teal-600 transition-colors group-hover:bg-teal-600 group-hover:text-white">
+                  <Tag className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  ניהול תגיות
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
+                יצירה, עריכה ומחיקה של תגיות לסיווג ותיוג תלמידים
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('tags')} 
+                disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <Tag className="h-4 w-4" /> ניהול תגיות
+              </Button>
+            </CardContent>
+          </Card>
         </div>
         )}
 
@@ -416,6 +445,7 @@ export default function Settings() {
                 selectedModule === 'instructors' ? <Users /> :
                 selectedModule === 'backup' ? <ShieldCheck /> :
                 selectedModule === 'logo' ? <Sparkles /> :
+                selectedModule === 'tags' ? <Tag /> :
                 null
               }
               title={
@@ -426,6 +456,7 @@ export default function Settings() {
                 selectedModule === 'instructors' ? 'ניהול מדריכים' :
                 selectedModule === 'backup' ? 'גיבוי ושחזור' :
                 selectedModule === 'logo' ? 'לוגו מותאם אישית' :
+                selectedModule === 'tags' ? 'ניהול תגיות' :
                 ''
               }
               onClose={() => setSelectedModule(null)}
@@ -474,6 +505,9 @@ export default function Settings() {
                 )}
                 {selectedModule === 'logo' && (
                   <LogoManager session={session} orgId={activeOrgId} />
+                )}
+                {selectedModule === 'tags' && (
+                  <TagsManager />
                 )}
               </div>
             </div>

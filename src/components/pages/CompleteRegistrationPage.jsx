@@ -19,6 +19,7 @@ export default function CompleteRegistrationPage() {
   const [inviteStatus, setInviteStatus] = useState('loading');
   const [inviteError, setInviteError] = useState('');
   const [invitationEmail, setInvitationEmail] = useState('');
+  const [invitationAuth, setInvitationAuth] = useState(null);
   const [verifyError, setVerifyError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [flowStep, setFlowStep] = useState('confirm');
@@ -64,7 +65,8 @@ export default function CompleteRegistrationPage() {
           setInviteStatus('error');
           return;
         }
-        setInvitationEmail(record.email || '');
+  setInvitationEmail(record.email || '');
+  setInvitationAuth(record.auth || null);
         setInviteStatus('ready');
       })
       .catch((error) => {
@@ -114,10 +116,34 @@ export default function CompleteRegistrationPage() {
       setPasswordError('');
     } catch (error) {
       console.error('Failed to verify invitation token on demand', error);
-      const message =
-        error?.message === 'Token has been expired or revoked'
-          ? 'קישור ההזמנה כבר לא פעיל. בקש מהמנהל לשלוח קישור חדש.'
-          : 'אימות הקישור נכשל. ודא שהשתמשת בקישור העדכני ביותר או נסה שוב מאוחר יותר.';
+      let message = 'אימות הקישור נכשל. ודא שהשתמשת בקישור העדכני ביותר או נסה שוב מאוחר יותר.';
+
+      // Distinguish between different error types
+      const rawMsg = String(error?.message || '').toLowerCase();
+      const status = Number(error?.status || error?.code || 0);
+
+      // Important: Supabase often returns 403 "Email link is invalid" for already-consumed invite links.
+      // Prioritize "invalid/403" as "already used" BEFORE checking for the word "expired" because
+      // the error string can be "invalid or has expired".
+      if (rawMsg.includes('invalid') || status === 403 || rawMsg.includes('used') || rawMsg.includes('already')) {
+        // Supabase often returns 403 "Email link is invalid" after the invite was already verified (single-use)
+        // Treat this as "already used" and guide user to reset password
+        // If we can tell from control DB that email has been confirmed, prefer the
+        // "already used" explanation; otherwise, fall back to expired.
+        const wasVerified = !!(invitationAuth?.exists && invitationAuth?.emailConfirmed);
+        if (wasVerified) {
+          message = 'הקישור כבר שומש. אם שכחת את הסיסמה, ';
+        } else {
+          message = 'ההזמנה פגה או שהקישור אינו תקף יותר. בקש מהמנהל לשלוח הזמנה חדשה.';
+        }
+      } else if (rawMsg.includes('expired')) {
+        // Token truly expired
+        message = 'ההזמנה פגה. נא לבקש מהמנהל לשלוח הזמנה חדשה.';
+      } else if (error?.message === 'Token has been expired or revoked') {
+        // Legacy generic message - try to be helpful
+        message = 'קישור ההזמנה כבר לא פעיל. אם כבר יצרת חשבון, נסה להתחבר. אם ההזמנה פגה, בקש מהמנהל לשלוח קישור חדש.';
+      }
+
       setVerifyError(message);
     } finally {
       setIsVerifying(false);
@@ -300,8 +326,17 @@ export default function CompleteRegistrationPage() {
         </p>
 
         {verifyError ? (
-          <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl px-4 py-3" role="alert">
-            {verifyError}
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl px-4 py-3 space-y-2" role="alert">
+            <p>{verifyError}</p>
+            {verifyError.includes('שומש') ? (
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="text-blue-600 hover:text-blue-800 underline text-sm font-medium"
+              >
+                לחץ כאן לאיפוס סיסמה
+              </button>
+            ) : null}
           </div>
         ) : null}
 

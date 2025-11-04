@@ -1,34 +1,25 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { 
-  TextField, 
-  TextAreaField, 
-  SelectField, 
-  PhoneField, 
-  DayOfWeekField, 
-  ComboBoxField, 
-  TimeField 
+import {
+  TextField,
+  TextAreaField,
+  SelectField,
+  PhoneField,
+  DayOfWeekField,
+  ComboBoxField,
+  TimeField
 } from '@/components/ui/forms-ui';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
-
-const INITIAL_STATE = {
-  name: '',
-  contactName: '',
-  contactPhone: '',
-  assignedInstructorId: '',
-  defaultService: '',
-  defaultDayOfWeek: null,
-  defaultSessionTime: null,
-  notes: '',
-  tags: '',
-};
+import StudentTagsField from './StudentTagsField.jsx';
+import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
+import { createStudentFormState } from '@/features/students/utils/form-state.js';
 
 export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
-  const [values, setValues] = useState(INITIAL_STATE);
+  const [values, setValues] = useState(() => createStudentFormState());
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -39,7 +30,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
 
   useEffect(() => {
     if (!isSubmitting && !error) {
-      setValues(INITIAL_STATE);
+      setValues(createStudentFormState());
       setTouched({});
     }
   }, [isSubmitting, error]);
@@ -109,9 +100,16 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
     }));
   };
 
+  const handleTagChange = useCallback((nextTagId) => {
+    setValues((previous) => ({
+      ...previous,
+      tagId: nextTagId,
+    }));
+  }, []);
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    
+
     const newTouched = {
       name: true,
       contactName: true,
@@ -135,11 +133,6 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       return;
     }
 
-    const tagsArray = values.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(Boolean);
-
     onSubmit({
       name: trimmedName,
       contactName: trimmedContactName,
@@ -149,7 +142,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       defaultDayOfWeek: values.defaultDayOfWeek,
       defaultSessionTime: values.defaultSessionTime,
       notes: values.notes.trim() || null,
-      tags: tagsArray.length > 0 ? tagsArray : null,
+      tags: normalizeTagIdsForWrite(values.tagId),
     });
   };
 
@@ -260,13 +253,9 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         />
       </div>
 
-      <TextField
-        id="tags"
-        name="tags"
-        label="תגיות"
-        value={values.tags}
-        onChange={handleChange}
-        placeholder="הפרד בפסיקים: תגית1, תגית2"
+      <StudentTagsField
+        value={values.tagId}
+        onChange={handleTagChange}
         disabled={isSubmitting}
         description="תגיות לסינון וארגון תלמידים."
       />
