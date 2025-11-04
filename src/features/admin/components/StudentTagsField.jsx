@@ -18,19 +18,13 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
     void loadTags();
   }, [loadTags]);
 
-  // Debug: Log the incoming value and tag options
   useEffect(() => {
-    console.log('[StudentTagsField] value:', value);
-    console.log('[StudentTagsField] tagOptions:', tagOptions);
-    console.log('[StudentTagsField] loadingTags:', loadingTags);
-  }, [value, tagOptions, loadingTags]);
-
-  useEffect(() => {
+    // Only check if tag exists AFTER tags have finished loading
     if (loadingTags || !value) {
       return;
     }
     const exists = tagOptions.some((tag) => tag.id === value);
-    if (!exists) {
+    if (!exists && tagOptions.length > 0) {
       // Tag was deleted from catalog but still assigned to student
       // Keep the value so user can see something is selected and choose to clear it
       console.warn(`Tag "${value}" is assigned to student but not found in catalog`);
@@ -92,8 +86,8 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
   const options = useMemo(() => {
     const base = tagOptions.map((tag) => ({ value: tag.id, label: tag.name }));
     
-    // If a tag is selected but not in catalog (deleted tag), show it as "תגית שנמחקה"
-    if (value && value !== NONE_VALUE && !tagOptions.some((tag) => tag.id === value)) {
+    // Only show "deleted tag" if tags have finished loading and tag is still not found
+    if (!loadingTags && value && value !== NONE_VALUE && !tagOptions.some((tag) => tag.id === value)) {
       base.push({ value, label: `${value.slice(0, 8)}... (תגית שנמחקה)` });
     }
     
@@ -101,7 +95,7 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
       { value: NONE_VALUE, label: 'ללא תגית' },
       ...base,
     ];
-  }, [tagOptions, value]);
+  }, [tagOptions, value, loadingTags]);
 
   const placeholder = loadingTags ? 'טוען תגיות...' : 'בחר תגית';
   const fieldDescription = useMemo(() => {

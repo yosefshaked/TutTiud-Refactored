@@ -51,12 +51,6 @@ function normalizeTimeValue(time) {
  * @returns {Object} Complete form state with all required fields
  */
 export function createStudentFormState(student) {
-  const tagId = Array.isArray(student?.tags) && student.tags.length > 0 ? student.tags[0] : '';
-  
-  // Debug: Log student tags
-  console.log('[createStudentFormState] student.tags:', student?.tags);
-  console.log('[createStudentFormState] extracted tagId:', tagId);
-  
   return {
     name: student?.name || '',
     contactName: student?.contact_name || '',
@@ -66,6 +60,6 @@ export function createStudentFormState(student) {
     defaultDayOfWeek: student?.default_day_of_week || null,
     defaultSessionTime: normalizeTimeValue(student?.default_session_time),
     notes: student?.notes || '',
-    tagId,
+    tagId: Array.isArray(student?.tags) && student.tags.length > 0 ? student.tags[0] : '',
   };
 }
