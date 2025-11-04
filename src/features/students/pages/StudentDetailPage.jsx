@@ -363,12 +363,6 @@ export default function StudentDetailPage() {
         notes: payload.notes,
         tags: normalizedTags,
       };
-      console.log('[StudentDetailPage] Sending PUT request with body:', body);
-      console.log('[StudentDetailPage] default_session_time details:', {
-        value: body.default_session_time,
-        type: typeof body.default_session_time,
-        length: body.default_session_time?.length,
-      });
       await authenticatedFetch(`students/${payload.id}`, { method: 'PUT', body, session });
       setStudentForEdit(null);
       // Refresh the header info
