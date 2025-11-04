@@ -440,25 +440,24 @@ async function handleCreateInvitation(context, req, supabase) {
     return;
   }
 
-  let authUserExists = false;
-  try {
-    await supabase.auth.admin.getUserByEmail(email);
-    authUserExists = true;
-  } catch (error) {
-    const errorMessage = typeof error?.message === 'string' ? error.message : '';
-    const normalizedMessage = errorMessage.toLowerCase();
-    if (error?.status === 404 || normalizedMessage.includes('user not found')) {
-      authUserExists = false;
-    } else {
-      context.log?.error?.('invitations failed to check existing auth user', {
-        orgId,
-        email,
-        message: errorMessage || 'unknown error',
-      });
-      respond(context, 500, { message: 'failed to verify auth user' });
-      return;
-    }
+  const {
+    data: { users } = { users: [] },
+    error: listUsersError,
+  } = await supabase.auth.admin.listUsers({
+    email,
+  });
+
+  if (listUsersError) {
+    context.log?.error?.('Failed to check for existing user due to an API error', {
+      orgId,
+      email,
+      message: listUsersError.message,
+    });
+    respond(context, 500, { message: 'Failed to verify auth user.' });
+    return;
   }
+
+  const authUserExists = users && users.length > 0;
 
   const { error: pendingError, invitation: pendingInvitation } = await findPendingInvitation(supabase, orgId, email);
   if (pendingError) {
