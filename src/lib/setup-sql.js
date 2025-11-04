@@ -46,27 +46,17 @@ ALTER TABLE tuttiud."Students"
 -- MIGRATION: If tags column exists and is text[], convert to uuid[]
 DO $$
 DECLARE
+  tags_oid oid;
   tags_type text;
 BEGIN
-  SELECT data_type INTO tags_type
-  FROM information_schema.columns
-  WHERE table_schema = 'tuttiud'
-    AND table_name = 'Students'
-    AND column_name = 'tags';
+  SELECT atttypid INTO tags_oid
+  FROM pg_attribute
+  WHERE attrelid = 'tuttiud."Students"'::regclass
+    AND attname = 'tags';
 
-  IF tags_type = 'ARRAY' THEN
-    -- Check the underlying type
-    IF EXISTS (
-      SELECT 1
-      FROM pg_type
-      WHERE typname = 'text[]'
-        AND oid = (
-          SELECT atttypid
-          FROM pg_attribute
-          WHERE attrelid = 'tuttiud."Students"'::regclass
-            AND attname = 'tags'
-        )
-    ) THEN
+  IF tags_oid IS NOT NULL THEN
+    SELECT typname INTO tags_type FROM pg_type WHERE oid = tags_oid;
+    IF tags_type = 'text[]' THEN
       -- Migrate text[] to uuid[] safely
       ALTER TABLE tuttiud."Students"
         ADD COLUMN IF NOT EXISTS "__tags_uuid" uuid[];
