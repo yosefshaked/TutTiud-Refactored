@@ -167,22 +167,11 @@ export default function TagsManager() {
     setDeleteError('');
     try {
       // First remove tag from all students who have it
-      const removeResponse = await fetch('/api/students-remove-tag', {
+      await authenticatedFetch('students-remove-tag', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ 
-          org_id: activeOrgId, 
-          tag_id: tagToDelete.id 
-        }),
+        body: { org_id: activeOrgId, tag_id: tagToDelete.id },
+        session,
       });
-
-      if (!removeResponse.ok) {
-        const errorData = await removeResponse.json().catch(() => ({ message: 'Failed to remove tag from students' }));
-        throw new Error(errorData.message || 'Failed to remove tag from students');
-      }
 
       // Then remove tag from catalog
       const updatedTags = tags.filter((t) => t.id !== tagToDelete.id);
