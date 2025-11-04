@@ -440,18 +440,24 @@ async function handleCreateInvitation(context, req, supabase) {
     return;
   }
 
-  const existingAuthResult = await supabase.auth.admin.getUserByEmail(email);
-  if (existingAuthResult.error && existingAuthResult.error.status !== 404) {
-    context.log?.error?.('invitations failed to check existing auth user', {
+  const {
+    data: userExists,
+    error: rpcError,
+  } = await supabase.rpc('user_exists', {
+    user_email: email,
+  });
+
+  if (rpcError) {
+    context.log?.error?.('Failed to check for existing user via rpc', {
       orgId,
       email,
-      message: existingAuthResult.error.message,
+      message: rpcError.message,
     });
-    respond(context, 500, { message: 'failed to verify auth user' });
+    respond(context, 500, { message: 'Failed to verify auth user.' });
     return;
   }
 
-  const authUserExists = Boolean(existingAuthResult.data?.user?.id);
+  const authUserExists = userExists;
 
   const { error: pendingError, invitation: pendingInvitation } = await findPendingInvitation(supabase, orgId, email);
   if (pendingError) {
