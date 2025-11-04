@@ -1,19 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { 
-  TextField, 
-  TextAreaField, 
-  SelectField, 
-  PhoneField, 
-  DayOfWeekField, 
-  ComboBoxField, 
-  TimeField 
+import {
+  TextField,
+  TextAreaField,
+  SelectField,
+  PhoneField,
+  DayOfWeekField,
+  ComboBoxField,
+  TimeField
 } from '@/components/ui/forms-ui';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
+import StudentTagsField from './StudentTagsField.jsx';
 
 export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
   const initial = {
@@ -25,7 +26,7 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
     defaultDayOfWeek: student?.default_day_of_week || null,
     defaultSessionTime: student?.default_session_time || null,
     notes: student?.notes || '',
-    tags: Array.isArray(student?.tags) ? student.tags.join(', ') : (student?.tags || ''),
+    tagId: Array.isArray(student?.tags) && student.tags.length > 0 ? student.tags[0] : '',
   };
 
   const [values, setValues] = useState(initial);
@@ -92,6 +93,13 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
     setTouched((previous) => ({ ...previous, [name]: true }));
   };
 
+  const handleTagChange = useCallback((nextTagId) => {
+    setValues((previous) => ({
+      ...previous,
+      tagId: nextTagId,
+    }));
+  }, []);
+
   const handleSubmit = (event) => {
     event.preventDefault();
 
@@ -118,10 +126,7 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
       return;
     }
 
-    const tagsArray = values.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(Boolean);
+    const tagsArray = values.tagId ? [values.tagId] : [];
 
     onSubmit({
       id: student?.id,
@@ -240,13 +245,9 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
             />
           </div>
 
-          <TextField
-            id="tags"
-            name="tags"
-            label="תגיות"
-            value={values.tags}
-            onChange={handleChange}
-            placeholder="הפרד בפסיקים: תגית1, תגית2"
+          <StudentTagsField
+            value={values.tagId}
+            onChange={handleTagChange}
             disabled={isSubmitting}
             description="תגיות לסינון וארגון תלמידים."
           />

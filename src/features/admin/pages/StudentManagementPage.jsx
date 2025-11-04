@@ -219,6 +219,7 @@ export default function StudentManagementPage() {
     setCreateError('');
 
     try {
+      const normalizedTags = Array.isArray(tags) && tags.length > 0 ? tags : null;
       const body = {
         org_id: activeOrgId,
         name,
@@ -229,7 +230,7 @@ export default function StudentManagementPage() {
         default_day_of_week: defaultDayOfWeek,
         default_session_time: defaultSessionTime,
         notes,
-        tags,
+        tags: normalizedTags,
       };
       await authenticatedFetch('students', {
         session,
@@ -277,7 +278,7 @@ export default function StudentManagementPage() {
         default_day_of_week: payload.defaultDayOfWeek,
         default_session_time: payload.defaultSessionTime,
         notes: payload.notes,
-        tags: payload.tags,
+        tags: Array.isArray(payload.tags) && payload.tags.length > 0 ? payload.tags : null,
       };
       await authenticatedFetch(`students/${payload.id}`, { session, method: 'PUT', body });
       setStudentForEdit(null);

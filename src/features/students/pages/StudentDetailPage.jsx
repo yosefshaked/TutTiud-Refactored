@@ -296,6 +296,7 @@ export default function StudentDetailPage() {
     setIsUpdatingStudent(true);
     setUpdateError('');
     try {
+      const normalizedTags = Array.isArray(payload.tags) && payload.tags.length > 0 ? payload.tags : null;
       const body = {
         org_id: activeOrgId,
         name: payload.name,
@@ -306,7 +307,7 @@ export default function StudentDetailPage() {
         default_day_of_week: payload.defaultDayOfWeek,
         default_session_time: payload.defaultSessionTime,
         notes: payload.notes,
-        tags: payload.tags,
+        tags: normalizedTags,
       };
       await authenticatedFetch(`students/${payload.id}`, { method: 'PUT', body, session });
       setStudentForEdit(null);

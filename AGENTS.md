@@ -187,6 +187,11 @@
 - Forms fully migrated to RTL structure: `AddStudentForm`, `NewSessionForm`.
 - Migration strategy: All new forms must follow RTL patterns from the start; existing forms should be updated to match the RTL structure during maintenance.
 
+### Student Tags Catalog (2025-11)
+- Tenant tag definitions live in the `tuttiud."Settings"` row keyed `student_tags` (JSONB array of `{ id, name }`).
+- Backend: `GET /api/settings/student-tags` returns the catalog for any org member; `POST /api/settings/student-tags` appends a tag (admin/owner only) and regenerates the row via Supabase upsert.
+- Frontend: use `useStudentTags()` (`src/features/students/hooks/useStudentTags.js`) to load/create tags and render `StudentTagsField.jsx` for the dropdown + admin-only creation modal in student forms.
+
 ### Session Form Question Types (2025-10)
 - Session form questions are managed via `SessionFormManager.jsx` (Settings page) and rendered in `NewSessionForm.jsx`.
 - Question type definitions in `QUESTION_TYPE_OPTIONS`:

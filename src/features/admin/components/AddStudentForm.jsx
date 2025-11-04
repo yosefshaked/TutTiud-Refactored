@@ -1,19 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { 
-  TextField, 
-  TextAreaField, 
-  SelectField, 
-  PhoneField, 
-  DayOfWeekField, 
-  ComboBoxField, 
-  TimeField 
+import {
+  TextField,
+  TextAreaField,
+  SelectField,
+  PhoneField,
+  DayOfWeekField,
+  ComboBoxField,
+  TimeField
 } from '@/components/ui/forms-ui';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
+import StudentTagsField from './StudentTagsField.jsx';
 
 const INITIAL_STATE = {
   name: '',
@@ -24,7 +25,7 @@ const INITIAL_STATE = {
   defaultDayOfWeek: null,
   defaultSessionTime: null,
   notes: '',
-  tags: '',
+  tagId: '',
 };
 
 export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
@@ -109,9 +110,16 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
     }));
   };
 
+  const handleTagChange = useCallback((nextTagId) => {
+    setValues((previous) => ({
+      ...previous,
+      tagId: nextTagId,
+    }));
+  }, []);
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    
+
     const newTouched = {
       name: true,
       contactName: true,
@@ -135,10 +143,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       return;
     }
 
-    const tagsArray = values.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(Boolean);
+    const tagsArray = values.tagId ? [values.tagId] : [];
 
     onSubmit({
       name: trimmedName,
@@ -260,13 +265,9 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
         />
       </div>
 
-      <TextField
-        id="tags"
-        name="tags"
-        label="תגיות"
-        value={values.tags}
-        onChange={handleChange}
-        placeholder="הפרד בפסיקים: תגית1, תגית2"
+      <StudentTagsField
+        value={values.tagId}
+        onChange={handleTagChange}
         disabled={isSubmitting}
         description="תגיות לסינון וארגון תלמידים."
       />

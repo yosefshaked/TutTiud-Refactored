@@ -112,6 +112,29 @@ function coerceSessionTime(value) {
   return { value: null, valid: false };
 }
 
+function coerceTags(value) {
+  if (value === null || value === undefined) {
+    return { value: null, valid: true };
+  }
+
+  if (Array.isArray(value)) {
+    const normalized = value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+    return { value: normalized.length ? normalized : null, valid: true };
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    return { value: normalized.length ? normalized : null, valid: true };
+  }
+
+  return { value: null, valid: false };
+}
+
 function buildStudentPayload(body) {
   const name = normalizeString(body?.name);
   if (!name) {
@@ -156,6 +179,11 @@ function buildStudentPayload(body) {
     return { error: 'invalid_default_session_time' };
   }
 
+  const tagsResult = coerceTags(body?.tags);
+  if (!tagsResult.valid) {
+    return { error: 'invalid_tags' };
+  }
+
   return {
     payload: {
       name,
@@ -166,6 +194,7 @@ function buildStudentPayload(body) {
       default_day_of_week: dayResult.value,
       default_session_time: sessionTimeResult.value,
       default_service: defaultServiceResult.value,
+      tags: tagsResult.value,
     },
   };
 }
@@ -277,6 +306,15 @@ function buildStudentUpdates(body) {
     hasAny = true;
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, 'tags')) {
+    const { value, valid } = coerceTags(body.tags);
+    if (!valid) {
+      return { error: 'invalid_tags' };
+    }
+    updates.tags = value;
+    hasAny = true;
+  }
+
   if (!hasAny) {
     return { error: 'missing_updates' };
   }
@@ -382,13 +420,15 @@ export default async function (context, req) {
               ? 'invalid contact name'
               : normalized.error === 'invalid_contact_phone'
                 ? 'invalid contact phone'
-                : normalized.error === 'invalid_default_service'
-                  ? 'invalid default service'
-                  : normalized.error === 'invalid_default_day'
-                    ? 'invalid default day of week'
-                    : normalized.error === 'invalid_default_session_time'
-                      ? 'invalid default session time'
-          : 'invalid payload';
+                  : normalized.error === 'invalid_default_service'
+                    ? 'invalid default service'
+                    : normalized.error === 'invalid_default_day'
+                      ? 'invalid default day of week'
+                      : normalized.error === 'invalid_default_session_time'
+                        ? 'invalid default session time'
+                        : normalized.error === 'invalid_tags'
+                          ? 'invalid tags'
+                          : 'invalid payload';
       return respond(context, 400, { message });
     }
 
@@ -432,7 +472,9 @@ export default async function (context, req) {
                       ? 'invalid default day of week'
                       : normalizedUpdates.error === 'invalid_default_session_time'
                         ? 'invalid default session time'
-                        : 'invalid payload';
+                        : normalizedUpdates.error === 'invalid_tags'
+                          ? 'invalid tags'
+                          : 'invalid payload';
     return respond(context, 400, { message: updateMessage });
   }
 
