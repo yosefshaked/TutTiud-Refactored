@@ -78,19 +78,19 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
     loadInstructors();
   }, [session, activeOrgId]);
 
-  const handleChange = (event) => {
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target;
     setValues((previous) => ({ ...previous, [name]: value }));
-  };
+  }, []);
 
-  const handleSelectChange = (name, value) => {
+  const handleSelectChange = useCallback((name, value) => {
     setValues((previous) => ({ ...previous, [name]: value }));
-  };
+  }, []);
 
-  const handleBlur = (event) => {
+  const handleBlur = useCallback((event) => {
     const { name } = event.target;
     setTouched((previous) => ({ ...previous, [name]: true }));
-  };
+  }, []);
 
   const handleTagChange = useCallback((nextTagId) => {
     setValues((previous) => ({
