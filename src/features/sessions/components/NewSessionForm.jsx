@@ -94,6 +94,16 @@ export default function NewSessionForm({
     return students.find((student) => student?.id === selectedStudentId) || null;
   }, [students, selectedStudentId]);
 
+  // Build instructor map for sorting
+  const instructorMap = useMemo(() => {
+    return instructors.reduce((map, instructor) => {
+      if (instructor?.id) {
+        map.set(instructor.id, instructor);
+      }
+      return map;
+    }, new Map());
+  }, [instructors]);
+
   const filteredStudents = useMemo(() => {
     const q = studentQuery.trim().toLowerCase();
 
@@ -127,9 +137,9 @@ export default function NewSessionForm({
       });
     }
 
-    // Apply default sorting by schedule (day → hour → name)
-    return sortStudentsBySchedule(filtered);
-  }, [students, studentQuery, studentDayFilter]);
+    // Apply default sorting by schedule (day → hour → instructor → name)
+    return sortStudentsBySchedule(filtered, instructorMap);
+  }, [students, studentQuery, studentDayFilter, instructorMap]);
 
   useEffect(() => {
     // If the currently selected student is filtered out, clear the selection

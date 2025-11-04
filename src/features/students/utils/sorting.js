@@ -25,6 +25,35 @@ function parseTimeToMinutes(timeStr) {
 }
 
 /**
+ * Compare two students by name using Hebrew locale
+ * @param {Object} a - First student
+ * @param {Object} b - Second student
+ * @returns {number} - Comparison result (-1, 0, 1)
+ */
+function compareStudentNames(a, b) {
+  const nameA = String(a?.name || '').toLowerCase();
+  const nameB = String(b?.name || '').toLowerCase();
+  return nameA.localeCompare(nameB, 'he');
+}
+
+/**
+ * Compare two instructor names handling null cases
+ * Returns comparison result or null if both are empty
+ * @param {string} nameA - First instructor name
+ * @param {string} nameB - Second instructor name
+ * @returns {number|null} - Comparison result or null
+ */
+function compareInstructorNames(nameA, nameB) {
+  // Empty instructor names go to end
+  if (!nameA && nameB) return 1;
+  if (nameA && !nameB) return -1;
+  if (nameA && nameB) {
+    return nameA.localeCompare(nameB, 'he');
+  }
+  return null; // Both empty
+}
+
+/**
  * Compare function for sorting students by:
  * 1. Day of week (1-7, nulls last)
  * 2. Hour within day (earliest first, nulls last)
@@ -63,19 +92,13 @@ export function compareStudentsBySchedule(a, b, instructorMap = new Map()) {
   const instructorNameA = instructorA?.name || '';
   const instructorNameB = instructorB?.name || '';
   
-  // Empty instructor names go to end
-  if (!instructorNameA && instructorNameB) return 1;
-  if (instructorNameA && !instructorNameB) return -1;
-  if (instructorNameA && instructorNameB) {
-    const instructorCompare = instructorNameA.localeCompare(instructorNameB, 'he');
-    if (instructorCompare !== 0) return instructorCompare;
+  const instructorCompare = compareInstructorNames(instructorNameA, instructorNameB);
+  if (instructorCompare !== null && instructorCompare !== 0) {
+    return instructorCompare;
   }
   
   // 4. Finally, compare by student name
-  const nameA = String(a?.name || '').toLowerCase();
-  const nameB = String(b?.name || '').toLowerCase();
-  
-  return nameA.localeCompare(nameB, 'he');
+  return compareStudentNames(a, b);
 }
 
 /**
@@ -109,11 +132,7 @@ export const STUDENT_SORT_OPTIONS = Object.freeze({
 export function getStudentComparator(sortBy, instructorMap = new Map()) {
   switch (sortBy) {
     case STUDENT_SORT_OPTIONS.NAME:
-      return (a, b) => {
-        const nameA = String(a?.name || '').toLowerCase();
-        const nameB = String(b?.name || '').toLowerCase();
-        return nameA.localeCompare(nameB, 'he');
-      };
+      return compareStudentNames;
     
     case STUDENT_SORT_OPTIONS.INSTRUCTOR:
       return (a, b) => {
@@ -123,17 +142,13 @@ export function getStudentComparator(sortBy, instructorMap = new Map()) {
         const instructorNameA = instructorA?.name || '';
         const instructorNameB = instructorB?.name || '';
         
-        // Empty instructor names go to end
-        if (!instructorNameA && instructorNameB) return 1;
-        if (instructorNameA && !instructorNameB) return -1;
-        
-        const instructorCompare = instructorNameA.localeCompare(instructorNameB, 'he');
-        if (instructorCompare !== 0) return instructorCompare;
+        const instructorCompare = compareInstructorNames(instructorNameA, instructorNameB);
+        if (instructorCompare !== null && instructorCompare !== 0) {
+          return instructorCompare;
+        }
         
         // Secondary sort by student name
-        const nameA = String(a?.name || '').toLowerCase();
-        const nameB = String(b?.name || '').toLowerCase();
-        return nameA.localeCompare(nameB, 'he');
+        return compareStudentNames(a, b);
       };
     
     case STUDENT_SORT_OPTIONS.DAY:
@@ -149,9 +164,7 @@ export function getStudentComparator(sortBy, instructorMap = new Map()) {
         }
         
         // Secondary sort by student name
-        const nameA = String(a?.name || '').toLowerCase();
-        const nameB = String(b?.name || '').toLowerCase();
-        return nameA.localeCompare(nameB, 'he');
+        return compareStudentNames(a, b);
       };
     
     case STUDENT_SORT_OPTIONS.SCHEDULE:

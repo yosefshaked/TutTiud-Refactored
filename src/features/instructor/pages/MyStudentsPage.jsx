@@ -143,7 +143,8 @@ export default function MyStudentsPage() {
     })
     
     // Apply default sorting by schedule (day → hour → name)
-    return sortStudentsBySchedule(filtered)
+    // Note: instructor comparison is not needed here as all students belong to the same instructor
+    return sortStudentsBySchedule(filtered, new Map())
   }, [students, searchQuery, dayFilter])
 
   const handleResetFilters = () => {
