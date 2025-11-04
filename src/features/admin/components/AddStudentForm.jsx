@@ -16,21 +16,10 @@ import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
 import StudentTagsField from './StudentTagsField.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
-
-const INITIAL_STATE = {
-  name: '',
-  contactName: '',
-  contactPhone: '',
-  assignedInstructorId: '',
-  defaultService: '',
-  defaultDayOfWeek: null,
-  defaultSessionTime: null,
-  notes: '',
-  tagId: '',
-};
+import { createStudentFormState } from '@/features/students/utils/form-state.js';
 
 export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
-  const [values, setValues] = useState(INITIAL_STATE);
+  const [values, setValues] = useState(() => createStudentFormState());
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -41,7 +30,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
 
   useEffect(() => {
     if (!isSubmitting && !error) {
-      setValues(INITIAL_STATE);
+      setValues(createStudentFormState());
       setTouched({});
     }
   }, [isSubmitting, error]);

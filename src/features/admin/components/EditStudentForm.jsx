@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import {
@@ -16,21 +16,10 @@ import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
 import StudentTagsField from './StudentTagsField.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
+import { createStudentFormState } from '@/features/students/utils/form-state.js';
 
 export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
-  const initial = {
-    name: student?.name || '',
-    contactName: student?.contact_name || '',
-    contactPhone: student?.contact_phone || '',
-    assignedInstructorId: student?.assigned_instructor_id || '',
-    defaultService: student?.default_service || '',
-    defaultDayOfWeek: student?.default_day_of_week || null,
-    defaultSessionTime: student?.default_session_time || null,
-    notes: student?.notes || '',
-    tagId: Array.isArray(student?.tags) && student.tags.length > 0 ? student.tags[0] : '',
-  };
-
-  const [values, setValues] = useState(initial);
+  const [values, setValues] = useState(() => createStudentFormState(student));
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -38,12 +27,21 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
   const [loadingInstructors, setLoadingInstructors] = useState(true);
   const { session } = useAuth();
   const { activeOrgId } = useOrg();
+  
+  // Track the ID of the student currently being edited
+  const currentStudentIdRef = useRef(student?.id);
 
   useEffect(() => {
-    setValues(initial);
-    setTouched({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [student?.id]);
+    const incomingStudentId = student?.id;
+    
+    // Only reset the form if we're switching to a different student
+    // If it's the same student (background refresh), preserve user's unsaved changes
+    if (incomingStudentId !== currentStudentIdRef.current) {
+      currentStudentIdRef.current = incomingStudentId;
+      setValues(createStudentFormState(student));
+      setTouched({});
+    }
+  }, [student]);
 
   useEffect(() => {
     async function loadServices() {
