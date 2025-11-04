@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
-import { includesDayQuery } from "@/features/students/utils/schedule.js"
+import { includesDayQuery, describeSchedule } from "@/features/students/utils/schedule.js"
+import { sortStudentsBySchedule } from "@/features/students/utils/sorting.js"
 import DayOfWeekSelect from "@/components/ui/DayOfWeekSelect.jsx"
 
 const REQUEST_STATUS = Object.freeze({
@@ -104,7 +105,7 @@ export default function MyStudentsPage() {
 
   const filteredStudents = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
-    return students.filter((student) => {
+    const filtered = students.filter((student) => {
       try {
         if (dayFilter && Number(student?.default_day_of_week) !== Number(dayFilter)) {
           return false
@@ -140,6 +141,9 @@ export default function MyStudentsPage() {
         return false
       }
     })
+    
+    // Apply default sorting by schedule (day → hour → name)
+    return sortStudentsBySchedule(filtered)
   }, [students, searchQuery, dayFilter])
 
   const handleResetFilters = () => {
@@ -253,6 +257,7 @@ export default function MyStudentsPage() {
             const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ')
             const legacyContactInfo = student?.contact_info?.trim?.()
             const finalContactDisplay = contactDisplay || legacyContactInfo || "לא סופק מידע ליצירת קשר"
+            const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time)
 
             return (
               <Card key={student.id || student.name}>
@@ -295,6 +300,10 @@ export default function MyStudentsPage() {
                 </CardHeader>
                 <CardContent>
                   <dl className="space-y-sm text-sm text-neutral-600">
+                    <div>
+                      <dt className="font-medium text-neutral-700">יום ושעת המפגש</dt>
+                      <dd>{schedule || '—'}</dd>
+                    </div>
                     <div>
                       <dt className="font-medium text-neutral-700">פרטי קשר</dt>
                       <dd>
