@@ -122,8 +122,16 @@ export default function TagsManager() {
       if (editingTag) {
         // Update existing tag
         const updatedTags = tags.map((t) => (t.id === editingTag.id ? { ...t, name: trimmedName } : t));
-        const body = { org_id: activeOrgId, key: 'student_tags', settings_value: updatedTags };
-        await authenticatedFetch('settings', { method: 'POST', body, session });
+        await authenticatedFetch('settings', { 
+          method: 'POST', 
+          body: { 
+            org_id: activeOrgId,
+            settings: {
+              student_tags: updatedTags
+            }
+          }, 
+          session 
+        });
         setTags(updatedTags);
       } else {
         // Create new tag
@@ -175,8 +183,16 @@ export default function TagsManager() {
 
       // Then remove tag from catalog
       const updatedTags = tags.filter((t) => t.id !== tagToDelete.id);
-      const body = { org_id: activeOrgId, key: 'student_tags', settings_value: updatedTags };
-      await authenticatedFetch('settings', { method: 'POST', body, session });
+      await authenticatedFetch('settings', { 
+        method: 'POST', 
+        body: { 
+          org_id: activeOrgId,
+          settings: {
+            student_tags: updatedTags
+          }
+        }, 
+        session 
+      });
 
       setTags(updatedTags);
       closeDeleteDialog();
