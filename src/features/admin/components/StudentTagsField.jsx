@@ -19,14 +19,14 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
   }, [loadTags]);
 
   useEffect(() => {
-    if (!value) {
+    if (loadingTags || !value) {
       return;
     }
     const exists = tagOptions.some((tag) => tag.id === value);
     if (!exists) {
       onChange('');
     }
-  }, [value, tagOptions, onChange]);
+  }, [value, tagOptions, onChange, loadingTags]);
 
   const handleSelectChange = useCallback((nextValue) => {
     onChange(nextValue === NONE_VALUE ? '' : nextValue);
