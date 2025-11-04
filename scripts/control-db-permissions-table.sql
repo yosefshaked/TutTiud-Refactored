@@ -148,6 +148,17 @@ INSERT INTO public.permission_registry (
     '50'::jsonb,
     'features',
     false
+  ),
+  -- Invitation expiry seconds configuration (global, control-level)
+  (
+    'invitation_expiry_seconds',
+    'Invitation Expiry Seconds',
+    'שניות תוקף הזמנה',
+    'Number of seconds until invitation links expire (global). Overrides Supabase auth config if set.',
+    'מספר שניות עד פקיעת קישורי הזמנה (גלובלי). דורס את הגדרת Supabase אם מוגדר.',
+    'null'::jsonb,
+    'features',
+    false
   )
 ON CONFLICT (permission_key) DO UPDATE SET
   display_name_en = EXCLUDED.display_name_en,

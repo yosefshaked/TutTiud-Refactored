@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { createInvitation, listPendingInvitations, revokeInvitation as revokeInvitationRequest } from '@/api/invitations.js';
+import { checkAuthByEmail } from '@/api/check-auth.js';
 
 function formatDate(isoString) {
   if (!isoString) return '';
@@ -43,6 +44,8 @@ export default function OrgMembersCard() {
   const [invitesError, setInvitesError] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
   const [reinvitingEmail, setReinvitingEmail] = useState(null);
+  const [authStates, setAuthStates] = useState({});
+  const [loadingAuthFor, setLoadingAuthFor] = useState(new Set());
   const activeOrgId = activeOrg?.id || null;
   const role = activeOrg?.membership?.role || '';
   const canManageOrgMembers = useMemo(() => {
@@ -173,6 +176,40 @@ export default function OrgMembersCard() {
       setReinvitingEmail(null);
     }
   };
+
+  const loadAuthStateForEmail = useCallback(async (email) => {
+    if (!email || !session || !canManageOrgMembers) return;
+    if (authStates[email] || loadingAuthFor.has(email)) return;
+
+    setLoadingAuthFor((prev) => new Set(prev).add(email));
+    try {
+      const result = await checkAuthByEmail(email, { session });
+      setAuthStates((prev) => ({
+        ...prev,
+        [email]: result.auth,
+      }));
+    } catch (error) {
+      console.error('Failed to load auth state for', email, error);
+      // Silently fail - auth badges are optional enhancement
+    } finally {
+      setLoadingAuthFor((prev) => {
+        const next = new Set(prev);
+        next.delete(email);
+        return next;
+      });
+    }
+  }, [session, canManageOrgMembers, authStates, loadingAuthFor]);
+
+  useEffect(() => {
+    if (!canManageOrgMembers || !session || !pendingInvites.length) return;
+    const controller = new AbortController();
+    pendingInvites.forEach((invite) => {
+      if (invite.email) {
+        loadAuthStateForEmail(invite.email);
+      }
+    });
+    return () => controller.abort();
+  }, [pendingInvites, canManageOrgMembers, session, loadAuthStateForEmail]);
 
   const handleRemoveMember = async (membershipId) => {
     try {
@@ -355,6 +392,32 @@ export default function OrgMembersCard() {
                               {invite.status === 'pending' ? 'ממתין' : invite.status}
                             </Badge>
                           )}
+                          {(() => {
+                            const auth = authStates[invite.email];
+                            if (!auth) return null;
+                            if (auth.exists && auth.emailConfirmed) {
+                              return (
+                                <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50">
+                                  אומת
+                                </Badge>
+                              );
+                            }
+                            if (auth.exists && !auth.emailConfirmed) {
+                              return (
+                                <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50">
+                                  ממתין לאימות
+                                </Badge>
+                              );
+                            }
+                            if (!auth.exists) {
+                              return (
+                                <Badge variant="outline" className="text-slate-600 border-slate-200 bg-slate-50">
+                                  לא רשום
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         {expired ? (
                           <p className="text-xs text-amber-700">ההזמנה פגה. שלח הזמנה חדשה או בטל את ההזמנה הישנה.</p>

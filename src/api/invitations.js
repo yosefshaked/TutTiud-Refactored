@@ -41,6 +41,14 @@ function normalizeInvitationRecord(record) {
     return null;
   }
   const email = typeof record.email === 'string' ? record.email.trim().toLowerCase() : '';
+  const rawAuth = record.auth || record.userAuth || null;
+  const auth = rawAuth && typeof rawAuth === 'object'
+    ? {
+        exists: !!(rawAuth.exists ?? rawAuth.user_exists),
+        emailConfirmed: !!(rawAuth.emailConfirmed ?? rawAuth.email_confirmed),
+        lastSignInAt: rawAuth.lastSignInAt || rawAuth.last_sign_in_at || null,
+      }
+    : null;
   return {
     id: record.id || null,
     orgId: record.orgId || record.org_id || null,
@@ -55,6 +63,7 @@ function normalizeInvitationRecord(record) {
     invitedBy: record.invitedBy || record.invited_by || null,
     createdAt: record.createdAt || record.created_at || null,
     expiresAt: record.expiresAt || record.expires_at || null,
+    auth,
   };
 }
 

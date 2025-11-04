@@ -391,10 +391,17 @@ async function handleCreateInvitation(context, req, supabase) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const orgId = normalizeUuid(body.orgId ?? body.org_id ?? body.organizationId);
   const email = normalizeEmail(body.email);
-  const expiration = normalizeExpirationInput(body.expiresAt ?? body.expires_at);
-  if (!expiration.valid) {
-    respond(context, 400, { message: 'invalid expiration' });
-    return;
+  
+  // Client can optionally provide explicit expiration, or we calculate it smartly
+  let expiresAt = null;
+  const clientExpiration = body.expiresAt ?? body.expires_at;
+  if (clientExpiration !== undefined && clientExpiration !== null && clientExpiration !== '') {
+    const expiration = normalizeExpirationInput(clientExpiration);
+    if (!expiration.valid) {
+      respond(context, 400, { message: 'invalid expiration' });
+      return;
+    }
+    expiresAt = expiration.value;
   }
 
   // If client didn't provide a redirect, default to the site's complete-registration route
@@ -421,6 +428,23 @@ async function handleCreateInvitation(context, req, supabase) {
 
   const role = await requireAdminForOrg(context, supabase, orgId, authUser.id);
   if (!role) {
+
+  // Calculate smart expiration if client didn't provide one
+  if (expiresAt === null) {
+    const expiryResult = await supabase.rpc('calculate_invitation_expiry', { org_id: orgId });
+    if (expiryResult.error) {
+      context.log?.warn?.('Failed to calculate smart expiration, using 24h default', {
+        orgId,
+        message: expiryResult.error.message,
+      });
+      // Fallback: 24 hours from now
+      const fallbackDate = new Date();
+      fallbackDate.setHours(fallbackDate.getHours() + 24);
+      expiresAt = fallbackDate.toISOString();
+    } else {
+      expiresAt = expiryResult.data;
+    }
+  }
     return;
   }
 
@@ -484,7 +508,7 @@ async function handleCreateInvitation(context, req, supabase) {
     email,
     invited_by: authUser.id,
     status: STATUS_PENDING,
-    expires_at: expiration.value,
+  expires_at: expiresAt,
   };
 
   const insertResult = await supabase
@@ -670,6 +694,33 @@ async function handleGetByToken(context, supabase, token) {
     return;
   }
 
+  // Enrich with auth state (exists + email_confirmed) using RPC
+  let authState = null;
+  try {
+    const { data: stateData, error: stateError } = await supabase.rpc('user_verification_state', {
+      user_email: String(invitation.email || '').toLowerCase(),
+    });
+    if (!stateError && stateData) {
+      // Function returns a single row/table or JSON depending on implementation. Normalize both.
+      if (Array.isArray(stateData) && stateData.length) {
+        const row = stateData[0];
+        authState = {
+          exists: !!(row.exists ?? row.user_exists),
+          emailConfirmed: !!row.email_confirmed,
+          lastSignInAt: row.last_sign_in_at ?? null,
+        };
+      } else if (typeof stateData === 'object') {
+        authState = {
+          exists: !!(stateData.exists ?? stateData.user_exists),
+          emailConfirmed: !!stateData.email_confirmed,
+          lastSignInAt: stateData.last_sign_in_at ?? null,
+        };
+      }
+    }
+  } catch (e) {
+    context.log?.warn?.('invitations could not load auth state via rpc', { email: invitation.email, message: e?.message });
+  }
+
   respond(context, 200, {
     invitation: {
       id: invitation.id,
@@ -679,6 +730,7 @@ async function handleGetByToken(context, supabase, token) {
       status: resolvedStatus,
       createdAt: invitation.created_at ?? null,
       expiresAt: invitation.expires_at ?? null,
+      auth: authState,
     },
   });
 }
@@ -819,6 +871,74 @@ async function revokeInvitation(context, req, supabase, invitationId) {
   respond(context, 200, { message: 'invitation revoked' });
 }
 
+async function handleCheckAuth(context, req, supabase) {
+  const authUser = await getAuthenticatedUser(context, req, supabase);
+  if (!authUser) {
+    return;
+  }
+
+  const email = normalizeEmail(req.query?.email ?? req.body?.email);
+  if (!email) {
+    respond(context, 400, { message: 'missing email' });
+    return;
+  }
+
+  // For now, require admin role in at least one org to prevent arbitrary email lookups
+  // Could be tightened further to require admin role in a specific org
+  const membershipResult = await supabase
+    .from('org_memberships')
+    .select('role')
+    .eq('user_id', authUser.id)
+    .in('role', ['admin', 'owner'])
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipResult.error || !membershipResult.data) {
+    respond(context, 403, { message: 'admin role required' });
+    return;
+  }
+
+  let authState = null;
+  try {
+    const { data: stateData, error: stateError } = await supabase.rpc('user_verification_state', {
+      user_email: email,
+    });
+    if (stateError) {
+      throw stateError;
+    }
+    if (stateData) {
+      if (Array.isArray(stateData) && stateData.length) {
+        const row = stateData[0];
+        authState = {
+          exists: !!(row.exists ?? row.user_exists),
+          emailConfirmed: !!row.email_confirmed,
+          lastSignInAt: row.last_sign_in_at ?? null,
+        };
+      } else if (typeof stateData === 'object') {
+        authState = {
+          exists: !!(stateData.exists ?? stateData.user_exists),
+          emailConfirmed: !!stateData.email_confirmed,
+          lastSignInAt: stateData.last_sign_in_at ?? null,
+        };
+      }
+    }
+  } catch (error) {
+    context.log?.error?.('invitations failed to check auth state', {
+      email,
+      message: error.message,
+    });
+    respond(context, 500, { message: 'failed to check auth state' });
+    return;
+  }
+
+  if (!authState) {
+    respond(context, 500, { message: 'failed to resolve auth state' });
+    return;
+  }
+
+  respond(context, 200, { email, auth: authState });
+}
+
 export default async function (context, req) {
   const { client: supabase, error } = getAdminClient(context);
   if (!supabase || error) {
@@ -842,6 +962,11 @@ export default async function (context, req) {
 
   if (method === 'GET' && segments.length === 2 && segments[0] === 'token') {
     await handleGetByToken(context, supabase, segments[1]);
+    return;
+  }
+
+  if (method === 'GET' && segments.length === 1 && segments[0] === 'check-auth') {
+    await handleCheckAuth(context, req, supabase);
     return;
   }
 

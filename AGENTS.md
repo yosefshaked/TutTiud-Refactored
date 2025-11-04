@@ -41,6 +41,19 @@
   - When creating new invitation for same email, automatically marks expired pending invites as expired before creating new one.
   - Returns 409 "invitation already pending" only if existing invitation is still valid (not expired).
   - Reinvitation effectively creates new Supabase OTP token and sends new email with updated expiry.
+  - `GET /api/invitations/token/:token` now enriches the payload with `auth` state when available:
+    `{ auth: { exists, emailConfirmed, lastSignInAt } }`. This is resolved via the control DB RPC below.
+
+### Control DB RPC: user_verification_state (2025-11)
+- New script: `scripts/control-db-auth-utils.sql` creates a SECURITY DEFINER SQL function:
+  - `public.user_verification_state(user_email text)` → returns one row `{ user_exists, email_confirmed, last_sign_in_at }` from `auth.users`.
+  - Used by `/api/invitations` to disambiguate "invalid or expired" links (already-used vs truly expired) without exposing service role to the client.
+- Deployment: run this script once against the control database in Supabase SQL editor.
+- Admin API endpoint: `GET /api/invitations/check-auth?email=...` allows admins to query user verification state by email.
+  - Requires admin/owner role in at least one organization.
+  - Returns `{ email, auth: { exists, emailConfirmed, lastSignInAt } }`.
+  - Frontend client helper: `src/api/check-auth.js` exports `checkAuthByEmail(email, { session, signal })`.
+  - Useful for admin UIs to display user status (e.g., "pending verification", "verified", "not registered") before reinviting or troubleshooting invitation issues.
 
 ### Request validation and payload limits (2025-10)
 - A shared server-side validation helper lives at `api/_shared/validation.js`.
@@ -146,6 +159,15 @@
 - The Employees → Vacations & Holidays tab is read-only; use the Time Entry flow for any leave creation or adjustments and rely on the collapsible history rows for review.
 - Reports CSV export (`Reports.jsx`) now uses `buildCsvRows` with the column order defined in `CSV_HEADERS`; update that helper when adding or reordering export columns.
 - `/api/invitations` is the control-plane API for organization invites. It uses `APP_CONTROL_DB_URL` and `APP_CONTROL_DB_SERVICE_ROLE_KEY` for the Supabase admin client, enforces admin/owner membership before writes, auto-expires pending rows once `expires_at` passes, and updates statuses to `accepted`, `declined`, `revoked`, `expired`, or `failed`.
+- `/api/invitations` is the control-plane API for organization invites. It uses `APP_CONTROL_DB_URL` and `APP_CONTROL_DB_SERVICE_ROLE_KEY` for the Supabase admin client, enforces admin/owner membership before writes, auto-expires pending rows once `expires_at` passes, and updates statuses to `accepted`, `declined`, `revoked`, `expired`, or `failed`.
+  - Invitation expiry is calculated automatically using smart precedence (global):
+    1. **Registry override (global)**: `permission_registry.invitation_expiry_seconds` (integer, seconds) takes priority if set.
+    2. **Supabase auth config**: Reads `MAILER_OTP_EXP` from `auth.config` via `get_auth_otp_expiry_seconds()` RPC (seconds).
+    3. **Hardcoded fallback**: 24 hours (86400 seconds) if both above are unavailable or fail.
+  - Backend uses `calculate_invitation_expiry(org_id)` RPC (control DB) to compute `expires_at` timestamp when client doesn't explicitly provide expiration.
+  - Control DB schema: Run `scripts/control-db-invitation-expiry.sql` to deploy the RPC functions (`get_auth_otp_expiry_seconds` and `calculate_invitation_expiry`).
+  - Permission registry: `invitation_expiry_seconds` (integer, default null) in `permission_registry` table allows global customization without modifying Supabase auth settings.
+  - Clients can still explicitly provide `expiresAt`/`expires_at` in the POST request body to override automatic calculation.
 - `/api/settings` surfaces HTTP 424 (`settings_schema_incomplete` / `settings_schema_unverified`) when `tuttiud.setup_assistant_diagnostics()` reports missing tenant tables or policies, and the response includes the failing diagnostic rows so admins rerun the setup script instead of retrying blindly.
 - Invitation completion emails land on `/#/complete-registration` with `token_hash` (Supabase invite) and `invitation_token` (control-plane token). The page must display the invited email, wait for the user to click the manual confirmation button, then call `supabase.auth.verifyOtp({ type: 'invite', token_hash })` before redirecting to `/#/accept-invite` while forwarding the original `invitation_token`.
 - The `/components/pages/AcceptInvitePage.jsx` route requires an authenticated session, reloads invitation status via `/api/invitations/token/:token`, blocks mismatched accounts until they sign out, and surfaces state-specific UI (pending actions, accepted success CTA, or invalid-link notice) while wiring accept/decline buttons to the secure `/api/invitations/:id/(accept|decline)` endpoints.
