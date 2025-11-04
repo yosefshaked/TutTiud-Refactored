@@ -119,8 +119,7 @@ export function sortStudentsBySchedule(students, instructorMap = new Map()) {
 export const STUDENT_SORT_OPTIONS = Object.freeze({
   SCHEDULE: 'schedule', // day → hour → instructor → name
   NAME: 'name',
-  INSTRUCTOR: 'instructor',
-  DAY: 'day',
+  INSTRUCTOR: 'instructor', // day → instructor → hour → name
 });
 
 /**
@@ -136,6 +135,17 @@ export function getStudentComparator(sortBy, instructorMap = new Map()) {
     
     case STUDENT_SORT_OPTIONS.INSTRUCTOR:
       return (a, b) => {
+        // 1. Compare by day of week
+        const dayA = normalizeDay(a?.default_day_of_week);
+        const dayB = normalizeDay(b?.default_day_of_week);
+        
+        if (dayA === null && dayB !== null) return 1;
+        if (dayA !== null && dayB === null) return -1;
+        if (dayA !== null && dayB !== null && dayA !== dayB) {
+          return dayA - dayB;
+        }
+        
+        // 2. Compare by instructor name
         const instructorA = instructorMap.get(a?.assigned_instructor_id);
         const instructorB = instructorMap.get(b?.assigned_instructor_id);
         
@@ -147,23 +157,15 @@ export function getStudentComparator(sortBy, instructorMap = new Map()) {
           return instructorCompare;
         }
         
-        // Secondary sort by student name
-        return compareStudentNames(a, b);
-      };
-    
-    case STUDENT_SORT_OPTIONS.DAY:
-      return (a, b) => {
-        const dayA = normalizeDay(a?.default_day_of_week);
-        const dayB = normalizeDay(b?.default_day_of_week);
+        // 3. Compare by hour (within same day and instructor)
+        const timeA = parseTimeToMinutes(a?.default_session_time);
+        const timeB = parseTimeToMinutes(b?.default_session_time);
         
-        // Nulls go to the end
-        if (dayA === null && dayB !== null) return 1;
-        if (dayA !== null && dayB === null) return -1;
-        if (dayA !== null && dayB !== null && dayA !== dayB) {
-          return dayA - dayB;
+        if (timeA !== timeB) {
+          return timeA - timeB;
         }
         
-        // Secondary sort by student name
+        // 4. Finally, sort by student name
         return compareStudentNames(a, b);
       };
     
