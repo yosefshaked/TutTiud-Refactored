@@ -125,6 +125,13 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
       return;
     }
 
+    // Debug logging
+    console.log('[EditStudentForm] Submitting with defaultSessionTime:', {
+      value: values.defaultSessionTime,
+      type: typeof values.defaultSessionTime,
+      length: values.defaultSessionTime?.length,
+    });
+
     onSubmit({
       id: student?.id,
       name: trimmedName,
