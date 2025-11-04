@@ -1,13 +1,9 @@
 export const SETUP_SQL_SCRIPT = `-- -- -- =================================================================
--- Tuttiud Platform Setup Script V2.4 (Settings metadata column)
--- =================================================================
 
--- Part 1: Extensions and Schema Creation (No Changes)
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "pgjwt" WITH SCHEMA extensions;
 CREATE SCHEMA IF NOT EXISTS tuttiud;
 
--- Part 2: Table Creation within 'tuttiud' schema (No Changes)
 CREATE TABLE IF NOT EXISTS tuttiud."Instructors" (
   "id" uuid NOT NULL PRIMARY KEY,
   "name" text NOT NULL,
@@ -31,10 +27,72 @@ CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "default_day_of_week" integer,
   "default_session_time" time with time zone,
   "default_service" text,
-  "tags" text[],
+  "tags" uuid[],
   "notes" text,
   "metadata" jsonb
 );
+
+-- Ensure all new columns exist (idempotent)
+ALTER TABLE tuttiud."Students"
+  ADD COLUMN IF NOT EXISTS "contact_name" text,
+  ADD COLUMN IF NOT EXISTS "contact_phone" text,
+  ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
+  ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
+  ADD COLUMN IF NOT EXISTS "default_service" text;
+
+ALTER TABLE tuttiud."Students"
+  DROP CONSTRAINT IF EXISTS "Students_assigned_instructor_id_fkey";
+
+-- MIGRATION: If tags column exists and is text[], convert to uuid[]
+DO $$
+DECLARE
+  tags_type text;
+BEGIN
+  SELECT data_type INTO tags_type
+  FROM information_schema.columns
+  WHERE table_schema = 'tuttiud'
+    AND table_name = 'Students'
+    AND column_name = 'tags';
+
+  IF tags_type = 'ARRAY' THEN
+    -- Check the underlying type
+    IF EXISTS (
+      SELECT 1
+      FROM pg_type
+      WHERE typname = 'text[]'
+        AND oid = (
+          SELECT atttypid
+          FROM pg_attribute
+          WHERE attrelid = 'tuttiud."Students"'::regclass
+            AND attname = 'tags'
+        )
+    ) THEN
+      -- Migrate text[] to uuid[] safely
+      ALTER TABLE tuttiud."Students"
+        ADD COLUMN IF NOT EXISTS "__tags_uuid" uuid[];
+
+      UPDATE tuttiud."Students"
+      SET "__tags_uuid" = (
+        CASE
+          WHEN tags IS NULL THEN NULL
+          ELSE ARRAY(
+            SELECT NULLIF(trim(t), '')::uuid
+            FROM unnest(tags) AS t
+            WHERE trim(t) ~* '^[0-9a-fA-F-]{36}$'
+          )
+        END
+      );
+
+      ALTER TABLE tuttiud."Students" DROP COLUMN "tags";
+      ALTER TABLE tuttiud."Students" RENAME COLUMN "__tags_uuid" TO "tags";
+    END IF;
+  END IF;
+END
+$$;
+
+-- If tags column does not exist, add it as uuid[]
+ALTER TABLE tuttiud."Students"
+  ADD COLUMN IF NOT EXISTS "tags" uuid[];
 ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "contact_name" text,
   ADD COLUMN IF NOT EXISTS "contact_phone" text,
