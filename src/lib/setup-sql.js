@@ -56,7 +56,8 @@ BEGIN
 
   IF tags_oid IS NOT NULL THEN
     SELECT typname INTO tags_type FROM pg_type WHERE oid = tags_oid;
-    IF tags_type = 'text[]' THEN
+    -- In PostgreSQL, array types have underscore prefix: text[] = '_text', uuid[] = '_uuid'
+    IF tags_type = '_text' THEN
       -- Migrate text[] to uuid[] safely
       ALTER TABLE tuttiud."Students"
         ADD COLUMN IF NOT EXISTS "__tags_uuid" uuid[];
