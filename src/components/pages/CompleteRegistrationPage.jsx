@@ -115,17 +115,23 @@ export default function CompleteRegistrationPage() {
     } catch (error) {
       console.error('Failed to verify invitation token on demand', error);
       let message = 'אימות הקישור נכשל. ודא שהשתמשת בקישור העדכני ביותר או נסה שוב מאוחר יותר.';
-      
+
       // Distinguish between different error types
-      if (error?.message?.toLowerCase().includes('expired')) {
+      const rawMsg = String(error?.message || '').toLowerCase();
+      const status = Number(error?.status || error?.code || 0);
+
+      if (rawMsg.includes('expired')) {
+        // Token truly expired
         message = 'ההזמנה פגה. נא לבקש מהמנהל לשלוח הזמנה חדשה.';
-      } else if (error?.message?.toLowerCase().includes('used') || error?.message?.toLowerCase().includes('already')) {
+      } else if (rawMsg.includes('invalid') || rawMsg.includes('used') || rawMsg.includes('already') || status === 403) {
+        // Supabase often returns 403 "Email link is invalid" after the invite was already verified (single-use)
+        // Treat this as "already used" and guide user to reset password
         message = 'הקישור כבר שומש. אם שכחת את הסיסמה, ';
       } else if (error?.message === 'Token has been expired or revoked') {
         // Legacy generic message - try to be helpful
         message = 'קישור ההזמנה כבר לא פעיל. אם כבר יצרת חשבון, נסה להתחבר. אם ההזמנה פגה, בקש מהמנהל לשלוח קישור חדש.';
       }
-      
+
       setVerifyError(message);
     } finally {
       setIsVerifying(false);
