@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Building2, Users } from 'lucide-react';
+import { AlertCircle, Building2, LogOut, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { mapSupabaseError } from '@/org/errors.js';
 import { buildInvitationSearch } from '@/lib/invite-tokens.js';
@@ -184,6 +185,7 @@ function CreateOrgDialog({ open, onClose, onCreate }) {
 
 export default function OrgSelection() {
   const { organizations, incomingInvites, status, selectOrg, createOrganization } = useOrg();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -225,12 +227,29 @@ export default function OrgSelection() {
     navigate(returnTo, { replace: true });
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      toast.success('התנתקת בהצלחה');
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Failed to sign out', error);
+      toast.error('התנתקות נכשלה. נסה שוב.');
+    }
+  };
+
   if (status === 'loading' || status === 'idle') {
     return <LoadingState />;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center px-4 py-10" dir="rtl">
+      <div className="absolute top-4 left-4">
+        <Button variant="ghost" onClick={handleLogout} className="gap-2 text-slate-600 hover:text-slate-900">
+          <LogOut className="w-4 h-4" />
+          התנתק
+        </Button>
+      </div>
       <div className="flex flex-col items-center gap-6 w-full">
         <InviteList invites={incomingInvites} onAccept={handleAcceptInvite} />
         <OrganizationList organizations={organizations} onSelect={handleSelect} />

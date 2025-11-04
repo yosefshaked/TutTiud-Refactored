@@ -19,6 +19,29 @@
 - Password reset flows must call `supabase.auth.resetPasswordForEmail` with a redirect that lands on `/#/update-password`, and the update form must rely on `AuthContext.updatePassword` so Supabase finalizes the session before returning users to the dashboard.
 - Login form submissions must set inline error state whenever Supabase rejects credentials so the page renders the design system's red alert with the failure message.
 
+### Invitation and Password Reset Flow Improvements (2025-11)
+- **CompleteRegistrationPage** now distinguishes between different OTP error types:
+  - Expired tokens: "ההזמנה פגה. נא לבקש מהמנהל לשלוח הזמנה חדשה."
+  - Already-used tokens: Shows message with "Forgot Password?" link to `/forgot-password`.
+  - Generic errors: Helpful fallback messages guiding users to appropriate recovery path.
+- **OrgMembersCard** (Settings → Team Members):
+  - Displays visual indicators for expired pending invitations (amber badge with clock icon).
+  - Shows expired invites count in card header badge when admin/owner has expired invitations.
+  - Each expired invite displays amber-highlighted row with explanation and "שלח הזמנה מחדש" button.
+  - Reinvite handler calls `createInvitation` with same email; backend auto-handles expired invites by marking old as expired and creating new token + sending new email.
+  - Helper function `isInvitationExpired()` checks if `expires_at` timestamp has passed.
+- **UpdatePassword** page improved error handling:
+  - Distinguishes between expired recovery tokens vs already-used tokens.
+  - Shows appropriate messages: expired → request new reset; used → try logging in or request new reset.
+- **OrgSelection** page now includes logout button:
+  - Positioned in top-left corner (RTL: top-right visually).
+  - Uses `useAuth().signOut()` to log out and redirect to `/login`.
+  - Provides escape path for users who want to sign out during org selection.
+- **Backend invitation flow** (`/api/invitations`):
+  - When creating new invitation for same email, automatically marks expired pending invites as expired before creating new one.
+  - Returns 409 "invitation already pending" only if existing invitation is still valid (not expired).
+  - Reinvitation effectively creates new Supabase OTP token and sends new email with updated expiry.
+
 ### Request validation and payload limits (2025-10)
 - A shared server-side validation helper lives at `api/_shared/validation.js`.
   - `parseJsonBodyWithLimit(req, limitBytes, { mode, context, endpoint })` safely parses JSON and logs when payloads exceed a soft limit. Default rollout uses `mode: 'observe'` to avoid breaking clients.

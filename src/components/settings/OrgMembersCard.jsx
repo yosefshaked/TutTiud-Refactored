@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, MailPlus, Trash2, UserMinus } from 'lucide-react';
+import { AlertTriangle, Clock, MailPlus, RefreshCw, Trash2, UserMinus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useAuth } from '@/auth/AuthContext.jsx';
@@ -23,6 +23,16 @@ function formatDate(isoString) {
   }
 }
 
+function isInvitationExpired(expiresAt) {
+  if (!expiresAt) return false;
+  try {
+    const expiryDate = new Date(expiresAt);
+    return expiryDate.getTime() <= Date.now();
+  } catch {
+    return false;
+  }
+}
+
 export default function OrgMembersCard() {
   const { activeOrg, members, removeMember, updateMemberRole } = useOrg();
   const { user, session } = useAuth();
@@ -32,6 +42,7 @@ export default function OrgMembersCard() {
   const [isInvitesLoading, setIsInvitesLoading] = useState(false);
   const [invitesError, setInvitesError] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
+  const [reinvitingEmail, setReinvitingEmail] = useState(null);
   const activeOrgId = activeOrg?.id || null;
   const role = activeOrg?.membership?.role || '';
   const canManageOrgMembers = useMemo(() => {
@@ -89,6 +100,10 @@ export default function OrgMembersCard() {
     };
   }, [refreshInvitations]);
 
+  const expiredInvitesCount = useMemo(() => {
+    return pendingInvites.filter((invite) => isInvitationExpired(invite.expiresAt || invite.expires_at)).length;
+  }, [pendingInvites]);
+
   const handleInvite = async (event) => {
     event.preventDefault();
     if (!canManageOrgMembers || !email.trim()) return;
@@ -133,6 +148,32 @@ export default function OrgMembersCard() {
     }
   };
 
+  const handleReinvite = async (email) => {
+    if (!email || !session) {
+      toast.error('לא ניתן לשלוח הזמנה ללא התחברות.');
+      return;
+    }
+    setReinvitingEmail(email);
+    try {
+      const result = await createInvitation(activeOrgId, email, { session });
+      if (result?.userExists) {
+        toast.success('הזמנה חדשה נוצרה בהצלחה. למשתמש זה כבר קיים חשבון.');
+      } else {
+        toast.success('הזמנה חדשה נשלחה בהצלחה.');
+      }
+      await refreshInvitations({ suppressToast: true });
+    } catch (error) {
+      console.error('Failed to resend invitation', error);
+      if (error?.message?.includes('already pending')) {
+        toast.error('ההזמנה עדיין תקפה. לא ניתן לשלוח הזמנה נוספת.');
+      } else {
+        toast.error(error?.message || 'שליחת ההזמנה החדשה נכשלה. נסה שוב.');
+      }
+    } finally {
+      setReinvitingEmail(null);
+    }
+  };
+
   const handleRemoveMember = async (membershipId) => {
     try {
       await removeMember(membershipId);
@@ -150,10 +191,20 @@ export default function OrgMembersCard() {
   return (
     <Card className="border-0 shadow-xl bg-white/90" dir="rtl">
       <CardHeader className="border-b border-slate-200">
-        <CardTitle className="text-xl font-semibold text-slate-900">חברי ארגון</CardTitle>
-        <p className="text-sm text-slate-600 mt-2">
-          כל המשתמשים בארגון חולקים את אותו חיבור Supabase. מנהלים יכולים להזמין ולנהל חברים נוספים.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <CardTitle className="text-xl font-semibold text-slate-900">חברי ארגון</CardTitle>
+            <p className="text-sm text-slate-600 mt-2">
+              כל המשתמשים בארגון חולקים את אותו חיבור Supabase. מנהלים יכולים להזמין ולנהל חברים נוספים.
+            </p>
+          </div>
+          {canManageOrgMembers && expiredInvitesCount > 0 ? (
+            <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-100 gap-1 whitespace-nowrap">
+              <Clock className="w-3 h-3" />
+              {expiredInvitesCount} הזמנות פגות
+            </Badge>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
         <section className="space-y-3">
@@ -281,32 +332,61 @@ export default function OrgMembersCard() {
                   <span>{invitesError}</span>
                 </div>
               ) : pendingInvites?.length ? (
-                pendingInvites.map((invite) => (
-                  <div
-                    key={invite.id}
-                    className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-slate-200 rounded-xl px-4 py-3"
-                  >
-                    <div className="text-right space-y-1">
-                      <p className="text-sm font-medium text-slate-900" dir="ltr">{invite.email}</p>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span>נשלח: {formatDate(invite.createdAt || invite.created_at)}</span>
-                        <Badge variant="outline" className="text-slate-600 border-slate-200 bg-slate-50">
-                          {invite.status === 'pending' ? 'ממתין' : invite.status}
-                        </Badge>
+                pendingInvites.map((invite) => {
+                  const expired = isInvitationExpired(invite.expiresAt || invite.expires_at);
+                  return (
+                    <div
+                      key={invite.id}
+                      className={`flex flex-col md:flex-row md:items-center md:justify-between gap-3 border rounded-xl px-4 py-3 ${
+                        expired ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+                      }`}
+                    >
+                      <div className="text-right space-y-1">
+                        <p className="text-sm font-medium text-slate-900" dir="ltr">{invite.email}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span>נשלח: {formatDate(invite.createdAt || invite.created_at)}</span>
+                          {expired ? (
+                            <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-100 gap-1">
+                              <Clock className="w-3 h-3" />
+                              פג תוקף
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-slate-600 border-slate-200 bg-slate-50">
+                              {invite.status === 'pending' ? 'ממתין' : invite.status}
+                            </Badge>
+                          )}
+                        </div>
+                        {expired ? (
+                          <p className="text-xs text-amber-700">ההזמנה פגה. שלח הזמנה חדשה או בטל את ההזמנה הישנה.</p>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {expired ? (
+                          <Button
+                            type="button"
+                            variant="default"
+                            className="gap-2"
+                            onClick={() => handleReinvite(invite.email)}
+                            disabled={reinvitingEmail === invite.email}
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            {reinvitingEmail === invite.email ? 'שולח...' : 'שלח הזמנה מחדש'}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-slate-600 hover:bg-slate-100 gap-2"
+                          onClick={() => handleRevoke(invite.id)}
+                          disabled={revokingId === invite.id}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          {revokingId === invite.id ? 'מבטל...' : 'בטל הזמנה'}
+                        </Button>
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="text-slate-600 hover:bg-slate-100 gap-2"
-                      onClick={() => handleRevoke(invite.id)}
-                      disabled={revokingId === invite.id}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      {revokingId === invite.id ? 'מבטל...' : 'בטל הזמנה'}
-                    </Button>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-xs text-slate-500">אין הזמנות ממתינות.</p>
               )}

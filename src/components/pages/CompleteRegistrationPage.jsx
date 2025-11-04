@@ -114,10 +114,18 @@ export default function CompleteRegistrationPage() {
       setPasswordError('');
     } catch (error) {
       console.error('Failed to verify invitation token on demand', error);
-      const message =
-        error?.message === 'Token has been expired or revoked'
-          ? 'קישור ההזמנה כבר לא פעיל. בקש מהמנהל לשלוח קישור חדש.'
-          : 'אימות הקישור נכשל. ודא שהשתמשת בקישור העדכני ביותר או נסה שוב מאוחר יותר.';
+      let message = 'אימות הקישור נכשל. ודא שהשתמשת בקישור העדכני ביותר או נסה שוב מאוחר יותר.';
+      
+      // Distinguish between different error types
+      if (error?.message?.toLowerCase().includes('expired')) {
+        message = 'ההזמנה פגה. נא לבקש מהמנהל לשלוח הזמנה חדשה.';
+      } else if (error?.message?.toLowerCase().includes('used') || error?.message?.toLowerCase().includes('already')) {
+        message = 'הקישור כבר שומש. אם שכחת את הסיסמה, ';
+      } else if (error?.message === 'Token has been expired or revoked') {
+        // Legacy generic message - try to be helpful
+        message = 'קישור ההזמנה כבר לא פעיל. אם כבר יצרת חשבון, נסה להתחבר. אם ההזמנה פגה, בקש מהמנהל לשלוח קישור חדש.';
+      }
+      
       setVerifyError(message);
     } finally {
       setIsVerifying(false);
@@ -300,8 +308,17 @@ export default function CompleteRegistrationPage() {
         </p>
 
         {verifyError ? (
-          <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl px-4 py-3" role="alert">
-            {verifyError}
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl px-4 py-3 space-y-2" role="alert">
+            <p>{verifyError}</p>
+            {verifyError.includes('שומש') ? (
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="text-blue-600 hover:text-blue-800 underline text-sm font-medium"
+              >
+                לחץ כאן לאיפוס סיסמה
+              </button>
+            ) : null}
           </div>
         ) : null}
 

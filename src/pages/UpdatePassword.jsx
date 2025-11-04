@@ -68,10 +68,16 @@ export default function UpdatePassword() {
           return;
         }
         console.error('Failed to verify password recovery token', error);
-        const message =
-          error?.message === 'Token has been expired or revoked'
-            ? 'הקישור לאיפוס אינו פעיל או שפג תוקפו. נסו לשלוח בקשה חדשה דרך עמוד איפוס הסיסמה.'
-            : 'אימות קישור האיפוס נכשל. נסו לרענן את הדף או לשלוח בקשה חדשה.';
+        let message = 'אימות קישור האיפוס נכשל. נסו לרענן את הדף או לשלוח בקשה חדשה.';
+        
+        if (error?.message?.toLowerCase().includes('expired')) {
+          message = 'הקישור לאיפוס פג תוקף. נסו לשלוח בקשה חדשה דרך עמוד איפוס הסיסמה.';
+        } else if (error?.message?.toLowerCase().includes('used') || error?.message?.toLowerCase().includes('already')) {
+          message = 'הקישור כבר שומש. אם סיימת לעדכן את הסיסמה, התחבר במסך הכניסה. אחרת, שלח בקשה חדשה לאיפוס.';
+        } else if (error?.message === 'Token has been expired or revoked') {
+          message = 'הקישור לאיפוס אינו פעיל או שפג תוקפו. נסו לשלוח בקשה חדשה דרך עמוד איפוס הסיסמה.';
+        }
+        
         setVerificationError(message);
         setVerificationStatus('error');
       });
