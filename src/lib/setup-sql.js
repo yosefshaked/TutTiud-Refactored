@@ -346,6 +346,9 @@ BEGIN
 END;
 $$;
 
+-- Ensure RPC permissions
+GRANT EXECUTE ON FUNCTION tuttiud.remove_tag_from_students(uuid) TO authenticated, service_role;
+
 
 -- Part 6: Generate the Application-Specific JWT (No Changes)
 SELECT extensions.sign(

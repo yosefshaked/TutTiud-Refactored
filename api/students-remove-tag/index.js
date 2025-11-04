@@ -1,80 +1,102 @@
-import { resolveTenantClient } from '../_shared/org-bff.js';
-import { sendError, sendSuccess } from '../_shared/http.js';
+import { resolveBearerAuthorization } from '../_shared/http.js';
+import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
+import {
+  ensureMembership,
+  isAdminRole,
+  readEnv,
+  respond,
+  resolveOrgId,
+  resolveTenantClient,
+} from '../_shared/org-bff.js';
+import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 
 export default async function (context, req) {
-  const { org_id, tag_id } = req.body || {};
-
-  if (!org_id || !tag_id) {
-    return sendError(context, 400, 'org_id and tag_id are required');
+  const authorization = resolveBearerAuthorization(req);
+  if (!authorization?.token) {
+    return respond(context, 401, { message: 'missing bearer' });
   }
 
+  const env = readEnv(context);
+  const adminConfig = readSupabaseAdminConfig(env);
+  if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
+    return respond(context, 500, { message: 'server_misconfigured' });
+  }
+  const supabase = createSupabaseAdminClient(adminConfig);
+
+  let authResult;
   try {
-    const tenantClient = await resolveTenantClient(req, org_id);
-
-    // Try to use the PostgreSQL helper function first
-    const { data, error: rpcError } = await tenantClient
-      .rpc('remove_tag_from_students', { tag_to_remove: tag_id });
-
-    if (rpcError) {
-      console.warn('RPC function not available, using fallback:', rpcError.message);
-      
-      // Fallback: manually update each student
-      const { data: students, error: fetchError } = await tenantClient
-        .from('Students')
-        .select('id, tags')
-        .contains('tags', [tag_id]);
-
-      if (fetchError) {
-        console.error('Failed to fetch students with tag:', fetchError);
-        return sendError(context, 500, 'Failed to fetch students with tag');
-      }
-
-      // If no students have this tag, that's fine - just return success
-      if (!students || students.length === 0) {
-        console.log('No students found with this tag, nothing to update');
-        return sendSuccess(context, { 
-          message: 'Tag removed (no students had this tag)', 
-          tag_id,
-          students_updated: 0 
-        });
-      }
-
-      // Update each student by removing the tag
-      let updateCount = 0;
-      const errors = [];
-      for (const student of students) {
-        const updatedTags = (student.tags || []).filter(id => id !== tag_id);
-        const { error: updateErr } = await tenantClient
-          .from('Students')
-          .update({ tags: updatedTags })
-          .eq('id', student.id);
-
-        if (updateErr) {
-          console.error(`Failed to update student ${student.id}:`, updateErr);
-          errors.push({ student_id: student.id, error: updateErr.message });
-        } else {
-          updateCount++;
-        }
-      }
-
-      if (errors.length > 0 && updateCount === 0) {
-        return sendError(context, 500, 'Failed to update any students');
-      }
-
-      return sendSuccess(context, { 
-        message: 'Tag removed from students (fallback method)', 
-        tag_id,
-        students_updated: updateCount,
-        ...(errors.length > 0 && { partial_errors: errors })
-      });
-    }
-
-    return sendSuccess(context, { 
-      message: 'Tag removed from all students', 
-      tag_id 
-    });
-  } catch (error) {
-    console.error('Error in students-remove-tag endpoint:', error);
-    return sendError(context, error.status || 500, error.message || 'Internal server error');
+    authResult = await supabase.auth.getUser(authorization.token);
+  } catch {
+    return respond(context, 401, { message: 'invalid or expired token' });
   }
-};
+  if (authResult.error || !authResult.data?.user?.id) {
+    return respond(context, 401, { message: 'invalid or expired token' });
+  }
+
+  if (String(req.method || 'POST').toUpperCase() !== 'POST') {
+    return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'POST' });
+  }
+
+  const body = parseJsonBodyWithLimit(req, 16 * 1024, { mode: 'observe', context, endpoint: 'students-remove-tag' });
+  const orgId = resolveOrgId(req, body);
+  const tagId = (body?.tag_id || body?.tagId || '').trim();
+
+  if (!orgId || !tagId) {
+    return respond(context, 400, { message: 'missing_org_or_tag' });
+  }
+
+  let role;
+  try {
+    role = await ensureMembership(supabase, orgId, authResult.data.user.id);
+  } catch {
+    return respond(context, 500, { message: 'failed_to_verify_membership' });
+  }
+  if (!isAdminRole(role)) {
+    return respond(context, 403, { message: 'forbidden' });
+  }
+
+  const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
+  if (tenantError) {
+    return respond(context, tenantError.status, tenantError.body);
+  }
+
+  // Try RPC first (SECURITY DEFINER expected)
+  const { error: rpcError } = await tenantClient.rpc('remove_tag_from_students', { tag_to_remove: tagId });
+  if (!rpcError) {
+    return respond(context, 200, { message: 'tag_removed_via_rpc', tag_id: tagId });
+  }
+
+  context.log?.warn?.('students-remove-tag: RPC failed, falling back', { message: rpcError.message });
+
+  // Fallback: manually update affected students using service key
+  const { data: students, error: fetchError } = await tenantClient
+    .from('Students')
+    .select('id, tags')
+    .contains('tags', [tagId]);
+
+  if (fetchError) {
+    context.log?.error?.('students-remove-tag: failed to fetch students', { message: fetchError.message });
+    return respond(context, 500, { message: 'failed_to_fetch_students' });
+  }
+  if (!students || students.length === 0) {
+    return respond(context, 200, { message: 'tag_removed_no_students', tag_id: tagId, students_updated: 0 });
+  }
+
+  let updated = 0;
+  const failures = [];
+  for (const student of students) {
+    const updatedTags = (student.tags || []).filter((id) => id !== tagId);
+    const { error } = await tenantClient.from('Students').update({ tags: updatedTags }).eq('id', student.id);
+    if (error) {
+      failures.push({ student_id: student.id, message: error.message });
+    } else {
+      updated++;
+    }
+  }
+
+  if (updated === 0 && failures.length > 0) {
+    return respond(context, 500, { message: 'failed_to_update_students', failures });
+  }
+
+  return respond(context, 200, { message: 'tag_removed_fallback', tag_id: tagId, students_updated: updated, failures });
+}

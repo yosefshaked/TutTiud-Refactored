@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,6 +39,7 @@ export default function TagsManager() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTag, setEditingTag] = useState(null);
   const [tagName, setTagName] = useState('');
+  const inputRef = useRef(null);
 
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -89,6 +90,13 @@ export default function TagsManager() {
       setActionError('');
     }
   };
+
+  // Auto-focus the input when the dialog opens
+  useEffect(() => {
+    if (isDialogOpen) {
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [isDialogOpen]);
 
   const handleSaveTag = async (e) => {
     e.preventDefault();
@@ -215,7 +223,7 @@ export default function TagsManager() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-row-reverse items-center justify-between gap-4">
             <div className="flex-1 text-right">
               <CardTitle className="flex items-center gap-2 justify-end mb-1">
                 <span>ניהול תגיות</span>
@@ -247,20 +255,21 @@ export default function TagsManager() {
               {tags.map((tag) => (
                 <div
                   key={tag.id}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  className="group flex items-center justify-between p-3 rounded-lg border bg-card/90 hover:bg-accent/40 transition-colors focus-within:ring-2 focus-within:ring-primary/30"
                   dir="rtl"
                 >
                   <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{tag.name}</span>
+                    <Tag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="font-medium select-text">{tag.name}</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditDialog(tag)}
                       className="h-8 px-2"
                       title="עריכת תגית"
+                      aria-label={`עריכת תגית ${tag.name}`}
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
@@ -270,6 +279,7 @@ export default function TagsManager() {
                       onClick={() => openDeleteDialog(tag)}
                       className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                       title="מחיקת תגית"
+                      aria-label={`מחיקת תגית ${tag.name}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -297,6 +307,7 @@ export default function TagsManager() {
               </Label>
               <Input
                 id="tag-name"
+                ref={inputRef}
                 value={tagName}
                 onChange={(e) => setTagName(e.target.value)}
                 placeholder="לדוגמה: תלמיד חדש"
@@ -304,7 +315,14 @@ export default function TagsManager() {
                 disabled={actionLoading}
                 dir="rtl"
                 className="text-right"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveTag(e);
+                  }
+                }}
               />
+              <p className="text-xs text-muted-foreground text-right">השם יוצג בתפריטים ושדות בחירת תגיות.</p>
             </div>
 
             {actionError && (
