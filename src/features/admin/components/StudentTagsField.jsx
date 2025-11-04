@@ -102,8 +102,8 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
   const footer = (
     <DialogFooter>
       <Button
-        form="student-tag-create-form"
-        type="submit"
+        type="button"
+        onClick={handleCreateTag}
         disabled={isSavingTag}
         className="gap-2"
       >
