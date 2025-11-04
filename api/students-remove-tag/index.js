@@ -1,7 +1,7 @@
-const { resolveTenantClient } = require('../_shared/org-bff');
-const { sendError, sendSuccess } = require('../_shared/http');
+import { resolveTenantClient } from '../_shared/org-bff.js';
+import { sendError, sendSuccess } from '../_shared/http.js';
 
-module.exports = async function (context, req) {
+export default async function (context, req) {
   const { org_id, tag_id } = req.body || {};
 
   if (!org_id || !tag_id) {
@@ -29,9 +29,20 @@ module.exports = async function (context, req) {
         return sendError(context, 500, 'Failed to fetch students with tag');
       }
 
+      // If no students have this tag, that's fine - just return success
+      if (!students || students.length === 0) {
+        console.log('No students found with this tag, nothing to update');
+        return sendSuccess(context, { 
+          message: 'Tag removed (no students had this tag)', 
+          tag_id,
+          students_updated: 0 
+        });
+      }
+
       // Update each student by removing the tag
       let updateCount = 0;
-      for (const student of students || []) {
+      const errors = [];
+      for (const student of students) {
         const updatedTags = (student.tags || []).filter(id => id !== tag_id);
         const { error: updateErr } = await tenantClient
           .from('Students')
@@ -40,15 +51,21 @@ module.exports = async function (context, req) {
 
         if (updateErr) {
           console.error(`Failed to update student ${student.id}:`, updateErr);
+          errors.push({ student_id: student.id, error: updateErr.message });
         } else {
           updateCount++;
         }
       }
 
+      if (errors.length > 0 && updateCount === 0) {
+        return sendError(context, 500, 'Failed to update any students');
+      }
+
       return sendSuccess(context, { 
         message: 'Tag removed from students (fallback method)', 
         tag_id,
-        students_updated: updateCount 
+        students_updated: updateCount,
+        ...(errors.length > 0 && { partial_errors: errors })
       });
     }
 

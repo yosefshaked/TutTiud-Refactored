@@ -213,17 +213,17 @@ export default function TagsManager() {
 
   return (
     <>
-      <Card dir="rtl">
+      <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="text-right">
-              <CardTitle className="flex items-center gap-2 justify-end">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 text-right">
+              <CardTitle className="flex items-center gap-2 justify-end mb-1">
                 <span>ניהול תגיות</span>
                 <Tag className="h-5 w-5" />
               </CardTitle>
               <CardDescription className="text-right">ניהול תגיות לסיווג ותיוג תלמידים</CardDescription>
             </div>
-            <Button onClick={openAddDialog} size="sm" className="gap-2">
+            <Button onClick={openAddDialog} size="sm" className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
               תגית חדשה
             </Button>
@@ -231,9 +231,9 @@ export default function TagsManager() {
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 text-right flex items-start gap-2" role="alert">
-              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>{error}</span>
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-start gap-2" role="alert" dir="rtl">
+              <span className="flex-1 text-right">{error}</span>
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
             </div>
           )}
 
@@ -247,13 +247,14 @@ export default function TagsManager() {
               {tags.map((tag) => (
                 <div
                   key={tag.id}
-                  className="flex flex-row-reverse items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  dir="rtl"
                 >
-                  <div className="flex flex-row-reverse items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <Tag className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">{tag.name}</span>
                   </div>
-                  <div className="flex flex-row-reverse items-center gap-1">
+                  <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -267,7 +268,7 @@ export default function TagsManager() {
                       variant="ghost"
                       size="sm"
                       onClick={() => openDeleteDialog(tag)}
-                      className="h-8 px-2 text-destructive hover:text-destructive"
+                      className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                       title="מחיקת תגית"
                     >
                       <Trash2 className="h-4 w-4" />
