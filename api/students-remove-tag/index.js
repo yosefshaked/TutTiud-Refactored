@@ -11,13 +11,13 @@ module.exports = async function (context, req) {
   try {
     const tenantClient = await resolveTenantClient(req, org_id);
 
-    // Remove the tag from all students who have it
-    // Use PostgreSQL's array_remove function to remove the UUID from the tags array
-    const { data, error: updateError } = await tenantClient
+    // Try to use the PostgreSQL helper function first
+    const { data, error: rpcError } = await tenantClient
       .rpc('remove_tag_from_students', { tag_to_remove: tag_id });
 
-    if (updateError) {
-      console.error('Failed to remove tag from students:', updateError);
+    if (rpcError) {
+      console.warn('RPC function not available, using fallback:', rpcError.message);
+      
       // Fallback: manually update each student
       const { data: students, error: fetchError } = await tenantClient
         .from('Students')
@@ -26,10 +26,11 @@ module.exports = async function (context, req) {
 
       if (fetchError) {
         console.error('Failed to fetch students with tag:', fetchError);
-        return sendError(context, 500, 'Failed to remove tag from students');
+        return sendError(context, 500, 'Failed to fetch students with tag');
       }
 
       // Update each student by removing the tag
+      let updateCount = 0;
       for (const student of students || []) {
         const updatedTags = (student.tags || []).filter(id => id !== tag_id);
         const { error: updateErr } = await tenantClient
@@ -39,13 +40,24 @@ module.exports = async function (context, req) {
 
         if (updateErr) {
           console.error(`Failed to update student ${student.id}:`, updateErr);
+        } else {
+          updateCount++;
         }
       }
+
+      return sendSuccess(context, { 
+        message: 'Tag removed from students (fallback method)', 
+        tag_id,
+        students_updated: updateCount 
+      });
     }
 
-    return sendSuccess(context, { message: 'Tag removed from all students', tag_id });
+    return sendSuccess(context, { 
+      message: 'Tag removed from all students', 
+      tag_id 
+    });
   } catch (error) {
-    console.error('Error in remove-tag endpoint:', error);
+    console.error('Error in students-remove-tag endpoint:', error);
     return sendError(context, error.status || 500, error.message || 'Internal server error');
   }
 };

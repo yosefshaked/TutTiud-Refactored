@@ -43,6 +43,7 @@ export default function TagsManager() {
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
 
   const loadTags = useCallback(async () => {
     if (!session || !activeOrgId) return;
@@ -139,6 +140,7 @@ export default function TagsManager() {
 
   const openDeleteDialog = (tag) => {
     setTagToDelete(tag);
+    setDeleteError('');
     setDeleteDialogOpen(true);
   };
 
@@ -146,6 +148,7 @@ export default function TagsManager() {
     if (!actionLoading) {
       setDeleteDialogOpen(false);
       setTagToDelete(null);
+      setDeleteError('');
     }
   };
 
@@ -153,24 +156,36 @@ export default function TagsManager() {
     if (!tagToDelete) return;
 
     setActionLoading(true);
+    setDeleteError('');
     try {
-      // Remove tag from catalog
+      // First remove tag from all students who have it
+      const removeResponse = await fetch('/api/students-remove-tag', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ 
+          org_id: activeOrgId, 
+          tag_id: tagToDelete.id 
+        }),
+      });
+
+      if (!removeResponse.ok) {
+        const errorData = await removeResponse.json().catch(() => ({ message: 'Failed to remove tag from students' }));
+        throw new Error(errorData.message || 'Failed to remove tag from students');
+      }
+
+      // Then remove tag from catalog
       const updatedTags = tags.filter((t) => t.id !== tagToDelete.id);
       const body = { org_id: activeOrgId, key: 'student_tags', settings_value: updatedTags };
       await authenticatedFetch('settings', { method: 'POST', body, session });
-
-      // Remove tag from all students who have it
-      await authenticatedFetch('students/remove-tag', {
-        method: 'POST',
-        body: { org_id: activeOrgId, tag_id: tagToDelete.id },
-        session,
-      });
 
       setTags(updatedTags);
       closeDeleteDialog();
     } catch (err) {
       console.error('Failed to delete tag', err);
-      setActionError(err?.message || 'מחיקת התגית נכשלה.');
+      setDeleteError(err?.message || 'מחיקת התגית נכשלה.');
     } finally {
       setActionLoading(false);
     }
@@ -198,15 +213,15 @@ export default function TagsManager() {
 
   return (
     <>
-      <Card>
+      <Card dir="rtl">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
+            <div className="text-right">
+              <CardTitle className="flex items-center gap-2 justify-end">
+                <span>ניהול תגיות</span>
                 <Tag className="h-5 w-5" />
-                ניהול תגיות
               </CardTitle>
-              <CardDescription>ניהול תגיות לסיווג ותיוג תלמידים</CardDescription>
+              <CardDescription className="text-right">ניהול תגיות לסיווג ותיוג תלמידים</CardDescription>
             </div>
             <Button onClick={openAddDialog} size="sm" className="gap-2">
               <Plus className="h-4 w-4" />
@@ -232,13 +247,13 @@ export default function TagsManager() {
               {tags.map((tag) => (
                 <div
                   key={tag.id}
-                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  className="flex flex-row-reverse items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-row-reverse items-center gap-2">
                     <Tag className="h-4 w-4 text-muted-foreground" />
                     <span className="font-medium">{tag.name}</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-row-reverse items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -312,13 +327,21 @@ export default function TagsManager() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={closeDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-right">האם למחוק את התגית "{tagToDelete?.name}"?</AlertDialogTitle>
             <AlertDialogDescription className="text-right">
               פעולה זו תמחק את התגית מהמערכת ותסיר אותה מכל התלמידים שמתויגים בה. לא ניתן לשחזר את הפעולה.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          
+          {deleteError && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 text-right flex items-start gap-2" role="alert">
+              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span>{deleteError}</span>
+            </div>
+          )}
+          
           <AlertDialogFooter className="flex-row-reverse gap-2">
             <AlertDialogAction
               onClick={handleDeleteTag}

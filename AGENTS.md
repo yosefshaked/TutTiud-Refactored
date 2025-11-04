@@ -195,9 +195,10 @@
 - **Tag Management UI** (2025-11): Admin/owner users can manage tags via Settings page card (`TagsManager.jsx`):
   - Create new tags with duplicate name validation
   - Edit existing tag names (updates propagate to all tagged students via settings catalog)
-  - Delete tags with confirmation guard; deletion removes tag from catalog and all student rows via `/api/students/remove-tag`
-  - Backend uses `tuttiud.remove_tag_from_students(tag_uuid)` PostgreSQL function for efficient bulk removal
+  - Delete tags with confirmation guard; deletion removes tag from catalog and all student rows via `/api/students-remove-tag`
+  - Backend uses `tuttiud.remove_tag_from_students(tag_uuid)` PostgreSQL function for efficient bulk removal with fallback to manual iteration
   - Tag deletion is permanent; confirmation dialog warns users that operation cannot be undone
+  - Full RTL support with proper Hebrew text alignment and flex-row-reverse layouts
 
 ### Session Form Question Types (2025-10)
 - Session form questions are managed via `SessionFormManager.jsx` (Settings page) and rendered in `NewSessionForm.jsx`.
