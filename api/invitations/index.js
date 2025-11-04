@@ -456,6 +456,7 @@ async function handleCreateInvitation(context, req, supabase) {
       orgId,
       email,
       message: authLookupError.message,
+      details: authLookupError.details,
       code: authLookupError.code,
     });
     respond(context, 500, { message: 'failed to verify auth user' });
