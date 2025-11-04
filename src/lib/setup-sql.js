@@ -333,6 +333,19 @@ BEGIN
 END;
 $$;
 
+-- Helper function to remove a specific tag UUID from all students
+CREATE OR REPLACE FUNCTION tuttiud.remove_tag_from_students(tag_to_remove uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE tuttiud."Students"
+  SET tags = array_remove(tags, tag_to_remove)
+  WHERE tags @> ARRAY[tag_to_remove];
+END;
+$$;
+
 
 -- Part 6: Generate the Application-Specific JWT (No Changes)
 SELECT extensions.sign(
