@@ -17,50 +17,44 @@ function isHebrew(char) {
  * @returns {string} Processed text with Hebrew portions reversed
  */
 export function reverseHebrewText(text) {
-  if (!text) return '';
-  
-  // Split text into segments of Hebrew and non-Hebrew
+  if (text === null || text === undefined) return '';
+  const str = String(text);
+
+  // Split into segments by Hebrew vs non-Hebrew. We will reverse only the
+  // characters inside Hebrew segments and keep the overall segment order.
+  // This preserves the natural order of numbers and punctuation.
   const segments = [];
-  let currentSegment = '';
-  let isCurrentSegmentHebrew = false;
-  
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    const charIsHebrew = isHebrew(char);
-    
-    if (i === 0) {
-      isCurrentSegmentHebrew = charIsHebrew;
-      currentSegment = char;
-    } else if (charIsHebrew === isCurrentSegmentHebrew) {
-      currentSegment += char;
+  let buf = '';
+  let currentHebrew = undefined;
+
+  const flush = () => {
+    if (!buf) return;
+    if (currentHebrew === true) {
+      segments.push(buf.split('').reverse().join(''));
     } else {
-      segments.push({ text: currentSegment, isHebrew: isCurrentSegmentHebrew });
-      currentSegment = char;
-      isCurrentSegmentHebrew = charIsHebrew;
+      segments.push(buf);
+    }
+    buf = '';
+  };
+
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    const isHeb = isHebrew(ch);
+    if (currentHebrew === undefined) {
+      currentHebrew = isHeb;
+      buf = ch;
+    } else if (isHeb === currentHebrew) {
+      buf += ch;
+    } else {
+      flush();
+      currentHebrew = isHeb;
+      buf = ch;
     }
   }
-  
-  // Push the last segment
-  if (currentSegment) {
-    segments.push({ text: currentSegment, isHebrew: isCurrentSegmentHebrew });
-  }
-  
-  // Reverse Hebrew segments and reverse the order of segments for RTL
-  const processedSegments = segments.map(seg => {
-    if (seg.isHebrew) {
-      // Reverse the Hebrew text
-      return seg.text.split('').reverse().join('');
-    }
-    return seg.text;
-  });
-  
-  // For RTL text, reverse the order of segments
-  const hasHebrew = segments.some(seg => seg.isHebrew);
-  if (hasHebrew) {
-    return processedSegments.reverse().join('');
-  }
-  
-  return processedSegments.join('');
+  flush();
+
+  // Join segments in original order
+  return segments.join('');
 }
 
 /**

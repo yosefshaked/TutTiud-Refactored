@@ -410,8 +410,9 @@ export default function StudentDetailPage() {
         permissions: activeOrgConnection?.permissions || {},
       };
 
+      const studentForPdf = { ...student, instructor_name: instructorName };
       await generateStudentReport({
-        student,
+        student: studentForPdf,
         sessions,
         org: orgContext,
         questions,

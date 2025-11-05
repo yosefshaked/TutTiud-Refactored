@@ -103,10 +103,51 @@ export async function generateStudentReport({ student, sessions, org, questions 
   const logoHeight = 15;
   const logoWidth = 40;
 
-  // Always render TutTiud logo on the right (RTL convention)
-  doc.setFontSize(16);
-  doc.setTextColor(...colors.primary);
-  doc.text('TutTiud', pageWidth - margin - 30, yPos + 10, { align: 'right' });
+  // Try to render the TutTiud app logo image on the right; fall back to text
+  let rightHeaderUsed = false;
+  try {
+    const appLogoUrl = (typeof window !== 'undefined' && window.location) ? `${window.location.origin}/icon.svg` : '/icon.svg';
+    const appLogoData = await fetchImageAsDataUrl(appLogoUrl);
+    if (appLogoData) {
+      const tmp = new Image();
+      await new Promise((resolve, reject) => {
+        tmp.onload = resolve;
+        tmp.onerror = reject;
+        tmp.src = appLogoData;
+      });
+      const fitted = fitImageToBounds(tmp.width, tmp.height, logoWidth, logoHeight);
+
+      // Format detection + rasterize fallback
+      let appData = appLogoData;
+      let appFmt = 'PNG';
+      const pfx = appLogoData.slice(0, 32).toLowerCase();
+      if (pfx.startsWith('data:image/jpeg') || pfx.startsWith('data:image/jpg')) appFmt = 'JPEG';
+      else if (pfx.startsWith('data:image/png')) appFmt = 'PNG';
+      else {
+        try {
+          const c = document.createElement('canvas');
+          c.width = tmp.width; c.height = tmp.height;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(tmp, 0, 0);
+          appData = c.toDataURL('image/png');
+          appFmt = 'PNG';
+        } catch (e) { void e; }
+      }
+      if (appData) {
+        // place at right
+        doc.addImage(appData, appFmt, pageWidth - margin - fitted.width, yPos, fitted.width, fitted.height);
+        rightHeaderUsed = true;
+      }
+    }
+  } catch (e) {
+    void e; // fallback to text
+  }
+
+  if (!rightHeaderUsed) {
+    doc.setFontSize(16);
+    doc.setTextColor(...colors.primary);
+    doc.text('TutTiud', pageWidth - margin - 2, yPos + 10, { align: 'right' });
+  }
 
   // Conditionally render organization logo on the left if permission is enabled
   if (org?.permissions?.can_use_custom_logo_on_exports && org?.logoUrl) {
@@ -155,13 +196,17 @@ export async function generateStudentReport({ student, sessions, org, questions 
     }
   }
 
-  yPos += logoHeight + 10;
+  // Underline separator
+  doc.setDrawColor(...colors.border);
+  doc.setLineWidth(0.3);
+  doc.line(margin, yPos + logoHeight + 6, pageWidth - margin, yPos + logoHeight + 6);
+  yPos += logoHeight + 12;
 
   // Student information block
   checkPageBreak(30);
   doc.setFillColor(...colors.lightGray);
   doc.setDrawColor(...colors.border);
-  doc.rect(margin, yPos, contentWidth, 22, 'FD');
+  doc.rect(margin, yPos, contentWidth, 24, 'FD');
 
   doc.setTextColor(...colors.text);
   doc.setFontSize(12);
@@ -176,11 +221,11 @@ export async function generateStudentReport({ student, sessions, org, questions 
   const colRightX = pageWidth - margin - 2;
   const colLeftX = margin + 2 + contentWidth / 2;
   doc.text(line1, colRightX, yPos + 14, { align: 'right' });
-  doc.text(line2, colRightX, yPos + 19, { align: 'right' });
+  doc.text(line2, colRightX, yPos + 20, { align: 'right' });
   doc.text(line3, colLeftX, yPos + 14, { align: 'right' });
-  doc.text(line4, colLeftX, yPos + 19, { align: 'right' });
+  doc.text(line4, colLeftX, yPos + 20, { align: 'right' });
 
-  yPos += 30;
+  yPos += 34;
 
   // Sessions section
   checkPageBreak(15);
