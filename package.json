@@ -33,6 +33,7 @@
     "date-fns": "^4.1.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.3",
     "lucide-react": "^0.542.0",
     "next-themes": "^0.4.6",
     "react": "^19.1.1",
@@ -67,7 +68,7 @@
   },
   "build": {
     "appId": "com.HavatTut.salaryapp",
-  "productName": "TutTiud - תותיעוד",
+    "productName": "TutTiud - תותיעוד",
     "files": [
       "dist/**/*",
       "electron.cjs",

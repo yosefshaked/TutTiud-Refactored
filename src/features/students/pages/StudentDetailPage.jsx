@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import EditStudentModal from '@/features/admin/components/EditStudentModal.jsx';
 import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } from '@/features/students/utils/tags.js';
+import { generateStudentReport } from '@/features/students/utils/generateStudentReport.js';
+import { toast } from 'sonner';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -113,7 +115,7 @@ export default function StudentDetailPage() {
   const { id: studentIdParam } = useParams();
   const studentId = typeof studentIdParam === 'string' ? studentIdParam : '';
   const { loading: supabaseLoading, session } = useSupabase();
-  const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
+  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgConnection } = useOrg();
   const { openSessionModal } = useSessionModal();
 
   const [studentState, setStudentState] = useState(REQUEST_STATE.idle);
@@ -139,6 +141,9 @@ export default function StudentDetailPage() {
   const [studentForEdit, setStudentForEdit] = useState(null);
   const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
   const [updateError, setUpdateError] = useState('');
+
+  // Export state
+  const [isExporting, setIsExporting] = useState(false);
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
@@ -394,6 +399,33 @@ export default function StudentDetailPage() {
     }
   };
 
+  const handleExportToPdf = async () => {
+    if (!student || isExporting) return;
+    
+    setIsExporting(true);
+    try {
+      // Prepare org context with logo and permissions
+      const orgContext = {
+        logoUrl: activeOrgConnection?.logoUrl || null,
+        permissions: activeOrgConnection?.permissions || {},
+      };
+
+      await generateStudentReport({
+        student,
+        sessions,
+        org: orgContext,
+        questions,
+      });
+
+      toast.success('הדוח יוצא בהצלחה');
+    } catch (error) {
+      console.error('Failed to export PDF', error);
+      toast.error(error?.message || 'יצוא הדוח נכשל');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!studentId) {
     return (
       <div className="space-y-md">
@@ -468,6 +500,22 @@ export default function StudentDetailPage() {
         </div>
         <div className="flex gap-2 self-start">
         {canEdit ? (
+          <>
+          <Button
+            type="button"
+            className="self-start text-sm"
+            size="sm"
+            onClick={handleExportToPdf}
+            disabled={studentLoadError || isStudentLoading || !student || isExporting || sessions.length === 0}
+            variant="outline"
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span className="ml-1">יצוא ל-PDF</span>
+          </Button>
           <Button
             type="button"
             className="self-start text-sm"
@@ -479,6 +527,7 @@ export default function StudentDetailPage() {
             <Pencil className="h-4 w-4" />
             <span className="ml-1">עריכת תלמיד</span>
           </Button>
+          </>
         ) : null}
         <Button
           type="button"
