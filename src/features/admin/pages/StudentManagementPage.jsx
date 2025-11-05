@@ -212,6 +212,7 @@ export default function StudentManagementPage() {
     setInstructorFilterId('');
     setSearchQuery('');
     setDayFilter(null);
+    setSortBy(STUDENT_SORT_OPTIONS.SCHEDULE);
   };
 
   // Check if any filters are active
