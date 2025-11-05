@@ -19,6 +19,7 @@ import { includesDayQuery, DAY_NAMES, formatDefaultTime } from '@/features/stude
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { getStudentComparator, STUDENT_SORT_OPTIONS } from '@/features/students/utils/sorting.js';
+import { saveFilterState, loadFilterState } from '@/features/students/utils/filter-state.js';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -116,6 +117,20 @@ export default function StudentManagementPage() {
     }
   }, [fetchStudents, fetchInstructors]);
 
+  // Load saved filter state on mount
+  useEffect(() => {
+    if (activeOrgId) {
+      const savedFilters = loadFilterState(activeOrgId, 'admin');
+      if (savedFilters) {
+        if (savedFilters.filterMode !== undefined) setFilterMode(savedFilters.filterMode);
+        if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery);
+        if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter);
+        if (savedFilters.instructorFilterId !== undefined) setInstructorFilterId(savedFilters.instructorFilterId);
+        if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy);
+      }
+    }
+  }, [activeOrgId]);
+
   useEffect(() => {
     if (canFetch) {
       refreshRoster(true);
@@ -140,6 +155,19 @@ export default function StudentManagementPage() {
       setInstructorFilterId('');
     }
   }, [filterMode, instructorFilterId]);
+
+  // Save filter state whenever it changes
+  useEffect(() => {
+    if (activeOrgId) {
+      saveFilterState(activeOrgId, 'admin', {
+        filterMode,
+        searchQuery,
+        dayFilter,
+        instructorFilterId,
+        sortBy,
+      });
+    }
+  }, [activeOrgId, filterMode, searchQuery, dayFilter, instructorFilterId, sortBy]);
 
   // Combined filter options for the control: mine, all, and per-instructor
   const combinedFilterOptions = useMemo(() => {
@@ -184,6 +212,7 @@ export default function StudentManagementPage() {
     setInstructorFilterId('');
     setSearchQuery('');
     setDayFilter(null);
+    setSortBy(STUDENT_SORT_OPTIONS.SCHEDULE);
   };
 
   // Check if any filters are active
