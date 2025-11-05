@@ -1,6 +1,6 @@
 /* eslint-env browser */
 import { jsPDF } from 'jspdf';
-import { addHebrewFont } from './hebrewFontHelper.js';
+import { addHebrewFont, reverseHebrewText } from './hebrewFontHelper.js';
 
 /**
  * Fetch and convert an image URL to a data URL for embedding in PDF
@@ -126,36 +126,7 @@ export async function generateStudentReport({ student, sessions, org, questions 
 
   yPos += logoHeight + 10;
 
-  // Title
-  doc.setFontSize(20);
-  doc.setTextColor(...colors.text);
-  doc.text('דוח מפגשים', pageWidth / 2, yPos, { align: 'center' });
-  yPos += 15;
 
-  // Student information section
-  doc.setFontSize(14);
-  doc.setTextColor(...colors.primary);
-  doc.text('פרטי תלמיד', pageWidth - margin, yPos, { align: 'right' });
-  yPos += 8;
-
-  // Student details
-  const studentDetails = [
-    { label: 'שם התלמיד', value: student.name || 'לא צוין' },
-    { label: 'שירות ברירת מחדל', value: student.default_service || 'לא הוגדר' },
-    { label: 'שם איש קשר', value: student.contact_name || 'לא סופק' },
-    { label: 'טלפון', value: student.contact_phone || 'לא סופק' },
-  ];
-
-  doc.setFontSize(10);
-  doc.setTextColor(...colors.text);
-  studentDetails.forEach((detail) => {
-    checkPageBreak(7);
-    doc.setFont('Rubik', 'bold');
-    const text = `${detail.label}: ${detail.value}`;
-    doc.text(text, pageWidth - margin, yPos, { align: 'right' });
-    doc.setFont('Rubik', 'normal');
-    yPos += 6;
-  });
 
   yPos += 8;
 
