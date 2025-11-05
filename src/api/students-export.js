@@ -24,7 +24,7 @@ export async function exportStudentPdf(studentId, orgId) {
 
   const token = data.session.access_token;
 
-  const response = await fetch('/api/students/export', {
+  const response = await fetch('/api/students-export', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

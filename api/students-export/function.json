@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["post"],
-      "route": "students/export"
+      "route": "students-export"
     },
     {
       "type": "http",
