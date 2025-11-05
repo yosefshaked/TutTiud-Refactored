@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
@@ -14,8 +15,10 @@ import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/f
 import { useSessionModal } from '@/features/sessions/context/SessionModalContext.jsx';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { toast } from 'sonner';
 import EditStudentModal from '@/features/admin/components/EditStudentModal.jsx';
 import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } from '@/features/students/utils/tags.js';
+import { exportStudentPdf, downloadPdfBlob } from '@/api/students-export.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -113,7 +116,7 @@ export default function StudentDetailPage() {
   const { id: studentIdParam } = useParams();
   const studentId = typeof studentIdParam === 'string' ? studentIdParam : '';
   const { loading: supabaseLoading, session } = useSupabase();
-  const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
+  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgConnection } = useOrg();
   const { openSessionModal } = useSessionModal();
 
   const [studentState, setStudentState] = useState(REQUEST_STATE.idle);
@@ -140,8 +143,12 @@ export default function StudentDetailPage() {
   const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
   const [updateError, setUpdateError] = useState('');
 
+  // Export state
+  const [isExporting, setIsExporting] = useState(false);
+
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
+  const permissions = activeOrgConnection?.permissions ?? {};
 
   const canFetch = useMemo(() => {
     return (
@@ -394,6 +401,33 @@ export default function StudentDetailPage() {
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!studentId || !activeOrgId || !student) {
+      toast.error('לא ניתן לייצא PDF ללא מזהה תלמיד או ארגון.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const blob = await exportStudentPdf(studentId, activeOrgId);
+      const safeName = student.name
+        .replace(/[^א-תa-zA-Z0-9\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '_');
+      const dateStr = format(new Date(), 'yyyy-MM-dd');
+      const filename = `${safeName}_Records_${dateStr}.pdf`;
+      
+      downloadPdfBlob(blob, filename);
+      toast.success('הקובץ הורד בהצלחה');
+    } catch (error) {
+      console.error('Failed to export PDF', error);
+      const message = error?.message || 'ייצוא PDF נכשל. נסה שוב.';
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!studentId) {
     return (
       <div className="space-y-md">
@@ -466,19 +500,58 @@ export default function StudentDetailPage() {
           <h1 className="text-xl font-semibold text-foreground sm:text-2xl">פרטי תלמיד</h1>
           <p className="text-xs text-neutral-600 sm:text-sm">סקירת הפרטים והמפגשים של {student?.name || 'תלמיד ללא שם'}.</p>
         </div>
-        <div className="flex gap-2 self-start">
+        <div className="flex gap-2 self-start flex-wrap">
         {canEdit ? (
-          <Button
-            type="button"
-            className="self-start text-sm"
-            size="sm"
-            onClick={handleOpenEdit}
-            disabled={studentLoadError || isStudentLoading || !student}
-            variant="outline"
-          >
-            <Pencil className="h-4 w-4" />
-            <span className="ml-1">עריכת תלמיד</span>
-          </Button>
+          <>
+            {permissions?.can_export_pdf_reports ? (
+              <Button
+                type="button"
+                className="self-start text-sm"
+                size="sm"
+                onClick={handleExportPdf}
+                disabled={studentLoadError || isStudentLoading || !student || isExporting}
+                variant="outline"
+              >
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span className="ml-1">{isExporting ? 'מייצא...' : 'ייצוא ל-PDF'}</span>
+              </Button>
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      className="self-start text-sm"
+                      size="sm"
+                      disabled
+                      variant="outline"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="ml-1">ייצוא ל-PDF (Premium)</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p className="text-sm">ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <Button
+              type="button"
+              className="self-start text-sm"
+              size="sm"
+              onClick={handleOpenEdit}
+              disabled={studentLoadError || isStudentLoading || !student}
+              variant="outline"
+            >
+              <Pencil className="h-4 w-4" />
+              <span className="ml-1">עריכת תלמיד</span>
+            </Button>
+          </>
         ) : null}
         <Button
           type="button"

@@ -286,6 +286,7 @@ export function OrgProvider({ children }) {
                 supabaseAnonKey: normalized.supabaseAnonKey || normalized.supabase_anon_key || '',
                 metadata: normalized.metadata ?? null,
                 updatedAt: normalized.updatedAt || normalized.updated_at || null,
+                permissions: normalized.permissions ?? {},
               },
             ];
           })

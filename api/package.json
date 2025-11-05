@@ -3,8 +3,13 @@
   "type": "module",
   "version": "1.1.1",
   "private": true,
-  "engines": { "node": ">=18 <20" },
+  "engines": {
+    "node": ">=18 <20"
+  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@sparticuz/chromium": "^141.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "date-fns": "^4.1.0",
+    "puppeteer-core": "^24.29.0"
   }
 }

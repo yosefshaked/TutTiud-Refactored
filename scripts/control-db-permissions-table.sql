@@ -159,6 +159,28 @@ INSERT INTO public.permission_registry (
     'null'::jsonb,
     'features',
     false
+  ),
+  -- PDF Export feature (premium)
+  (
+    'can_export_pdf_reports',
+    'Export PDF Reports',
+    'ייצוא דוחות PDF',
+    'Allow organization to export student session records to professional PDF documents',
+    'אפשר לארגון לייצא רישומי מפגשים של תלמידים למסמכי PDF מקצועיים',
+    'false'::jsonb,
+    'features',
+    true
+  ),
+  -- Custom logo on PDF exports (premium)
+  (
+    'can_use_custom_logo_on_exports',
+    'Custom Logo on Exports',
+    'לוגו מותאם אישית בייצוא',
+    'Allow organization to display their custom logo alongside TutTiud logo on PDF exports',
+    'אפשר לארגון להציג את הלוגו המותאם שלהם לצד לוגו TutTiud בייצוא PDF',
+    'false'::jsonb,
+    'branding',
+    true
   )
 ON CONFLICT (permission_key) DO UPDATE SET
   display_name_en = EXCLUDED.display_name_en,
