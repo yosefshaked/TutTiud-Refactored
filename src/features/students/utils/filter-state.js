@@ -1,6 +1,6 @@
 /**
  * Utility for persisting and restoring student list filter state
- * Uses localStorage to remember filters when navigating between pages
+ * Uses sessionStorage to remember filters when navigating between pages within a session
  */
 
 const STORAGE_PREFIX = 'tuttiud:student-filters';
@@ -16,7 +16,7 @@ function getStorageKey(orgId, page) {
 }
 
 /**
- * Save filter state to localStorage
+ * Save filter state to sessionStorage
  * @param {string} orgId - Organization ID
  * @param {string} page - Page identifier ('admin' or 'instructor')
  * @param {Object} filters - Filter state to save
@@ -30,14 +30,14 @@ export function saveFilterState(orgId, page, filters) {
   try {
     const key = getStorageKey(orgId, page);
     const data = JSON.stringify(filters);
-    window.localStorage.setItem(key, data);
+    window.sessionStorage.setItem(key, data);
   } catch (error) {
     console.error('[filter-state] Failed to save filter state:', error);
   }
 }
 
 /**
- * Load filter state from localStorage
+ * Load filter state from sessionStorage
  * @param {string} orgId - Organization ID
  * @param {string} page - Page identifier ('admin' or 'instructor')
  * @returns {Object|null} Saved filter state or null if not found
@@ -49,7 +49,7 @@ export function loadFilterState(orgId, page) {
 
   try {
     const key = getStorageKey(orgId, page);
-    const data = window.localStorage.getItem(key);
+    const data = window.sessionStorage.getItem(key);
     
     if (!data) {
       return null;
@@ -63,7 +63,7 @@ export function loadFilterState(orgId, page) {
 }
 
 /**
- * Clear filter state from localStorage
+ * Clear filter state from sessionStorage
  * @param {string} orgId - Organization ID
  * @param {string} page - Page identifier ('admin' or 'instructor')
  */
@@ -74,7 +74,7 @@ export function clearFilterState(orgId, page) {
 
   try {
     const key = getStorageKey(orgId, page);
-    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
   } catch (error) {
     console.error('[filter-state] Failed to clear filter state:', error);
   }
