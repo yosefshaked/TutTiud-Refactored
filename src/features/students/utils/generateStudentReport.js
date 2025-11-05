@@ -78,12 +78,14 @@ export async function generateStudentReport({ student, sessions, org, questions 
     if (str.length === 0) {
       return;
     }
-    const rtlOptions = { lang: 'he', isInputRtl: true, isOutputRtl: true };
+    const opts = { ...drawOptions };
     if (HEBREW_REGEX.test(str)) {
-      doc.text(str, x, y, drawOptions, rtlOptions);
-    } else {
-      doc.text(str, x, y, drawOptions);
+      // Let jsPDF handle bidi reordering; do not flip output
+      opts.lang = 'he';
+      opts.isInputRtl = true;
+      // opts.isOutputRtl left false/undefined to avoid reversing numbers/Latin
     }
+    doc.text(str, x, y, opts);
   };
 
   // Page dimensions
