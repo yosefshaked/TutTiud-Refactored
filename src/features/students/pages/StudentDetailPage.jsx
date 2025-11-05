@@ -410,6 +410,7 @@ export default function StudentDetailPage() {
     setIsExporting(true);
     try {
       const blob = await exportStudentPdf(studentId, activeOrgId);
+      // Generate filename with date (sanitization happens in backend)
       const safeName = student.name
         .replace(/[^א-תa-zA-Z0-9\s-]/g, '')
         .trim()

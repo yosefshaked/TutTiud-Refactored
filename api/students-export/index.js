@@ -415,13 +415,20 @@ function escapeHtml(text) {
 }
 
 /**
- * Generate safe filename from student name
+ * Sanitize student name for use in filename
  */
-function generateFilename(studentName) {
-  const safeName = studentName
+function sanitizeStudentName(studentName) {
+  return studentName
     .replace(/[^א-תa-zA-Z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '_');
+}
+
+/**
+ * Generate safe filename from student name
+ */
+function generateFilename(studentName) {
+  const safeName = sanitizeStudentName(studentName);
   const dateStr = format(new Date(), 'yyyy-MM-dd');
   return `${safeName}_Records_${dateStr}.pdf`;
 }
@@ -594,8 +601,8 @@ export default async function (context, req) {
     }
   }
 
-  // Use a public TutTiud logo URL (you'll need to update this with actual logo URL)
-  const tuttiudLogoUrl = 'https://tuttiud.com/logo.png'; // Update with actual logo URL
+  // Use TutTiud logo URL from environment or default
+  const tuttiudLogoUrl = env.VITE_TUTTIUD_LOGO_URL || env.TUTTIUD_LOGO_URL || 'https://tuttiud.com/logo.png';
 
   // Generate PDF
   let browser;
