@@ -1,45 +1,151 @@
 /* eslint-env browser */
 import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 /**
- * Fetch and convert an image URL to a data URL for embedding in PDF
- * @param {string} url - Image URL
- * @returns {Promise<string|null>} Base64 data URL or null on failure
+ * Create HTML content for the PDF report
+ * @param {Object} student - Student information
+ * @param {Array} sessions - Session records
+ * @param {Object} org - Organization context
+ * @param {Array} questions - Form questions
+ * @returns {HTMLElement} Container element with report content
  */
-async function fetchImageAsDataUrl(url) {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.warn(`Failed to fetch image from ${url}`);
-      return null;
-    }
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error('Error fetching image:', error);
-    return null;
+function createReportHTML(student, sessions, org, questions) {
+  const container = document.createElement('div');
+  container.style.cssText = `
+    width: 210mm;
+    padding: 20mm;
+    background: white;
+    font-family: Arial, sans-serif;
+    direction: rtl;
+    color: #1e293b;
+  `;
+
+  // Header with logos
+  const header = document.createElement('div');
+  header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;';
+  
+  // TutTiud logo (right side for RTL)
+  const tuttiudLogo = document.createElement('div');
+  tuttiudLogo.textContent = 'TutTiud';
+  tuttiudLogo.style.cssText = 'font-size: 20px; font-weight: bold; color: #2563eb;';
+  header.appendChild(tuttiudLogo);
+
+  // Org logo (left side for RTL) - conditional
+  if (org?.permissions?.can_use_custom_logo_on_exports && org?.logoUrl) {
+    const orgLogo = document.createElement('img');
+    orgLogo.src = org.logoUrl;
+    orgLogo.style.cssText = 'max-height: 40px; max-width: 100px; object-fit: contain;';
+    orgLogo.onerror = () => { orgLogo.style.display = 'none'; };
+    header.appendChild(orgLogo);
   }
-}
 
-/**
- * Get dimensions for image to fit within bounds while maintaining aspect ratio
- * @param {number} imgWidth - Original image width
- * @param {number} imgHeight - Original image height
- * @param {number} maxWidth - Maximum width
- * @param {number} maxHeight - Maximum height
- * @returns {{width: number, height: number}} Fitted dimensions
- */
-function fitImageToBounds(imgWidth, imgHeight, maxWidth, maxHeight) {
-  const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
-  return {
-    width: imgWidth * ratio,
-    height: imgHeight * ratio,
-  };
+  container.appendChild(header);
+
+  // Title
+  const title = document.createElement('h1');
+  title.textContent = 'דוח מפגשים';
+  title.style.cssText = 'text-align: center; font-size: 24px; margin: 20px 0; color: #1e293b;';
+  container.appendChild(title);
+
+  // Student Info Section
+  const studentSection = document.createElement('div');
+  studentSection.style.cssText = 'margin-bottom: 30px;';
+  
+  const studentTitle = document.createElement('h2');
+  studentTitle.textContent = 'פרטי תלמיד';
+  studentTitle.style.cssText = 'font-size: 16px; color: #2563eb; margin-bottom: 15px; font-weight: bold;';
+  studentSection.appendChild(studentTitle);
+
+  const studentDetails = [
+    { label: 'שם התלמיד', value: student.name || 'לא צוין' },
+    { label: 'שירות ברירת מחדל', value: student.default_service || 'לא הוגדר' },
+    { label: 'שם איש קשר', value: student.contact_name || 'לא סופק' },
+    { label: 'טלפון', value: student.contact_phone || 'לא סופק' },
+  ];
+
+  studentDetails.forEach(detail => {
+    const detailDiv = document.createElement('div');
+    detailDiv.style.cssText = 'margin-bottom: 8px; font-size: 11px;';
+    detailDiv.innerHTML = `<strong>${detail.label}:</strong> ${detail.value}`;
+    studentSection.appendChild(detailDiv);
+  });
+
+  container.appendChild(studentSection);
+
+  // Sessions Section
+  const sessionsTitle = document.createElement('h2');
+  sessionsTitle.textContent = 'היסטוריית מפגשים';
+  sessionsTitle.style.cssText = 'font-size: 16px; color: #2563eb; margin-bottom: 15px; font-weight: bold;';
+  container.appendChild(sessionsTitle);
+
+  if (!sessions || sessions.length === 0) {
+    const noSessions = document.createElement('div');
+    noSessions.textContent = 'לא נמצאו מפגשים מתועדים';
+    noSessions.style.cssText = 'color: #64748b; font-size: 11px;';
+    container.appendChild(noSessions);
+  } else {
+    // Sort sessions by date
+    const sortedSessions = [...sessions].sort((a, b) => {
+      if (!a?.date || !b?.date) return 0;
+      return a.date < b.date ? 1 : -1;
+    });
+
+    sortedSessions.forEach(session => {
+      const sessionDiv = document.createElement('div');
+      sessionDiv.style.cssText = 'margin-bottom: 20px; page-break-inside: avoid;';
+
+      // Session header
+      const sessionHeader = document.createElement('div');
+      sessionHeader.style.cssText = 'background: #f1f5f9; border: 1px solid #cbd5e1; padding: 8px; margin-bottom: 10px; font-weight: bold; font-size: 12px;';
+      sessionHeader.textContent = formatSessionDate(session.date);
+      sessionDiv.appendChild(sessionHeader);
+
+      // Service context
+      if (session.service_context) {
+        const service = document.createElement('div');
+        service.style.cssText = 'color: #64748b; font-size: 10px; margin-bottom: 8px; padding-right: 8px;';
+        service.textContent = `שירות: ${session.service_context}`;
+        sessionDiv.appendChild(service);
+      }
+
+      // Answers
+      const answers = buildAnswerList(session.content, questions);
+      if (answers.length > 0) {
+        answers.forEach(answer => {
+          const answerDiv = document.createElement('div');
+          answerDiv.style.cssText = 'margin-bottom: 12px; padding-right: 8px; font-size: 10px;';
+          
+          const label = document.createElement('div');
+          label.style.cssText = 'font-weight: bold; margin-bottom: 4px;';
+          label.textContent = answer.label;
+          answerDiv.appendChild(label);
+
+          const value = document.createElement('div');
+          value.style.cssText = 'white-space: pre-wrap; word-break: break-word;';
+          value.textContent = answer.value;
+          answerDiv.appendChild(value);
+
+          sessionDiv.appendChild(answerDiv);
+        });
+      } else {
+        const noAnswers = document.createElement('div');
+        noAnswers.style.cssText = 'color: #64748b; font-size: 10px; padding-right: 8px;';
+        noAnswers.textContent = 'לא תועדו תשובות עבור מפגש זה';
+        sessionDiv.appendChild(noAnswers);
+      }
+
+      container.appendChild(sessionDiv);
+    });
+  }
+
+  // Footer
+  const footer = document.createElement('div');
+  footer.style.cssText = 'margin-top: 30px; text-align: center; font-size: 8px; color: #64748b;';
+  footer.textContent = `נוצר בתאריך ${new Date().toLocaleDateString('he-IL')}`;
+  container.appendChild(footer);
+
+  return container;
 }
 
 /**
@@ -56,201 +162,77 @@ export async function generateStudentReport({ student, sessions, org, questions 
     throw new Error('Student data is required');
   }
 
-  // Create a new PDF document (A4 size)
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  // Page dimensions
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
-  const contentWidth = pageWidth - (2 * margin);
+  // Create HTML content
+  const container = createReportHTML(student, sessions, org, questions);
   
-  // Color palette - professional blue and gray scheme
-  const colors = {
-    primary: [37, 99, 235], // Blue-600 RGB
-    secondary: [100, 116, 139], // Slate-500 RGB
-    text: [30, 41, 59], // Slate-800 RGB
-    lightGray: [241, 245, 249], // Slate-100 RGB
-    border: [203, 213, 225], // Slate-300 RGB
-  };
+  // Temporarily add to document for rendering
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  document.body.appendChild(container);
 
-  let yPos = margin;
-
-  // Helper to check if we need a new page
-  const checkPageBreak = (requiredSpace) => {
-    if (yPos + requiredSpace > pageHeight - margin) {
-      doc.addPage();
-      yPos = margin;
-      return true;
+  try {
+    // Wait for any images to load
+    const images = container.getElementsByTagName('img');
+    if (images.length > 0) {
+      await Promise.all(
+        Array.from(images).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve; // Resolve anyway to not block
+            setTimeout(resolve, 2000); // Timeout after 2 seconds
+          });
+        })
+      );
     }
-    return false;
-  };
 
-  // Header with logo(s)
-  const logoHeight = 15;
-  const logoWidth = 40;
-
-  // Always render TutTiud logo on the right (RTL convention)
-  doc.setFontSize(16);
-  doc.setTextColor(...colors.primary);
-  doc.text('TutTiud', pageWidth - margin - 30, yPos + 10, { align: 'right' });
-
-  // Conditionally render organization logo on the left if permission is enabled
-  if (org?.permissions?.can_use_custom_logo_on_exports && org?.logoUrl) {
-    try {
-      const orgLogoData = await fetchImageAsDataUrl(org.logoUrl);
-      if (orgLogoData) {
-        // Create a temporary image to get dimensions
-        const img = new Image();
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = orgLogoData;
-        });
-        
-        const fitted = fitImageToBounds(img.width, img.height, logoWidth, logoHeight);
-        doc.addImage(orgLogoData, 'PNG', margin, yPos, fitted.width, fitted.height);
-      }
-    } catch (error) {
-      console.warn('Failed to load organization logo:', error);
-    }
-  }
-
-  yPos += logoHeight + 10;
-
-  // Title
-  doc.setFontSize(20);
-  doc.setTextColor(...colors.text);
-  doc.text('דוח מפגשים', pageWidth / 2, yPos, { align: 'center' });
-  yPos += 15;
-
-  // Student information section
-  doc.setFontSize(14);
-  doc.setTextColor(...colors.primary);
-  doc.text('פרטי תלמיד', margin, yPos);
-  yPos += 8;
-
-  // Student details
-  const studentDetails = [
-    { label: 'שם התלמיד', value: student.name || 'לא צוין' },
-    { label: 'שירות ברירת מחדל', value: student.default_service || 'לא הוגדר' },
-    { label: 'שם איש קשר', value: student.contact_name || 'לא סופק' },
-    { label: 'טלפון', value: student.contact_phone || 'לא סופק' },
-  ];
-
-  doc.setFontSize(10);
-  doc.setTextColor(...colors.text);
-  studentDetails.forEach((detail) => {
-    checkPageBreak(7);
-    doc.setFont(undefined, 'bold');
-    const labelWidth = doc.getTextWidth(`${detail.label}: `);
-    doc.text(`${detail.label}: `, margin, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(detail.value, margin + labelWidth, yPos);
-    yPos += 6;
-  });
-
-  yPos += 8;
-
-  // Sessions section
-  checkPageBreak(15);
-  doc.setFontSize(14);
-  doc.setTextColor(...colors.primary);
-  doc.text('היסטוריית מפגשים', margin, yPos);
-  yPos += 10;
-
-  if (!sessions || sessions.length === 0) {
-    doc.setFontSize(10);
-    doc.setTextColor(...colors.secondary);
-    doc.text('לא נמצאו מפגשים מתועדים', margin, yPos);
-  } else {
-    // Sort sessions by date (most recent first)
-    const sortedSessions = [...sessions].sort((a, b) => {
-      if (!a?.date || !b?.date) return 0;
-      return a.date < b.date ? 1 : -1;
+    // Convert HTML to canvas
+    const canvas = await html2canvas(container, {
+      scale: 2, // Higher quality
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
     });
 
-    for (const session of sortedSessions) {
-      checkPageBreak(20);
+    // Create PDF
+    const imgWidth = 210; // A4 width in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pageHeight = 297; // A4 height in mm
+    
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
 
-      // Session date header with background
-      doc.setFillColor(...colors.lightGray);
-      doc.setDrawColor(...colors.border);
-      doc.rect(margin, yPos, contentWidth, 8, 'FD');
-      
-      doc.setFontSize(11);
-      doc.setTextColor(...colors.text);
-      doc.setFont(undefined, 'bold');
-      doc.text(formatSessionDate(session.date), margin + 2, yPos + 5.5);
-      yPos += 10;
+    let heightLeft = imgHeight;
+    let position = 0;
 
-      // Service context
-      if (session.service_context) {
-        checkPageBreak(7);
-        doc.setFontSize(9);
-        doc.setTextColor(...colors.secondary);
-        doc.setFont(undefined, 'normal');
-        doc.text(`שירות: ${session.service_context}`, margin + 2, yPos);
-        yPos += 6;
-      }
+    // Add first page
+    doc.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
 
-      // Session content/answers
-      const answers = buildAnswerList(session.content, questions);
-      
-      if (answers.length > 0) {
-        doc.setFontSize(9);
-        doc.setTextColor(...colors.text);
-        
-        for (const answer of answers) {
-          checkPageBreak(15);
-
-          doc.setFont(undefined, 'bold');
-          doc.text(answer.label, margin + 2, yPos);
-          yPos += 5;
-
-          doc.setFont(undefined, 'normal');
-          // Split text into lines to handle wrapping
-          const lines = doc.splitTextToSize(answer.value, contentWidth - 4);
-          lines.forEach((line) => {
-            checkPageBreak(5);
-            doc.text(line, margin + 2, yPos, { align: 'right', maxWidth: contentWidth - 4 });
-            yPos += 5;
-          });
-          yPos += 3;
-        }
-      } else {
-        checkPageBreak(7);
-        doc.setFontSize(9);
-        doc.setTextColor(...colors.secondary);
-        doc.text('לא תועדו תשובות עבור מפגש זה', margin + 2, yPos);
-        yPos += 6;
-      }
-
-      yPos += 5; // Space between sessions
+    // Add additional pages if needed
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      doc.addPage();
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
     }
+
+    // Generate filename with student name and date
+    const date = new Date().toISOString().split('T')[0];
+    const studentName = (student.name || 'Student').replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
+    const filename = `${studentName}_Records_${date}.pdf`;
+
+    // Save the PDF
+    doc.save(filename);
+  } finally {
+    // Clean up: remove temporary container
+    document.body.removeChild(container);
   }
-
-  // Footer with generation date on all pages
-  const totalPages = doc.internal.pages.length - 1; // -1 because pages array includes a null first element
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(...colors.secondary);
-    const footerText = `נוצר בתאריך ${new Date().toLocaleDateString('he-IL')} | עמוד ${i} מתוך ${totalPages}`;
-    doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
-  }
-
-  // Generate filename with student name and date
-  const date = new Date().toISOString().split('T')[0];
-  const studentName = (student.name || 'Student').replace(/[^a-zA-Z0-9\u0590-\u05FF]/g, '_');
-  const filename = `${studentName}_Records_${date}.pdf`;
-
-  // Save the PDF
-  doc.save(filename);
 }
 
 /**

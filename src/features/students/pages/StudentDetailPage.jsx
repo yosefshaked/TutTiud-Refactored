@@ -498,12 +498,12 @@ export default function StudentDetailPage() {
           <h1 className="text-xl font-semibold text-foreground sm:text-2xl">פרטי תלמיד</h1>
           <p className="text-xs text-neutral-600 sm:text-sm">סקירת הפרטים והמפגשים של {student?.name || 'תלמיד ללא שם'}.</p>
         </div>
-        <div className="flex gap-2 self-start">
+        <div className="flex flex-wrap gap-2 self-start">
         {canEdit ? (
           <>
           <Button
             type="button"
-            className="self-start text-sm"
+            className="text-sm"
             size="sm"
             onClick={handleExportToPdf}
             disabled={studentLoadError || isStudentLoading || !student || isExporting || sessions.length === 0}
@@ -518,7 +518,7 @@ export default function StudentDetailPage() {
           </Button>
           <Button
             type="button"
-            className="self-start text-sm"
+            className="text-sm"
             size="sm"
             onClick={handleOpenEdit}
             disabled={studentLoadError || isStudentLoading || !student}
@@ -531,7 +531,7 @@ export default function StudentDetailPage() {
         ) : null}
         <Button
           type="button"
-          className="self-start text-sm"
+          className="text-sm"
           size="sm"
           onClick={handleOpenSessionModal}
           disabled={studentLoadError || isStudentLoading || !student}
