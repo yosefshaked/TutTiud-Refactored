@@ -1,7 +1,9 @@
 /* eslint-env browser */
 import { jsPDF } from 'jspdf';
 import "@/lib/fonts/rubik"; // Rubik font JS (converted via jsPDF fontconverter)
-import { addHebrewFont, reverseHebrewText } from './hebrewFontHelper.js';
+import { addHebrewFont } from './hebrewFontHelper.js';
+
+const HEBREW_REGEX = /[\u0590-\u05FF]/;
 
 /**
  * Fetch and convert an image URL to a data URL for embedding in PDF
@@ -70,8 +72,19 @@ export async function generateStudentReport({ student, sessions, org, questions 
   // Ensure we use the embedded Hebrew-capable font
   try { doc.setFont('Rubik', 'normal'); } catch (e) { void e; /* ignore missing style variant in jsPDF */ }
 
-  // Helper for RTL Hebrew rendering (reverses only Hebrew segments)
-  const t = (s) => reverseHebrewText(String(s ?? ''));
+  // Render text with automatic RTL handling when Hebrew glyphs are detected
+  const drawText = (value, x, y, drawOptions = {}) => {
+    const str = value == null ? '' : String(value);
+    if (str.length === 0) {
+      return;
+    }
+    const rtlOptions = { lang: 'he', isInputRtl: true, isOutputRtl: true };
+    if (HEBREW_REGEX.test(str)) {
+      doc.text(str, x, y, drawOptions, rtlOptions);
+    } else {
+      doc.text(str, x, y, drawOptions);
+    }
+  };
 
   // Page dimensions
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -146,7 +159,7 @@ export async function generateStudentReport({ student, sessions, org, questions 
   if (!rightHeaderUsed) {
     doc.setFontSize(16);
     doc.setTextColor(...colors.primary);
-    doc.text('TutTiud', pageWidth - margin - 2, yPos + 10, { align: 'right' });
+    drawText('TutTiud', pageWidth - margin - 2, yPos + 10, { align: 'right' });
   }
 
   // Conditionally render organization logo on the left if permission is enabled
@@ -210,20 +223,20 @@ export async function generateStudentReport({ student, sessions, org, questions 
 
   doc.setTextColor(...colors.text);
   doc.setFontSize(12);
-  doc.text(t('פרטי תלמיד'), pageWidth - margin - 2, yPos + 7, { align: 'right' });
+  drawText('פרטי תלמיד', pageWidth - margin - 2, yPos + 7, { align: 'right' });
 
   doc.setFontSize(10);
-  const line1 = t(`שם: ${student?.name ?? ''}`);
-  const line2 = t(`טלפון: ${student?.contact_phone ?? ''}`);
-  const line3 = t(`מדריך: ${student?.instructor_name ?? ''}`);
-  const line4 = t(`שירות: ${student?.default_service ?? ''}`);
+  const line1 = `שם: ${student?.name ?? ''}`;
+  const line2 = `טלפון: ${student?.contact_phone ?? ''}`;
+  const line3 = `מדריך: ${student?.instructor_name ?? ''}`;
+  const line4 = `שירות: ${student?.default_service ?? ''}`;
 
   const colRightX = pageWidth - margin - 2;
   const colLeftX = margin + 2 + contentWidth / 2;
-  doc.text(line1, colRightX, yPos + 14, { align: 'right' });
-  doc.text(line2, colRightX, yPos + 20, { align: 'right' });
-  doc.text(line3, colLeftX, yPos + 14, { align: 'right' });
-  doc.text(line4, colLeftX, yPos + 20, { align: 'right' });
+  drawText(line1, colRightX, yPos + 14, { align: 'right' });
+  drawText(line2, colRightX, yPos + 20, { align: 'right' });
+  drawText(line3, colLeftX, yPos + 14, { align: 'right' });
+  drawText(line4, colLeftX, yPos + 20, { align: 'right' });
 
   yPos += 34;
 
@@ -231,13 +244,13 @@ export async function generateStudentReport({ student, sessions, org, questions 
   checkPageBreak(15);
   doc.setFontSize(14);
   doc.setTextColor(...colors.primary);
-  doc.text(t('היסטוריית מפגשים'), pageWidth - margin, yPos, { align: 'right' });
+  drawText('היסטוריית מפגשים', pageWidth - margin, yPos, { align: 'right' });
   yPos += 10;
 
   if (!sessions || sessions.length === 0) {
     doc.setFontSize(10);
     doc.setTextColor(...colors.secondary);
-  doc.text(t('לא נמצאו מפגשים מתועדים'), pageWidth - margin, yPos, { align: 'right' });
+    drawText('לא נמצאו מפגשים מתועדים', pageWidth - margin, yPos, { align: 'right' });
   } else {
     // Sort sessions by date (most recent first)
     const sortedSessions = [...sessions].sort((a, b) => {
@@ -253,19 +266,19 @@ export async function generateStudentReport({ student, sessions, org, questions 
       doc.setDrawColor(...colors.border);
       doc.rect(margin, yPos, contentWidth, 8, 'FD');
       
-  doc.setFontSize(11);
-  doc.setTextColor(...colors.text);
-  try { doc.setFont('Rubik', 'normal'); } catch (e) { void e; }
-  doc.text(t(formatSessionDate(session.date)), pageWidth - margin - 2, yPos + 5.5, { align: 'right' });
+    doc.setFontSize(11);
+    doc.setTextColor(...colors.text);
+    try { doc.setFont('Rubik', 'normal'); } catch (e) { void e; }
+    drawText(formatSessionDate(session.date), pageWidth - margin - 2, yPos + 5.5, { align: 'right' });
       yPos += 10;
 
       // Service context
       if (session.service_context) {
         checkPageBreak(7);
-  doc.setFontSize(9);
-  doc.setTextColor(...colors.secondary);
-  try { doc.setFont('Rubik', 'normal'); } catch (e) { void e; }
-  doc.text(t(`שירות: ${session.service_context}`), pageWidth - margin - 2, yPos, { align: 'right' });
+    doc.setFontSize(9);
+    doc.setTextColor(...colors.secondary);
+    try { doc.setFont('Rubik', 'normal'); } catch (e) { void e; }
+    drawText(`שירות: ${session.service_context}`, pageWidth - margin - 2, yPos, { align: 'right' });
         yPos += 6;
       }
 
@@ -273,31 +286,31 @@ export async function generateStudentReport({ student, sessions, org, questions 
       const answers = buildAnswerList(session.content, questions);
       
       if (answers.length > 0) {
-        doc.setFontSize(9);
-        doc.setTextColor(...colors.text);
-  try { doc.setFont('Rubik', 'normal'); } catch (e) { void e; }
+    doc.setFontSize(9);
+    doc.setTextColor(...colors.text);
+    try { doc.setFont('Rubik', 'normal'); } catch (e) { void e; }
 
         for (const answer of answers) {
           checkPageBreak(15);
 
           // Question label
-          doc.text(t(answer.label), pageWidth - margin - 2, yPos, { align: 'right' });
+          drawText(answer.label, pageWidth - margin - 2, yPos, { align: 'right' });
           yPos += 5;
 
           // Split text into lines to handle wrapping (apply RTL processing first)
-          const wrapped = doc.splitTextToSize(t(answer.value), contentWidth - 4);
+          const wrapped = doc.splitTextToSize(String(answer.value ?? ''), contentWidth - 4);
           wrapped.forEach((line) => {
             checkPageBreak(5);
-            doc.text(line, pageWidth - margin - 2, yPos, { align: 'right', maxWidth: contentWidth - 4 });
+            drawText(line, pageWidth - margin - 2, yPos, { align: 'right', maxWidth: contentWidth - 4 });
             yPos += 5;
           });
           yPos += 3;
         }
       } else {
         checkPageBreak(7);
-        doc.setFontSize(9);
-        doc.setTextColor(...colors.secondary);
-        doc.text(t('לא תועדו תשובות עבור מפגש זה'), pageWidth - margin - 2, yPos, { align: 'right' });
+  doc.setFontSize(9);
+  doc.setTextColor(...colors.secondary);
+  drawText('לא תועדו תשובות עבור מפגש זה', pageWidth - margin - 2, yPos, { align: 'right' });
         yPos += 6;
       }
 
@@ -311,8 +324,8 @@ export async function generateStudentReport({ student, sessions, org, questions 
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(...colors.secondary);
-    const footerText = t(`נוצר בתאריך ${new Date().toLocaleDateString('he-IL')} | עמוד ${i} מתוך ${totalPages}`);
-    doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    const footerText = `נוצר בתאריך ${new Date().toLocaleDateString('he-IL')} | עמוד ${i} מתוך ${totalPages}`;
+    drawText(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
   }
 
   // Generate filename with student name and date

@@ -1,60 +1,16 @@
 /* eslint-env browser */
 
 /**
- * Check if a character is Hebrew
- * @param {string} char - Character to check
- * @returns {boolean} True if Hebrew
- */
-function isHebrew(char) {
-  const code = char.charCodeAt(0);
-  return (code >= 0x0590 && code <= 0x05FF) || (code >= 0xFB1D && code <= 0xFB4F);
-}
-
-/**
- * Reverse Hebrew text for proper RTL display in jsPDF
- * This function handles mixed Hebrew and Latin text, reversing only the Hebrew portions
+ * Legacy helper kept for backwards compatibility with older PDF exports.
+ * jsPDF now handles bidi text directly, so we simply coerce to string.
  * @param {string} text - Text to process
- * @returns {string} Processed text with Hebrew portions reversed
+ * @returns {string} Stringified text ready for rendering
  */
 export function reverseHebrewText(text) {
   if (text === null || text === undefined) return '';
-  const str = String(text);
-
-  // Split into segments by Hebrew vs non-Hebrew. We will reverse only the
-  // characters inside Hebrew segments and keep the overall segment order.
-  // This preserves the natural order of numbers and punctuation.
-  const segments = [];
-  let buf = '';
-  let currentHebrew = undefined;
-
-  const flush = () => {
-    if (!buf) return;
-    if (currentHebrew === true) {
-      segments.push(buf.split('').reverse().join(''));
-    } else {
-      segments.push(buf);
-    }
-    buf = '';
-  };
-
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i];
-    const isHeb = isHebrew(ch);
-    if (currentHebrew === undefined) {
-      currentHebrew = isHeb;
-      buf = ch;
-    } else if (isHeb === currentHebrew) {
-      buf += ch;
-    } else {
-      flush();
-      currentHebrew = isHeb;
-      buf = ch;
-    }
-  }
-  flush();
-
-  // Join segments in original order
-  return segments.join('');
+  // jsPDF 2.5+ offers native bidi support, so we no longer need to flip glyphs.
+  // Keep this function as a passthrough for backwards compatibility.
+  return String(text);
 }
 
 /**
