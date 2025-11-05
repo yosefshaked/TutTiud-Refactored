@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
-  const [expandedVersions, setExpandedVersions] = useState({ '1.1.0': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.1.1': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -88,6 +88,89 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.1.1 - Sorting & Layout */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header 
+                onClick={() => toggleVersion('1.1.1')}
+                style={{ 
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.1.1'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.1.1'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ 
+                      background: '#5B5BD6', 
+                      color: 'white', 
+                      padding: '4px 12px', 
+                      borderRadius: '6px', 
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.1.1
+                    </span>
+                    <time dateTime="2025-11-05" style={{ color: '#64748b', fontSize: '14px' }}>
+                      5 בנובמבר 2025
+                    </time>
+                  </div>
+                  <span style={{ 
+                    fontSize: '20px', 
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.1.1'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{ 
+                  fontWeight: 700, 
+                  fontSize: 18, 
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  🔀 מיון ושיפורי תצוגה
+                </h3>
+              </header>
+
+              {expandedVersions['1.1.1'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שינויים ושיפורים:
+                </h4>
+                <ul style={{ 
+                  listStyle: 'none', 
+                  padding: 0, 
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>שינוי ברירת מחדל למיון:</strong> ברירת המחדל ברשימת התלמידים היא עכשיו לפי יום ושעה במקום לפי שם
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>מיון מתקדם (מנהלים בלבד):</strong> עכשיו ניתן למיין את עמוד התלמידים לפי מדריך / שם / יום ושעה
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>שיפור תצוגת פרופיל תלמיד:</strong> עיצוב ופריסה משופרים בדף פרופיל התלמיד
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.1.0 - Tags & Invitations */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>

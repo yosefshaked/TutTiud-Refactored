@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ComboBoxField, TimeField } from '@/components/ui/forms-ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
+import { sortStudentsBySchedule } from '@/features/students/utils/sorting.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
@@ -93,6 +94,16 @@ export default function NewSessionForm({
     return students.find((student) => student?.id === selectedStudentId) || null;
   }, [students, selectedStudentId]);
 
+  // Build instructor map for sorting
+  const instructorMap = useMemo(() => {
+    return instructors.reduce((map, instructor) => {
+      if (instructor?.id) {
+        map.set(instructor.id, instructor);
+      }
+      return map;
+    }, new Map());
+  }, [instructors]);
+
   const filteredStudents = useMemo(() => {
     const q = studentQuery.trim().toLowerCase();
 
@@ -100,31 +111,35 @@ export default function NewSessionForm({
     // We still apply day filter and text query locally for responsiveness.
     const byDay = students.filter((s) => dayMatches(s?.default_day_of_week, studentDayFilter));
 
-    if (!q) return byDay;
+    let filtered = byDay;
+    if (q) {
+      // Apply text query over the day-filtered list
+      filtered = byDay.filter((s) => {
+        try {
+          const name = String(s?.name || '').toLowerCase();
+          if (name.includes(q)) return true;
 
-    // Then apply text query over the day-filtered list
-    return byDay.filter((s) => {
-      try {
-        const name = String(s?.name || '').toLowerCase();
-        if (name.includes(q)) return true;
+    // Match by Hebrew day label (e.g., "יום שני")
+    if (includesDayQuery(s?.default_day_of_week, q)) return true;
 
-  // Match by Hebrew day label (e.g., "יום שני")
-  if (includesDayQuery(s?.default_day_of_week, q)) return true;
+          // Match by time (e.g., 14:30)
+          const timeStr = String(describeSchedule(null, s?.default_session_time) || '').toLowerCase();
+          if (timeStr.includes(q)) return true;
 
-        // Match by time (e.g., 14:30)
-        const timeStr = String(describeSchedule(null, s?.default_session_time) || '').toLowerCase();
-        if (timeStr.includes(q)) return true;
+          // Also match full schedule text
+          const fullSchedule = String(describeSchedule(s?.default_day_of_week, s?.default_session_time) || '').toLowerCase();
+          if (fullSchedule.includes(q)) return true;
 
-        // Also match full schedule text
-        const fullSchedule = String(describeSchedule(s?.default_day_of_week, s?.default_session_time) || '').toLowerCase();
-        if (fullSchedule.includes(q)) return true;
+          return false;
+        } catch {
+          return false;
+        }
+      });
+    }
 
-        return false;
-      } catch {
-        return false;
-      }
-    });
-  }, [students, studentQuery, studentDayFilter]);
+    // Apply default sorting by schedule (day → hour → instructor → name)
+    return sortStudentsBySchedule(filtered, instructorMap);
+  }, [students, studentQuery, studentDayFilter, instructorMap]);
 
   useEffect(() => {
     // If the currently selected student is filtered out, clear the selection

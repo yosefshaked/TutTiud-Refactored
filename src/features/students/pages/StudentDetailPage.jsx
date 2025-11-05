@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, Phone, Calendar, Clock, User, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -133,6 +133,8 @@ export default function StudentDetailPage() {
   const [tagsState, setTagsState] = useState(REQUEST_STATE.idle);
   const [tagsError, setTagsError] = useState('');
 
+  const [instructors, setInstructors] = useState([]);
+
   // Edit student modal state
   const [studentForEdit, setStudentForEdit] = useState(null);
   const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
@@ -250,11 +252,27 @@ export default function StudentDetailPage() {
     }
   }, [canFetch, studentId, activeOrgId]);
 
+  const loadInstructors = useCallback(async () => {
+    if (!canFetch) {
+      return;
+    }
+
+    try {
+      const searchParams = new URLSearchParams({ org_id: activeOrgId });
+      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`);
+      setInstructors(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      console.error('Failed to load instructors', error);
+      setInstructors([]);
+    }
+  }, [canFetch, activeOrgId]);
+
   useEffect(() => {
     if (canFetch) {
       void loadStudent();
       void loadQuestions();
       void loadSessions();
+      void loadInstructors();
     } else {
       setStudentState(REQUEST_STATE.idle);
       setStudentError('');
@@ -265,8 +283,9 @@ export default function StudentDetailPage() {
       setSessionState(REQUEST_STATE.idle);
       setSessionError('');
       setSessions([]);
+      setInstructors([]);
     }
-  }, [canFetch, loadStudent, loadQuestions, loadSessions]);
+  }, [canFetch, loadStudent, loadQuestions, loadSessions, loadInstructors]);
 
   const hasStudentTags = Array.isArray(student?.tags) && student.tags.length > 0;
   const studentIdentifier = student?.id || '';
@@ -435,6 +454,9 @@ export default function StudentDetailPage() {
   const tagDisplayList = buildTagDisplayList(student?.tags, tagCatalog);
   const isTagsLoading = tagsState === REQUEST_STATE.loading;
   const tagsLoadError = tagsState === REQUEST_STATE.error;
+  
+  const assignedInstructor = instructors.find((inst) => inst?.id === student?.assigned_instructor_id);
+  const instructorName = assignedInstructor?.name || (student?.assigned_instructor_id ? 'מדריך לא זמין' : 'לא הוקצה מדריך');
 
   return (
     <>
@@ -485,44 +507,52 @@ export default function StudentDetailPage() {
               {studentError}
             </div>
           ) : student ? (
-            <dl className="grid gap-md sm:gap-lg md:grid-cols-2">
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <User className="h-4 w-4" aria-hidden="true" />
-                  שם התלמיד
-                </dt>
-                <dd className="text-sm font-semibold text-foreground sm:text-base">{student.name}</dd>
+            <dl className="grid grid-cols-2 gap-md text-sm sm:gap-lg lg:grid-cols-3">
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם התלמיד</dt>
+                <dd className="font-semibold text-foreground">{student.name}</dd>
               </div>
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <Phone className="h-4 w-4" aria-hidden="true" />
-                  איש קשר
-                </dt>
-                <dd className="text-sm text-foreground sm:text-base">{contactName}</dd>
-                {contactPhone ? (
-                  <dd className="text-xs text-neutral-600 sm:text-sm">טלפון: {contactPhone}</dd>
-                ) : null}
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מדריך מוקצה</dt>
+                <dd className="text-foreground">{instructorName}</dd>
               </div>
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <Calendar className="h-4 w-4" aria-hidden="true" />
-                  יום ושעה קבועים
-                </dt>
-                <dd className="text-sm text-foreground sm:text-base">{scheduleDescription}</dd>
-                {student?.default_session_time ? (
-                  <dd className="text-xs text-neutral-600 sm:text-sm">שעת ברירת מחדל: {formatDefaultTime(student.default_session_time)}</dd>
-                ) : null}
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שירות ברירת מחדל</dt>
+                <dd className="text-foreground">{defaultService}</dd>
               </div>
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <Clock className="h-4 w-4" aria-hidden="true" />
-                  שירות ברירת מחדל
-                </dt>
-                <dd className="text-sm text-foreground sm:text-base">{defaultService}</dd>
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">יום ושעה</dt>
+                <dd className="text-foreground">{scheduleDescription}</dd>
               </div>
+              {student?.default_session_time ? (
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שעה</dt>
+                  <dd className="text-foreground">{formatDefaultTime(student.default_session_time)}</dd>
+                </div>
+              ) : null}
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם איש קשר</dt>
+                <dd className="text-foreground">{contactName}</dd>
+              </div>
+              {contactPhone ? (
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">טלפון</dt>
+                  <dd className="text-foreground">
+                    <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
+                      {contactPhone}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+              {contactInfo ? (
+                <div className="space-y-1 col-span-2 lg:col-span-3">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מידע נוסף</dt>
+                  <dd className="whitespace-pre-wrap break-words text-foreground">{contactInfo}</dd>
+                </div>
+              ) : null}
               {hasStudentTags ? (
-                <div className="space-y-xs sm:col-span-2">
-                  <dt className="text-xs font-medium text-neutral-600 sm:text-sm">תגיות</dt>
+                <div className="space-y-1 col-span-2 lg:col-span-3">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">תגיות</dt>
                   <dd>
                     {isTagsLoading ? (
                       <span className="text-xs text-neutral-500 sm:text-sm">טוען תגיות...</span>
@@ -545,12 +575,6 @@ export default function StudentDetailPage() {
                       <span className="text-xs text-neutral-500 sm:text-sm">לא נמצאו תגיות תואמות.</span>
                     )}
                   </dd>
-                </div>
-              ) : null}
-              {contactInfo ? (
-                <div className="space-y-xs sm:col-span-2">
-                  <dt className="text-xs font-medium text-neutral-600 sm:text-sm">פרטי קשר נוספים</dt>
-                  <dd className="whitespace-pre-wrap break-words text-xs text-neutral-700 sm:text-sm">{contactInfo}</dd>
                 </div>
               ) : null}
             </dl>

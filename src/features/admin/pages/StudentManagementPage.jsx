@@ -15,9 +15,10 @@ import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentFo
 // Removed legacy instructor assignment modal; instructor is edited inside EditStudent now
 import EditStudentModal from '../components/EditStudentModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
-import { includesDayQuery } from '@/features/students/utils/schedule.js';
+import { includesDayQuery, DAY_NAMES, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
+import { getStudentComparator, STUDENT_SORT_OPTIONS } from '@/features/students/utils/sorting.js';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -44,6 +45,7 @@ export default function StudentManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dayFilter, setDayFilter] = useState(null);
   const [instructorFilterId, setInstructorFilterId] = useState('');
+  const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE); // Default sort by schedule
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -339,8 +341,12 @@ export default function StudentManagementPage() {
       });
     }
 
-    return filtered;
-  }, [students, filterMode, user?.id, searchQuery, dayFilter, instructorFilterId]);
+    // Apply sorting
+    const comparator = getStudentComparator(sortBy, instructorMap);
+    const sorted = [...filtered].sort(comparator);
+
+    return sorted;
+  }, [students, filterMode, user?.id, searchQuery, dayFilter, instructorFilterId, sortBy, instructorMap]);
 
   if (supabaseLoading) {
     return (
@@ -396,16 +402,18 @@ export default function StudentManagementPage() {
     >
 
       <Card className="w-full">
-        <CardHeader className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-semibold text-foreground">רשימת תלמידים</CardTitle>
-          <div className="flex flex-col gap-sm sm:flex-row sm:items-center">
+        <CardHeader className="space-y-sm">
+          <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base font-semibold text-foreground">רשימת תלמידים</CardTitle>
             {instructorsState === REQUEST_STATES.loading ? (
               <p className="flex items-center gap-xs text-sm text-neutral-600">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 טוען רשימת מדריכים...
               </p>
             ) : null}
-            <div className="relative w-full sm:w-64">
+          </div>
+          <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+            <div className="relative sm:col-span-2">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
               <Input
                 type="text"
@@ -425,12 +433,23 @@ export default function StudentManagementPage() {
                 </button>
               )}
             </div>
-            <div className="sm:w-56">
-              <DayOfWeekSelect
-                value={dayFilter}
-                onChange={setDayFilter}
-                placeholder="סינון לפי יום"
-              />
+            <DayOfWeekSelect
+              value={dayFilter}
+              onChange={setDayFilter}
+              placeholder="סינון לפי יום"
+            />
+            <div className="flex items-center gap-2 text-sm">
+              <label htmlFor="students-sort" className="text-neutral-600 whitespace-nowrap">מיון:</label>
+              <select
+                id="students-sort"
+                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value={STUDENT_SORT_OPTIONS.SCHEDULE}>יום ושעה</option>
+                <option value={STUDENT_SORT_OPTIONS.NAME}>שם התלמיד</option>
+                <option value={STUDENT_SORT_OPTIONS.INSTRUCTOR}>מדריך</option>
+              </select>
             </div>
             {hasActiveFilters && (
               <Button
@@ -484,6 +503,8 @@ export default function StudentManagementPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-right text-sm font-medium text-neutral-600">שם התלמיד</TableHead>
+                  <TableHead className="hidden text-right text-sm font-medium text-neutral-600 md:table-cell">יום</TableHead>
+                  <TableHead className="hidden text-right text-sm font-medium text-neutral-600 md:table-cell">שעה</TableHead>
                   <TableHead className="hidden text-right text-sm font-medium text-neutral-600 sm:table-cell">פרטי קשר</TableHead>
                   <TableHead className="w-[100px] text-right text-sm font-medium text-neutral-600">פעולות</TableHead>
                 </TableRow>
@@ -494,6 +515,8 @@ export default function StudentManagementPage() {
                   const contactName = student.contact_name || '';
                   const contactPhone = student.contact_phone || '';
                   const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ') || '—';
+                  const dayLabel = DAY_NAMES[student.default_day_of_week] || '—';
+                  const timeLabel = formatDefaultTime(student.default_session_time) || '—';
                   
                   return (
                     <TableRow key={student.id}>
@@ -525,6 +548,10 @@ export default function StudentManagementPage() {
                                 )}
                               </div>
                             ) : null}
+                            {/* Show day and time on mobile (md breakpoint hides the separate columns) */}
+                            <div className="mt-0.5 text-xs text-neutral-500 md:hidden">
+                              {dayLabel} • {timeLabel}
+                            </div>
                           </div>
                           {contactDisplay !== '—' && (
                             <Popover>
@@ -559,6 +586,12 @@ export default function StudentManagementPage() {
                             </Popover>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="hidden text-sm text-neutral-600 md:table-cell">
+                        {dayLabel}
+                      </TableCell>
+                      <TableCell className="hidden text-sm text-neutral-600 md:table-cell">
+                        {timeLabel}
                       </TableCell>
                       <TableCell className="hidden text-sm text-neutral-600 sm:table-cell">
                         {contactDisplay}
