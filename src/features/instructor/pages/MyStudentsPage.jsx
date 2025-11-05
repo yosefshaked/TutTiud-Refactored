@@ -14,6 +14,7 @@ import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/f
 import { includesDayQuery, describeSchedule } from "@/features/students/utils/schedule.js"
 import { sortStudentsBySchedule } from "@/features/students/utils/sorting.js"
 import DayOfWeekSelect from "@/components/ui/DayOfWeekSelect.jsx"
+import { saveFilterState, loadFilterState } from "@/features/students/utils/filter-state.js"
 
 const REQUEST_STATUS = Object.freeze({
   idle: "idle",
@@ -46,6 +47,27 @@ export default function MyStudentsPage() {
       !isAdminMember
     )
   }, [activeOrgId, tenantClientReady, activeOrgHasConnection, supabaseLoading, isAdminMember])
+
+  // Load saved filter state on mount
+  useEffect(() => {
+    if (activeOrgId) {
+      const savedFilters = loadFilterState(activeOrgId, 'instructor')
+      if (savedFilters) {
+        if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery)
+        if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter)
+      }
+    }
+  }, [activeOrgId])
+
+  // Save filter state whenever it changes
+  useEffect(() => {
+    if (activeOrgId) {
+      saveFilterState(activeOrgId, 'instructor', {
+        searchQuery,
+        dayFilter,
+      })
+    }
+  }, [activeOrgId, searchQuery, dayFilter])
 
   useEffect(() => {
     if (!canFetch) {
