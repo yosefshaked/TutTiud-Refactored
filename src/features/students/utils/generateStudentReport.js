@@ -1,5 +1,6 @@
 /* eslint-env browser */
 import { jsPDF } from 'jspdf';
+import "@/lib/fonts/rubik"; // Rubik font JS (converted via jsPDF fontconverter)
 import { addHebrewFont, reverseHebrewText } from './hebrewFontHelper.js';
 
 /**
@@ -38,8 +39,8 @@ async function fetchImageAsDataUrl(url) {
 function fitImageToBounds(imgWidth, imgHeight, maxWidth, maxHeight) {
   const ratio = Math.min(maxWidth / imgWidth, maxHeight / imgHeight);
   return {
-    width: imgWidth * ratio,
-    height: imgHeight * ratio,
+    width: Math.round(imgWidth * ratio),
+    height: Math.round(imgHeight * ratio),
   };
 }
 
@@ -88,16 +89,15 @@ export async function generateStudentReport({ student, sessions, org, questions 
   };
 
   let yPos = margin;
-
-  // Helper to check if we need a new page
-  const checkPageBreak = (requiredSpace) => {
+  // Helper for page break (keeps yPos in bounds)
+  function checkPageBreak(requiredSpace) {
     if (yPos + requiredSpace > pageHeight - margin) {
       doc.addPage();
       yPos = margin;
       return true;
     }
     return false;
-  };
+  }
 
   // Header with logo(s)
   const logoHeight = 15;
