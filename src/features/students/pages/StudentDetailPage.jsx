@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, Phone, Calendar, Clock, User, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -507,52 +507,72 @@ export default function StudentDetailPage() {
               {studentError}
             </div>
           ) : student ? (
-            <dl className="grid gap-md sm:gap-lg md:grid-cols-2">
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <User className="h-4 w-4" aria-hidden="true" />
-                  שם התלמיד
-                </dt>
-                <dd className="text-sm font-semibold text-foreground sm:text-base">{student.name}</dd>
+            <div className="space-y-lg">
+              {/* Primary Information */}
+              <dl className="grid gap-md text-sm sm:grid-cols-2 sm:gap-lg lg:grid-cols-3">
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם התלמיד</dt>
+                  <dd className="font-semibold text-foreground">{student.name}</dd>
+                </div>
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מדריך מוקצה</dt>
+                  <dd className="text-foreground">{instructorName}</dd>
+                </div>
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שירות ברירת מחדל</dt>
+                  <dd className="text-foreground">{defaultService}</dd>
+                </div>
+              </dl>
+
+              {/* Schedule Information */}
+              <div>
+                <h3 className="mb-sm text-xs font-semibold text-neutral-700 sm:text-sm">מועד מפגש קבוע</h3>
+                <dl className="grid gap-md text-sm sm:grid-cols-2 sm:gap-lg">
+                  <div className="space-y-1">
+                    <dt className="text-xs font-medium text-neutral-500 sm:text-sm">יום ושעה</dt>
+                    <dd className="text-foreground">{scheduleDescription}</dd>
+                  </div>
+                  {student?.default_session_time ? (
+                    <div className="space-y-1">
+                      <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שעה</dt>
+                      <dd className="text-foreground">{formatDefaultTime(student.default_session_time)}</dd>
+                    </div>
+                  ) : null}
+                </dl>
               </div>
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <Phone className="h-4 w-4" aria-hidden="true" />
-                  איש קשר
-                </dt>
-                <dd className="text-sm text-foreground sm:text-base">{contactName}</dd>
-                {contactPhone ? (
-                  <dd className="text-xs text-neutral-600 sm:text-sm">טלפון: {contactPhone}</dd>
-                ) : null}
+
+              {/* Contact Information */}
+              <div>
+                <h3 className="mb-sm text-xs font-semibold text-neutral-700 sm:text-sm">פרטי קשר</h3>
+                <dl className="grid gap-md text-sm sm:grid-cols-2 sm:gap-lg">
+                  <div className="space-y-1">
+                    <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם איש קשר</dt>
+                    <dd className="text-foreground">{contactName}</dd>
+                  </div>
+                  {contactPhone ? (
+                    <div className="space-y-1">
+                      <dt className="text-xs font-medium text-neutral-500 sm:text-sm">טלפון</dt>
+                      <dd className="text-foreground">
+                        <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
+                          {contactPhone}
+                        </a>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {contactInfo ? (
+                    <div className="space-y-1 sm:col-span-2">
+                      <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מידע נוסף</dt>
+                      <dd className="whitespace-pre-wrap break-words text-foreground">{contactInfo}</dd>
+                    </div>
+                  ) : null}
+                </dl>
               </div>
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <User className="h-4 w-4" aria-hidden="true" />
-                  מדריך מוקצה
-                </dt>
-                <dd className="text-sm text-foreground sm:text-base">{instructorName}</dd>
-              </div>
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <Calendar className="h-4 w-4" aria-hidden="true" />
-                  יום ושעה קבועים
-                </dt>
-                <dd className="text-sm text-foreground sm:text-base">{scheduleDescription}</dd>
-                {student?.default_session_time ? (
-                  <dd className="text-xs text-neutral-600 sm:text-sm">שעת ברירת מחדל: {formatDefaultTime(student.default_session_time)}</dd>
-                ) : null}
-              </div>
-              <div className="space-y-xs">
-                <dt className="flex items-center gap-xs text-xs font-medium text-neutral-600 sm:text-sm">
-                  <Clock className="h-4 w-4" aria-hidden="true" />
-                  שירות ברירת מחדל
-                </dt>
-                <dd className="text-sm text-foreground sm:text-base">{defaultService}</dd>
-              </div>
+
+              {/* Tags */}
               {hasStudentTags ? (
-                <div className="space-y-xs sm:col-span-2">
-                  <dt className="text-xs font-medium text-neutral-600 sm:text-sm">תגיות</dt>
-                  <dd>
+                <div>
+                  <h3 className="mb-sm text-xs font-semibold text-neutral-700 sm:text-sm">תגיות</h3>
+                  <div>
                     {isTagsLoading ? (
                       <span className="text-xs text-neutral-500 sm:text-sm">טוען תגיות...</span>
                     ) : tagsLoadError ? (
@@ -573,16 +593,10 @@ export default function StudentDetailPage() {
                     ) : (
                       <span className="text-xs text-neutral-500 sm:text-sm">לא נמצאו תגיות תואמות.</span>
                     )}
-                  </dd>
+                  </div>
                 </div>
               ) : null}
-              {contactInfo ? (
-                <div className="space-y-xs sm:col-span-2">
-                  <dt className="text-xs font-medium text-neutral-600 sm:text-sm">פרטי קשר נוספים</dt>
-                  <dd className="whitespace-pre-wrap break-words text-xs text-neutral-700 sm:text-sm">{contactInfo}</dd>
-                </div>
-              ) : null}
-            </dl>
+            </div>
           ) : (
             <p className="text-xs text-neutral-600 sm:text-sm">לא נמצאו פרטי תלמיד להצגה.</p>
           )}
