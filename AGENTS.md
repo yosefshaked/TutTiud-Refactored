@@ -5,6 +5,8 @@
 - Prefer ES module syntax.
 
 ## Workflow
+- For premium features, always check permissions in both frontend (UI) and backend (API) before allowing access.
+- PDF export feature uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment.
 - Lint any changed JavaScript or JSX files with `npx eslint <files>`.
 - Run `npm run build` to ensure the project builds.
 - No test script is configured; note this in your testing summary.
@@ -103,6 +105,23 @@
 - Global display: `OrgLogo.jsx` component fetches and displays custom logo in AppShell header (desktop sidebar + mobile header). Falls back to TutTiud logo (`/icon.svg`) when no logo is set.
 - Logo refresh: Component refetches when `activeOrgId` changes, ensuring correct logo displays after org switch.
 - Logo sizing: Uses `object-contain` with white background padding to ensure logos fit nicely in all display locations (48px container).
+
+### PDF Export Feature (2025-11)
+- `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
+  - Validates admin/owner role and permission before processing
+  - Generates Hebrew/RTL-ready PDF with student info, session history, and custom branding
+  - Uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment
+  - Co-branding: Always displays TutTiud logo; optionally includes custom org logo if `permissions.can_use_custom_logo_on_exports = true`
+  - File naming: `[Student_Name]_Records_[Date].pdf`
+  - Resource management: Browser instance always closed in finally block to prevent memory leaks
+- Permissions added to `scripts/control-db-permissions-table.sql`:
+  - `can_export_pdf_reports` (boolean, default false) - Controls access to PDF export feature
+  - `can_use_custom_logo_on_exports` (boolean, default false) - Controls custom logo on exports
+- Frontend: Export button on `StudentDetailPage` for admin/owner roles only
+  - Conditional rendering: enabled button for permitted orgs, disabled with tooltip for non-permitted orgs
+  - Tooltip message: "ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו."
+  - Uses toast notifications for success/error feedback
+  - API client: `src/api/students-export.js` exports `exportStudentPdf()` and `downloadPdfBlob()`
 
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
