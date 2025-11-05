@@ -507,72 +507,53 @@ export default function StudentDetailPage() {
               {studentError}
             </div>
           ) : student ? (
-            <div className="space-y-lg">
-              {/* Primary Information */}
-              <dl className="grid gap-md text-sm sm:grid-cols-2 sm:gap-lg lg:grid-cols-3">
-                <div className="space-y-1">
-                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם התלמיד</dt>
-                  <dd className="font-semibold text-foreground">{student.name}</dd>
-                </div>
-                <div className="space-y-1">
-                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מדריך מוקצה</dt>
-                  <dd className="text-foreground">{instructorName}</dd>
-                </div>
-                <div className="space-y-1">
-                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שירות ברירת מחדל</dt>
-                  <dd className="text-foreground">{defaultService}</dd>
-                </div>
-              </dl>
-
-              {/* Schedule Information */}
-              <div>
-                <h3 className="mb-sm text-xs font-semibold text-neutral-700 sm:text-sm">מועד מפגש קבוע</h3>
-                <dl className="grid gap-md text-sm sm:grid-cols-2 sm:gap-lg">
-                  <div className="space-y-1">
-                    <dt className="text-xs font-medium text-neutral-500 sm:text-sm">יום ושעה</dt>
-                    <dd className="text-foreground">{scheduleDescription}</dd>
-                  </div>
-                  {student?.default_session_time ? (
-                    <div className="space-y-1">
-                      <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שעה</dt>
-                      <dd className="text-foreground">{formatDefaultTime(student.default_session_time)}</dd>
-                    </div>
-                  ) : null}
-                </dl>
+            <dl className="grid grid-cols-2 gap-md text-sm sm:gap-lg lg:grid-cols-3">
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם התלמיד</dt>
+                <dd className="font-semibold text-foreground">{student.name}</dd>
               </div>
-
-              {/* Contact Information */}
-              <div>
-                <h3 className="mb-sm text-xs font-semibold text-neutral-700 sm:text-sm">פרטי קשר</h3>
-                <dl className="grid gap-md text-sm sm:grid-cols-2 sm:gap-lg">
-                  <div className="space-y-1">
-                    <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם איש קשר</dt>
-                    <dd className="text-foreground">{contactName}</dd>
-                  </div>
-                  {contactPhone ? (
-                    <div className="space-y-1">
-                      <dt className="text-xs font-medium text-neutral-500 sm:text-sm">טלפון</dt>
-                      <dd className="text-foreground">
-                        <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
-                          {contactPhone}
-                        </a>
-                      </dd>
-                    </div>
-                  ) : null}
-                  {contactInfo ? (
-                    <div className="space-y-1 sm:col-span-2">
-                      <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מידע נוסף</dt>
-                      <dd className="whitespace-pre-wrap break-words text-foreground">{contactInfo}</dd>
-                    </div>
-                  ) : null}
-                </dl>
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מדריך מוקצה</dt>
+                <dd className="text-foreground">{instructorName}</dd>
               </div>
-
-              {/* Tags */}
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שירות ברירת מחדל</dt>
+                <dd className="text-foreground">{defaultService}</dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">יום ושעה</dt>
+                <dd className="text-foreground">{scheduleDescription}</dd>
+              </div>
+              {student?.default_session_time ? (
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שעה</dt>
+                  <dd className="text-foreground">{formatDefaultTime(student.default_session_time)}</dd>
+                </div>
+              ) : null}
+              <div className="space-y-1">
+                <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם איש קשר</dt>
+                <dd className="text-foreground">{contactName}</dd>
+              </div>
+              {contactPhone ? (
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">טלפון</dt>
+                  <dd className="text-foreground">
+                    <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
+                      {contactPhone}
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+              {contactInfo ? (
+                <div className="space-y-1 col-span-2 lg:col-span-3">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מידע נוסף</dt>
+                  <dd className="whitespace-pre-wrap break-words text-foreground">{contactInfo}</dd>
+                </div>
+              ) : null}
               {hasStudentTags ? (
-                <div>
-                  <h3 className="mb-sm text-xs font-semibold text-neutral-700 sm:text-sm">תגיות</h3>
-                  <div>
+                <div className="space-y-1 col-span-2 lg:col-span-3">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">תגיות</dt>
+                  <dd>
                     {isTagsLoading ? (
                       <span className="text-xs text-neutral-500 sm:text-sm">טוען תגיות...</span>
                     ) : tagsLoadError ? (
@@ -593,10 +574,10 @@ export default function StudentDetailPage() {
                     ) : (
                       <span className="text-xs text-neutral-500 sm:text-sm">לא נמצאו תגיות תואמות.</span>
                     )}
-                  </div>
+                  </dd>
                 </div>
               ) : null}
-            </div>
+            </dl>
           ) : (
             <p className="text-xs text-neutral-600 sm:text-sm">לא נמצאו פרטי תלמיד להצגה.</p>
           )}
