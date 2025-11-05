@@ -104,6 +104,23 @@
 - Logo refresh: Component refetches when `activeOrgId` changes, ensuring correct logo displays after org switch.
 - Logo sizing: Uses `object-contain` with white background padding to ensure logos fit nicely in all display locations (48px container).
 
+### PDF Export Feature (2025-11)
+- **Student Session Records Export**: Admin/owner users can export a student's complete session history to PDF from the Student Detail page.
+- **Permission**: `can_use_custom_logo_on_exports` (boolean, default false) controls whether the organization's custom logo appears alongside the TutTiud logo in PDF exports.
+  - Control DB schema: run `scripts/control-db-export-permission.sql` to add the permission to the registry.
+  - When `true` and `org_settings.logo_url` is set, PDF header displays both logos (TutTiud on right, org logo on left, RTL).
+  - When `false` or `logo_url` is null, only TutTiud logo is displayed.
+- **Implementation**: Client-side PDF generation using `jspdf` library.
+  - Utility: `src/features/students/utils/generateStudentReport.js` generates professional PDF with:
+    - Co-branded header (conditional org logo based on permission).
+    - Student information section (name, contact, service, instructor).
+    - Chronological session history with form answers.
+    - Automatic page breaks and page numbers in footer.
+    - Hebrew text support and RTL layout.
+  - UI: "Export to PDF" button on `StudentDetailPage` (admin/owner only, disabled when no sessions exist).
+  - Context: `OrgContext` exposes `activeOrgConnection.logoUrl` and `activeOrgConnection.permissions` for use in PDF generation.
+- **Backend**: `/api/user-context` includes `logo_url` and `permissions` fields from `org_settings` in the connections payload.
+
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
 - Render the summary information in the base `<TableRow>` and immediately follow it with a conditional second `<TableRow>` that holds the drawer content inside a single spanning `<TableCell>` (e.g., `colSpan={totalColumns}`).
