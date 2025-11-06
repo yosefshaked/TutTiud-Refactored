@@ -130,7 +130,13 @@ export default function OrgMembersCard() {
       await refreshInvitations({ suppressToast: true });
     } catch (error) {
       console.error('Failed to send invitation', error);
-      toast.error(error?.message || 'שליחת ההזמנה נכשלה. ודא שהכתובת תקינה ונסה שוב.');
+      if (error?.code === 'user already a member') {
+        toast.error('לא נשלחה הזמנה. המשתמש כבר חבר בארגון.');
+      } else if (error?.code === 'invitation already pending') {
+        toast.error('כבר קיימת הזמנה בתוקף למשתמש זה.');
+      } else {
+        toast.error(error?.message || 'שליחת ההזמנה נכשלה. ודא שהכתובת תקינה ונסה שוב.');
+      }
     } finally {
       setIsInviting(false);
     }
@@ -170,8 +176,10 @@ export default function OrgMembersCard() {
       await refreshInvitations({ suppressToast: true });
     } catch (error) {
       console.error('Failed to resend invitation', error);
-      if (error?.message?.includes('already pending')) {
+      if (error?.code === 'invitation already pending' || error?.data?.message === 'invitation already pending') {
         toast.error('ההזמנה עדיין תקפה. לא ניתן לשלוח הזמנה נוספת.');
+      } else if (error?.code === 'user already a member' || error?.data?.message === 'user already a member') {
+        toast.error('לא נשלחה הזמנה. המשתמש כבר חבר בארגון.');
       } else {
         toast.error(error?.message || 'שליחת ההזמנה החדשה נכשלה. נסה שוב.');
       }

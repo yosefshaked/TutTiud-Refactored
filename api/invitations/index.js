@@ -326,29 +326,50 @@ async function fetchOrganization(context, supabase, orgId) {
 }
 
 async function findExistingMemberByEmail(supabase, orgId, email) {
-  const listResult = await supabase.auth.admin.listUsers({ email, perPage: 1 });
-  if (listResult.error) {
-    return { error: listResult.error };
+  let profileId = null;
+  let profileResult = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (profileResult.error) {
+    return { error: profileResult.error };
   }
-  const users = Array.isArray(listResult.data?.users) ? listResult.data.users : [];
-  for (const user of users) {
-    if (typeof user?.email !== 'string' || user.email.toLowerCase() !== email) {
-      continue;
-    }
-    const membershipResult = await supabase
-      .from('org_memberships')
-      .select('user_id')
-      .eq('org_id', orgId)
-      .eq('user_id', user.id)
+
+  profileId = profileResult.data?.id ?? null;
+
+  if (!profileId) {
+    profileResult = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('email', email)
       .maybeSingle();
 
-    if (membershipResult.error) {
-      return { error: membershipResult.error };
+    if (profileResult.error) {
+      return { error: profileResult.error };
     }
 
-    if (membershipResult.data) {
-      return { userId: user.id };
-    }
+    profileId = profileResult.data?.id ?? null;
+  }
+
+  if (!profileId) {
+    return { userId: null };
+  }
+
+  const membershipResult = await supabase
+    .from('org_memberships')
+    .select('user_id')
+    .eq('org_id', orgId)
+    .eq('user_id', profileId)
+    .maybeSingle();
+
+  if (membershipResult.error) {
+    return { error: membershipResult.error };
+  }
+
+  if (membershipResult.data) {
+    return { userId: profileId };
   }
   return { userId: null };
 }
