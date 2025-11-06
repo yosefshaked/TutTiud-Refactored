@@ -13,6 +13,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { ensureOrgPermissions } from '../_shared/permissions-utils.js';
+import { extractQuestionsForVersion } from '../../src/features/sessions/utils/version-lookup.js';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { format, parseISO } from 'date-fns';
@@ -110,8 +111,9 @@ function buildAnswerList(content, questions) {
 
 /**
  * Parse session form config
+ * Currently unused but kept for potential future use
  */
-function parseSessionFormConfig(value) {
+function _parseSessionFormConfig(value) {
   if (value === null || value === undefined) {
     return [];
   }
@@ -136,60 +138,8 @@ function parseSessionFormConfig(value) {
   return [];
 }
 
-/**
- * Extract questions for a specific form version
- * Handles both legacy array format and new versioned format with current/history
- */
-function getQuestionsForVersion(formConfig, version) {
-  if (!formConfig) {
-    return [];
-  }
-
-  // Parse if string
-  let config = formConfig;
-  if (typeof formConfig === 'string') {
-    try {
-      config = JSON.parse(formConfig);
-    } catch {
-      return [];
-    }
-  }
-
-  // Legacy format: array of questions (no versioning)
-  if (Array.isArray(config)) {
-    return config;
-  }
-
-  // New format: object with current and history
-  if (config && typeof config === 'object') {
-    // If no version specified, use current
-    if (version === null || version === undefined) {
-      return Array.isArray(config.current) ? config.current : [];
-    }
-
-    // Check current version
-    if (config.current && Array.isArray(config.current)) {
-      const currentVersion = config.version;
-      if (currentVersion === version) {
-        return config.current;
-      }
-    }
-
-    // Search in history
-    if (Array.isArray(config.history)) {
-      for (const historyEntry of config.history) {
-        if (historyEntry.version === version && Array.isArray(historyEntry.questions)) {
-          return historyEntry.questions;
-        }
-      }
-    }
-
-    // Fallback to current if version not found
-    return Array.isArray(config.current) ? config.current : [];
-  }
-
-  return [];
-}
+// getQuestionsForVersion is now imported from shared utility (extractQuestionsForVersion)
+// No need for duplicate implementation here
 
 /**
  * Generate HTML content for PDF
@@ -199,8 +149,8 @@ function generatePdfHtml(student, sessions, formConfig, logoUrl, customLogoUrl) 
     // Extract form version from session metadata
     const formVersion = session.metadata?.form_version ?? null;
     
-    // Get questions for this specific session's form version
-    const questions = getQuestionsForVersion(formConfig, formVersion);
+    // Get questions for this specific session's form version (using shared utility)
+    const questions = extractQuestionsForVersion(formConfig, formVersion);
     
     const answers = buildAnswerList(session.content, questions);
     const answersHtml = answers.length ? answers.map(entry => `
