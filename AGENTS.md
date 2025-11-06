@@ -280,6 +280,15 @@
   - **`buttons`**: Displays as horizontally wrapped button group; radio input is hidden (`sr-only`); selected button gets primary background with white text and shadow; unselected buttons have neutral border with hover effects
 - Both types use the same data structure (options array) and validation rules (minimum 2 options required).
 - **Metadata support**: The `Settings` table includes a `metadata` jsonb column for storing auxiliary configuration. For `session_form_config`, this holds preconfigured answer lists for `text`/`textarea` questions under `metadata.preconfigured_answers[question_id]`. The cap is enforced server-side using control DB permissions and respected in the editor UI.
+- **Session form versioning** (2025-11):
+  - Backend (`/api/sessions`) saves `SessionRecords.metadata.form_version` by extracting from `Settings.session_form_config.current.version` (primary) or `Settings.session_form_config.version` (legacy fallback).
+  - Frontend (`StudentDetailPage.jsx`) uses version-aware rendering via `getQuestionsForVersion` helper (`src/features/sessions/utils/version-helpers.js`).
+  - When displaying session records, the page:
+    1. Checks `session.metadata.form_version` for each record
+    2. If version is set, retrieves matching questions from `session_form_config.current` or `session_form_config.history`
+    3. If version is null/missing, falls back to current form configuration
+  - This gracefully handles legacy records (no version) while supporting future versioned forms when history tracking is implemented.
+  - PDF export (`api/students-export`) already implements version-aware question lookup using the same pattern.
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.

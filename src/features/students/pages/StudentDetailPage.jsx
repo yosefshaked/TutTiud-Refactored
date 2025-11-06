@@ -13,6 +13,7 @@ import { describeSchedule, formatDefaultTime } from '@/features/students/utils/s
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 import { useSessionModal } from '@/features/sessions/context/SessionModalContext.jsx';
+import { getQuestionsForVersion } from '@/features/sessions/utils/version-helpers.js';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -131,6 +132,7 @@ export default function StudentDetailPage() {
   const [questionsState, setQuestionsState] = useState(REQUEST_STATE.idle);
   const [questionsError, setQuestionsError] = useState('');
   const [questions, setQuestions] = useState([]);
+  const [formConfig, setFormConfig] = useState(null); // Store full config for version lookup
 
   const [tagCatalog, setTagCatalog] = useState([]);
   const [tagsState, setTagsState] = useState(REQUEST_STATE.idle);
@@ -206,11 +208,17 @@ export default function StudentDetailPage() {
       }
       const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
       const settingsValue = payload?.settings?.session_form_config ?? null;
+      
+      // Store full config for version-aware lookups
+      setFormConfig(settingsValue);
+      
+      // Parse current questions for display
       const normalized = ensureSessionFormFallback(parseSessionFormConfig(settingsValue));
       setQuestions(normalized);
       setQuestionsState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to load session form configuration', error);
+      setFormConfig(null);
       setQuestions(ensureSessionFormFallback([]));
       setQuestionsState(REQUEST_STATE.error);
       setQuestionsError(error?.message || 'טעינת תצורת טופס המפגש נכשלה.');
@@ -699,7 +707,15 @@ export default function StudentDetailPage() {
         ) : (
           <div className="space-y-sm md:space-y-md">
             {sessions.map((record) => {
-              const answers = buildAnswerList(record.content, questions);
+              // Extract form version from session metadata (null if not set)
+              const formVersion = record?.metadata?.form_version ?? null;
+              
+              // Get questions for this session's version (falls back to current if version not found/null)
+              const versionedQuestions = formConfig 
+                ? getQuestionsForVersion(formConfig, formVersion)
+                : questions; // Fallback to current questions if config not loaded
+              
+              const answers = buildAnswerList(record.content, versionedQuestions);
               const key = record.id || record.date;
               const isOpen = Boolean(expandedById[key]);
               return (
