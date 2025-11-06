@@ -72,31 +72,34 @@ function buildAnswerList(content, questions) {
   const entries = [];
   const seenKeys = new Set();
 
-  if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
-    for (const question of questions) {
-      const key = question.key;
-      const label = question.label;
-      let value = answers[key];
-      if (value === undefined && typeof answers[label] !== 'undefined') {
-        value = answers[label];
-      }
-      if (value === undefined || value === null || value === '') {
-        continue;
-      }
-      entries.push({ label, value: String(value) });
-      seenKeys.add(key);
-      seenKeys.add(label);
+  // Create a lookup map for questions by ID, key, and label
+  const questionMap = new Map();
+  for (const question of questions) {
+    if (question.id) {
+      questionMap.set(question.id, question.label);
     }
+    if (question.key) {
+      questionMap.set(question.key, question.label);
+    }
+    if (question.label) {
+      questionMap.set(question.label, question.label);
+    }
+  }
 
-    for (const [rawKey, rawValue] of Object.entries(answers)) {
-      if (rawValue === undefined || rawValue === null || rawValue === '') {
+  if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
+    // Process all answers and look up their labels from the question map
+    for (const [answerKey, answerValue] of Object.entries(answers)) {
+      if (answerValue === undefined || answerValue === null || answerValue === '') {
         continue;
       }
-      const normalizedKey = String(rawKey);
-      if (seenKeys.has(normalizedKey)) {
-        continue;
+      
+      // Try to find the human-readable label for this answer
+      const label = questionMap.get(answerKey) || answerKey;
+      
+      if (!seenKeys.has(answerKey)) {
+        entries.push({ label, value: String(answerValue) });
+        seenKeys.add(answerKey);
       }
-      entries.push({ label: normalizedKey, value: String(rawValue) });
     }
   } else if (typeof answers === 'string' && answers.trim()) {
     entries.push({ label: 'תוכן המפגש', value: answers.trim() });
@@ -355,7 +358,7 @@ function generatePdfHtml(student, sessions, questions, logoUrl, customLogoUrl) {
   <div class="header">
     <div class="header-info">
       <h1>רישומי מפגשים</h1>
-      <p class="subtitle">נוצר ב-${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: he })}</p>
+      <p class="subtitle">נוצר ב-${format(new Date(), 'dd/MM/yyyy', { locale: he })}</p>
     </div>
     ${logoSection}
   </div>
@@ -602,7 +605,7 @@ export default async function (context, req) {
   }
 
   // Use TutTiud logo URL from environment or default
-  const tuttiudLogoUrl = env.VITE_TUTTIUD_LOGO_URL || env.TUTTIUD_LOGO_URL || 'https://tuttiud.com/logo.png';
+  const tuttiudLogoUrl = env.VITE_TUTTIUD_LOGO_URL || env.TUTTIUD_LOGO_URL || 'https://tuttiud.thepcrunners.com/icon.png';
 
   // Generate PDF
   let browser;
