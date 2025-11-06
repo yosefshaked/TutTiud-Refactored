@@ -48,8 +48,76 @@ function parseSessionContent(raw) {
 }
 
 /**
- * Format date for display
+ * Create a stable key from a label/id similar to frontend normalization
+ * - lowercases
+ * - replaces non [a-z0-9א-ת] with underscores
+ * - collapses multiple underscores and trims edges
  */
+function toKey(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const str = String(value);
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9א-ת]+/gi, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+/**
+ * Build answer list with human-readable labels
+ */
+function buildAnswerList(content, questions) {
+  const answers = parseSessionContent(content);
+  const entries = [];
+  const seenKeys = new Set();
+
+  // Create a lookup map for questions by ID, key, and label (including slugged variants)
+  const questionMap = new Map();
+  for (const question of questions) {
+    const qLabel = typeof question.label === 'string' ? question.label : '';
+    const qId = typeof question.id === 'string' ? question.id : '';
+    const qKey = typeof question.key === 'string' ? question.key : '';
+
+    if (qLabel) {
+      questionMap.set(qLabel, qLabel);
+      questionMap.set(toKey(qLabel), qLabel);
+    }
+    if (qId) {
+      questionMap.set(qId, qLabel || qId);
+      questionMap.set(toKey(qId), qLabel || qId);
+    }
+    if (qKey) {
+      questionMap.set(qKey, qLabel || qKey);
+      questionMap.set(toKey(qKey), qLabel || qKey);
+    }
+  }
+
+  if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
+    // Process all answers and look up their labels from the question map
+    for (const [answerKey, answerValue] of Object.entries(answers)) {
+      if (answerValue === undefined || answerValue === null || answerValue === '') {
+        continue;
+      }
+      const rawKey = String(answerKey);
+      // Try to find the human-readable label for this answer
+      const label = questionMap.get(rawKey) || questionMap.get(toKey(rawKey)) || rawKey;
+
+      if (!seenKeys.has(rawKey)) {
+        entries.push({ label, value: String(answerValue) });
+        seenKeys.add(rawKey);
+      }
+    }
+  } else if (typeof answers === 'string' && answers.trim()) {
+    entries.push({ label: 'תוכן המפגש', value: answers.trim() });
+  }
+
+  return entries;
+}
+
+/** Format date to dd/MM/yyyy (Hebrew locale) */
 function formatSessionDate(value) {
   if (!value) {
     return '';
@@ -63,50 +131,6 @@ function formatSessionDate(value) {
     // ignore parsing failures
   }
   return value;
-}
-
-/**
- * Build answer list from session content and questions
- */
-function buildAnswerList(content, questions) {
-  const answers = parseSessionContent(content);
-  const entries = [];
-  const seenKeys = new Set();
-
-  // Create a lookup map for questions by ID, key, and label
-  const questionMap = new Map();
-  for (const question of questions) {
-    if (question.id) {
-      questionMap.set(question.id, question.label);
-    }
-    if (question.key) {
-      questionMap.set(question.key, question.label);
-    }
-    if (question.label) {
-      questionMap.set(question.label, question.label);
-    }
-  }
-
-  if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
-    // Process all answers and look up their labels from the question map
-    for (const [answerKey, answerValue] of Object.entries(answers)) {
-      if (answerValue === undefined || answerValue === null || answerValue === '') {
-        continue;
-      }
-      
-      // Try to find the human-readable label for this answer
-      const label = questionMap.get(answerKey) || answerKey;
-      
-      if (!seenKeys.has(answerKey)) {
-        entries.push({ label, value: String(answerValue) });
-        seenKeys.add(answerKey);
-      }
-    }
-  } else if (typeof answers === 'string' && answers.trim()) {
-    entries.push({ label: 'תוכן המפגש', value: answers.trim() });
-  }
-
-  return entries;
 }
 
 /**
