@@ -21,12 +21,10 @@ export default function CompleteRegistrationPage() {
   const [invitationEmail, setInvitationEmail] = useState('');
   const [invitationAuth, setInvitationAuth] = useState(null);
   const [verifyError, setVerifyError] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [flowStep, setFlowStep] = useState('confirm');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [isSettingPassword, setIsSettingPassword] = useState(false);
 
   useEffect(() => {
     if (!tokenHash) {
@@ -45,7 +43,6 @@ export default function CompleteRegistrationPage() {
     let isActive = true;
     setInviteStatus('loading');
     setInviteError('');
-    setFlowStep('confirm');
     setVerifyError('');
     setPassword('');
     setConfirmPassword('');
@@ -65,8 +62,8 @@ export default function CompleteRegistrationPage() {
           setInviteStatus('error');
           return;
         }
-  setInvitationEmail(record.email || '');
-  setInvitationAuth(record.auth || null);
+        setInvitationEmail(record.email || '');
+        setInvitationAuth(record.auth || null);
         setInviteStatus('ready');
       })
       .catch((error) => {
@@ -85,8 +82,9 @@ export default function CompleteRegistrationPage() {
     };
   }, [tokenHash, invitationTokenValue]);
 
-  const handleConfirm = async () => {
-    if (flowStep !== 'confirm') {
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (inviteStatus !== 'ready') {
       return;
     }
     if (!authClient) {
@@ -97,70 +95,15 @@ export default function CompleteRegistrationPage() {
       setVerifyError('אסימון ההרשמה חסר או פגום. בקש הזמנה חדשה מהמנהל.');
       return;
     }
-    if (isVerifying) {
-      return;
-    }
-
-    setVerifyError('');
-    setIsVerifying(true);
-    try {
-      const { error } = await authClient.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' });
-      if (error) {
-        throw error;
-      }
-
-      setFlowStep('password');
-      setVerifyError('');
-      setPassword('');
-      setConfirmPassword('');
-      setPasswordError('');
-    } catch (error) {
-      console.error('Failed to verify invitation token on demand', error);
-      let message = 'אימות הקישור נכשל. ודא שהשתמשת בקישור העדכני ביותר או נסה שוב מאוחר יותר.';
-
-      // Distinguish between different error types
-      const rawMsg = String(error?.message || '').toLowerCase();
-      const status = Number(error?.status || error?.code || 0);
-
-      // Important: Supabase often returns 403 "Email link is invalid" for already-consumed invite links.
-      // Prioritize "invalid/403" as "already used" BEFORE checking for the word "expired" because
-      // the error string can be "invalid or has expired".
-      if (rawMsg.includes('invalid') || status === 403 || rawMsg.includes('used') || rawMsg.includes('already')) {
-        // Supabase often returns 403 "Email link is invalid" after the invite was already verified (single-use)
-        // Treat this as "already used" and guide user to reset password
-        // If we can tell from control DB that email has been confirmed, prefer the
-        // "already used" explanation; otherwise, fall back to expired.
-        const wasVerified = !!(invitationAuth?.exists && invitationAuth?.emailConfirmed);
-        if (wasVerified) {
-          message = 'הקישור כבר שומש. אם שכחת את הסיסמה, ';
-        } else {
-          message = 'ההזמנה פגה או שהקישור אינו תקף יותר. בקש מהמנהל לשלוח הזמנה חדשה.';
-        }
-      } else if (rawMsg.includes('expired')) {
-        // Token truly expired
-        message = 'ההזמנה פגה. נא לבקש מהמנהל לשלוח הזמנה חדשה.';
-      } else if (error?.message === 'Token has been expired or revoked') {
-        // Legacy generic message - try to be helpful
-        message = 'קישור ההזמנה כבר לא פעיל. אם כבר יצרת חשבון, נסה להתחבר. אם ההזמנה פגה, בקש מהמנהל לשלוח קישור חדש.';
-      }
-
-      setVerifyError(message);
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handlePasswordSubmit = async (event) => {
-    event.preventDefault();
-    if (flowStep !== 'password') {
-      return;
-    }
-    if (!authClient) {
-      setPasswordError('לקוח האימות עדיין נטען. רענן את הדף ונסה שוב.');
+    if (isSubmitting) {
       return;
     }
     if (!password || !confirmPassword) {
       setPasswordError('יש למלא סיסמה ולאשר אותה כדי להמשיך.');
+      return;
+    }
+    if (password.length < 6) {
+      setPasswordError('הסיסמה חייבת להכיל לפחות 6 תווים.');
       return;
     }
     if (password !== confirmPassword) {
@@ -169,23 +112,56 @@ export default function CompleteRegistrationPage() {
     }
 
     setPasswordError('');
-    setIsSettingPassword(true);
+    setVerifyError('');
+    setIsSubmitting(true);
     try {
-      const { error } = await authClient.auth.updateUser({ password });
-      if (error) {
-        throw error;
+      const { error: verifyOtpError } = await authClient.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' });
+      if (verifyOtpError) {
+        throw { stage: 'verify', error: verifyOtpError };
+      }
+
+      const { error: updateError } = await authClient.auth.updateUser({ password });
+      if (updateError) {
+        throw { stage: 'update', error: updateError };
       }
       const search = buildInvitationSearch(invitationTokenValue, invitationTokenKey);
       navigate(`/accept-invite${search}`, { replace: true });
-    } catch (error) {
-      console.error('Failed to set password after verifying invitation', error);
-      const message =
-        error?.message === 'Password should be at least 6 characters'
-          ? 'הסיסמה חייבת להכיל לפחות 6 תווים.'
-          : error?.message || 'שמירת הסיסמה נכשלה. נסה שוב או בחר סיסמה אחרת.';
-      setPasswordError(message);
+    } catch (caught) {
+      const stage = caught?.stage || 'verify';
+      const error = caught?.error || caught;
+
+      if (stage === 'update') {
+        console.error('Failed to set password after verifying invitation', error);
+        const message =
+          error?.message === 'Password should be at least 6 characters'
+            ? 'הסיסמה חייבת להכיל לפחות 6 תווים.'
+            : error?.message || 'שמירת הסיסמה נכשלה. נסה שוב או בחר סיסמה אחרת.';
+        setPasswordError(message);
+        return;
+      }
+
+      console.error('Failed to verify invitation token on demand', error);
+      let message = 'אימות הקישור נכשל. ודא שהשתמשת בקישור העדכני ביותר או נסה שוב מאוחר יותר.';
+
+      const rawMsg = String(error?.message || '').toLowerCase();
+      const status = Number(error?.status || error?.code || 0);
+
+      if (rawMsg.includes('invalid') || status === 403 || rawMsg.includes('used') || rawMsg.includes('already')) {
+        const wasVerified = !!(invitationAuth?.exists && invitationAuth?.emailConfirmed);
+        if (wasVerified) {
+          message = 'הקישור כבר שומש. אם שכחת את הסיסמה, ניתן לאפס אותה באמצעות הכפתור מטה.';
+        } else {
+          message = 'ההזמנה פגה או שהקישור אינו תקף יותר. בקש מהמנהל לשלוח הזמנה חדשה.';
+        }
+      } else if (rawMsg.includes('expired')) {
+        message = 'ההזמנה פגה. נא לבקש מהמנהל לשלוח הזמנה חדשה.';
+      } else if (error?.message === 'Token has been expired or revoked') {
+        message = 'קישור ההזמנה כבר לא פעיל. אם כבר יצרת חשבון, נסה להתחבר. אם ההזמנה פגה, בקש מהמנהל לשלוח קישור חדש.';
+      }
+
+      setVerifyError(message);
     } finally {
-      setIsSettingPassword(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -229,82 +205,8 @@ export default function CompleteRegistrationPage() {
       );
     }
 
-    if (flowStep === 'password') {
-      return (
-        <div className="p-8 space-y-6 text-right">
-          <div className="flex items-center justify-end gap-3 text-emerald-600">
-            <div className="w-10 h-10 rounded-full border-2 border-emerald-200 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm text-emerald-500">הדוא"ל אומת בהצלחה</p>
-              <p className="text-lg font-semibold text-emerald-900">יצירת סיסמה חדשה לחשבון</p>
-            </div>
-          </div>
-
-          <p className="text-sm text-slate-600 leading-relaxed">
-            בחר סיסמה מאובטחת עבור החשבון של <span className="font-semibold">{invitationEmail}</span>. תזדקק לה להתחבר בעתיד.
-          </p>
-
-          <form dir="rtl" className="space-y-4" onSubmit={handlePasswordSubmit}>
-            <div>
-              <label htmlFor="invite-password" className="block text-sm font-medium text-slate-600 text-right">
-                צור סיסמה
-              </label>
-              <div className="relative mt-1">
-                <Lock className="w-4 h-4 absolute left-3 top-3 text-slate-400" aria-hidden="true" />
-                <input
-                  id="invite-password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-4 text-right shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoComplete="new-password"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="invite-password-confirm" className="block text-sm font-medium text-slate-600 text-right">
-                אימות סיסמה
-              </label>
-              <input
-                id="invite-password-confirm"
-                type="password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-right shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="new-password"
-                required
-              />
-            </div>
-
-            {passwordError ? (
-              <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl px-4 py-3" role="alert">
-                {passwordError}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-l from-blue-600 to-indigo-500 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
-              disabled={isSettingPassword}
-            >
-              {isSettingPassword ? (
-                <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-              ) : (
-                <ShieldCheck className="w-5 h-5" aria-hidden="true" />
-              )}
-              <span>{isSettingPassword ? 'שומר...' : 'שמירת סיסמה והמשך'}</span>
-            </button>
-          </form>
-        </div>
-      );
-    }
-
     return (
-      <div className="p-8 space-y-6 text-right">
+      <form dir="rtl" className="p-8 space-y-6 text-right" onSubmit={handleSubmit}>
         <div className="space-y-2">
           <label htmlFor="invite-email" className="block text-sm font-medium text-slate-600">
             ההזמנה נשלחה ל
@@ -322,7 +224,7 @@ export default function CompleteRegistrationPage() {
         </div>
 
         <p className="text-sm text-slate-600 leading-relaxed">
-          לחץ על הכפתור כדי לאשר שאתה הבעלים של כתובת האימייל הזו ולהמשיך לתהליך הצטרפות לארגון.
+          הזן כאן סיסמה חדשה כדי לאשר את בעלותך על הכתובת <span className="font-semibold">{invitationEmail}</span> ולהשלים את ההצטרפות לארגון.
         </p>
 
         {verifyError ? (
@@ -340,16 +242,56 @@ export default function CompleteRegistrationPage() {
           </div>
         ) : null}
 
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="invite-password" className="block text-sm font-medium text-slate-600 text-right">
+              צור סיסמה
+            </label>
+            <div className="relative mt-1">
+              <Lock className="w-4 h-4 absolute left-3 top-3 text-slate-400" aria-hidden="true" />
+              <input
+                id="invite-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-4 text-right shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoComplete="new-password"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="invite-password-confirm" className="block text-sm font-medium text-slate-600 text-right">
+              אימות סיסמה
+            </label>
+            <input
+              id="invite-password-confirm"
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-right shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoComplete="new-password"
+              required
+            />
+          </div>
+
+          {passwordError ? (
+            <div className="bg-red-50 border border-red-200 text-red-800 rounded-2xl px-4 py-3" role="alert">
+              {passwordError}
+            </div>
+          ) : null}
+        </div>
+
         <button
-          type="button"
-          onClick={handleConfirm}
+          type="submit"
           className="w-full bg-gradient-to-l from-blue-600 to-indigo-500 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60"
-          disabled={isVerifying || !authClient}
+          disabled={isSubmitting || !authClient || inviteStatus !== 'ready'}
         >
-          {isVerifying ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> : <ShieldCheck className="w-5 h-5" />}
-          <span>{isVerifying ? 'מאמת...' : 'אישור והמשך'}</span>
+          {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> : <ShieldCheck className="w-5 h-5" aria-hidden="true" />}
+          <span>{isSubmitting ? 'שומר...' : 'אישור, אימות וסיום'}</span>
         </button>
-      </div>
+      </form>
     );
   };
 
