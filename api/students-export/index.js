@@ -77,10 +77,11 @@ function extractQuestionLabelRaw(entry) {
   return '';
 }
 
-function buildAnswerList(content, questions) {
+function buildAnswerList(content, questions, opts = {}) {
   const answers = parseSessionContent(content);
   const entries = [];
   const seenKeys = new Set();
+  const onDebug = typeof opts.onDebug === 'function' ? opts.onDebug : null;
 
   // Create a lookup map for questions by ID, key, and label (including slugged variants)
   const questionMap = new Map();
@@ -89,6 +90,9 @@ function buildAnswerList(content, questions) {
     const qId = typeof question.id === 'string' ? question.id : '';
     const qKey = typeof question.key === 'string' ? question.key : '';
 
+    if (onDebug && !qLabel && (qId || qKey)) {
+      onDebug('question-label-missing', { qId, qKey });
+    }
     if (qLabel) {
       questionMap.set(qLabel, qLabel);
       questionMap.set(toKey(qLabel), qLabel);
@@ -102,6 +106,9 @@ function buildAnswerList(content, questions) {
       questionMap.set(toKey(qKey), qLabel || qKey);
     }
   }
+  if (onDebug) {
+    onDebug('question-map-built', { size: questionMap.size, questionsCount: questions.length });
+  }
 
   if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
     // Process all answers and look up their labels from the question map
@@ -111,7 +118,17 @@ function buildAnswerList(content, questions) {
       }
       const rawKey = String(answerKey);
       // Try to find the human-readable label for this answer
-      const label = questionMap.get(rawKey) || questionMap.get(toKey(rawKey)) || rawKey;
+      let label = questionMap.get(rawKey);
+      let via = 'raw';
+      if (!label) {
+        const slug = toKey(rawKey);
+        label = questionMap.get(slug);
+        via = label ? 'slug' : 'fallback';
+      }
+      label = label || rawKey;
+      if (onDebug) {
+        onDebug('answer-key-resolution', { rawKey, via, mapped: label !== rawKey });
+      }
 
       if (!seenKeys.has(rawKey)) {
         entries.push({ label, value: String(answerValue) });
@@ -176,15 +193,23 @@ function _parseSessionFormConfig(value) {
 /**
  * Generate HTML content for PDF
  */
-function generatePdfHtml(student, sessions, formConfig, logoUrl, customLogoUrl) {
+function generatePdfHtml(student, sessions, formConfig, logoUrl, customLogoUrl, opts = {}) {
+  const onDebug = typeof opts.onDebug === 'function' ? opts.onDebug : null;
   const sessionsHtml = sessions.map(session => {
     // Extract form version from session metadata
     const formVersion = session.metadata?.form_version ?? null;
     
     // Get questions for this specific session's form version (using shared utility)
     const questions = extractQuestionsForVersion(formConfig, formVersion);
+    if (onDebug) {
+      onDebug('session-questions', {
+        sessionRef: session.id || session.date,
+        formVersion,
+        questionsCount: Array.isArray(questions) ? questions.length : 0,
+      });
+    }
     
-    const answers = buildAnswerList(session.content, questions);
+    const answers = buildAnswerList(session.content, questions, { onDebug });
     const answersHtml = answers.length ? answers.map(entry => `
       <div class="answer-item">
         <div class="answer-label">${escapeHtml(entry.label)}</div>
@@ -486,6 +511,12 @@ export default async function (context, req) {
   }
 
   const env = readEnv(context);
+  // Parse body early to check debug flag as well
+  const body = parseRequestBody(req);
+  const debug = (req.query?.debug === 'true') || Boolean(body?.debug) || env.DEBUG_STUDENTS_EXPORT === 'true';
+  const dbg = (...args) => {
+    if (debug) context.log?.info?.('[students-export][debug]', ...args);
+  };
   const adminConfig = readSupabaseAdminConfig(env);
 
   if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
@@ -514,7 +545,7 @@ export default async function (context, req) {
   }
 
   const userId = authResult.data.user.id;
-  const body = parseRequestBody(req);
+  dbg('invocation', { userId, debug });
   const orgId = resolveOrgId(req, body);
 
   if (!orgId) {
@@ -549,6 +580,10 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_load_permissions' });
   }
 
+  dbg('permissions', {
+    can_export_pdf_reports: !!permissions?.can_export_pdf_reports,
+    can_use_custom_logo_on_exports: !!permissions?.can_use_custom_logo_on_exports,
+  });
   if (!permissions?.can_export_pdf_reports) {
     return respond(context, 403, {
       message: 'pdf_export_not_enabled',
@@ -585,7 +620,8 @@ export default async function (context, req) {
       return respond(context, 404, { message: 'student_not_found' });
     }
 
-    student = data;
+  student = data;
+  dbg('student-loaded', { id: studentId, hasDefaultService: !!student.default_service });
   } catch (error) {
     context.log?.error?.('students-export failed to fetch student', { message: error?.message, studentId });
     return respond(context, 500, { message: 'failed_to_load_student' });
@@ -605,7 +641,8 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_load_sessions' });
     }
 
-    sessions = Array.isArray(data) ? data : [];
+  sessions = Array.isArray(data) ? data : [];
+  dbg('sessions-loaded', { count: sessions.length, firstRef: sessions[0]?.id || sessions[0]?.date });
   } catch (error) {
     context.log?.error?.('students-export failed to fetch sessions', { message: error?.message, studentId });
     return respond(context, 500, { message: 'failed_to_load_sessions' });
@@ -623,6 +660,12 @@ export default async function (context, req) {
     if (!error && data?.settings_value) {
       formConfig = data.settings_value;
     }
+    const currentQs = extractQuestionsForVersion(formConfig, null);
+    dbg('form-config', {
+      type: typeof formConfig,
+      hasHistory: Boolean(formConfig?.history),
+      currentQuestions: Array.isArray(currentQs) ? currentQs.length : 0,
+    });
   } catch (error) {
     context.log?.warn?.('students-export failed to fetch form config', { message: error?.message });
     // Continue without form config
@@ -641,6 +684,7 @@ export default async function (context, req) {
       if (!error && data?.logo_url) {
         customLogoUrl = data.logo_url;
       }
+      dbg('custom-logo', { enabled: !!customLogoUrl });
     } catch (error) {
       context.log?.warn?.('students-export failed to fetch custom logo', { message: error?.message });
       // Continue without custom logo
@@ -662,8 +706,8 @@ export default async function (context, req) {
       headless: chromium.headless,
     });
 
-    const page = await browser.newPage();
-    const html = generatePdfHtml(student, sessions, formConfig, tuttiudLogoUrl, customLogoUrl);
+  const page = await browser.newPage();
+  const html = generatePdfHtml(student, sessions, formConfig, tuttiudLogoUrl, customLogoUrl, { onDebug: dbg });
     
     await page.setContent(html, { waitUntil: 'networkidle0' });
     

@@ -24,7 +24,10 @@ export async function exportStudentPdf(studentId, orgId) {
 
   const token = data.session.access_token;
 
-  const response = await fetch('/api/students-export', {
+  const debugFlag = typeof window !== 'undefined' && window.localStorage?.getItem('debug:students-export') === 'true';
+  const url = debugFlag ? '/api/students-export?debug=true' : '/api/students-export';
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -37,6 +40,7 @@ export async function exportStudentPdf(studentId, orgId) {
     body: JSON.stringify({
       student_id: studentId,
       org_id: orgId,
+      debug: debugFlag,
     }),
   });
 
