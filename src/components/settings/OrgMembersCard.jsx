@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Clock, MailPlus, RefreshCw, Trash2, UserMinus } from 'lucide-react';
+import { AlertTriangle, Check, Clock, MailPlus, Pencil, RefreshCw, Trash2, UserMinus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useAuth } from '@/auth/AuthContext.jsx';
@@ -35,7 +35,7 @@ function isInvitationExpired(expiresAt) {
 }
 
 export default function OrgMembersCard() {
-  const { activeOrg, members, removeMember, updateMemberRole } = useOrg();
+  const { activeOrg, members, removeMember, updateMemberRole, updateMemberName } = useOrg();
   const { user, session } = useAuth();
   const [email, setEmail] = useState('');
   const [isInviting, setIsInviting] = useState(false);
@@ -46,6 +46,9 @@ export default function OrgMembersCard() {
   const [reinvitingEmail, setReinvitingEmail] = useState(null);
   const [authStates, setAuthStates] = useState({});
   const [loadingAuthFor, setLoadingAuthFor] = useState(new Set());
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+  const [savingMemberId, setSavingMemberId] = useState(null);
   const activeOrgId = activeOrg?.id || null;
   const role = activeOrg?.membership?.role || '';
   const canManageOrgMembers = useMemo(() => {
@@ -211,6 +214,16 @@ export default function OrgMembersCard() {
     return () => controller.abort();
   }, [pendingInvites, canManageOrgMembers, session, loadAuthStateForEmail]);
 
+  useEffect(() => {
+    if (!editingMemberId) return;
+    const stillExists = (members || []).some((member) => member.id === editingMemberId);
+    if (!stillExists) {
+      setEditingMemberId(null);
+      setEditingName('');
+      setSavingMemberId(null);
+    }
+  }, [editingMemberId, members]);
+
   const handleRemoveMember = async (membershipId) => {
     try {
       await removeMember(membershipId);
@@ -220,6 +233,44 @@ export default function OrgMembersCard() {
       toast.error('הסרת החבר נכשלה.');
     }
   };
+
+  const handleEditNameStart = useCallback(
+    (member) => {
+      setEditingMemberId(member.id);
+      setEditingName(member.name || member.email || '');
+    },
+    [],
+  );
+
+  const handleEditNameCancel = useCallback(() => {
+    setEditingMemberId(null);
+    setEditingName('');
+    setSavingMemberId(null);
+  }, []);
+
+  const handleEditNameSave = useCallback(
+    async (member) => {
+      if (!member?.id) return;
+      const trimmed = editingName.replace(/\s+/g, ' ').trim();
+      if (!trimmed) {
+        toast.error('נא להזין שם מלא תקין.');
+        return;
+      }
+      setSavingMemberId(member.id);
+      try {
+        await updateMemberName(member.id, trimmed);
+        toast.success('שם החבר עודכן בהצלחה.');
+        setEditingMemberId(null);
+        setEditingName('');
+      } catch (error) {
+        console.error('Failed to update member name', error);
+        toast.error(error?.message || 'עדכון השם נכשל.');
+      } finally {
+        setSavingMemberId(null);
+      }
+    },
+    [editingName, updateMemberName],
+  );
 
   if (!activeOrg) {
     return null;
@@ -252,15 +303,42 @@ export default function OrgMembersCard() {
               const roleNorm = typeof member.role === 'string' ? member.role.toLowerCase() : '';
               const isOwner = roleNorm === 'owner';
               const roleLabel = roleNorm === 'owner' ? 'בעלים' : roleNorm === 'admin' ? 'מנהל' : 'מדריך';
+              const isEditing = editingMemberId === member.id;
+              const isSaving = savingMemberId === member.id;
               return (
                 <div
                   key={member.id || member.user_id}
                   className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border border-slate-200 rounded-xl px-4 py-3"
                 >
-                  <div className="text-right space-y-1">
-                    <p className="text-sm font-medium text-slate-900">
-                      {member.name || member.email || 'משתמש ללא שם'}
-                    </p>
+                  <div className="text-right space-y-2 flex-1">
+                    {isEditing ? (
+                      <div className="space-y-1">
+                        <label htmlFor={`member-name-${member.id}`} className="sr-only">
+                          שם החבר
+                        </label>
+                        <Input
+                          id={`member-name-${member.id}`}
+                          value={editingName}
+                          onChange={(event) => setEditingName(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              void handleEditNameSave(member);
+                            }
+                            if (event.key === 'Escape') {
+                              event.preventDefault();
+                              handleEditNameCancel();
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <p className="text-xs text-slate-500">יש להזין שם עם לפחות תו אחד.</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-medium text-slate-900">
+                        {member.name || member.email || 'משתמש ללא שם'}
+                      </p>
+                    )}
                     <p className="text-xs text-slate-500" dir="ltr">
                       {member.email || member.user_id}
                     </p>
@@ -273,12 +351,49 @@ export default function OrgMembersCard() {
                       ) : null}
                     </div>
                   </div>
-                  {canManageOrgMembers && !isCurrentUser ? (
+                  {canManageOrgMembers ? (
                     <div className="flex items-center gap-3">
+                      {isEditing ? (
+                        <>
+                          <Button
+                            type="button"
+                            className="gap-2"
+                            disabled={isSaving}
+                            onClick={() => handleEditNameSave(member)}
+                          >
+                            {isSaving ? 'שומר...' : (
+                              <>
+                                <Check className="w-4 h-4" />
+                                שמור
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-slate-600 hover:bg-slate-100 gap-2"
+                            onClick={handleEditNameCancel}
+                            disabled={isSaving}
+                          >
+                            <X className="w-4 h-4" />
+                            בטל
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-slate-600 hover:bg-slate-100 gap-2"
+                          onClick={() => handleEditNameStart(member)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                          ערוך שם
+                        </Button>
+                      )}
                       <select
                         className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                         value={roleNorm || 'member'}
-                        disabled={isOwner}
+                        disabled={isOwner || isCurrentUser || isSaving}
                         onChange={async (e) => {
                           const nextRole = e.target.value;
                           const nextLabel = nextRole === 'admin' ? 'מנהל' : 'מדריך';
@@ -300,20 +415,22 @@ export default function OrgMembersCard() {
                         <option value="member">מדריך</option>
                         <option value="admin">מנהל</option>
                       </select>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="text-red-600 hover:bg-red-50 gap-2"
-                        disabled={isOwner}
-                        onClick={() => {
-                          const confirmed = window.confirm(`האם להסיר את ${member.name || member.email || 'המשתמש'} מהארגון?`);
-                          if (!confirmed) return;
-                          void handleRemoveMember(member.id);
-                        }}
-                      >
-                        <UserMinus className="w-4 h-4" />
-                        הסר מהארגון
-                      </Button>
+                      {!isCurrentUser ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-red-600 hover:bg-red-50 gap-2"
+                          disabled={isOwner || isSaving}
+                          onClick={() => {
+                            const confirmed = window.confirm(`האם להסיר את ${member.name || member.email || 'המשתמש'} מהארגון?`);
+                            if (!confirmed) return;
+                            void handleRemoveMember(member.id);
+                          }}
+                        >
+                          <UserMinus className="w-4 h-4" />
+                          הסר מהארגון
+                        </Button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

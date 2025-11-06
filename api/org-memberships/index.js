@@ -47,6 +47,21 @@ function normalizeRole(r){
   if (t === 'member' || t === 'admin') return t; // owner changes are not supported here
   return null;
 }
+
+function normalizeDisplayName(input){
+  if (input === undefined) {
+    return { provided: false, value: null, error: null };
+  }
+  const raw = typeof input === 'string' ? input : '';
+  const collapsed = raw.replace(/\s+/g, ' ').trim();
+  if (!collapsed) {
+    return { provided: true, value: null, error: 'invalid_name' };
+  }
+  if (collapsed.length > 120) {
+    return { provided: true, value: null, error: 'name_too_long' };
+  }
+  return { provided: true, value: collapsed, error: null };
+}
 async function getAuthUser(context, req, supabase){
   const auth = resolveBearerAuthorization(req);
   if (!auth?.token) { respond(context,401,{message:'missing bearer'}); return null; }
@@ -90,18 +105,97 @@ async function handlePatch(context, req, supabase, membershipId){
   const authUser = await getAuthUser(context, req, supabase); if (!authUser) return;
   const body = req.body && typeof req.body==='object' ? req.body : {};
   const role = normalizeRole(body.role ?? body.newRole);
-  if (!role){ respond(context,400,{message:'invalid role'}); return; }
+  const hasRoleField = Object.prototype.hasOwnProperty.call(body, 'role') || Object.prototype.hasOwnProperty.call(body, 'newRole');
+  const nameInput = body.fullName ?? body.full_name ?? body.name;
+  const normalizedName = normalizeDisplayName(nameInput);
+
+  if (hasRoleField && !role){ respond(context,400,{message:'invalid role'}); return; }
+  if (!role && !normalizedName.provided){ respond(context,400,{message:'nothing to update'}); return; }
+  if (normalizedName.error === 'invalid_name'){ respond(context,400,{message:'name is required'}); return; }
+  if (normalizedName.error === 'name_too_long'){ respond(context,400,{message:'name too long'}); return; }
+
   const target = await loadTargetMembership(context, supabase, membershipId); if (!target) return;
   const actor = await requireActorRole(context, supabase, target.org_id, authUser.id); if (!actor) return;
+
   const targetRole = (target.role||'member').toLowerCase();
   const actorIsOwner = (actor.role||'member').toLowerCase()==='owner';
-  if (targetRole === 'owner'){ respond(context,403,{message:'cannot change owner role'}); return; }
-  if (target.user_id === authUser.id){ respond(context,403,{message:'cannot change your own role'}); return; }
-  if (!actorIsOwner && role === 'admin' && targetRole === 'admin'){ respond(context,200,{message:'no-op'}); return; }
-  if (!actorIsOwner && targetRole === 'admin' && role === 'member'){ respond(context,403,{message:'admin cannot demote admin'}); return; }
-  const upd = await supabase.from('org_memberships').update({ role }).eq('id', membershipId);
-  if (upd.error){ respond(context,500,{message:'failed to update role'}); return; }
-  respond(context,200,{ message:'updated', role });
+
+  if (role){
+    if (targetRole === 'owner'){ respond(context,403,{message:'cannot change owner role'}); return; }
+    if (target.user_id === authUser.id){ respond(context,403,{message:'cannot change your own role'}); return; }
+    if (!actorIsOwner && role === 'admin' && targetRole === 'admin'){
+      if (!normalizedName.provided){ respond(context,200,{message:'no-op', role: targetRole}); return; }
+    }
+    if (!actorIsOwner && targetRole === 'admin' && role === 'member'){ respond(context,403,{message:'admin cannot demote admin'}); return; }
+    if (role !== targetRole){
+      const upd = await supabase.from('org_memberships').update({ role }).eq('id', membershipId);
+      if (upd.error){ respond(context,500,{message:'failed to update role'}); return; }
+    }
+  }
+
+  let profileUpdated = false;
+  let accountUpdated = false;
+
+  if (normalizedName.provided){
+    if (!target.user_id){ respond(context,400,{message:'membership missing user id'}); return; }
+
+    const profileResult = await supabase.from('profiles').select('id, email, full_name').eq('id', target.user_id).maybeSingle();
+    if (profileResult.error){ respond(context,500,{message:'failed to load profile'}); return; }
+
+    let authUserRecord = null;
+    let previousMetadata = null;
+    try {
+      const adminResult = await supabase.auth.admin.getUserById(target.user_id);
+      if (adminResult.error){ throw adminResult.error; }
+      authUserRecord = adminResult.data?.user ?? null;
+      previousMetadata = authUserRecord?.user_metadata ? { ...authUserRecord.user_metadata } : {};
+    } catch (error){
+      context.log?.error?.('org-memberships failed to load auth user for name update', { membershipId, userId: target.user_id, message: error?.message });
+      respond(context,500,{message:'failed to load account'}); return;
+    }
+
+    const nextMetadata = {
+      ...previousMetadata,
+      full_name: normalizedName.value,
+      fullName: normalizedName.value,
+      name: normalizedName.value,
+    };
+
+    const metadataResult = await supabase.auth.admin.updateUserById(target.user_id, { user_metadata: nextMetadata });
+    if (metadataResult.error){
+      context.log?.error?.('org-memberships failed to update auth metadata', { membershipId, userId: target.user_id, message: metadataResult.error.message });
+      respond(context,500,{message:'failed to update account name'}); return;
+    }
+    accountUpdated = true;
+
+    const profilePayload = {
+      id: target.user_id,
+      full_name: normalizedName.value,
+    };
+    if (profileResult.data?.email){ profilePayload.email = profileResult.data.email; }
+    else if (authUserRecord?.email){ profilePayload.email = authUserRecord.email.toLowerCase(); }
+
+    const profileUpdate = await supabase
+      .from('profiles')
+      .upsert(profilePayload, { onConflict: 'id' })
+      .select('id')
+      .maybeSingle();
+
+    if (profileUpdate.error){
+      context.log?.error?.('org-memberships failed to update profile name', { membershipId, userId: target.user_id, message: profileUpdate.error.message });
+      // Attempt to revert auth metadata to previous value
+      try {
+        await supabase.auth.admin.updateUserById(target.user_id, { user_metadata: previousMetadata });
+      } catch (revertError){
+        context.log?.error?.('org-memberships failed to revert auth metadata after profile error', { membershipId, userId: target.user_id, message: revertError?.message });
+      }
+      respond(context,500,{message:'failed to update profile name'}); return;
+    }
+
+    profileUpdated = true;
+  }
+
+  respond(context,200,{ message:'updated', role: role || targetRole, profileUpdated, accountUpdated, name: normalizedName.provided ? normalizedName.value : undefined });
 }
 
 export default async function orgMemberships(context, req){

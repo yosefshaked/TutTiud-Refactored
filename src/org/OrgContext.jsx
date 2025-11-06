@@ -987,6 +987,24 @@ export function OrgProvider({ children }) {
     [activeOrgId, loadOrgDirectory],
   );
 
+  const updateMemberName = useCallback(
+    async (membershipId, name) => {
+      if (!membershipId) throw new Error('membership id required');
+      const normalized = typeof name === 'string' ? name.replace(/\s+/g, ' ').trim() : '';
+      if (!normalized) {
+        throw new Error('יש להזין שם מלא תקין.');
+      }
+      await authenticatedFetch(`/api/org-memberships/${membershipId}`, {
+        method: 'PATCH',
+        body: { fullName: normalized },
+      });
+      if (activeOrgId) {
+        await loadOrgDirectory(activeOrgId);
+      }
+    },
+    [activeOrgId, loadOrgDirectory],
+  );
+
   const acceptInvite = useCallback(
     async (inviteId) => {
       if (!inviteId || !user) throw new Error('הזמנה אינה זמינה.');
@@ -1061,6 +1079,7 @@ export function OrgProvider({ children }) {
       revokeInvite,
       removeMember,
       updateMemberRole,
+      updateMemberName,
       acceptInvite,
       enableDirectory,
       disableDirectory,
@@ -1092,6 +1111,7 @@ export function OrgProvider({ children }) {
       revokeInvite,
       removeMember,
       updateMemberRole,
+      updateMemberName,
       acceptInvite,
       enableDirectory,
       disableDirectory,

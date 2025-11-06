@@ -32,6 +32,7 @@
   - Each expired invite displays amber-highlighted row with explanation and "שלח הזמנה מחדש" button.
   - Reinvite handler calls `createInvitation` with same email; backend auto-handles expired invites by marking old as expired and creating new token + sending new email.
   - Helper function `isInvitationExpired()` checks if `expires_at` timestamp has passed.
+  - Admins can edit a member’s display name inline; saving updates `profiles.full_name` and Supabase Auth metadata so future sessions show the refreshed name.
 - **UpdatePassword** page improved error handling:
   - Distinguishes between expired recovery tokens vs already-used tokens.
   - Shows appropriate messages: expired → request new reset; used → try logging in or request new reset.

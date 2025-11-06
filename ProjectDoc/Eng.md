@@ -99,6 +99,8 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 5. **Email guardrails** – If the logged-in Supabase account email does not match the invitation email the page blocks actions and offers a “Sign out and switch accounts” CTA.
 6. **Org selection context (`GET /api/user-context`)** – After authentication the `OrgProvider` calls the new endpoint to retrieve both accepted memberships and pending invitations with organization names, avoiding client-side RLS denials that previously produced “ארגון ללא שם”.
 
+- **Team member management (`OrgMembersCard.jsx`)** – Admins and owners can edit a member’s full name directly from the Team Members card. Saving the change patches `/api/org-memberships/{membershipId}` with `fullName`, which updates both the `profiles.full_name` column and the Supabase Auth user metadata (`full_name`, `fullName`, `name`) so the refreshed display name appears across the control plane and future sessions.
+
 ### 7.3 User Story Mapping
 
 | User Story | Implementation Notes |
