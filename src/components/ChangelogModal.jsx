@@ -156,11 +156,11 @@ export default function ChangelogModal({ open, onClose }) {
                 }}>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>פיצ'ר חדש – ייצוא PDF של היסטוריית המפגשים:</strong> זמין למנהלים ובעלי ארגון בלבד. כולל תמיכה בעברית/RTL ומיתוג ארגוני בהתאם להרשאות
+                    <strong>ייצוא PDF של היסטוריית המפגשים (מנהלים בלבד):</strong>. כולל תמיכה בעברית ומיתוג ארגוני בהתאם להרשאות
                   </li>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>פיצ'ר חדש – עריכת שם משתמש בארגון:</strong> מנהלים יכולים לערוך את שם התצוגה של חברי הארגון
+                    <strong>עריכת שמות תצוגה (מנהלים בלבד):</strong> מנהלים יכולים לערוך את שם התצוגה של חברי הארגון
                   </li>
                 </ul>
 
