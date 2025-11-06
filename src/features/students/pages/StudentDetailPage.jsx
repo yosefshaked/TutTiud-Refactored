@@ -711,9 +711,15 @@ export default function StudentDetailPage() {
               const formVersion = record?.metadata?.form_version ?? null;
               
               // Get questions for this session's version (falls back to current if version not found/null)
-              const versionedQuestions = formConfig 
-                ? getQuestionsForVersion(formConfig, formVersion)
-                : questions; // Fallback to current questions if config not loaded
+              let versionedQuestions = questions; // Default to current parsed questions
+              
+              if (formConfig) {
+                const extracted = getQuestionsForVersion(formConfig, formVersion);
+                // Only use extracted questions if we actually got results
+                if (extracted.length > 0) {
+                  versionedQuestions = extracted;
+                }
+              }
               
               const answers = buildAnswerList(record.content, versionedQuestions);
               const key = record.id || record.date;

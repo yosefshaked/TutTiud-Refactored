@@ -1,10 +1,13 @@
+import { parseSessionFormConfig } from './form-config.js';
+
 /**
  * Extract questions for a specific form version from session form config
  * Handles both legacy array format and new versioned format with current/history
+ * Returns normalized questions (with key, label, etc.) ready for use in UI
  * 
  * @param {*} formConfig - The session form configuration (from Settings)
  * @param {number|null} version - The form version to retrieve (null/undefined = use current)
- * @returns {Array} Array of question objects
+ * @returns {Array} Array of normalized question objects
  */
 export function getQuestionsForVersion(formConfig, version) {
   if (!formConfig) {
@@ -21,60 +24,40 @@ export function getQuestionsForVersion(formConfig, version) {
     }
   }
 
-  // Legacy format: array of questions (no versioning)
+  // Legacy format: array of questions (no versioning) - normalize and return
   if (Array.isArray(config)) {
-    return config;
+    return parseSessionFormConfig(config);
   }
 
   // New format: object with current and optional history
   if (config && typeof config === 'object') {
-    // If no version specified or version is null/undefined, use current
+    // If no version specified or version is null/undefined, use current (entire config)
     if (version === null || version === undefined) {
-      // Handle both config.current.questions and config.questions for backwards compatibility
-      if (config.current && Array.isArray(config.current.questions)) {
-        return config.current.questions;
-      }
-      if (Array.isArray(config.questions)) {
-        return config.questions;
-      }
-      if (Array.isArray(config.current)) {
-        return config.current;
-      }
-      return [];
+      // Just pass the entire config to parseSessionFormConfig - it knows how to handle it
+      return parseSessionFormConfig(config);
     }
 
-    // Check current version first
-    if (config.current) {
+    // Check if requested version matches current version
+    if (config.current && typeof config.current === 'object') {
       const currentVersion = config.current.version ?? config.version;
       if (currentVersion === version) {
-        if (Array.isArray(config.current.questions)) {
-          return config.current.questions;
-        }
-        if (Array.isArray(config.current)) {
-          return config.current;
-        }
+        // Return the entire config so parseSessionFormConfig can extract current.questions
+        return parseSessionFormConfig(config);
       }
     }
 
-    // Search in history if version doesn't match current
+    // Search in history for the requested version
     if (Array.isArray(config.history)) {
       for (const historyEntry of config.history) {
         if (historyEntry.version === version && Array.isArray(historyEntry.questions)) {
-          return historyEntry.questions;
+          // Normalize the historical questions
+          return parseSessionFormConfig(historyEntry.questions);
         }
       }
     }
 
     // Fallback to current if version not found in history
-    if (config.current && Array.isArray(config.current.questions)) {
-      return config.current.questions;
-    }
-    if (Array.isArray(config.questions)) {
-      return config.questions;
-    }
-    if (config.current && Array.isArray(config.current)) {
-      return config.current;
-    }
+    return parseSessionFormConfig(config);
   }
 
   return [];
