@@ -518,7 +518,7 @@ export default function StudentDetailPage() {
                 className="self-start text-sm"
                 size="sm"
                 onClick={handleExportPdf}
-                disabled={studentLoadError || isStudentLoading || !student || isExporting}
+                disabled={studentLoadError || isStudentLoading || !student || isExporting || questionsState === REQUEST_STATE.loading}
                 variant="outline"
               >
                 {isExporting ? (

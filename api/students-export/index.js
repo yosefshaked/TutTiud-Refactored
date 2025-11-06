@@ -69,6 +69,14 @@ function toKey(value) {
 /**
  * Build answer list with human-readable labels
  */
+function extractQuestionLabelRaw(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  if (typeof entry.label === 'string' && entry.label.trim()) return entry.label.trim();
+  if (typeof entry.title === 'string' && entry.title.trim()) return entry.title.trim();
+  if (typeof entry.question === 'string' && entry.question.trim()) return entry.question.trim();
+  return '';
+}
+
 function buildAnswerList(content, questions) {
   const answers = parseSessionContent(content);
   const entries = [];
@@ -77,7 +85,7 @@ function buildAnswerList(content, questions) {
   // Create a lookup map for questions by ID, key, and label (including slugged variants)
   const questionMap = new Map();
   for (const question of questions) {
-    const qLabel = typeof question.label === 'string' ? question.label : '';
+    const qLabel = extractQuestionLabelRaw(question);
     const qId = typeof question.id === 'string' ? question.id : '';
     const qKey = typeof question.key === 'string' ? question.key : '';
 
