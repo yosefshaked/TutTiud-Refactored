@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
-  const [expandedVersions, setExpandedVersions] = useState({ '1.1.1': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.2.0': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -88,6 +88,119 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.2.0 - PDF Export & Registration */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header 
+                onClick={() => toggleVersion('1.2.0')}
+                style={{ 
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.2.0'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.2.0'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ 
+                      background: '#5B5BD6', 
+                      color: 'white', 
+                      padding: '4px 12px', 
+                      borderRadius: '6px', 
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.2.0
+                    </span>
+                    <time dateTime="2025-11-06" style={{ color: '#64748b', fontSize: '14px' }}>
+                      6 בנובמבר 2025
+                    </time>
+                  </div>
+                  <span style={{ 
+                    fontSize: '20px', 
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.2.0'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{ 
+                  fontWeight: 700, 
+                  fontSize: 18, 
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  📄 ייצוא PDF, הרשמה משופרת ותיקוני הזמנות
+                </h3>
+              </header>
+
+              {expandedVersions['1.2.0'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תוספות:
+                </h4>
+                <ul style={{ 
+                  listStyle: 'none', 
+                  padding: 0, 
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>פיצ'ר חדש – ייצוא PDF של היסטוריית המפגשים:</strong> זמין למנהלים ובעלי ארגון בלבד. כולל תמיכה בעברית/RTL ומיתוג ארגוני בהתאם להרשאות
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>פיצ'ר חדש – עריכת שם משתמש בארגון:</strong> מנהלים יכולים לערוך את שם התצוגה של חברי הארגון
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים:
+                </h4>
+                <ul style={{ 
+                  listStyle: 'none', 
+                  padding: 0, 
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>שיפור תהליך ההרשמה:</strong> הודעות ברורות ותזרים משופר למשתמשים במהלך ההרשמה לארגון
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תיקוני באגים:
+                </h4>
+                <ul style={{ 
+                  listStyle: 'none', 
+                  padding: 0, 
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#10b981' }}>✓</span>
+                    שופרו הודעות ושומרי-סף בזרימת ההזמנות; טיפול טוב יותר בקישורים שפגו או שומשו
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.1.1 - Sorting & Layout */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
