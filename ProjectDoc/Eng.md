@@ -87,6 +87,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 ### 7.2 Invitation onboarding flow (2025-11 update)
 
 1. **Azure Function invite (`POST /api/invitations`)** – Admins trigger an invite email that embeds the Supabase `token_hash` and the control-plane `invitation_token` inside the redirect URL.
+   - The handler now blocks invitations when the email already belongs to an active `org_memberships` row for the same organization, returning HTTP 409 with the `user already a member` message so the UI can surface a precise error.
    - The handler now resolves existing accounts via `supabase.auth.admin.getUserByEmail(email)` and treats a thrown “User not found” (or 404) as confirmation that no auth record exists yet.
    - If the Supabase admin client finds an existing auth user for the requested email, the function still creates the control-plane invitation but skips `inviteUserByEmail`, returning `{ userExists: true }` so the UI can confirm the member may sign in immediately.
    - Invitation rows are written to `org_invitations` only after Supabase confirms the invite email was sent. When an account already exists (no email dispatch), the row is created immediately so the member can accept without waiting for a new message.

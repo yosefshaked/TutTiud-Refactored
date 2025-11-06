@@ -326,29 +326,35 @@ async function fetchOrganization(context, supabase, orgId) {
 }
 
 async function findExistingMemberByEmail(supabase, orgId, email) {
-  const listResult = await supabase.auth.admin.listUsers({ email, perPage: 1 });
-  if (listResult.error) {
-    return { error: listResult.error };
+  let userResult;
+  try {
+    userResult = await supabase.auth.admin.getUserByEmail(email);
+  } catch (error) {
+    return { error };
   }
-  const users = Array.isArray(listResult.data?.users) ? listResult.data.users : [];
-  for (const user of users) {
-    if (typeof user?.email !== 'string' || user.email.toLowerCase() !== email) {
-      continue;
-    }
-    const membershipResult = await supabase
-      .from('org_memberships')
-      .select('user_id')
-      .eq('org_id', orgId)
-      .eq('user_id', user.id)
-      .maybeSingle();
 
-    if (membershipResult.error) {
-      return { error: membershipResult.error };
-    }
+  if (userResult.error) {
+    return { error: userResult.error };
+  }
 
-    if (membershipResult.data) {
-      return { userId: user.id };
-    }
+  const user = userResult.data?.user ?? null;
+  if (!user?.id) {
+    return { userId: null };
+  }
+
+  const membershipResult = await supabase
+    .from('org_memberships')
+    .select('user_id')
+    .eq('org_id', orgId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (membershipResult.error) {
+    return { error: membershipResult.error };
+  }
+
+  if (membershipResult.data) {
+    return { userId: user.id };
   }
   return { userId: null };
 }
