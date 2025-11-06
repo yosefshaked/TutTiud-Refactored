@@ -282,11 +282,13 @@
 - **Metadata support**: The `Settings` table includes a `metadata` jsonb column for storing auxiliary configuration. For `session_form_config`, this holds preconfigured answer lists for `text`/`textarea` questions under `metadata.preconfigured_answers[question_id]`. The cap is enforced server-side using control DB permissions and respected in the editor UI.
 - **Session form versioning** (2025-11):
   - Backend (`/api/sessions`) saves `SessionRecords.metadata.form_version` by extracting from `Settings.session_form_config.current.version` (primary) or `Settings.session_form_config.version` (legacy fallback).
-  - **Shared version lookup utility** (`src/features/sessions/utils/version-lookup.js`):
+  - **Shared version lookup utility**:
     - `extractQuestionsForVersion(formConfig, version)` contains the core logic for extracting questions from versioned config
+    - Frontend: `src/features/sessions/utils/version-lookup.js`
+    - Backend: `api/_shared/version-lookup.js` (copy kept in sync with frontend)
     - Handles nested structure `config.current.questions`, legacy `config.current` array, and flat `config.questions`
     - Searches history array for specific versions
-    - Used by both frontend and backend to maintain DRY principle
+    - Note: Two copies needed because Azure Static Web Apps deploys API and frontend separately; keep them synchronized
   - Frontend (`StudentDetailPage.jsx`) uses `getQuestionsForVersion` helper (`src/features/sessions/utils/version-helpers.js`):
     - Calls shared `extractQuestionsForVersion` to get raw questions
     - Then normalizes via `parseSessionFormConfig` (adds `key` field from `id`, proper structure, etc.)

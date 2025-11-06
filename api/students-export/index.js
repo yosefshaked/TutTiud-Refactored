@@ -13,7 +13,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { ensureOrgPermissions } from '../_shared/permissions-utils.js';
-import { extractQuestionsForVersion } from '../../src/features/sessions/utils/version-lookup.js';
+import { extractQuestionsForVersion } from '../_shared/version-lookup.js';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { format, parseISO } from 'date-fns';
