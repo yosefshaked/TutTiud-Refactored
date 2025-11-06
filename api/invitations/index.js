@@ -326,19 +326,34 @@ async function fetchOrganization(context, supabase, orgId) {
 }
 
 async function findExistingMemberByEmail(supabase, orgId, email) {
-  let userResult;
-  try {
-    userResult = await supabase.auth.admin.getUserByEmail(email);
-  } catch (error) {
-    return { error };
+  let profileId = null;
+  let profileResult = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (profileResult.error) {
+    return { error: profileResult.error };
   }
 
-  if (userResult.error) {
-    return { error: userResult.error };
+  profileId = profileResult.data?.id ?? null;
+
+  if (!profileId) {
+    profileResult = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('email', email)
+      .maybeSingle();
+
+    if (profileResult.error) {
+      return { error: profileResult.error };
+    }
+
+    profileId = profileResult.data?.id ?? null;
   }
 
-  const user = userResult.data?.user ?? null;
-  if (!user?.id) {
+  if (!profileId) {
     return { userId: null };
   }
 
@@ -346,7 +361,7 @@ async function findExistingMemberByEmail(supabase, orgId, email) {
     .from('org_memberships')
     .select('user_id')
     .eq('org_id', orgId)
-    .eq('user_id', user.id)
+    .eq('user_id', profileId)
     .maybeSingle();
 
   if (membershipResult.error) {
@@ -354,7 +369,7 @@ async function findExistingMemberByEmail(supabase, orgId, email) {
   }
 
   if (membershipResult.data) {
-    return { userId: user.id };
+    return { userId: profileId };
   }
   return { userId: null };
 }
