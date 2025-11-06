@@ -654,7 +654,7 @@ export default async function (context, req) {
     const { data, error } = await tenantClient
       .from('Settings')
       .select('settings_value')
-      .eq('settings_key', 'session_form_config')
+      .eq('key', 'session_form_config')
       .maybeSingle();
 
     if (!error && data?.settings_value) {
