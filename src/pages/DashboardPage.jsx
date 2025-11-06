@@ -5,39 +5,57 @@ import PageLayout from "@/components/ui/PageLayout.jsx"
 import Card from "@/components/ui/CustomCard.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
+import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
 
-function buildGreeting(instructorName, user) {
-  // Priority 1: Instructor name from Instructors table
+/**
+ * Build greeting with proper fallback chain:
+ * 1. Instructor name (from tenant DB Instructors table)
+ * 2. Profile full_name (from control DB profiles table)
+ * 3. Auth metadata display name (from Supabase Auth user_metadata)
+ * 4. Email address
+ */
+function buildGreeting(instructorName, profileName, authName, email) {
+  // Priority 1: Instructor name from tenant DB
   if (instructorName && typeof instructorName === "string") {
     const name = instructorName.trim()
-    if (name && !name.includes('@')) {
-      return `ברוך הבא, ${name}!`
+    if (name) {
+      return `ברוכים הבא, ${name}!`
     }
   }
 
-  // Priority 2: User display name from profile
-  if (user) {
-    const displayName = typeof user.name === "string" ? user.name.trim() : ""
-    if (displayName && !displayName.includes('@')) {
-      return `ברוך הבא, ${displayName}!`
-    }
-
-    // Priority 3: User email
-    if (user.email) {
-      return `ברוך הבא, ${user.email}!`
+  // Priority 2: Profile name from control DB
+  if (profileName && typeof profileName === "string") {
+    const name = profileName.trim()
+    if (name) {
+      return `ברוכים הבא, ${name}!`
     }
   }
 
-  return "ברוך הבא!"
+  // Priority 3: Auth metadata display name
+  if (authName && typeof authName === "string") {
+    const name = authName.trim()
+    if (name) {
+      return `ברוכים הבא, ${name}!`
+    }
+  }
+
+  // Priority 4: Email fallback
+  if (email && typeof email === "string") {
+    return `ברוכים הבא, ${email}!`
+  }
+
+  return "ברוכים הבא!"
 }
 
 export default function DashboardPage() {
   const { user, session } = useAuth()
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg()
+  const { authClient } = useSupabase()
   const { openSessionModal } = useSessionModal()
   const [instructorName, setInstructorName] = useState(null)
+  const [profileName, setProfileName] = useState(null)
 
   const membershipRole = activeOrg?.membership?.role
   const { studentsLink, studentsTitle, studentsDescription } = useMemo(() => {
@@ -59,7 +77,7 @@ export default function DashboardPage() {
     }
   }, [membershipRole])
 
-  // Fetch instructor name from Instructors table
+  // Fetch instructor name from tenant DB Instructors table
   useEffect(() => {
     if (!user?.id || !activeOrgId || !tenantClientReady || !activeOrgHasConnection || !session) {
       return
@@ -82,7 +100,7 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error('Failed to fetch instructor name:', error)
-        // Silently fail - will fall back to user.name or email
+        // Silently fail - will fall back to profile/auth name
       }
     }
 
@@ -93,7 +111,46 @@ export default function DashboardPage() {
     }
   }, [user?.id, activeOrgId, tenantClientReady, activeOrgHasConnection, session])
 
-  const greeting = buildGreeting(instructorName, user)
+  // Fetch profile name from control DB profiles table
+  useEffect(() => {
+    if (!user?.id || !authClient) {
+      return
+    }
+
+    let isMounted = true
+
+    async function fetchProfileName() {
+      try {
+        const { data, error } = await authClient
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle()
+        
+        if (!isMounted) return
+
+        if (error) {
+          console.error('Failed to fetch profile name:', error)
+          return
+        }
+
+        if (data?.full_name) {
+          setProfileName(data.full_name)
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile name:', error)
+        // Silently fail - will fall back to auth name or email
+      }
+    }
+
+    fetchProfileName()
+
+    return () => {
+      isMounted = false
+    }
+  }, [user?.id, authClient])
+
+  const greeting = buildGreeting(instructorName, profileName, user?.name, user?.email)
 
   return (
     <PageLayout
