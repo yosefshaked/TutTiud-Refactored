@@ -137,10 +137,71 @@ function parseSessionFormConfig(value) {
 }
 
 /**
+ * Extract questions for a specific form version
+ * Handles both legacy array format and new versioned format with current/history
+ */
+function getQuestionsForVersion(formConfig, version) {
+  if (!formConfig) {
+    return [];
+  }
+
+  // Parse if string
+  let config = formConfig;
+  if (typeof formConfig === 'string') {
+    try {
+      config = JSON.parse(formConfig);
+    } catch {
+      return [];
+    }
+  }
+
+  // Legacy format: array of questions (no versioning)
+  if (Array.isArray(config)) {
+    return config;
+  }
+
+  // New format: object with current and history
+  if (config && typeof config === 'object') {
+    // If no version specified, use current
+    if (version === null || version === undefined) {
+      return Array.isArray(config.current) ? config.current : [];
+    }
+
+    // Check current version
+    if (config.current && Array.isArray(config.current)) {
+      const currentVersion = config.version;
+      if (currentVersion === version) {
+        return config.current;
+      }
+    }
+
+    // Search in history
+    if (Array.isArray(config.history)) {
+      for (const historyEntry of config.history) {
+        if (historyEntry.version === version && Array.isArray(historyEntry.questions)) {
+          return historyEntry.questions;
+        }
+      }
+    }
+
+    // Fallback to current if version not found
+    return Array.isArray(config.current) ? config.current : [];
+  }
+
+  return [];
+}
+
+/**
  * Generate HTML content for PDF
  */
-function generatePdfHtml(student, sessions, questions, logoUrl, customLogoUrl) {
+function generatePdfHtml(student, sessions, formConfig, logoUrl, customLogoUrl) {
   const sessionsHtml = sessions.map(session => {
+    // Extract form version from session metadata
+    const formVersion = session.metadata?.form_version ?? null;
+    
+    // Get questions for this specific session's form version
+    const questions = getQuestionsForVersion(formConfig, formVersion);
+    
     const answers = buildAnswerList(session.content, questions);
     const answersHtml = answers.length ? answers.map(entry => `
       <div class="answer-item">
@@ -568,8 +629,8 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_load_sessions' });
   }
 
-  // Fetch session form questions
-  let questions = [];
+  // Fetch session form config (complete with version history)
+  let formConfig = null;
   try {
     const { data, error } = await tenantClient
       .from('Settings')
@@ -578,11 +639,11 @@ export default async function (context, req) {
       .maybeSingle();
 
     if (!error && data?.settings_value) {
-      questions = parseSessionFormConfig(data.settings_value);
+      formConfig = data.settings_value;
     }
   } catch (error) {
-    context.log?.warn?.('students-export failed to fetch questions', { message: error?.message });
-    // Continue without questions
+    context.log?.warn?.('students-export failed to fetch form config', { message: error?.message });
+    // Continue without form config
   }
 
   // Fetch organization logo URL
@@ -620,7 +681,7 @@ export default async function (context, req) {
     });
 
     const page = await browser.newPage();
-    const html = generatePdfHtml(student, sessions, questions, tuttiudLogoUrl, customLogoUrl);
+    const html = generatePdfHtml(student, sessions, formConfig, tuttiudLogoUrl, customLogoUrl);
     
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
