@@ -110,6 +110,17 @@ export async function createInvitation(orgId, email, { session, expiresAt, redir
       invitation: normalizedInvitation,
     };
   } catch (error) {
+    const serverMessage = error?.data?.message || '';
+    if (serverMessage) {
+      error.code = serverMessage;
+    }
+    if (error?.status === 409) {
+      if (serverMessage === 'user already a member') {
+        error.message = 'לא נשלחה הזמנה. המשתמש כבר חבר בארגון.';
+      } else if (serverMessage === 'invitation already pending') {
+        error.message = 'כבר קיימת הזמנה בתוקף למשתמש זה.';
+      }
+    }
     if (!error?.message) {
       error.message = 'שליחת ההזמנה נכשלה. נסה שוב מאוחר יותר.';
     }
