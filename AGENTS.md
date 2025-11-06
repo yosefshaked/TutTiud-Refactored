@@ -5,6 +5,8 @@
 - Prefer ES module syntax.
 
 ## Workflow
+- For premium features, always check permissions in both frontend (UI) and backend (API) before allowing access.
+- PDF export feature uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment.
 - Lint any changed JavaScript or JSX files with `npx eslint <files>`.
 - Run `npm run build` to ensure the project builds.
 - No test script is configured; note this in your testing summary.
@@ -103,6 +105,23 @@
 - Global display: `OrgLogo.jsx` component fetches and displays custom logo in AppShell header (desktop sidebar + mobile header). Falls back to TutTiud logo (`/icon.svg`) when no logo is set.
 - Logo refresh: Component refetches when `activeOrgId` changes, ensuring correct logo displays after org switch.
 - Logo sizing: Uses `object-contain` with white background padding to ensure logos fit nicely in all display locations (48px container).
+
+### PDF Export Feature (2025-11)
+- `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
+  - Validates admin/owner role and permission before processing
+  - Generates Hebrew/RTL-ready PDF with student info, session history, and custom branding
+  - Uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment
+  - Co-branding: Always displays TutTiud logo; optionally includes custom org logo if `permissions.can_use_custom_logo_on_exports = true`
+  - File naming: `[Student_Name]_Records_[Date].pdf`
+  - Resource management: Browser instance always closed in finally block to prevent memory leaks
+- Permissions added to `scripts/control-db-permissions-table.sql`:
+  - `can_export_pdf_reports` (boolean, default false) - Controls access to PDF export feature
+  - `can_use_custom_logo_on_exports` (boolean, default false) - Controls custom logo on exports
+- Frontend: Export button on `StudentDetailPage` for admin/owner roles only
+  - Conditional rendering: enabled button for permitted orgs, disabled with tooltip for non-permitted orgs
+  - Tooltip message: "ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו."
+  - Uses toast notifications for success/error feedback
+  - API client: `src/api/students-export.js` exports `exportStudentPdf()` and `downloadPdfBlob()`
 
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
@@ -261,6 +280,27 @@
   - **`buttons`**: Displays as horizontally wrapped button group; radio input is hidden (`sr-only`); selected button gets primary background with white text and shadow; unselected buttons have neutral border with hover effects
 - Both types use the same data structure (options array) and validation rules (minimum 2 options required).
 - **Metadata support**: The `Settings` table includes a `metadata` jsonb column for storing auxiliary configuration. For `session_form_config`, this holds preconfigured answer lists for `text`/`textarea` questions under `metadata.preconfigured_answers[question_id]`. The cap is enforced server-side using control DB permissions and respected in the editor UI.
+- **Session form versioning** (2025-11):
+  - Backend (`/api/sessions`) saves `SessionRecords.metadata.form_version` by extracting from `Settings.session_form_config.current.version` (primary) or `Settings.session_form_config.version` (legacy fallback).
+  - **Shared version lookup utility**:
+    - `extractQuestionsForVersion(formConfig, version)` contains the core logic for extracting questions from versioned config
+    - Frontend: `src/features/sessions/utils/version-lookup.js`
+    - Backend: `api/_shared/version-lookup.js` (copy kept in sync with frontend)
+    - Handles nested structure `config.current.questions`, legacy `config.current` array, and flat `config.questions`
+    - Searches history array for specific versions
+    - Note: Two copies needed because Azure Static Web Apps deploys API and frontend separately; keep them synchronized
+  - Frontend (`StudentDetailPage.jsx`) uses `getQuestionsForVersion` helper (`src/features/sessions/utils/version-helpers.js`):
+    - Calls shared `extractQuestionsForVersion` to get raw questions
+    - Then normalizes via `parseSessionFormConfig` (adds `key` field from `id`, proper structure, etc.)
+  - PDF export (`api/students-export/index.js`):
+    - Imports and uses shared `extractQuestionsForVersion` directly (no normalization needed)
+    - Uses `buildAnswerList` with question map that looks up by `id`, `key`, or `label` to match raw questions
+  - When displaying session records:
+    1. Checks `session.metadata.form_version` for each record
+    2. If version is set, retrieves matching questions from `session_form_config.current.questions` or `session_form_config.history[].questions`
+    3. If version is null/missing, falls back to current form configuration
+  - This gracefully handles legacy records (no version) while supporting future versioned forms when history tracking is implemented.
+  - Database structure: `session_form_config` is stored as `{"current": {"version": N, "saved_at": "...", "questions": [...]}, "history": [...]}`
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.

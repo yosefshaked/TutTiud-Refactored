@@ -42,9 +42,20 @@ function extractSessionFormVersion(value) {
     return null;
   }
 
-  const candidate = Object.prototype.hasOwnProperty.call(payload, 'version')
-    ? payload.version
-    : null;
+  // Check nested structure first (current format): payload.current.version
+  let candidate = null;
+  if (payload.current && typeof payload.current === 'object' && !Array.isArray(payload.current)) {
+    if (Object.prototype.hasOwnProperty.call(payload.current, 'version')) {
+      candidate = payload.current.version;
+    }
+  }
+
+  // Fall back to legacy format: payload.version
+  if (candidate === null || candidate === undefined) {
+    if (Object.prototype.hasOwnProperty.call(payload, 'version')) {
+      candidate = payload.version;
+    }
+  }
 
   if (candidate === null || candidate === undefined) {
     return null;

@@ -37,6 +37,7 @@ function mapOrganizationRecord(record, membership, connection) {
       user_id: membership.user_id,
       created_at: membership.created_at,
     },
+    permissions: connection?.permissions ?? {},
     org_settings_metadata: connection?.metadata ?? null,
     org_settings_updated_at: connection?.updatedAt ?? null,
   };
@@ -173,7 +174,7 @@ export default async function userContext(context, req) {
 
       settingsResponse = await supabase
         .from('org_settings')
-        .select('org_id, supabase_url, anon_key, metadata, updated_at')
+        .select('org_id, supabase_url, anon_key, metadata, updated_at, permissions')
         .in('org_id', idsArray);
     } catch (error) {
       context.log?.error?.('user-context enrichment queries failed', { message: error?.message, userId });
@@ -208,6 +209,7 @@ export default async function userContext(context, req) {
           supabaseAnonKey: record.anon_key || '',
           metadata: record.metadata ?? null,
           updatedAt: record.updated_at || null,
+          permissions: record.permissions ?? {},
         },
       ]),
   );
