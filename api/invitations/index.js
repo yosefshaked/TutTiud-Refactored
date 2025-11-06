@@ -1,4 +1,5 @@
 /* eslint-env node */
+import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 import { createClient } from '@supabase/supabase-js';
 import { json, resolveBearerAuthorization } from '../_shared/http.js';
@@ -428,6 +429,8 @@ async function handleCreateInvitation(context, req, supabase) {
 
   const role = await requireAdminForOrg(context, supabase, orgId, authUser.id);
   if (!role) {
+    return;
+  }
 
   // Calculate smart expiration if client didn't provide one
   if (expiresAt === null) {
@@ -444,8 +447,6 @@ async function handleCreateInvitation(context, req, supabase) {
     } else {
       expiresAt = expiryResult.data;
     }
-  }
-    return;
   }
 
   const { error: memberLookupError, userId: existingUserId } = await findExistingMemberByEmail(supabase, orgId, email);
@@ -503,34 +504,33 @@ async function handleCreateInvitation(context, req, supabase) {
     }
   }
 
-  const invitationPayload = {
+  const baseInvitationPayload = {
     org_id: orgId,
     email,
     invited_by: authUser.id,
     status: STATUS_PENDING,
-  expires_at: expiresAt,
+    expires_at: expiresAt,
   };
 
-  const insertResult = await supabase
-    .from('org_invitations')
-    .insert(invitationPayload)
-    .select('id, token, email, status, invited_by, created_at, expires_at, org_id')
-    .maybeSingle();
-
-  if (insertResult.error || !insertResult.data) {
-    context.log?.error?.('invitations failed to create invitation', {
-      orgId,
-      email,
-      message: insertResult.error?.message,
-    });
-    respond(context, 500, { message: 'failed to create invitation' });
-    return;
-  }
-
-  const invitation = insertResult.data;
   if (authUserExists) {
+    const existingUserInsert = await supabase
+      .from('org_invitations')
+      .insert(baseInvitationPayload)
+      .select('id, token, email, status, invited_by, created_at, expires_at, org_id')
+      .maybeSingle();
+
+    if (existingUserInsert.error || !existingUserInsert.data) {
+      context.log?.error?.('invitations failed to create invitation for existing user', {
+        orgId,
+        email,
+        message: existingUserInsert.error?.message,
+      });
+      respond(context, 500, { message: 'failed to create invitation' });
+      return;
+    }
+
     respond(context, 200, {
-      invitation: sanitizeInvitation(invitation),
+      invitation: sanitizeInvitation(existingUserInsert.data),
       userExists: true,
     });
     return;
@@ -549,14 +549,18 @@ async function handleCreateInvitation(context, req, supabase) {
   }
 
   const inviterName = resolveUserFullName(inviterResult.data.user) || null;
+  const invitationId = randomUUID();
+  const invitationToken = randomUUID();
   const inviteMetadata = {
     ...emailData,
     orgId,
     orgName: organization.name ?? null,
     organization_name: organization.name ?? null,
     inviter_name: inviterName,
-    invitationId: invitation.id,
-    invitationToken: invitation.token,
+    invitationId,
+    invitation_id: invitationId,
+    invitationToken,
+    invitation_token: invitationToken,
   };
 
   const inviteResult = await supabase.auth.admin.inviteUserByEmail(email, {
@@ -568,19 +572,32 @@ async function handleCreateInvitation(context, req, supabase) {
     context.log?.error?.('invitations failed to send email invite', {
       orgId,
       email,
-      invitationId: invitation.id,
+      invitationId,
       message: inviteResult.error.message,
     });
-    await supabase
-      .from('org_invitations')
-      .update({ status: STATUS_FAILED })
-      .eq('id', invitation.id);
     respond(context, 502, { message: 'failed to send invitation email' });
     return;
   }
 
+  const insertResult = await supabase
+    .from('org_invitations')
+    .insert({ ...baseInvitationPayload, id: invitationId, token: invitationToken })
+    .select('id, token, email, status, invited_by, created_at, expires_at, org_id')
+    .maybeSingle();
+
+  if (insertResult.error || !insertResult.data) {
+    context.log?.error?.('invitations failed to persist invitation after email send', {
+      orgId,
+      email,
+      invitationId,
+      message: insertResult.error?.message,
+    });
+    respond(context, 500, { message: 'failed to create invitation' });
+    return;
+  }
+
   respond(context, 201, {
-    invitation: sanitizeInvitation(invitation),
+    invitation: sanitizeInvitation(insertResult.data),
   });
 }
 
