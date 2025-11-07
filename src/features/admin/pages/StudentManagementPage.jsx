@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
 import { Plus, Loader2, Pencil, Search, X, User, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
@@ -47,6 +48,7 @@ export default function StudentManagementPage() {
   const [dayFilter, setDayFilter] = useState(null);
   const [instructorFilterId, setInstructorFilterId] = useState('');
   const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE); // Default sort by schedule
+  const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -74,6 +76,9 @@ export default function StudentManagementPage() {
 
     try {
       const searchParams = new URLSearchParams({ org_id: activeOrgId });
+      if (statusFilter) {
+        searchParams.set('status', statusFilter);
+      }
       const payload = await authenticatedFetch(`students?${searchParams.toString()}`, { session });
       setStudents(Array.isArray(payload) ? payload : []);
     } catch (error) {
@@ -86,7 +91,7 @@ export default function StudentManagementPage() {
     }
 
     setStudentsState(REQUEST_STATES.idle);
-  }, [canFetch, activeOrgId, session]);
+  }, [canFetch, activeOrgId, session, statusFilter]);
 
   const fetchInstructors = useCallback(async () => {
     if (!canFetch) {
@@ -127,6 +132,7 @@ export default function StudentManagementPage() {
         if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter);
         if (savedFilters.instructorFilterId !== undefined) setInstructorFilterId(savedFilters.instructorFilterId);
         if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy);
+        if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter);
       }
     }
   }, [activeOrgId]);
@@ -165,9 +171,10 @@ export default function StudentManagementPage() {
         dayFilter,
         instructorFilterId,
         sortBy,
+        statusFilter,
       });
     }
-  }, [activeOrgId, filterMode, searchQuery, dayFilter, instructorFilterId, sortBy]);
+  }, [activeOrgId, filterMode, searchQuery, dayFilter, instructorFilterId, sortBy, statusFilter]);
 
   // Combined filter options for the control: mine, all, and per-instructor
   const combinedFilterOptions = useMemo(() => {
@@ -213,12 +220,19 @@ export default function StudentManagementPage() {
     setSearchQuery('');
     setDayFilter(null);
     setSortBy(STUDENT_SORT_OPTIONS.SCHEDULE);
+    setStatusFilter('active');
   };
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
-    return searchQuery.trim() !== '' || dayFilter !== null || instructorFilterId !== '' || filterMode !== 'all';
-  }, [searchQuery, dayFilter, instructorFilterId, filterMode]);
+    return (
+      searchQuery.trim() !== '' ||
+      dayFilter !== null ||
+      instructorFilterId !== '' ||
+      filterMode !== 'all' ||
+      statusFilter !== 'active'
+    );
+  }, [searchQuery, dayFilter, instructorFilterId, filterMode, statusFilter]);
 
   const handleOpenAddDialog = () => {
     setCreateError('');
@@ -242,6 +256,7 @@ export default function StudentManagementPage() {
     defaultSessionTime,
     notes,
     tags,
+    isActive,
   }) => {
     if (!canFetch) {
       return;
@@ -263,6 +278,7 @@ export default function StudentManagementPage() {
         default_session_time: defaultSessionTime,
         notes,
         tags: normalizedTags,
+        is_active: isActive,
       };
       await authenticatedFetch('students', {
         session,
@@ -311,6 +327,7 @@ export default function StudentManagementPage() {
         default_session_time: payload.defaultSessionTime,
         notes: payload.notes,
         tags: normalizeTagIdsForWrite(payload.tags),
+        is_active: payload.isActive,
       };
       await authenticatedFetch(`students/${payload.id}`, { session, method: 'PUT', body });
       setStudentForEdit(null);
@@ -326,6 +343,12 @@ export default function StudentManagementPage() {
   // Compute filtered/sorted students before any early returns to satisfy hooks rules
   const displayedStudents = useMemo(() => {
     let filtered = students;
+
+    if (statusFilter === 'active') {
+      filtered = filtered.filter((s) => s?.is_active !== false);
+    } else if (statusFilter === 'inactive') {
+      filtered = filtered.filter((s) => s?.is_active === false);
+    }
 
     // Filter by instructor (explicit instructor takes precedence over mode)
     if (instructorFilterId) {
@@ -375,7 +398,7 @@ export default function StudentManagementPage() {
     const sorted = [...filtered].sort(comparator);
 
     return sorted;
-  }, [students, filterMode, user?.id, searchQuery, dayFilter, instructorFilterId, sortBy, instructorMap]);
+  }, [students, filterMode, user?.id, searchQuery, dayFilter, instructorFilterId, sortBy, instructorMap, statusFilter]);
 
   if (supabaseLoading) {
     return (
@@ -462,16 +485,29 @@ export default function StudentManagementPage() {
                 </button>
               )}
             </div>
-            <DayOfWeekSelect
-              value={dayFilter}
-              onChange={setDayFilter}
-              placeholder="סינון לפי יום"
-            />
-            <div className="flex items-center gap-2 text-sm">
-              <label htmlFor="students-sort" className="text-neutral-600 whitespace-nowrap">מיון:</label>
-              <select
-                id="students-sort"
-                className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+          <DayOfWeekSelect
+            value={dayFilter}
+            onChange={setDayFilter}
+            placeholder="סינון לפי יום"
+          />
+          <div className="flex items-center gap-2 text-sm">
+            <label htmlFor="students-status" className="text-neutral-600 whitespace-nowrap">מצב:</label>
+            <select
+              id="students-status"
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="active">תלמידים פעילים</option>
+              <option value="inactive">תלמידים לא פעילים</option>
+              <option value="all">הצג הכל</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <label htmlFor="students-sort" className="text-neutral-600 whitespace-nowrap">מיון:</label>
+            <select
+              id="students-sort"
+              className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
@@ -551,14 +587,21 @@ export default function StudentManagementPage() {
                     <TableRow key={student.id}>
                       <TableCell className="text-sm font-semibold text-foreground">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            {student.id ? (
-                              <Link to={`/students/${student.id}`} className="text-primary hover:underline">
-                                {student.name || 'ללא שם'}
-                              </Link>
-                            ) : (
-                              student.name || 'ללא שם'
-                            )}
+                          <div className="flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {student.id ? (
+                                <Link to={`/students/${student.id}`} className="text-primary hover:underline">
+                                  {student.name || 'ללא שם'}
+                                </Link>
+                              ) : (
+                                student.name || 'ללא שם'
+                              )}
+                              {student.is_active === false ? (
+                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                                  לא פעיל
+                                </Badge>
+                              ) : null}
+                            </div>
                             {filterMode === 'all' ? (
                               <div className="mt-0.5 text-xs text-neutral-500">
                                 {instructor?.name ? (

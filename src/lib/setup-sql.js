@@ -38,7 +38,12 @@ ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "contact_phone" text,
   ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
   ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
-  ADD COLUMN IF NOT EXISTS "default_service" text;
+  ADD COLUMN IF NOT EXISTS "default_service" text,
+  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true;
+
+UPDATE tuttiud."Students"
+SET "is_active" = true
+WHERE "is_active" IS NULL;
 
 ALTER TABLE tuttiud."Students"
   DROP CONSTRAINT IF EXISTS "Students_assigned_instructor_id_fkey";
@@ -89,7 +94,12 @@ ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "contact_phone" text,
   ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
   ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
-  ADD COLUMN IF NOT EXISTS "default_service" text;
+  ADD COLUMN IF NOT EXISTS "default_service" text,
+  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true;
+
+UPDATE tuttiud."Students"
+SET "is_active" = true
+WHERE "is_active" IS NULL;
 ALTER TABLE tuttiud."Students"
   DROP CONSTRAINT IF EXISTS "Students_assigned_instructor_id_fkey";
 DO $$

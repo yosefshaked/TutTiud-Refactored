@@ -26,6 +26,10 @@ export default function NewSessionForm({
   canFilterByInstructor = false,
   studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
   onScopeChange,
+  statusFilter = 'active',
+  onStatusFilterChange,
+  canViewInactive = false,
+  visibilityLoaded = false,
   initialStudentId = '',
   onSubmit,
   onCancel,
@@ -112,6 +116,11 @@ export default function NewSessionForm({
     const byDay = students.filter((s) => dayMatches(s?.default_day_of_week, studentDayFilter));
 
     let filtered = byDay;
+    if ((statusFilter === 'active' || (!canViewInactive && statusFilter !== 'active'))) {
+      filtered = filtered.filter((s) => s?.is_active !== false);
+    } else if (statusFilter === 'inactive') {
+      filtered = filtered.filter((s) => s?.is_active === false);
+    }
     if (q) {
       // Apply text query over the day-filtered list
       filtered = byDay.filter((s) => {
@@ -119,14 +128,20 @@ export default function NewSessionForm({
           const name = String(s?.name || '').toLowerCase();
           if (name.includes(q)) return true;
 
-    // Match by Hebrew day label (e.g., "יום שני")
-    if (includesDayQuery(s?.default_day_of_week, q)) return true;
+          const contactName = String(s?.contact_name || '').toLowerCase();
+          if (contactName.includes(q)) return true;
 
-          // Match by time (e.g., 14:30)
+          const contactPhone = String(s?.contact_phone || '').toLowerCase();
+          if (contactPhone.includes(q)) return true;
+
+          const contactInfo = String(s?.contact_info || '').toLowerCase();
+          if (contactInfo.includes(q)) return true;
+
+          if (includesDayQuery(s?.default_day_of_week, q)) return true;
+
           const timeStr = String(describeSchedule(null, s?.default_session_time) || '').toLowerCase();
           if (timeStr.includes(q)) return true;
 
-          // Also match full schedule text
           const fullSchedule = String(describeSchedule(s?.default_day_of_week, s?.default_session_time) || '').toLowerCase();
           if (fullSchedule.includes(q)) return true;
 
@@ -139,7 +154,7 @@ export default function NewSessionForm({
 
     // Apply default sorting by schedule (day → hour → instructor → name)
     return sortStudentsBySchedule(filtered, instructorMap);
-  }, [students, studentQuery, studentDayFilter, instructorMap]);
+  }, [students, studentQuery, studentDayFilter, instructorMap, statusFilter, canViewInactive]);
 
   useEffect(() => {
     // If the currently selected student is filtered out, clear the selection
@@ -178,12 +193,13 @@ export default function NewSessionForm({
   const handleResetFilters = () => {
     setStudentQuery('');
     setStudentDayFilter(null);
+    onStatusFilterChange?.('active');
   };
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
-    return studentQuery.trim() !== '' || studentDayFilter !== null;
-  }, [studentQuery, studentDayFilter]);
+    return studentQuery.trim() !== '' || studentDayFilter !== null || statusFilter !== 'active';
+  }, [studentQuery, studentDayFilter, statusFilter]);
 
   const updateAnswer = useCallback((questionKey, value) => {
     setAnswers((previous) => ({
@@ -280,6 +296,24 @@ export default function NewSessionForm({
                 placeholder="סינון לפי יום"
               />
             </div>
+            {canViewInactive ? (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
+                  מצב:
+                </Label>
+                <select
+                  id="session-status-filter"
+                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+                  value={statusFilter}
+                  onChange={(event) => onStatusFilterChange?.(event.target.value)}
+                  disabled={isSubmitting || !visibilityLoaded}
+                >
+                  <option value="active">תלמידים פעילים</option>
+                  <option value="inactive">תלמידים לא פעילים</option>
+                  <option value="all">הצג הכל</option>
+                </select>
+              </div>
+            ) : null}
           </div>
           {hasActiveFilters && (
             <div className="flex justify-end">

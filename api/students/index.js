@@ -135,6 +135,45 @@ function coerceTags(value) {
   return { value: null, valid: false };
 }
 
+function coerceBooleanFlag(raw, { defaultValue = null, allowUndefined = true } = {}) {
+  if (raw === undefined) {
+    return { value: defaultValue, valid: allowUndefined, provided: false };
+  }
+
+  if (raw === null) {
+    return { value: defaultValue, valid: false, provided: true };
+  }
+
+  if (typeof raw === 'boolean') {
+    return { value: raw, valid: true, provided: true };
+  }
+
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase();
+    if (!normalized) {
+      return { value: defaultValue, valid: false, provided: true };
+    }
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on') {
+      return { value: true, valid: true, provided: true };
+    }
+    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'n' || normalized === 'off') {
+      return { value: false, valid: true, provided: true };
+    }
+    return { value: defaultValue, valid: false, provided: true };
+  }
+
+  if (typeof raw === 'number') {
+    if (raw === 1) {
+      return { value: true, valid: true, provided: true };
+    }
+    if (raw === 0) {
+      return { value: false, valid: true, provided: true };
+    }
+  }
+
+  return { value: defaultValue, valid: false, provided: true };
+}
+
 function buildStudentPayload(body) {
   const name = normalizeString(body?.name);
   if (!name) {
@@ -184,6 +223,13 @@ function buildStudentPayload(body) {
     return { error: 'invalid_tags' };
   }
 
+  const isActiveResult = coerceBooleanFlag(body?.is_active ?? body?.isActive, { defaultValue: true });
+  if (!isActiveResult.valid) {
+    return { error: 'invalid_is_active' };
+  }
+
+  const isActiveValue = isActiveResult.provided ? Boolean(isActiveResult.value) : true;
+
   return {
     payload: {
       name,
@@ -195,6 +241,7 @@ function buildStudentPayload(body) {
       default_session_time: sessionTimeResult.value,
       default_service: defaultServiceResult.value,
       tags: tagsResult.value,
+      is_active: isActiveValue,
     },
   };
 }
@@ -315,11 +362,40 @@ function buildStudentUpdates(body) {
     hasAny = true;
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(body, 'is_active') ||
+    Object.prototype.hasOwnProperty.call(body, 'isActive')
+  ) {
+    const source = Object.prototype.hasOwnProperty.call(body, 'is_active') ? body.is_active : body.isActive;
+    const { value, valid } = coerceBooleanFlag(source, { defaultValue: true, allowUndefined: false });
+    if (!valid) {
+      return { error: 'invalid_is_active' };
+    }
+    updates.is_active = Boolean(value);
+    hasAny = true;
+  }
+
   if (!hasAny) {
     return { error: 'missing_updates' };
   }
 
   return { updates };
+}
+
+function determineStatusFilter(query) {
+  const status = normalizeString(query?.status);
+  if (status === 'inactive') {
+    return 'inactive';
+  }
+  if (status === 'all') {
+    return 'all';
+  }
+  const includeInactive = query?.include_inactive ?? query?.includeInactive;
+  const includeFlag = coerceBooleanFlag(includeInactive, { defaultValue: false, allowUndefined: true });
+  if (includeFlag.valid && includeFlag.value) {
+    return 'all';
+  }
+  return 'active';
 }
 
 export default async function (context, req) {
@@ -398,6 +474,13 @@ export default async function (context, req) {
       builder = builder.eq('assigned_instructor_id', assignedInstructorId);
     }
 
+    const statusFilter = determineStatusFilter(req?.query);
+    if (statusFilter === 'active') {
+      builder = builder.eq('is_active', true);
+    } else if (statusFilter === 'inactive') {
+      builder = builder.eq('is_active', false);
+    }
+
     const { data, error } = await builder;
 
     if (error) {
@@ -420,14 +503,16 @@ export default async function (context, req) {
               ? 'invalid contact name'
               : normalized.error === 'invalid_contact_phone'
                 ? 'invalid contact phone'
-                  : normalized.error === 'invalid_default_service'
-                    ? 'invalid default service'
-                    : normalized.error === 'invalid_default_day'
-                      ? 'invalid default day of week'
-                      : normalized.error === 'invalid_default_session_time'
-                        ? 'invalid default session time'
-                        : normalized.error === 'invalid_tags'
-                          ? 'invalid tags'
+                : normalized.error === 'invalid_default_service'
+                  ? 'invalid default service'
+                  : normalized.error === 'invalid_default_day'
+                    ? 'invalid default day of week'
+                    : normalized.error === 'invalid_default_session_time'
+                      ? 'invalid default session time'
+                      : normalized.error === 'invalid_tags'
+                        ? 'invalid tags'
+                        : normalized.error === 'invalid_is_active'
+                          ? 'invalid is_active flag'
                           : 'invalid payload';
       return respond(context, 400, { message });
     }
@@ -474,7 +559,9 @@ export default async function (context, req) {
                         ? 'invalid default session time'
                         : normalizedUpdates.error === 'invalid_tags'
                           ? 'invalid tags'
-                          : 'invalid payload';
+                          : normalizedUpdates.error === 'invalid_is_active'
+                            ? 'invalid is_active flag'
+                            : 'invalid payload';
     return respond(context, 400, { message: updateMessage });
   }
 

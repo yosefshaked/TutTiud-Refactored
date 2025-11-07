@@ -143,6 +143,7 @@ export default function AddStudentForm({ onSubmit, onCancel, isSubmitting = fals
       defaultSessionTime: values.defaultSessionTime,
       notes: values.notes.trim() || null,
       tags: normalizeTagIdsForWrite(values.tagId),
+      isActive: values.isActive !== false,
     });
   };
 

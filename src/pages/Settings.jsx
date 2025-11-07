@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EnhancedDialogHeader } from '@/components/ui/DialogHeader';
-import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag } from 'lucide-react';
+import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
@@ -13,6 +13,7 @@ import InstructorManager from '@/components/settings/InstructorManager.jsx';
 import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
 import TagsManager from '@/components/settings/TagsManager.jsx';
+import StudentVisibilitySettings from '@/components/settings/StudentVisibilitySettings.jsx';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -25,7 +26,7 @@ export default function Settings() {
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility'
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
 
@@ -326,6 +327,34 @@ export default function Settings() {
               >
                 <Users className="h-4 w-4" /> ניהול מדריכים
               </Button>
+          </CardContent>
+        </Card>
+
+          {/* Student Visibility Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-sky-100 p-2 text-sky-600 transition-colors group-hover:bg-sky-600 group-hover:text-white">
+                  <EyeOff className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  תצוגת תלמידים לא פעילים
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
+                הגדרת הגישה של מדריכים לתלמידים שסומנו כלא פעילים במערכת.
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => setSelectedModule('studentVisibility')}
+                disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <EyeOff className="h-4 w-4" /> ניהול תצוגת תלמידים
+              </Button>
             </CardContent>
           </Card>
 
@@ -446,6 +475,7 @@ export default function Settings() {
                 selectedModule === 'backup' ? <ShieldCheck /> :
                 selectedModule === 'logo' ? <Sparkles /> :
                 selectedModule === 'tags' ? <Tag /> :
+                selectedModule === 'studentVisibility' ? <EyeOff /> :
                 null
               }
               title={
@@ -457,6 +487,7 @@ export default function Settings() {
                 selectedModule === 'backup' ? 'גיבוי ושחזור' :
                 selectedModule === 'logo' ? 'לוגו מותאם אישית' :
                 selectedModule === 'tags' ? 'ניהול תגיות' :
+                selectedModule === 'studentVisibility' ? 'תצוגת תלמידים לא פעילים' :
                 ''
               }
               onClose={() => setSelectedModule(null)}
@@ -508,6 +539,13 @@ export default function Settings() {
                 )}
                 {selectedModule === 'tags' && (
                   <TagsManager />
+                )}
+                {selectedModule === 'studentVisibility' && (
+                  <StudentVisibilitySettings
+                    session={session}
+                    orgId={activeOrgId}
+                    activeOrgHasConnection={activeOrgHasConnection}
+                  />
                 )}
               </div>
             </div>

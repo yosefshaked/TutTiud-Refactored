@@ -171,10 +171,17 @@ export default function StudentDetailPage() {
     setStudentError('');
 
     try {
-      const endpoint = buildStudentsEndpoint(activeOrgId, membershipRole);
-      const payload = await authenticatedFetch(endpoint);
-      const roster = Array.isArray(payload) ? payload : [];
-      const match = roster.find((entry) => entry?.id === studentId) || null;
+      const endpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: 'all' });
+      let payload = await authenticatedFetch(endpoint);
+      let roster = Array.isArray(payload) ? payload : [];
+      let match = roster.find((entry) => entry?.id === studentId) || null;
+
+      if (!match && !isAdminRole(membershipRole)) {
+        const fallbackEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: 'active' });
+        payload = await authenticatedFetch(fallbackEndpoint);
+        roster = Array.isArray(payload) ? payload : [];
+        match = roster.find((entry) => entry?.id === studentId) || null;
+      }
 
       if (!match) {
         setStudent(null);
@@ -396,6 +403,7 @@ export default function StudentDetailPage() {
         default_session_time: payload.defaultSessionTime,
         notes: payload.notes,
         tags: normalizedTags,
+        is_active: payload.isActive,
       };
       await authenticatedFetch(`students/${payload.id}`, { method: 'PUT', body, session });
       setStudentForEdit(null);
@@ -589,10 +597,23 @@ export default function StudentDetailPage() {
               {studentError}
             </div>
           ) : student ? (
-            <dl className="grid grid-cols-2 gap-md text-sm sm:gap-lg lg:grid-cols-3">
+            <>
+              {student?.is_active === false ? (
+                <div className="mb-md rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  תלמיד זה סומן כלא פעיל ויוסתר מתצוגות ברירת המחדל. כל הרשומות ההיסטוריות יישארו זמינות בדף זה ובייצואי PDF.
+                </div>
+              ) : null}
+              <dl className="grid grid-cols-2 gap-md text-sm sm:gap-lg lg:grid-cols-3">
               <div className="space-y-1">
                 <dt className="text-xs font-medium text-neutral-500 sm:text-sm">שם התלמיד</dt>
-                <dd className="font-semibold text-foreground">{student.name}</dd>
+                <dd className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
+                  <span>{student.name}</span>
+                  {student?.is_active === false ? (
+                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                      לא פעיל
+                    </Badge>
+                  ) : null}
+                </dd>
               </div>
               <div className="space-y-1">
                 <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מדריך מוקצה</dt>
@@ -659,7 +680,8 @@ export default function StudentDetailPage() {
                   </dd>
                 </div>
               ) : null}
-            </dl>
+              </dl>
+            </>
           ) : (
             <p className="text-xs text-neutral-600 sm:text-sm">לא נמצאו פרטי תלמיד להצגה.</p>
           )}

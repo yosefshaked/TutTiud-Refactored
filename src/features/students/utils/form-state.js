@@ -61,5 +61,6 @@ export function createStudentFormState(student) {
     defaultSessionTime: normalizeTimeValue(student?.default_session_time),
     notes: student?.notes || '',
     tagId: Array.isArray(student?.tags) && student.tags.length > 0 ? student.tags[0] : '',
+    isActive: student?.is_active !== false,
   };
 }

@@ -10,6 +10,8 @@ import {
   ComboBoxField,
   TimeField
 } from '@/components/ui/forms-ui';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
@@ -99,6 +101,13 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
     }));
   }, []);
 
+  const handleStatusChange = useCallback((nextValue) => {
+    setValues((previous) => ({
+      ...previous,
+      isActive: Boolean(nextValue),
+    }));
+  }, []);
+
   const handleSubmit = (event) => {
     event.preventDefault();
 
@@ -136,6 +145,7 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
       defaultSessionTime: values.defaultSessionTime,
       notes: values.notes.trim() || null,
       tags: normalizeTagIdsForWrite(values.tagId),
+      isActive: values.isActive !== false,
     });
   };
 
@@ -145,6 +155,7 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
   const showInstructorError = touched.assignedInstructorId && !values.assignedInstructorId;
   const showDayError = touched.defaultDayOfWeek && !values.defaultDayOfWeek;
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
+  const isInactive = values.isActive === false;
 
   return (
     <form id="edit-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
@@ -240,6 +251,36 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
               required
               error={showTimeError ? 'יש לבחור שעה.' : ''}
             />
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="student-status" className="text-sm font-medium text-neutral-800">
+                  סטטוס תלמיד
+                </Label>
+                <p className="text-xs leading-relaxed text-neutral-600">
+                  תלמידים לא פעילים יוסתרו כברירת מחדל מרשימות ומטפסים אך יישארו נגישים בדף התלמיד ובהיסטוריית המפגשים.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-medium ${isInactive ? 'text-amber-700' : 'text-emerald-600'}`}>
+                  {isInactive ? 'לא פעיל' : 'פעיל'}
+                </span>
+                <Switch
+                  id="student-status"
+                  checked={!isInactive}
+                  onCheckedChange={handleStatusChange}
+                  disabled={isSubmitting}
+                  aria-label="החלפת סטטוס פעיל של התלמיד"
+                />
+              </div>
+            </div>
+            {isInactive ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                התלמיד יוסתר מתצוגות ברירת המחדל אך ימשיך להופיע כאשר תבחרו להציג תלמידים לא פעילים.
+              </div>
+            ) : null}
           </div>
 
           <StudentTagsField
