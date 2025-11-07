@@ -361,13 +361,15 @@ export default function StudentDetailPage() {
     if (!studentId) {
       return;
     }
+    const studentStatus = student?.is_active === false ? 'inactive' : 'active';
     openSessionModal?.({
       studentId,
+      studentStatus,
       onCreated: async () => {
         await loadSessions();
       },
     });
-  }, [openSessionModal, studentId, loadSessions]);
+  }, [openSessionModal, studentId, loadSessions, student?.is_active]);
 
   const backDestination = isAdminRole(membershipRole) ? '/admin/students' : '/my-students';
   const canEdit = isAdminRole(membershipRole);

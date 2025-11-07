@@ -31,6 +31,7 @@ export default function NewSessionForm({
   canViewInactive = false,
   visibilityLoaded = false,
   initialStudentId = '',
+  isLoadingStudents = false,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -159,14 +160,15 @@ export default function NewSessionForm({
   useEffect(() => {
     // If the currently selected student is filtered out, clear the selection
     // EXCEPTION: Don't clear if the student was pre-selected via initialStudentId
-    // to prevent clearing the selection before the students list fully loads
+    // or while the students list is still loading to avoid clearing prematurely.
     if (!selectedStudentId) return;
     if (String(selectedStudentId) === String(initialStudentId)) return;
+    if (isLoadingStudents) return;
     const stillVisible = filteredStudents.some((s) => s?.id === selectedStudentId);
     if (!stillVisible) {
       setSelectedStudentId('');
     }
-  }, [filteredStudents, selectedStudentId, initialStudentId]);
+  }, [filteredStudents, selectedStudentId, initialStudentId, isLoadingStudents]);
 
   useEffect(() => {
     if (!selectedStudent || serviceTouched) {
@@ -193,7 +195,9 @@ export default function NewSessionForm({
   const handleResetFilters = () => {
     setStudentQuery('');
     setStudentDayFilter(null);
-    onStatusFilterChange?.('active');
+    if (canViewInactive) {
+      onStatusFilterChange?.('active');
+    }
   };
 
   // Check if any filters are active
@@ -250,11 +254,8 @@ export default function NewSessionForm({
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
         <div className="mb-2 space-y-2">
-          <div className={cn(
-            'grid grid-cols-1 gap-2',
-            canFilterByInstructor ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
-          )}>
-            <div className="relative">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="relative min-w-[200px] flex-1">
               <Input
                 type="text"
                 placeholder="חיפוש לפי שם, יום או שעה..."
@@ -266,7 +267,7 @@ export default function NewSessionForm({
               />
             </div>
             {canFilterByInstructor ? (
-              <div>
+              <div className="min-w-[200px] flex-1 sm:flex-none">
                 <Select
                   value={studentScope}
                   onValueChange={(v) => onScopeChange?.(v)}
@@ -288,7 +289,7 @@ export default function NewSessionForm({
                 </Select>
               </div>
             ) : null}
-            <div>
+            <div className="min-w-[160px] flex-1 sm:flex-none">
               <DayOfWeekSelect
                 value={studentDayFilter}
                 onChange={setStudentDayFilter}
@@ -314,23 +315,23 @@ export default function NewSessionForm({
                 </select>
               </div>
             ) : null}
+            {hasActiveFilters ? (
+              <div className="flex-shrink-0 ltr:ml-auto rtl:mr-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetFilters}
+                  className="gap-xs"
+                  disabled={isSubmitting}
+                  title="נקה מסנני תלמיד"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">נקה מסננים</span>
+                </Button>
+              </div>
+            ) : null}
           </div>
-          {hasActiveFilters && (
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleResetFilters}
-                className="gap-xs"
-                disabled={isSubmitting}
-                title="נקה מסנני תלמיד"
-              >
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">נקה מסננים</span>
-              </Button>
-            </div>
-          )}
         </div>
         <select
           id="session-student"
