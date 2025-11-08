@@ -185,7 +185,7 @@ export default function ChangelogModal({ open, onClose }) {
                   </li>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>חוויית מובייל טובה יותר:</strong> בקרת "הצג" ברשימת התלמידים קיבלה רוחב גמיש כך שהיא לא תגלוש מחוץ למסך במכשירים צרים
+                    <strong>חוויית מובייל טובה יותר (למנהלים בלבד):</strong> בקרת "הצג" ברשימת התלמידים קיבלה רוחב גמיש כך שהיא לא תגלוש מחוץ למסך במכשירים צרים
                   </li>
                 </ul>
 
