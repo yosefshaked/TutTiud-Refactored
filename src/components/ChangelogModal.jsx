@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
-  const [expandedVersions, setExpandedVersions] = useState({ '1.2.0': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.3.0': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -88,6 +88,127 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.3.0 - Student lifecycle controls */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.3.0')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.3.0'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.3.0'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.3.0
+                    </span>
+                    <time dateTime="2025-11-07" style={{ color: '#64748b', fontSize: '14px' }}>
+                      7 בנובמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.3.0'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  🧭 ניהול מחזור חיים של תלמידים ושיפורי בחירת תלמידים
+                </h3>
+              </header>
+
+              {expandedVersions['1.3.0'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  חידושים:
+                </h4>
+                <ul style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>סימון תלמידים כלא פעילים:</strong> הוספנו אפשרות להסתיר תלמידים שסיימו מסלול כברירת מחדל, תוך שמירה על כל ההיסטוריה שלהם זמינה לצפייה וייצוא
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>העדפת תצוגה למדריכים:</strong> מנהלים יכולים להחליט אם מדריכים יראו תלמידים לא פעילים דרך כרטיס ההגדרות החדש
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים:
+                </h4>
+                <ul style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>מסנני תלמידים חכמים:</strong> רשימות תלמידים, טפסים וסינונים זוכרים את בחירתכם ומוודאים שהתוצאות מסונכרנות עם הנתונים שהוטענו מהשרת
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>פתיחת תיעוד מתלמיד לא פעיל:</strong> ניתן לפתוח תיעוד חדש מתוך פרופיל של תלמיד לא פעיל והמערכת תדאג שהוא יופיע ברשימה וייבחר אוטומטית
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>חוויית מובייל טובה יותר:</strong> בקרת "הצג" ברשימת התלמידים קיבלה רוחב גמיש כך שהיא לא תגלוש מחוץ למסך במכשירים צרים
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תיקוני באגים:
+                </h4>
+                <ul style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#10b981' }}>✓</span>
+                    כפתור "נקה מסננים" מיושר עכשיו לצד שאר הבקרות כך שהטופס נשאר קומפקטי
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.2.0 - PDF Export & Registration */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
