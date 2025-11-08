@@ -116,8 +116,8 @@ export default function ChangelogModal({ open, onClose }) {
                     }}>
                       גרסה 1.3.0
                     </span>
-                    <time dateTime="2025-11-07" style={{ color: '#64748b', fontSize: '14px' }}>
-                      7 בנובמבר 2025
+                    <time dateTime="2025-11-08" style={{ color: '#64748b', fontSize: '14px' }}>
+                      8 בנובמבר 2025
                     </time>
                   </div>
                   <span style={{
@@ -156,11 +156,11 @@ export default function ChangelogModal({ open, onClose }) {
                 }}>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>סימון תלמידים כלא פעילים:</strong> הוספנו אפשרות להסתיר תלמידים שסיימו מסלול כברירת מחדל, תוך שמירה על כל ההיסטוריה שלהם זמינה לצפייה וייצוא
+                    <strong>סימון תלמידים כלא פעילים (למנהלים בלבד):</strong> נוספה האפשרות להסתיר תלמידים לא פעילים, תוך שמירה על כל ההיסטוריה שלהם זמינה לצפייה וייצוא
                   </li>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>העדפת תצוגה למדריכים:</strong> מנהלים יכולים להחליט אם מדריכים יראו תלמידים לא פעילים דרך כרטיס ההגדרות החדש
+                    <strong>העדפת תצוגה למדריכים:</strong> מנהלים יכולים להחליט אם מדריכים יראו תלמידים לא פעילים דרך כרטיס ההגדרות החדש (הגדרה רחבה)
                   </li>
                 </ul>
 
@@ -181,7 +181,7 @@ export default function ChangelogModal({ open, onClose }) {
                   </li>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>פתיחת תיעוד מתלמיד לא פעיל:</strong> ניתן לפתוח תיעוד חדש מתוך פרופיל של תלמיד לא פעיל והמערכת תדאג שהוא יופיע ברשימה וייבחר אוטומטית
+                    <strong>פתיחת תיעוד מתלמיד לא פעיל:</strong> ניתן לפתוח תיעוד חדש מתוך פרופיל של תלמיד לא פעיל במקרה הצורך
                   </li>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
