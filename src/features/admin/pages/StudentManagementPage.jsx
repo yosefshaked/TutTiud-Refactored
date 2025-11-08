@@ -436,7 +436,7 @@ export default function StudentManagementPage() {
             <label htmlFor="students-filter-combined" className="text-neutral-600">הצג:</label>
             <select
               id="students-filter-combined"
-              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground w-[clamp(8rem,20vw,12rem)]"
               value={combinedFilterValue}
               onChange={handleCombinedFilterChange}
             >
