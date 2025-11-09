@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, ListChecks, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +11,6 @@ import { sortStudentsBySchedule } from '@/features/students/utils/sorting.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
-
-function todayIsoDate() {
-  return format(new Date(), 'yyyy-MM-dd');
-}
 
 export default function NewSessionForm({
   students = [],
@@ -38,15 +33,18 @@ export default function NewSessionForm({
   error = '',
   renderFooterOutside = false, // New prop to control footer rendering
   onSelectedStudentChange, // Callback to notify parent of selection changes
+  onFormValidityChange, // Callback to inform parent when form validity changes
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentDayFilter, setStudentDayFilter] = useState(null);
-  const [sessionDate, setSessionDate] = useState(todayIsoDate());
+  const [sessionDate, setSessionDate] = useState('');
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
   const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
   const [activeQuestionKey, setActiveQuestionKey] = useState(null);
+  const [isFormValid, setIsFormValid] = useState(false);
+  const formRef = useRef(null);
   const [answers, setAnswers] = useState(() => {
     const initial = {};
     for (const question of questions) {
@@ -220,6 +218,12 @@ export default function NewSessionForm({
   const handleSubmit = (event) => {
     event.preventDefault();
 
+    const form = event.currentTarget;
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
     if (!selectedStudentId) {
       return;
     }
@@ -249,8 +253,26 @@ export default function NewSessionForm({
     onSubmit?.(payload);
   };
 
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) {
+      return;
+    }
+    const nextIsValid = form.checkValidity();
+    if (isFormValid !== nextIsValid) {
+      setIsFormValid(nextIsValid);
+    }
+    onFormValidityChange?.(nextIsValid);
+  }, [selectedStudentId, sessionDate, answers, questions, onFormValidityChange, isFormValid]);
+
   return (
-    <form id="new-session-form" className="space-y-lg" onSubmit={handleSubmit} dir="rtl">
+    <form
+      id="new-session-form"
+      ref={formRef}
+      className="space-y-lg"
+      onSubmit={handleSubmit}
+      dir="rtl"
+    >
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
         <div className="mb-2 space-y-2">
@@ -703,7 +725,7 @@ export default function NewSessionForm({
       {!renderFooterOutside && (
         <div className="border-t -mx-4 sm:-mx-6 mt-6 pt-3 sm:pt-4 px-4 sm:px-6">
           <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
-            <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
+            <Button type="submit" disabled={isSubmitting || !isFormValid} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
               שמירת מפגש
             </Button>
@@ -746,10 +768,10 @@ export default function NewSessionForm({
 }
 
 // Export footer component for external rendering
-export function NewSessionFormFooter({ onSubmit, onCancel, isSubmitting = false, selectedStudentId }) {
+export function NewSessionFormFooter({ onSubmit, onCancel, isSubmitting = false, isFormValid = false }) {
   return (
     <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
-      <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
+      <Button type="submit" disabled={isSubmitting || !isFormValid} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         שמירת מפגש
       </Button>

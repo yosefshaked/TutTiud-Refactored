@@ -200,7 +200,8 @@ if (styleSheet) {
         100% { transform: rotate(360deg); }
       }
     `, styleSheet.cssRules.length);
-  } catch (e) {
+  } catch (error) {
     // Ignore if rule already exists
+    void error;
   }
 }

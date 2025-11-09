@@ -344,8 +344,7 @@ export default function NewSessionModal({
   const isLoadingQuestions = questionsState === REQUEST_STATE.loading;
   const showLoading = isLoadingStudents || isLoadingQuestions;
 
-  // Track selected student for footer button state
-  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [isFormValid, setIsFormValid] = useState(false);
 
   const footer = canFetchStudents && !showLoading && studentsState !== REQUEST_STATE.error ? (
     <NewSessionFormFooter
@@ -355,7 +354,7 @@ export default function NewSessionModal({
       }}
       onCancel={onClose}
       isSubmitting={submitState === REQUEST_STATE.loading}
-      selectedStudentId={selectedStudentId}
+      isFormValid={isFormValid}
     />
   ) : null;
 
@@ -400,7 +399,7 @@ export default function NewSessionModal({
             isSubmitting={submitState === REQUEST_STATE.loading}
             error={submitError || (questionsState === REQUEST_STATE.error ? questionError : '')}
             renderFooterOutside={true}
-            onSelectedStudentChange={setSelectedStudentId}
+            onFormValidityChange={setIsFormValid}
           />
         )}
       </DialogContent>
