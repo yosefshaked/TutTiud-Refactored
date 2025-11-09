@@ -21,7 +21,7 @@ function buildGreeting(instructorName, profileName, authName, email) {
   if (instructorName && typeof instructorName === "string") {
     const name = instructorName.trim()
     if (name) {
-      return `ברוכים הבא, ${name}!`
+      return `ברוכים הבאים, ${name}!`
     }
   }
 
@@ -29,7 +29,7 @@ function buildGreeting(instructorName, profileName, authName, email) {
   if (profileName && typeof profileName === "string") {
     const name = profileName.trim()
     if (name) {
-      return `ברוכים הבא, ${name}!`
+      return `ברוכים הבאים, ${name}!`
     }
   }
 
@@ -37,16 +37,16 @@ function buildGreeting(instructorName, profileName, authName, email) {
   if (authName && typeof authName === "string") {
     const name = authName.trim()
     if (name) {
-      return `ברוכים הבא, ${name}!`
+      return `ברוכים הבאים, ${name}!`
     }
   }
 
   // Priority 4: Email fallback
   if (email && typeof email === "string") {
-    return `ברוכים הבא, ${email}!`
+    return `ברוכים הבאים, ${email}!`
   }
 
-  return "ברוכים הבא!"
+  return "ברוכים הבאים!"
 }
 
 export default function DashboardPage() {
