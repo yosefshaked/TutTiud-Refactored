@@ -285,7 +285,8 @@ export default async function (context, req) {
       .from('SessionRecords')
       .select('id, student_id, date')
       .gte('date', formatUtcDate(weekStart))
-      .lte('date', formatUtcDate(weekEnd));
+      .lte('date', formatUtcDate(weekEnd))
+      .eq('deleted', false);
 
     recordQuery = recordQuery.in('student_id', studentIds);
 
