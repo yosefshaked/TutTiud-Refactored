@@ -150,9 +150,10 @@ export default function TimePickerInput({ id, name, value, onChange, disabled, r
     if (open) {
       requestAnimationFrame(() => {
         // Prefer scrolling to the selected row; otherwise, scroll to hint
-        try {
-          (selectedRef.current || hintRef.current)?.scrollIntoView({ block: 'center' });
-        } catch {}
+        const target = selectedRef.current || hintRef.current;
+        if (target && typeof target.scrollIntoView === 'function') {
+          target.scrollIntoView({ block: 'center' });
+        }
       });
     }
   }, [open, displayValue, highlightLabel]);

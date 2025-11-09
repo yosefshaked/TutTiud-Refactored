@@ -10,16 +10,28 @@ const state = {
   onClose: null,
 };
 
+function safeInvoke(fn, payload, context) {
+  if (typeof fn !== 'function') {
+    return;
+  }
+  try {
+    fn(payload);
+  } catch (error) {
+    console.error(`[customTour] Failed to notify ${context}`, error);
+  }
+}
+
 function notify() {
+  const snapshot = { ...state };
   for (const fn of listeners) {
-    try { fn({ ...state }); } catch {}
+    safeInvoke(fn, snapshot, 'listener');
   }
 }
 
 export function subscribe(listener) {
   listeners.add(listener);
   // send current state immediately
-  try { listener({ ...state }); } catch {}
+  safeInvoke(listener, { ...state }, 'listener');
   return () => listeners.delete(listener);
 }
 
@@ -38,7 +50,7 @@ export function closeTour(reason = 'close') {
   const cb = state.onClose;
   state.onClose = null;
   if (cb) {
-    try { cb({ reason }); } catch {}
+    safeInvoke(cb, { reason }, 'onClose');
   }
 }
 

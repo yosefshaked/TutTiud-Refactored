@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
-  const [expandedVersions, setExpandedVersions] = useState({ '1.3.1': true });
+  // הגרסה האחרונה נפתחת כברירת מחדל
+  const [expandedVersions, setExpandedVersions] = useState({ '1.3.2': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -88,6 +89,102 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.3.2 - Mandatory manual date selection in session form */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.3.2')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.3.2'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.3.2'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.3.2
+                    </span>
+                    <time dateTime="2025-11-09" style={{ color: '#64748b', fontSize: '14px' }}>
+                      9 בנובמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.3.2'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  📆 בחירת תאריך מפגש ידנית + דיוק תיעוד
+                </h3>
+              </header>
+
+              {expandedVersions['1.3.2'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שינויים עיקריים:
+                </h4>
+                <ul style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>דרישת בחירת תאריך מפגש ידנית:</strong> בטופס יצירת מפגש חדש חובה עכשיו לבחור תאריך באופן מפורש במקום הסתמכות על ערך ברירת מחדל. מונע טעויות רישום על תאריך שגוי ומקבע תשומת לב המשתמש לשדה
+                  </li>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
+                    <strong>הדגשת שדה חובה:</strong> כוכבית ושגיאת אימות ברורה אם נשלח טופס ללא תאריך, עם הודעת שגיאה עקבית לכלל טפסי המפגש
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תיקונים:
+                </h4>
+                <ul style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <li style={{ paddingRight: '20px', position: 'relative' }}>
+                    <span style={{ position: 'absolute', right: 0, color: '#10b981' }}>✓</span>
+                    תוקן הטקסט במסך הראשי מ"ברוכים הבא" ל"ברוכים הבאים"
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.3.1 - Student notes persistence */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
