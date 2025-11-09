@@ -11,6 +11,55 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 
+function parseBoolean(value) {
+  if (value === null || value === undefined) {
+    return { valid: false, value: false };
+  }
+  if (typeof value === 'boolean') {
+    return { valid: true, value };
+  }
+  if (typeof value === 'number') {
+    if (value === 1) {
+      return { valid: true, value: true };
+    }
+    if (value === 0) {
+      return { valid: true, value: false };
+    }
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return { valid: false, value: false };
+    }
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on') {
+      return { valid: true, value: true };
+    }
+    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'n' || normalized === 'off') {
+      return { valid: true, value: false };
+    }
+    return { valid: false, value: false };
+  }
+  return { valid: false, value: false };
+}
+
+function determineStatusFilter(query, canViewInactive) {
+  const status = normalizeString(query?.status);
+  if (canViewInactive && status === 'inactive') {
+    return 'inactive';
+  }
+  if (canViewInactive && status === 'all') {
+    return 'all';
+  }
+  if (canViewInactive) {
+    const includeInactive = query?.include_inactive ?? query?.includeInactive;
+    const flag = parseBoolean(includeInactive);
+    if (flag.valid && flag.value) {
+      return 'all';
+    }
+  }
+  return 'active';
+}
+
 export default async function (context, req) {
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
@@ -69,11 +118,39 @@ export default async function (context, req) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
-  const { data, error } = await tenantClient
+  let instructorsCanViewInactive = false;
+  try {
+    const { data: settingRow, error: settingError } = await tenantClient
+      .from('Settings')
+      .select('settings_value')
+      .eq('key', 'instructors_can_view_inactive_students')
+      .maybeSingle();
+
+    if (!settingError && settingRow && typeof settingRow.settings_value === 'boolean') {
+      instructorsCanViewInactive = settingRow.settings_value === true;
+    }
+  } catch (settingsError) {
+    context.log?.warn?.('my-students failed to read inactive visibility setting', {
+      message: settingsError?.message,
+      orgId,
+    });
+  }
+
+  const statusFilter = determineStatusFilter(req?.query, instructorsCanViewInactive);
+
+  let builder = tenantClient
     .from('Students')
     .select('*')
     .eq('assigned_instructor_id', normalizeString(userId))
     .order('name', { ascending: true });
+
+  if (statusFilter === 'active') {
+    builder = builder.eq('is_active', true);
+  } else if (statusFilter === 'inactive') {
+    builder = builder.eq('is_active', false);
+  }
+
+  const { data, error } = await builder;
 
   if (error) {
     context.log?.error?.('my-students failed to fetch assigned roster', { message: error.message });

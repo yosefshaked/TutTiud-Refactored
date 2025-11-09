@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Badge } from "@/components/ui/badge"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
 import { includesDayQuery, describeSchedule } from "@/features/students/utils/schedule.js"
 import { sortStudentsBySchedule } from "@/features/students/utils/sorting.js"
@@ -32,6 +33,9 @@ export default function MyStudentsPage() {
   const [errorMessage, setErrorMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [dayFilter, setDayFilter] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('active')
+  const [canViewInactive, setCanViewInactive] = useState(false)
+  const [visibilityLoaded, setVisibilityLoaded] = useState(false)
 
   const activeOrgId = activeOrg?.id ?? null
   const membershipRole = activeOrg?.membership?.role
@@ -55,6 +59,7 @@ export default function MyStudentsPage() {
       if (savedFilters) {
         if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery)
         if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter)
+        if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter)
       }
     }
   }, [activeOrgId])
@@ -65,9 +70,64 @@ export default function MyStudentsPage() {
       saveFilterState(activeOrgId, 'instructor', {
         searchQuery,
         dayFilter,
+        statusFilter,
       })
     }
-  }, [activeOrgId, searchQuery, dayFilter])
+  }, [activeOrgId, searchQuery, dayFilter, statusFilter])
+
+  useEffect(() => {
+    if (!activeOrgId || !activeOrgHasConnection || !tenantClientReady) {
+      setCanViewInactive(false)
+      setVisibilityLoaded(false)
+      if (statusFilter !== 'active') {
+        setStatusFilter('active')
+      }
+      return
+    }
+
+    let cancelled = false
+    const abortController = new AbortController()
+
+    const loadVisibilitySetting = async () => {
+      try {
+        const searchParams = new URLSearchParams({ org_id: activeOrgId, keys: 'instructors_can_view_inactive_students' })
+        const payload = await authenticatedFetch(`settings?${searchParams.toString()}`, {
+          signal: abortController.signal,
+        })
+        const entry = payload?.settings?.instructors_can_view_inactive_students
+        const value = entry && typeof entry === 'object' && Object.prototype.hasOwnProperty.call(entry, 'value')
+          ? entry.value
+          : entry
+        const allowed = value === true
+        if (!cancelled) {
+          setCanViewInactive(allowed)
+          setVisibilityLoaded(true)
+          if (!allowed && statusFilter !== 'active') {
+            setStatusFilter('active')
+          }
+        }
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return
+        }
+        console.error('Failed to load instructor visibility setting', error)
+        if (!cancelled) {
+          setCanViewInactive(false)
+          setVisibilityLoaded(true)
+          if (statusFilter !== 'active') {
+            setStatusFilter('active')
+          }
+        }
+      }
+    }
+
+    void loadVisibilitySetting()
+
+    return () => {
+      cancelled = true
+      abortController.abort()
+    }
+  }, [activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter])
 
   useEffect(() => {
     if (!canFetch) {
@@ -85,7 +145,9 @@ export default function MyStudentsPage() {
       setErrorMessage("")
 
       try {
-        const endpoint = buildStudentsEndpoint(activeOrgId, normalizedRole)
+        const endpoint = buildStudentsEndpoint(activeOrgId, normalizedRole, {
+          status: canViewInactive ? statusFilter : 'active',
+        })
         const payload = await authenticatedFetch(endpoint, {
           signal: abortController.signal,
         })
@@ -119,7 +181,7 @@ export default function MyStudentsPage() {
       isMounted = false
       abortController.abort()
     }
-  }, [activeOrgId, canFetch, normalizedRole])
+  }, [activeOrgId, canFetch, normalizedRole, statusFilter, canViewInactive])
 
   const isLoading = status === REQUEST_STATUS.loading
   const isError = status === REQUEST_STATUS.error
@@ -129,6 +191,12 @@ export default function MyStudentsPage() {
     const query = searchQuery.toLowerCase().trim()
     const filtered = students.filter((student) => {
       try {
+        if ((statusFilter === 'active' || (!canViewInactive && statusFilter !== 'active')) && student?.is_active === false) {
+          return false
+        }
+        if (statusFilter === 'inactive' && student?.is_active !== false) {
+          return false
+        }
         if (dayFilter && Number(student?.default_day_of_week) !== Number(dayFilter)) {
           return false
         }
@@ -167,17 +235,18 @@ export default function MyStudentsPage() {
     // Apply default sorting by schedule (day → hour → name)
     // Note: instructor comparison is not needed here as all students belong to the same instructor
     return sortStudentsBySchedule(filtered, new Map())
-  }, [students, searchQuery, dayFilter])
+  }, [students, searchQuery, dayFilter, statusFilter, canViewInactive])
 
   const handleResetFilters = () => {
     setSearchQuery('')
     setDayFilter(null)
+    setStatusFilter('active')
   }
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
-    return searchQuery.trim() !== '' || dayFilter !== null
-  }, [searchQuery, dayFilter])
+    return searchQuery.trim() !== '' || dayFilter !== null || statusFilter !== 'active'
+  }, [searchQuery, dayFilter, statusFilter])
 
   const hasNoResults = isSuccess && filteredStudents.length === 0
 
@@ -243,6 +312,24 @@ export default function MyStudentsPage() {
                       onChange={setDayFilter}
                       placeholder="סינון לפי יום"
                     />
+                    {canViewInactive ? (
+                      <div className="flex items-center gap-2 text-sm">
+                        <label htmlFor="instructor-status-filter" className="text-neutral-600 whitespace-nowrap">
+                          מצב:
+                        </label>
+                        <select
+                          id="instructor-status-filter"
+                          className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+                          value={statusFilter}
+                          onChange={(event) => setStatusFilter(event.target.value)}
+                          disabled={!visibilityLoaded}
+                        >
+                          <option value="active">תלמידים פעילים</option>
+                          <option value="inactive">תלמידים לא פעילים</option>
+                          <option value="all">הצג הכל</option>
+                        </select>
+                      </div>
+                    ) : null}
                     {hasActiveFilters && (
                       <Button
                         type="button"
@@ -287,6 +374,11 @@ export default function MyStudentsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg font-semibold text-neutral-900">
                     <span className="flex-1">{student?.name || "ללא שם"}</span>
+                    {student?.is_active === false ? (
+                      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                        לא פעיל
+                      </Badge>
+                    ) : null}
                     {(contactName || contactPhone) && (
                       <Popover>
                         <PopoverTrigger asChild>

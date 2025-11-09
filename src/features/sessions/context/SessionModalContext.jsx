@@ -5,6 +5,7 @@ export const SessionModalContext = createContext({
   closeSessionModal: () => {},
   isSessionModalOpen: false,
   sessionModalStudentId: null,
+  sessionModalStudentStatus: 'active',
 });
 
 export function useSessionModal() {

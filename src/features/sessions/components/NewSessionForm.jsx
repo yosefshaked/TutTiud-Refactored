@@ -26,7 +26,12 @@ export default function NewSessionForm({
   canFilterByInstructor = false,
   studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
   onScopeChange,
+  statusFilter = 'active',
+  onStatusFilterChange,
+  canViewInactive = false,
+  visibilityLoaded = false,
   initialStudentId = '',
+  isLoadingStudents = false,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -112,6 +117,11 @@ export default function NewSessionForm({
     const byDay = students.filter((s) => dayMatches(s?.default_day_of_week, studentDayFilter));
 
     let filtered = byDay;
+    if ((statusFilter === 'active' || (!canViewInactive && statusFilter !== 'active'))) {
+      filtered = filtered.filter((s) => s?.is_active !== false);
+    } else if (statusFilter === 'inactive') {
+      filtered = filtered.filter((s) => s?.is_active === false);
+    }
     if (q) {
       // Apply text query over the day-filtered list
       filtered = byDay.filter((s) => {
@@ -119,14 +129,20 @@ export default function NewSessionForm({
           const name = String(s?.name || '').toLowerCase();
           if (name.includes(q)) return true;
 
-    // Match by Hebrew day label (e.g., "יום שני")
-    if (includesDayQuery(s?.default_day_of_week, q)) return true;
+          const contactName = String(s?.contact_name || '').toLowerCase();
+          if (contactName.includes(q)) return true;
 
-          // Match by time (e.g., 14:30)
+          const contactPhone = String(s?.contact_phone || '').toLowerCase();
+          if (contactPhone.includes(q)) return true;
+
+          const contactInfo = String(s?.contact_info || '').toLowerCase();
+          if (contactInfo.includes(q)) return true;
+
+          if (includesDayQuery(s?.default_day_of_week, q)) return true;
+
           const timeStr = String(describeSchedule(null, s?.default_session_time) || '').toLowerCase();
           if (timeStr.includes(q)) return true;
 
-          // Also match full schedule text
           const fullSchedule = String(describeSchedule(s?.default_day_of_week, s?.default_session_time) || '').toLowerCase();
           if (fullSchedule.includes(q)) return true;
 
@@ -139,19 +155,20 @@ export default function NewSessionForm({
 
     // Apply default sorting by schedule (day → hour → instructor → name)
     return sortStudentsBySchedule(filtered, instructorMap);
-  }, [students, studentQuery, studentDayFilter, instructorMap]);
+  }, [students, studentQuery, studentDayFilter, instructorMap, statusFilter, canViewInactive]);
 
   useEffect(() => {
     // If the currently selected student is filtered out, clear the selection
     // EXCEPTION: Don't clear if the student was pre-selected via initialStudentId
-    // to prevent clearing the selection before the students list fully loads
+    // or while the students list is still loading to avoid clearing prematurely.
     if (!selectedStudentId) return;
     if (String(selectedStudentId) === String(initialStudentId)) return;
+    if (isLoadingStudents) return;
     const stillVisible = filteredStudents.some((s) => s?.id === selectedStudentId);
     if (!stillVisible) {
       setSelectedStudentId('');
     }
-  }, [filteredStudents, selectedStudentId, initialStudentId]);
+  }, [filteredStudents, selectedStudentId, initialStudentId, isLoadingStudents]);
 
   useEffect(() => {
     if (!selectedStudent || serviceTouched) {
@@ -178,12 +195,15 @@ export default function NewSessionForm({
   const handleResetFilters = () => {
     setStudentQuery('');
     setStudentDayFilter(null);
+    if (canViewInactive) {
+      onStatusFilterChange?.('active');
+    }
   };
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
-    return studentQuery.trim() !== '' || studentDayFilter !== null;
-  }, [studentQuery, studentDayFilter]);
+    return studentQuery.trim() !== '' || studentDayFilter !== null || statusFilter !== 'active';
+  }, [studentQuery, studentDayFilter, statusFilter]);
 
   const updateAnswer = useCallback((questionKey, value) => {
     setAnswers((previous) => ({
@@ -234,11 +254,8 @@ export default function NewSessionForm({
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
         <div className="mb-2 space-y-2">
-          <div className={cn(
-            'grid grid-cols-1 gap-2',
-            canFilterByInstructor ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
-          )}>
-            <div className="relative">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="relative min-w-[200px] flex-1">
               <Input
                 type="text"
                 placeholder="חיפוש לפי שם, יום או שעה..."
@@ -250,7 +267,7 @@ export default function NewSessionForm({
               />
             </div>
             {canFilterByInstructor ? (
-              <div>
+              <div className="min-w-[200px] flex-1 sm:flex-none">
                 <Select
                   value={studentScope}
                   onValueChange={(v) => onScopeChange?.(v)}
@@ -272,7 +289,7 @@ export default function NewSessionForm({
                 </Select>
               </div>
             ) : null}
-            <div>
+            <div className="min-w-[160px] flex-1 sm:flex-none">
               <DayOfWeekSelect
                 value={studentDayFilter}
                 onChange={setStudentDayFilter}
@@ -280,23 +297,41 @@ export default function NewSessionForm({
                 placeholder="סינון לפי יום"
               />
             </div>
+            {canViewInactive ? (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
+                  מצב:
+                </Label>
+                <select
+                  id="session-status-filter"
+                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+                  value={statusFilter}
+                  onChange={(event) => onStatusFilterChange?.(event.target.value)}
+                  disabled={isSubmitting || !visibilityLoaded}
+                >
+                  <option value="active">תלמידים פעילים</option>
+                  <option value="inactive">תלמידים לא פעילים</option>
+                  <option value="all">הצג הכל</option>
+                </select>
+              </div>
+            ) : null}
+            {hasActiveFilters ? (
+              <div className="flex-shrink-0 ltr:ml-auto rtl:mr-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetFilters}
+                  className="gap-xs"
+                  disabled={isSubmitting}
+                  title="נקה מסנני תלמיד"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">נקה מסננים</span>
+                </Button>
+              </div>
+            ) : null}
           </div>
-          {hasActiveFilters && (
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleResetFilters}
-                className="gap-xs"
-                disabled={isSubmitting}
-                title="נקה מסנני תלמיד"
-              >
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">נקה מסננים</span>
-              </Button>
-            </div>
-          )}
         </div>
         <select
           id="session-student"

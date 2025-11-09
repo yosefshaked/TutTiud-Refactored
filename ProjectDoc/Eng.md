@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 1.2.0**
-**Last Updated: 2025-11-06**
+**Version: 1.2.1**
+**Last Updated: 2025-11-07**
 
 > **Developer Conventions:** For folder structure, naming rules, API patterns, and feature organization, refer to [Conventions.md](./Conventions.md).
 
@@ -38,7 +38,7 @@ Key characteristics:
 | Table | Purpose | Key Columns |
 | :---- | :------ | :---------- |
 | `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` |
-| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `tags`, `notes`, `metadata` |
+| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
 | `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, timestamps, `metadata` |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
 
@@ -72,10 +72,10 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | Route | Method | Audience | Purpose |
 | :---- | :----- | :------- | :------ |
 | `/api/instructors` | GET | Admin/Owner | Reads `tuttiud."Instructors"` (defaulting to active rows) and returns instructor records keyed by their Supabase auth user ID (`id`). |
-| `/api/students` | GET | Admin/Owner | Returns every `tuttiud."Students"` row ordered by name, including scheduling defaults and contact fields. |
+| `/api/students` | GET | Admin/Owner | Returns active students by default (`status=active`), with `status=inactive` and `status=all` options plus `include_inactive=true` for legacy callers. Responses echo the `is_active` flag so the UI can render lifecycle state. |
 | `/api/students` | POST | Admin/Owner | Inserts a student (name + optional contact data, scheduling defaults, instructor assignment) and echoes the created row. |
-| `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor) and returns the refreshed row or 404. |
-| `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.id` (Supabase auth UUID), supporting the instructor dashboard. |
+| `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor, `is_active`) and returns the refreshed row or 404. |
+| `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.id` (Supabase auth UUID) and hides inactive students unless the organization enables instructor visibility; supports optional `status` query parity with the admin endpoint. |
 | `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry (JSON answer payload + optional service context) after confirming members only write for students assigned to them. |
 | `/api/settings` | GET/POST/PUT/PATCH/DELETE | Admin/Owner (read allowed to members) | Provides full CRUD for tenant settings, supporting creation of new keys like `session_form_config`. |
 | `/api/user-context` | GET | Authenticated users | Returns the caller's organization memberships (with connection flags) and pending invitations, using the Supabase admin client to bypass RLS so invitees can still see organization names. |
@@ -114,6 +114,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 ## 8. Developer Notes
 
 - Keep `SETUP_SQL_SCRIPT` as the single source of truth; import it anywhere the script must be displayed (wizard, docs, etc.).
+- The setup script now includes `Students.is_active boolean default true` (with backfill) to support inactive lifecycle flows; rerunning it on legacy tenants is safe because every `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` stays idempotent.
 - `verifyOrgConnection` (`src/runtime/verification.js`) now expects a Supabase data client and returns the diagnostics array so callers can render pass/fail status.
 - All onboarding status updates should call `recordVerification(orgId, timestamp)` to persist `setup_completed` / `verified_at` on the control-plane organization row.
 - Documentation must remain bilingual (see `ProjectDoc/Heb.md`) and the README should highlight the onboarding checklist for quick reference.
@@ -129,9 +130,10 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 ## 9. Admin Student Management UI
 
 - **Feature slice** – all admin-only UI now lives in `src/features/admin/`. Components scoped to this feature sit under `components/` while page-level containers are housed in `pages/`.
-- **StudentManagementPage.jsx** – renders the `/admin/students` route. It reads the active organization from `OrgContext`, fetches `/api/students` on mount, surfaces loading/error/empty states, and keeps an instructor map in memory for display. Dialog state is managed locally for add/edit flows.
+- **StudentManagementPage.jsx** – renders the `/admin/students` route. It reads the active organization from `OrgContext`, fetches `/api/students` on mount (defaulting to `status=active`), surfaces loading/error/empty states, and keeps an instructor map in memory for display. Dialog state is managed locally for add/edit flows, while a sessionStorage-persisted filter control toggles between Active/Inactive/All states and badges inactive rows inline.
 - **AddStudentForm.jsx** – collects `name` and `contactInfo`, enforces client-side validation, and raises `onSubmit` with trimmed values. The form is rendered inside a dialog launched from the Student Management page.
 - **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
+- **EditStudentForm.jsx** – exposes an Active/Inactive toggle guarded with confirmation copy, ensuring admins can deactivate and later reactivate students while preserving history.
 - **Roster deep links** – student names now link to `/students/:id`, sending admins directly into the dedicated detail page without leaving the management workflow.
 - **App shell & routing** – `src/main.jsx` redirects `/Employees` to `/admin/students` and wraps authenticated routes with `src/components/layout/AppShell.jsx`. The shell renders a bottom tab bar + FAB on mobile and a left sidebar on desktop while keeping the student management view front and center.
 
@@ -141,7 +143,9 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
   `components/`, while the `MyStudentsPage.jsx` container resides in `pages/` and wires the full view state.
 - **Page layout & routing** – `MyStudentsPage.jsx` composes the shared `PageLayout` shell, calls `GET /api/my-students` once the
   organization connection is ready, and renders loading, error, and empty states. Successful fetches map each student to a
-  `Card` showing their name and contact details.
+  `Card` showing their name and contact details, including an inactive badge when the organization allows visibility.
+- **Lifecycle-aware filtering** – Instructor rosters hide inactive students by default. When the organization enables visibility,
+  the page surfaces the same Active / Inactive / All selector used by admins while keeping Active as the default.
 - **Drill-down access** – each card includes a "צפייה בפרטי התלמיד" link to `/students/:id`, giving instructors a one-click path into the shared detail page while keeping the roster lightweight.
 - **Navigation updates** – `AppShell.jsx` derives the Students destination from the member role so admins/owners keep
   `/admin/students` while instructors are routed to `/my-students`. The router (`src/main.jsx`) exposes the `/my-students`
@@ -165,11 +169,11 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 
 ## 13. Student Detail & Session Registration Flow
 
-- **StudentDetailPage.jsx** – new route `/students/:id` shared by admins and instructors. It fetches the selected student via the appropriate roster endpoint, renders contact + scheduling defaults, and displays session history with graceful fallbacks when the history endpoint is not yet available.
+- **StudentDetailPage.jsx** – new route `/students/:id` shared by admins and instructors. It fetches the selected student via the appropriate roster endpoint (forcing `status=all` so inactive records stay reachable), renders contact + scheduling defaults, flags inactive students with a banner, and displays session history with graceful fallbacks when the history endpoint is not yet available.
 - **Session history rendering** – the page loads `session_form_config` through `/api/settings?keys=session_form_config`, normalizes questions with `parseSessionFormConfig`, and maps stored JSON answers back to their Hebrew labels. A 404 from the forthcoming `/api/session-records` endpoint is treated as “no sessions recorded” so UI scaffolding is testable today.
 - **SessionModalContext.jsx** – provided by `AppShell.jsx`, exposing `openSessionModal({ studentId, onCreated })` to any routed page. It keeps modal state in a single location so the FAB, desktop CTA, and Student Detail page all share the same creation flow.
-- **NewSessionModal.jsx** – orchestrates data dependencies: loads the student roster (admin vs. instructor scope), fetches `session_form_config`, and surfaces loading/error states. On submit it posts to `/api/sessions` with `{ student_id, date, service_context, content }` and triggers any supplied `onCreated` callback before closing.
-- **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, and collects answers for every configured question (text, textarea, select, radio/button groups, numeric fields, and range scales). Empty responses are stripped before sending the payload.
+- **NewSessionModal.jsx** – orchestrates data dependencies: loads the student roster (admin vs. instructor scope) while honoring the inactive visibility setting, fetches `session_form_config`, and surfaces loading/error states. On submit it posts to `/api/sessions` with `{ student_id, date, service_context, content }` and triggers any supplied `onCreated` callback before closing.
+- **NewSessionForm.jsx** – Hebrew UI for the session questionnaire. It pre-selects the active student when invoked from the detail page, shows each student’s default day/time beside their name, pre-fills the service field, mirrors the Active / Inactive filter so dropdowns stay focused on current students, and collects answers for every configured question (text, textarea, select, radio/button groups, numeric fields, and range scales). Empty responses are stripped before sending the payload.
 - **Shared utilities** – `src/features/students/utils/schedule.js` centralizes day/time formatting, `src/features/students/utils/endpoints.js` standardizes roster endpoint selection, and `src/features/sessions/utils/form-config.js` parses question configs so both the modal and detail view stay in sync.
 - **Student tags catalog** – tenant-wide tag definitions now live in the `tuttiud."Settings"` row keyed by `student_tags`. The Azure Functions endpoint `GET /api/settings/student-tags` returns the normalized catalog for any member of the active organization, while `POST /api/settings/student-tags` (admin/owner only) appends a `{ id, name }` entry with a generated UUID. Front-end consumers use `useStudentTags()` (`src/features/students/hooks/useStudentTags.js`) to load the catalog and `StudentTagsField.jsx` to render the select + modal combo inside both add/edit student forms. Each student stores an array of tag UUIDs in the `Students.tags` column (`uuid[]` type). To migrate legacy tenants run:
   ```sql
@@ -211,3 +215,10 @@ A Node.js script is provided for super admins/system administrators to verify ba
   - Prints error if file is invalid or password is incorrect
 
 This tool is essential for validating backups before restore or for compliance checks.
+
+## 16. Organization Setting: Instructor Visibility for Inactive Students
+
+- **Setting key** – `instructors_can_view_inactive_students` lives in the tenant `tuttiud."Settings"` row and defaults to `false` so instructors never see inactive roster entries unless an admin opts in.
+- **Settings UI** – `StudentVisibilitySettings.jsx` adds a dedicated card (eye-off icon) to `Settings.jsx`. Admins/owners can review the current value, read the guard copy, and toggle the permission through `upsertSetting` while instructors only see the status if they have manage rights.
+- **API integration** – `/api/my-students` checks the setting server-side and only includes inactive rows when the flag is enabled or the caller holds admin privileges. Query parameters (`status=active|inactive|all`) stay aligned with `/api/students` so both dashboards share a single filtering model.
+- **Frontend consumers** – `MyStudentsPage.jsx`, `NewSessionModal.jsx`, and `NewSessionForm.jsx` load the setting via `fetchSettingsValue` and adjust local filters + UI affordances accordingly. The preference for showing inactive students in admin lists persists per tab via `sessionStorage`.

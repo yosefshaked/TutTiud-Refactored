@@ -15,7 +15,13 @@ const REQUEST_STATE = Object.freeze({
   error: 'error',
 });
 
-export default function NewSessionModal({ open, onClose, initialStudentId = '', onCreated }) {
+export default function NewSessionModal({
+  open,
+  onClose,
+  initialStudentId = '',
+  initialStudentStatus = 'active',
+  onCreated,
+}) {
   const { loading: supabaseLoading } = useSupabase();
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
   const [studentsState, setStudentsState] = useState(REQUEST_STATE.idle);
@@ -30,6 +36,10 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   const [submitError, setSubmitError] = useState('');
   const [instructors, setInstructors] = useState([]);
   const [studentScope, setStudentScope] = useState('all'); // 'all' | 'mine' | `inst:<id>`
+  const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
+  const [canViewInactive, setCanViewInactive] = useState(false);
+  const [visibilityLoaded, setVisibilityLoaded] = useState(false);
+  const [initialStatusApplied, setInitialStatusApplied] = useState(false);
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
@@ -44,13 +54,87 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
   }, [open, activeOrgId, activeOrgHasConnection, tenantClientReady, supabaseLoading]);
 
   useEffect(() => {
+    const isAdmin = isAdminRole(membershipRole);
+    if (!open) {
+      setStatusFilter('active');
+      setCanViewInactive(isAdmin);
+      setVisibilityLoaded(false);
+      setInitialStatusApplied(false);
+      return;
+    }
+
+    if (isAdmin) {
+      setCanViewInactive(true);
+      setVisibilityLoaded(true);
+      return;
+    }
+
+    if (!activeOrgId || !activeOrgHasConnection || !tenantClientReady) {
+      setCanViewInactive(false);
+      setVisibilityLoaded(false);
+      if (statusFilter !== 'active') {
+        setStatusFilter('active');
+      }
+      setInitialStatusApplied(false);
+      return;
+    }
+
+    let cancelled = false;
+    const abortController = new AbortController();
+
+    const loadVisibilitySetting = async () => {
+      try {
+        const searchParams = new URLSearchParams({ org_id: activeOrgId, keys: 'instructors_can_view_inactive_students' });
+        const payload = await authenticatedFetch(`settings?${searchParams.toString()}`, {
+          signal: abortController.signal,
+        });
+        const entry = payload?.settings?.instructors_can_view_inactive_students;
+        const value = entry && typeof entry === 'object' && Object.prototype.hasOwnProperty.call(entry, 'value')
+          ? entry.value
+          : entry;
+        const allowed = value === true;
+        if (!cancelled) {
+          setCanViewInactive(allowed);
+          setVisibilityLoaded(true);
+          if (!allowed && statusFilter !== 'active') {
+            setStatusFilter('active');
+          }
+          if (!allowed) {
+            setInitialStatusApplied(false);
+          }
+        }
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          return;
+        }
+        console.error('Failed to load inactive visibility setting for session modal', error);
+        if (!cancelled) {
+          setCanViewInactive(false);
+          setVisibilityLoaded(true);
+          if (statusFilter !== 'active') {
+            setStatusFilter('active');
+          }
+          setInitialStatusApplied(false);
+        }
+      }
+    };
+
+    void loadVisibilitySetting();
+
+    return () => {
+      cancelled = true;
+      abortController.abort();
+    };
+  }, [open, membershipRole, activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter]);
+
+  useEffect(() => {
     if (!open) {
       setSubmitState(REQUEST_STATE.idle);
       setSubmitError('');
     }
   }, [open]);
 
-  const loadStudents = useCallback(async () => {
+  const loadStudents = useCallback(async (options = {}) => {
     if (!canFetchStudents) {
       return;
     }
@@ -60,7 +144,9 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
 
     try {
       // Determine endpoint and optional server-side filter based on scope and role
-      const baseEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole);
+      const overrideStatus = typeof options.status === 'string' ? options.status : null;
+      const statusParam = canViewInactive ? (overrideStatus || statusFilter) : 'active';
+      const baseEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: statusParam });
       let endpoint = baseEndpoint;
       const isAdmin = isAdminRole(membershipRole);
       if (isAdmin) {
@@ -68,12 +154,14 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
           // Admin viewing their own assigned students -> use my-students
           const searchParams = new URLSearchParams();
           if (activeOrgId) searchParams.set('org_id', activeOrgId);
+          if (statusParam) searchParams.set('status', statusParam);
           endpoint = searchParams.toString() ? `my-students?${searchParams}` : 'my-students';
         } else if (studentScope.startsWith('inst:')) {
           const instructorId = studentScope.slice(5);
           const searchParams = new URLSearchParams();
           if (activeOrgId) searchParams.set('org_id', activeOrgId);
           if (instructorId) searchParams.set('assigned_instructor_id', instructorId);
+          if (statusParam) searchParams.set('status', statusParam);
           endpoint = searchParams.toString() ? `students?${searchParams}` : 'students';
         }
       }
@@ -87,7 +175,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setStudentsState(REQUEST_STATE.error);
       setStudentsError(error?.message || 'טעינת רשימת התלמידים נכשלה.');
     }
-  }, [activeOrgId, canFetchStudents, membershipRole, studentScope]);
+  }, [activeOrgId, canFetchStudents, membershipRole, studentScope, statusFilter, canViewInactive]);
 
   const loadInstructors = useCallback(async () => {
     if (!open || !canFetchStudents) return;
@@ -151,7 +239,6 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
 
   useEffect(() => {
     if (open) {
-      void loadStudents();
       void loadQuestions();
       void loadServices();
       void loadInstructors();
@@ -159,6 +246,7 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setStudentsState(REQUEST_STATE.idle);
       setStudentsError('');
       setStudents([]);
+      setInitialStatusApplied(false);
       setQuestionsState(REQUEST_STATE.idle);
       setQuestionError('');
       setQuestions([]);
@@ -167,7 +255,48 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
       setInstructors([]);
       setStudentScope('all');
     }
-  }, [open, loadQuestions, loadStudents, loadServices, loadInstructors]);
+  }, [open, loadQuestions, loadServices, loadInstructors]);
+
+  useEffect(() => {
+    if (!open || !canFetchStudents) {
+      return;
+    }
+
+    if (!canViewInactive && statusFilter !== 'active') {
+      setStatusFilter('active');
+      setInitialStatusApplied(false);
+      return;
+    }
+
+    const shouldForceInactive = (
+      canViewInactive &&
+      initialStudentId &&
+      initialStudentStatus === 'inactive' &&
+      !initialStatusApplied
+    );
+
+    if (shouldForceInactive && statusFilter !== 'inactive') {
+      setStatusFilter('inactive');
+      setInitialStatusApplied(true);
+      return;
+    }
+
+    if (shouldForceInactive && statusFilter === 'inactive') {
+      setInitialStatusApplied(true);
+    }
+
+    const effectiveStatus = canViewInactive ? statusFilter : 'active';
+    void loadStudents({ status: effectiveStatus });
+  }, [
+    open,
+    canFetchStudents,
+    canViewInactive,
+    statusFilter,
+    initialStudentId,
+    initialStudentStatus,
+    initialStatusApplied,
+    loadStudents,
+  ]);
 
   const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
     setSubmitState(REQUEST_STATE.loading);
@@ -260,7 +389,12 @@ export default function NewSessionModal({ open, onClose, initialStudentId = '', 
             canFilterByInstructor={isAdminRole(membershipRole)}
             studentScope={studentScope}
             onScopeChange={(next) => setStudentScope(next)}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            canViewInactive={canViewInactive}
+            visibilityLoaded={visibilityLoaded}
             initialStudentId={initialStudentId}
+            isLoadingStudents={isLoadingStudents}
             onSubmit={handleSubmit}
             onCancel={onClose}
             isSubmitting={submitState === REQUEST_STATE.loading}

@@ -285,6 +285,7 @@ export default function AppShell({ children }) {
   const [sessionModalState, setSessionModalState] = useState({
     isOpen: false,
     studentId: '',
+    studentStatus: 'active',
     onCreated: null,
   })
 
@@ -292,10 +293,12 @@ export default function AppShell({ children }) {
   const navItems = useMemo(() => buildNavItems(role), [role])
 
   const openSessionModal = useCallback((options = {}) => {
-    const { studentId = '', onCreated = null } = options
+    const { studentId = '', studentStatus = 'active', onCreated = null } = options
+    const normalizedStatus = studentStatus === 'inactive' ? 'inactive' : 'active'
     setSessionModalState({
       isOpen: true,
       studentId,
+      studentStatus: normalizedStatus,
       onCreated: typeof onCreated === 'function' ? onCreated : null,
     })
   }, [])
@@ -304,6 +307,7 @@ export default function AppShell({ children }) {
     setSessionModalState({
       isOpen: false,
       studentId: '',
+      studentStatus: 'active',
       onCreated: null,
     })
   }, [])
@@ -313,7 +317,8 @@ export default function AppShell({ children }) {
     closeSessionModal,
     isSessionModalOpen: sessionModalState.isOpen,
     sessionModalStudentId: sessionModalState.studentId,
-  }), [openSessionModal, closeSessionModal, sessionModalState.isOpen, sessionModalState.studentId])
+    sessionModalStudentStatus: sessionModalState.studentStatus,
+  }), [openSessionModal, closeSessionModal, sessionModalState.isOpen, sessionModalState.studentId, sessionModalState.studentStatus])
 
   const handleOrgClick = () => {
     toast.info("בקרוב: בחירת ארגון נוסף")
@@ -397,6 +402,7 @@ export default function AppShell({ children }) {
           open={sessionModalState.isOpen}
           onClose={closeSessionModal}
           initialStudentId={sessionModalState.studentId}
+          initialStudentStatus={sessionModalState.studentStatus}
           onCreated={sessionModalState.onCreated}
         />
       </div>

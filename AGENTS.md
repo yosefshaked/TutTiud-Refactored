@@ -252,6 +252,13 @@
 - Forms fully migrated to RTL structure: `AddStudentForm`, `NewSessionForm`.
 - Migration strategy: All new forms must follow RTL patterns from the start; existing forms should be updated to match the RTL structure during maintenance.
 
+### Student Lifecycle & Visibility (2025-11)
+- Tenant students now include an `is_active` boolean (default `true`). The setup script (`src/lib/setup-sql.js`) adds the column with `ADD COLUMN IF NOT EXISTS` and backfills existing rows, so rerunning the script on legacy tenants is safe.
+- `/api/students` defaults to `status=active`; pass `status=inactive`, `status=all`, or `include_inactive=true` (legacy) when maintenance flows need archived rows. `PUT` handlers accept `is_active` alongside the existing roster fields.
+- `/api/my-students` respects the org setting `instructors_can_view_inactive_students`. Instructors only see inactive records when the flag is enabled; admins/owners always see them when requesting `status=all`.
+- Admin UI (`StudentManagementPage.jsx`) persists the Active/Inactive/All filter in `sessionStorage`, badges inactive rows, and exposes the toggle in `EditStudentForm.jsx`. Instructor surfaces (`MyStudentsPage.jsx`, `NewSessionModal.jsx`, `NewSessionForm.jsx`) automatically hide inactive students unless the setting is on.
+- Settings page adds `StudentVisibilitySettings.jsx` (eye-off card) so admins control the instructor flag through `fetchSettingsValue`/`upsertSetting`. Keep the copy bilingual and honor API permission checks when extending the card.
+
 ### Student Tags Catalog (2025-11)
 - Tenant tag definitions live in the `tuttiud."Settings"` row keyed `student_tags` (JSONB array of `{ id, name }`).
 - Backend: `GET /api/settings/student-tags` returns the catalog for any org member; `POST /api/settings/student-tags` appends a tag (admin/owner only) and regenerates the row via Supabase upsert.
