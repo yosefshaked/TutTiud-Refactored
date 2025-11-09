@@ -156,11 +156,11 @@ export default function ChangelogModal({ open, onClose }) {
                 }}>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>שימור הערות תלמידים:</strong> עדכוני API מבטיחים שהערות נשמרות גם בעת יצירה ועריכה מחדש של תלמידים.
+                    <strong>שימור הערות תלמידים:</strong> הערות שנוספו לתלמיד נשמרות עכשיו גם אחרי יצירה או עריכה מחודשת.
                   </li>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>בהירות בטפסי הוספה/עריכה:</strong> התיעוד באנגלית ובעברית עודכן כדי להסביר כיצד להזין הערות חדשות.
+                    <strong>הסברים ברורים בטפסים:</strong> הטפסים לפרטי תלמיד עודכנו כדי להנחות כיצד להוסיף ולנהל הערות.
                   </li>
                 </ul>
 
@@ -177,7 +177,7 @@ export default function ChangelogModal({ open, onClose }) {
                 }}>
                   <li style={{ paddingRight: '20px', position: 'relative' }}>
                     <span style={{ position: 'absolute', right: 0, color: '#10b981' }}>✓</span>
-                    טיפול משופר בשגיאות ולידציה במקרים של נתוני הערות לא תקינים מחזיר הודעות מדויקות יותר.
+                    תיקנו הודעות שגיאה כך שהמערכת תדריך בצורה ברורה כשיש בעיה עם הערות.
                   </li>
                 </ul>
               </section>
