@@ -218,6 +218,11 @@ function buildStudentPayload(body) {
     return { error: 'invalid_default_session_time' };
   }
 
+  const notesResult = coerceOptionalText(body?.notes);
+  if (!notesResult.valid) {
+    return { error: 'invalid_notes' };
+  }
+
   const tagsResult = coerceTags(body?.tags);
   if (!tagsResult.valid) {
     return { error: 'invalid_tags' };
@@ -240,6 +245,7 @@ function buildStudentPayload(body) {
       default_day_of_week: dayResult.value,
       default_session_time: sessionTimeResult.value,
       default_service: defaultServiceResult.value,
+      notes: notesResult.value,
       tags: tagsResult.value,
       is_active: isActiveValue,
     },
@@ -375,6 +381,15 @@ function buildStudentUpdates(body) {
     hasAny = true;
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, 'notes')) {
+    const { value, valid } = coerceOptionalText(body.notes);
+    if (!valid) {
+      return { error: 'invalid_notes' };
+    }
+    updates.notes = value;
+    hasAny = true;
+  }
+
   if (!hasAny) {
     return { error: 'missing_updates' };
   }
@@ -507,13 +522,15 @@ export default async function (context, req) {
                   ? 'invalid default service'
                   : normalized.error === 'invalid_default_day'
                     ? 'invalid default day of week'
-                    : normalized.error === 'invalid_default_session_time'
-                      ? 'invalid default session time'
-                      : normalized.error === 'invalid_tags'
-                        ? 'invalid tags'
-                        : normalized.error === 'invalid_is_active'
-                          ? 'invalid is_active flag'
-                          : 'invalid payload';
+          : normalized.error === 'invalid_default_session_time'
+            ? 'invalid default session time'
+            : normalized.error === 'invalid_notes'
+              ? 'invalid notes'
+              : normalized.error === 'invalid_tags'
+                ? 'invalid tags'
+                : normalized.error === 'invalid_is_active'
+                  ? 'invalid is_active flag'
+                  : 'invalid payload';
       return respond(context, 400, { message });
     }
 
@@ -555,13 +572,15 @@ export default async function (context, req) {
                     ? 'invalid default service'
                     : normalizedUpdates.error === 'invalid_default_day'
                       ? 'invalid default day of week'
-                      : normalizedUpdates.error === 'invalid_default_session_time'
-                        ? 'invalid default session time'
-                        : normalizedUpdates.error === 'invalid_tags'
-                          ? 'invalid tags'
-                          : normalizedUpdates.error === 'invalid_is_active'
-                            ? 'invalid is_active flag'
-                            : 'invalid payload';
+          : normalizedUpdates.error === 'invalid_default_session_time'
+            ? 'invalid default session time'
+            : normalizedUpdates.error === 'invalid_notes'
+              ? 'invalid notes'
+              : normalizedUpdates.error === 'invalid_tags'
+                ? 'invalid tags'
+                : normalizedUpdates.error === 'invalid_is_active'
+                  ? 'invalid is_active flag'
+                  : 'invalid payload';
     return respond(context, 400, { message: updateMessage });
   }
 
