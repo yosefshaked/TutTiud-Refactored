@@ -11,6 +11,8 @@
 - Run `npm run build` to ensure the project builds.
 - No test script is configured; note this in your testing summary.
 - Run `npm run check:schema` before adding new persistence logic; if it reports missing columns, add a checklist note to the PR instead of coding around the gap.
+- Instructor color assignments live in `api/_shared/instructor-colors.js`. Use `ensureInstructorColors()` before returning instructor records or aggregations so every row keeps a unique `metadata.instructor_color` (solid or gradient).
+- `/api/weekly-compliance` powers the dashboard widget with aggregated schedules, legend entries, and dynamic hour ranges. Frontend work should consume its payload instead of duplicating aggregation logic.
 - Add any important information learned into this AGENTS.md file.
 	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
 	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.

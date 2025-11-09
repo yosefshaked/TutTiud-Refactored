@@ -8,6 +8,7 @@ import { useOrg } from "@/org/OrgContext.jsx"
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
+import WeeklyComplianceView from "@/features/dashboard/components/WeeklyComplianceView.jsx"
 
 /**
  * Build greeting with proper fallback chain:
@@ -158,6 +159,16 @@ export default function DashboardPage() {
       subtitle="מה תרצו לעשות כעת?"
       className="space-y-xl"
     >
+      {tenantClientReady && activeOrgHasConnection ? (
+        <WeeklyComplianceView orgId={activeOrgId} />
+      ) : (
+        <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+          </p>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
         <Link to={studentsLink} className="group focus-visible:outline-none">
           <Card

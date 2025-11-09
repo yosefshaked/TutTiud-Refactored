@@ -26,7 +26,9 @@ All states (loading, error, success) are surfaced inline with accessible message
 
 - **Supabase Setup Assistant** (`src/components/settings/SetupAssistant.jsx`) is the single entry point for onboarding. It owns the SQL copy helpers, JWT capture, and validation flow.
 - **App shell** (`src/components/layout/AppShell.jsx`) delivers the mobile-first navigation: a bottom tab bar with a central session FAB on phones and a desktop sidebar for wider screens.
-- **Dashboard landing page** (`src/pages/DashboardPage.jsx`) greets authenticated users, linking directly to `/my-students` and `/TimeEntry` so the Home tab always presents useful actions.
+- **Dashboard landing page** (`src/pages/DashboardPage.jsx`) greets authenticated users, surfaces the Weekly Compliance widget once the tenant database is reachable, and keeps quick links to `/my-students` (or `/admin/students`) alongside the session logging shortcut.
+- **Weekly Compliance View** (`src/features/dashboard/components/WeeklyComplianceView.jsx`) renders a role-aware weekly grid powered by `/api/weekly-compliance`. Instructor chips inherit permanent colors/gradients, documentation icons (✔ / ✖) only appear for past sessions, navigation buttons jump between weeks, and the mobile layout focuses on one day at a time.
+- **Instructor color palette** – `api/_shared/instructor-colors.js` maintains a 20-color bank with deterministic gradient fallbacks. Both `/api/instructors` and `/api/weekly-compliance` call `ensureInstructorColors()` so every instructor persists a unique `metadata.instructor_color`.
 - **Admin Student Management** (`src/features/admin/pages/StudentManagementPage.jsx`) is the new mobile-first roster experience. It fetches `/api/students` on load, renders loading/error/empty states, opens `AddStudentForm` for creation, and drives instructor assignment through `AssignInstructorModal`.
 - **Instructor My Students** (`src/features/instructor/pages/MyStudentsPage.jsx`) presents members with only their assigned students. It composes `PageLayout`, loads `/api/my-students`, and surfaces loading, error, and empty cards before rendering each student inside a `Card` with name and contact details.
 - **Password reset experience** (`src/pages/ForgotPassword.jsx` and `src/pages/UpdatePassword.jsx`) delivers the full Supabase Auth recovery flow. The request page sends `resetPasswordForEmail` links that target `/#/update-password`, and the update page verifies matching passwords before calling `AuthContext.updatePassword` and redirecting to the dashboard with success feedback.
@@ -51,6 +53,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - `POST /api/students` – admin/owner creation of student records with optional instructor assignment.
 - `PUT /api/students/{studentId}` – admin/owner updates to student metadata (name, contact info, instructor).
 - `GET /api/my-students` – member/admin/owner view of students whose `assigned_instructor_id` equals the caller.
+- `GET /api/weekly-compliance` – member/admin/owner weekly aggregation including instructor colors, scheduled chips, documentation status, and a dynamic hour range for the dashboard widget.
 - `POST /api/sessions` – member/admin/owner insertion of `SessionRecords` with assignment verification for members.
 - `GET /api/user-context` – authenticated fetch that returns the caller's organization memberships and pending invitations (with organization names) via the Supabase admin client so invitees bypass RLS limitations.
 
