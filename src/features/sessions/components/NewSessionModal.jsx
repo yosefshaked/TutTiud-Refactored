@@ -40,6 +40,7 @@ export default function NewSessionModal({
   const [canViewInactive, setCanViewInactive] = useState(false);
   const [visibilityLoaded, setVisibilityLoaded] = useState(false);
   const [initialStatusApplied, setInitialStatusApplied] = useState(false);
+  const [canSubmit, setCanSubmit] = useState(false);
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
@@ -52,6 +53,12 @@ export default function NewSessionModal({
       !supabaseLoading
     );
   }, [open, activeOrgId, activeOrgHasConnection, tenantClientReady, supabaseLoading]);
+
+  useEffect(() => {
+    if (!open) {
+      setCanSubmit(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     const isAdmin = isAdminRole(membershipRole);
@@ -344,9 +351,6 @@ export default function NewSessionModal({
   const isLoadingQuestions = questionsState === REQUEST_STATE.loading;
   const showLoading = isLoadingStudents || isLoadingQuestions;
 
-  // Track selected student for footer button state
-  const [selectedStudentId, setSelectedStudentId] = useState('');
-
   const footer = canFetchStudents && !showLoading && studentsState !== REQUEST_STATE.error ? (
     <NewSessionFormFooter
       onSubmit={() => {
@@ -355,7 +359,7 @@ export default function NewSessionModal({
       }}
       onCancel={onClose}
       isSubmitting={submitState === REQUEST_STATE.loading}
-      selectedStudentId={selectedStudentId}
+      canSubmit={canSubmit}
     />
   ) : null;
 
@@ -400,7 +404,7 @@ export default function NewSessionModal({
             isSubmitting={submitState === REQUEST_STATE.loading}
             error={submitError || (questionsState === REQUEST_STATE.error ? questionError : '')}
             renderFooterOutside={true}
-            onSelectedStudentChange={setSelectedStudentId}
+            onCanSubmitChange={setCanSubmit}
           />
         )}
       </DialogContent>

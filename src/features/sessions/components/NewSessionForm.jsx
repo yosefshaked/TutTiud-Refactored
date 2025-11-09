@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
 import { Loader2, ListChecks, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,10 +11,6 @@ import { sortStudentsBySchedule } from '@/features/students/utils/sorting.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
-
-function todayIsoDate() {
-  return format(new Date(), 'yyyy-MM-dd');
-}
 
 export default function NewSessionForm({
   students = [],
@@ -38,11 +33,13 @@ export default function NewSessionForm({
   error = '',
   renderFooterOutside = false, // New prop to control footer rendering
   onSelectedStudentChange, // Callback to notify parent of selection changes
+  onCanSubmitChange,
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentDayFilter, setStudentDayFilter] = useState(null);
-  const [sessionDate, setSessionDate] = useState(todayIsoDate());
+  const [sessionDate, setSessionDate] = useState('');
+  const [dateTouched, setDateTouched] = useState(false);
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
   const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
@@ -94,6 +91,10 @@ export default function NewSessionForm({
     setSelectedStudentId(initialStudentId);
     onSelectedStudentChange?.(initialStudentId);
   }, [initialStudentId, onSelectedStudentChange]);
+
+  useEffect(() => {
+    onCanSubmitChange?.(Boolean(selectedStudentId) && Boolean(sessionDate));
+  }, [selectedStudentId, sessionDate, onCanSubmitChange]);
 
   const selectedStudent = useMemo(() => {
     return students.find((student) => student?.id === selectedStudentId) || null;
@@ -221,6 +222,11 @@ export default function NewSessionForm({
     event.preventDefault();
 
     if (!selectedStudentId) {
+      return;
+    }
+
+    if (!sessionDate) {
+      setDateTouched(true);
       return;
     }
 
@@ -367,10 +373,19 @@ export default function NewSessionForm({
             id="session-date"
             type="date"
             value={sessionDate}
-            onChange={(event) => setSessionDate(event.target.value)}
+            onChange={(event) => {
+              if (!dateTouched) {
+                setDateTouched(true);
+              }
+              setSessionDate(event.target.value);
+            }}
+            onBlur={() => setDateTouched(true)}
             required
             disabled={isSubmitting}
           />
+          {dateTouched && !sessionDate ? (
+            <p className="text-xs text-red-600 text-right">אנא בחרו תאריך למפגש.</p>
+          ) : null}
         </div>
         <ComboBoxField
           id="session-service"
@@ -703,7 +718,7 @@ export default function NewSessionForm({
       {!renderFooterOutside && (
         <div className="border-t -mx-4 sm:-mx-6 mt-6 pt-3 sm:pt-4 px-4 sm:px-6">
           <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
-            <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
+            <Button type="submit" disabled={isSubmitting || !selectedStudentId || !sessionDate} className="gap-xs shadow-md hover:shadow-lg transition-shadow">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
               שמירת מפגש
             </Button>
@@ -746,10 +761,10 @@ export default function NewSessionForm({
 }
 
 // Export footer component for external rendering
-export function NewSessionFormFooter({ onSubmit, onCancel, isSubmitting = false, selectedStudentId }) {
+export function NewSessionFormFooter({ onSubmit, onCancel, isSubmitting = false, canSubmit = false }) {
   return (
     <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
-      <Button type="submit" disabled={isSubmitting || !selectedStudentId} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
+      <Button type="submit" disabled={isSubmitting || !canSubmit} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         שמירת מפגש
       </Button>
