@@ -158,10 +158,6 @@ export default function ChangelogModal({ open, onClose }) {
                     <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
                     <strong>שימור הערות תלמידים:</strong> הערות שנוספו לתלמיד נשמרות עכשיו גם אחרי יצירה או עריכה מחודשת.
                   </li>
-                  <li style={{ paddingRight: '20px', position: 'relative' }}>
-                    <span style={{ position: 'absolute', right: 0, color: '#5B5BD6' }}>•</span>
-                    <strong>הסברים ברורים בטפסים:</strong> הטפסים לפרטי תלמיד עודכנו כדי להנחות כיצד להוסיף ולנהל הערות.
-                  </li>
                 </ul>
 
                 <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
