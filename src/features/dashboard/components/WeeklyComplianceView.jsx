@@ -209,6 +209,63 @@ function buildLegendStyle(identifier, { inactive = false } = {}) {
   return { backgroundImage: gradient }
 }
 
+function LegendEntries({ legend, itemClassName = '' }) {
+  if (!Array.isArray(legend) || legend.length === 0) {
+    return null
+  }
+
+  return legend.map(item => (
+    <div key={item.id} className={cn('flex items-center gap-xs text-sm text-muted-foreground', itemClassName)}>
+      <span
+        aria-hidden="true"
+        className="inline-block h-3 w-3 rounded-full border border-border"
+        style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
+      />
+      <span className="truncate">{item.name}</span>
+      {item.isActive === false ? (
+        <span className="text-xs text-destructive">מדריך לא פעיל</span>
+      ) : null}
+    </div>
+  ))
+}
+
+function InlineInstructorLegend({ legend, isLoading }) {
+  if (!legend?.length && !isLoading) {
+    return (
+      <p className="mb-lg text-sm text-muted-foreground">
+        אין מדריכים להצגה בשבוע זה.
+      </p>
+    )
+  }
+
+  if (!legend?.length) {
+    return null
+  }
+
+  return (
+    <div className="mb-lg flex flex-wrap gap-sm md:hidden">
+      <LegendEntries legend={legend} />
+    </div>
+  )
+}
+
+function FloatingInstructorLegend({ legend }) {
+  if (!legend?.length) {
+    return null
+  }
+
+  return (
+    <div className="pointer-events-none fixed right-6 top-32 z-[55] hidden md:block">
+      <div className="pointer-events-auto w-64 space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-lg backdrop-blur">
+        <p className="text-sm font-semibold text-foreground">מקרא מדריכים</p>
+        <div className="space-y-xs">
+          <LegendEntries legend={legend} itemClassName="justify-between rounded-lg bg-muted/40 px-sm py-xxs" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function createGridSlots(window) {
   if (!window) {
     return []
@@ -401,6 +458,10 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
     const visibleWidth = visibleColumns === 1
       ? '100%'
       : `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
+    const chipHeight = Math.max(
+      GRID_ROW_HEIGHT - 8,
+      GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8,
+    )
 
     for (const event of cluster.events) {
       const shouldHide = totalColumns > MAX_VISIBLE_CHIPS && event.columnIndex >= MAX_VISIBLE_CHIPS
@@ -418,7 +479,7 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
       chips.push({
         session: event.session,
         top: Math.round(event.top),
-        height: Math.max(GRID_ROW_HEIGHT - 8, GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8),
+        height: chipHeight,
         style: {
           left: leftValue,
           width: visibleColumns === 1 ? '100%' : visibleWidth,
@@ -434,10 +495,11 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
         ? '0'
         : `calc(${badgeLeftPercent}% + ${COLUMN_GAP_PX / 2}px)`
 
+      const overflowTop = Math.max(0, Math.round(firstHidden.top + chipHeight - 28))
       overflowBadges.push({
         sessions: hiddenSessions.map(entry => entry.session),
-        top: Math.round(firstHidden.top),
-        height: Math.max(GRID_ROW_HEIGHT - 8, GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8),
+        top: overflowTop,
+        height: chipHeight,
         style: {
           left: badgeLeft,
           width: visibleColumns === 1 ? '100%' : visibleWidth,
@@ -642,7 +704,7 @@ function StudentChip({
   )
 }
 
-function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoarse }) {
+function OverflowBadge({ sessions, top, style, zIndex, onNavigate, isCoarse }) {
   const [open, setOpen] = useState(false)
 
   const sortedSessions = useMemo(
@@ -659,7 +721,6 @@ function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoa
   const computedStyle = useMemo(() => {
     const result = {
       top: `${top}px`,
-      height: `${height}px`,
       zIndex,
     }
     if (typeof style?.left !== 'undefined') {
@@ -669,14 +730,14 @@ function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoa
       result.maxWidth = style.width
     }
     return result
-  }, [height, style?.left, style?.width, top, zIndex])
+  }, [style?.left, style?.width, top, zIndex])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="absolute flex h-full min-w-[64px] items-center justify-center rounded-full border border-dashed border-primary bg-primary/5 px-sm py-xxs text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          className="absolute flex min-h-[28px] min-w-[64px] items-center justify-center rounded-full border border-dashed border-primary bg-primary/5 px-sm py-xxs text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           style={computedStyle}
         >
           +{total} נוספים
@@ -740,18 +801,26 @@ function DayScheduleView({
       <div className="mb-sm flex gap-sm overflow-x-auto pb-sm">
         {safeDays.map((day, index) => {
           const display = buildDayDisplay(day)
+          const isSelected = index === selectedDayIndex
           return (
             <Button
               key={day.date}
               type="button"
               size="sm"
-              variant={index === selectedDayIndex ? 'default' : 'outline'}
-              aria-pressed={index === selectedDayIndex}
+              variant={isSelected ? 'default' : 'outline'}
+              aria-pressed={isSelected}
               onClick={() => onSelectDay(index)}
               className="flex-col gap-0 text-center leading-tight"
             >
               <span className="text-sm font-semibold">{display.label || '—'}</span>
-              <span className="text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+              <span
+                className={cn(
+                  'text-xs font-normal',
+                  isSelected ? 'text-primary-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {display.date || '—'}
+              </span>
             </Button>
           )
         })}
@@ -808,12 +877,53 @@ export default function WeeklyComplianceView({ orgId }) {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0)
   const isCoarsePointer = useIsCoarsePointer()
   const [viewMode, setViewMode] = useState('week')
+  const [isBelowBreakpoint, setIsBelowBreakpoint] = useState(false)
+  const containerRef = useRef(null)
+  const manualSelectionRef = useRef(false)
 
   useEffect(() => {
-    if (isCoarsePointer) {
-      setViewMode(current => (current === 'day' ? current : 'day'))
+    const element = containerRef.current
+    if (!element) {
+      return undefined
     }
-  }, [isCoarsePointer])
+
+    const updateForWidth = width => {
+      const below = width < 1450
+      setIsBelowBreakpoint(below)
+      if (below) {
+        manualSelectionRef.current = false
+        setViewMode('day')
+      } else if (!manualSelectionRef.current) {
+        setViewMode('week')
+      }
+    }
+
+    updateForWidth(element.clientWidth)
+
+    if (typeof ResizeObserver === 'undefined') {
+      const handleResize = () => updateForWidth(element.clientWidth)
+      if (typeof window !== 'undefined') {
+        window.addEventListener('resize', handleResize)
+      }
+      return () => {
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('resize', handleResize)
+        }
+      }
+    }
+
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[0]
+      const width = entry?.contentRect?.width ?? element.clientWidth
+      updateForWidth(width)
+    })
+
+    observer.observe(element)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     if (!orgId || !weekStart) {
@@ -924,8 +1034,27 @@ export default function WeeklyComplianceView({ orgId }) {
     [navigate],
   )
 
+  const defaultViewMode = isBelowBreakpoint ? 'day' : 'week'
+
+  const handleViewModeChange = useCallback(
+    nextMode => {
+      if (nextMode === 'week' && isBelowBreakpoint) {
+        return
+      }
+      if (nextMode === defaultViewMode) {
+        manualSelectionRef.current = false
+      } else {
+        manualSelectionRef.current = true
+      }
+      setViewMode(nextMode)
+    },
+    [defaultViewMode, isBelowBreakpoint],
+  )
+
   return (
-    <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+    <>
+      <FloatingInstructorLegend legend={legend} />
+      <Card ref={containerRef} className="relative rounded-2xl border border-border bg-surface p-lg shadow-sm">
       <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
@@ -956,7 +1085,8 @@ export default function WeeklyComplianceView({ orgId }) {
               size="sm"
               variant={viewMode === 'week' ? 'default' : 'ghost'}
               aria-pressed={viewMode === 'week'}
-              onClick={() => setViewMode('week')}
+              onClick={() => handleViewModeChange('week')}
+              disabled={isBelowBreakpoint}
             >
               שבוע
             </Button>
@@ -965,7 +1095,7 @@ export default function WeeklyComplianceView({ orgId }) {
               size="sm"
               variant={viewMode === 'day' ? 'default' : 'ghost'}
               aria-pressed={viewMode === 'day'}
-              onClick={() => setViewMode('day')}
+              onClick={() => handleViewModeChange('day')}
             >
               יום
             </Button>
@@ -973,24 +1103,7 @@ export default function WeeklyComplianceView({ orgId }) {
         </div>
       </div>
 
-      <div className="mb-lg flex flex-wrap gap-sm">
-        {legend.map(item => (
-          <div key={item.id} className="flex items-center gap-xs text-sm text-muted-foreground">
-            <span
-              aria-hidden="true"
-              className="inline-block h-3 w-3 rounded-full border border-border"
-              style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
-            />
-            <span>{item.name}</span>
-            {item.isActive === false ? (
-              <span className="text-xs text-destructive">מדריך לא פעיל</span>
-            ) : null}
-          </div>
-        ))}
-        {!legend.length && !isLoading && (
-          <p className="text-sm text-muted-foreground">אין מדריכים להצגה בשבוע זה.</p>
-        )}
-      </div>
+      <InlineInstructorLegend legend={legend} isLoading={isLoading} />
 
       {isLoading && (
         <p className="text-sm text-muted-foreground">טוען נתונים...</p>
@@ -1007,92 +1120,90 @@ export default function WeeklyComplianceView({ orgId }) {
         <>
           {viewMode === 'week' ? (
             <div className="hidden md:block">
-              <div className="overflow-x-auto">
-                <div
-                  className="grid"
-                  style={{ gridTemplateColumns: `80px repeat(${days.length}, minmax(0, 1fr))` }}
-                >
-                  <div className="sticky top-0 bg-surface" />
-                  {days.map(day => {
-                    const display = buildDayDisplay(day)
-                    return (
-                      <div
-                        key={day.date}
-                        className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
-                      >
-                        <span className="block text-base font-semibold">{display.label || '—'}</span>
-                        <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
-                      </div>
-                    )
-                  })}
-                  <div
-                    className="relative border-l border-border"
-                    style={{ height: `${gridHeight}px` }}
-                  >
+              <div
+                className="grid"
+                style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(0, 1fr))` }}
+              >
+                <div className="sticky top-0 bg-surface" />
+                {days.map(day => {
+                  const display = buildDayDisplay(day)
+                  return (
                     <div
-                      className="grid text-sm text-muted-foreground"
-                      style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                      key={day.date}
+                      className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
                     >
-                      {gridSlots.map(minutes => (
-                        <div
-                          key={`time-${minutes}`}
-                          className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
-                        >
-                          {formatTimeLabel(minutes)}
-                        </div>
+                      <span className="block text-base font-semibold">{display.label || '—'}</span>
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+                    </div>
+                  )
+                })}
+                <div
+                  className="relative border-l border-border"
+                  style={{ height: `${gridHeight}px` }}
+                >
+                  <div
+                    className="grid text-sm text-muted-foreground"
+                    style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                  >
+                    {gridSlots.map(minutes => (
+                      <div
+                        key={`time-${minutes}`}
+                        className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
+                      >
+                        {formatTimeLabel(minutes)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {days.map(day => {
+                  const layout = dayLayouts.get(day.date)
+                  const chipItems = layout?.chips ?? []
+                  const overflowItems = layout?.overflowBadges ?? []
+                  return (
+                    <div
+                      key={`column-${day.date}`}
+                      className="relative border-b border-l border-border bg-background/60"
+                      style={{ height: `${gridHeight}px` }}
+                    >
+                      <div
+                        className="grid"
+                        aria-hidden="true"
+                        style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                      >
+                        {gridSlots.map(minutes => (
+                          <div
+                            key={`${day.date}-row-${minutes}`}
+                            className="border-b border-border/70"
+                          />
+                        ))}
+                      </div>
+                      {chipItems.map(item => (
+                        <StudentChip
+                          key={`${item.session.studentId}-${item.session.time}`}
+                          session={item.session}
+                          top={item.top}
+                          height={item.height}
+                          style={item.style}
+                          zIndex={item.zIndex}
+                          onNavigate={handleNavigateToStudent}
+                          isCoarse={isCoarsePointer}
+                        />
+                      ))}
+                      {overflowItems.map(item => (
+                        <OverflowBadge
+                          key={`${day.date}-overflow-${item.top}`}
+                          sessions={item.sessions}
+                          top={item.top}
+                          height={item.height}
+                          style={item.style}
+                          zIndex={item.zIndex}
+                          onNavigate={handleNavigateToStudent}
+                          isCoarse={isCoarsePointer}
+                        />
                       ))}
                     </div>
-                  </div>
-                  {days.map(day => {
-                    const layout = dayLayouts.get(day.date)
-                    const chipItems = layout?.chips ?? []
-                    const overflowItems = layout?.overflowBadges ?? []
-                    return (
-                      <div
-                        key={`column-${day.date}`}
-                        className="relative border-b border-l border-border bg-background/60"
-                        style={{ height: `${gridHeight}px` }}
-                      >
-                        <div
-                          className="grid"
-                          aria-hidden="true"
-                          style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
-                        >
-                          {gridSlots.map(minutes => (
-                            <div
-                              key={`${day.date}-row-${minutes}`}
-                              className="border-b border-border/70"
-                            />
-                          ))}
-                        </div>
-                        {chipItems.map(item => (
-                          <StudentChip
-                            key={`${item.session.studentId}-${item.session.time}`}
-                            session={item.session}
-                            top={item.top}
-                            height={item.height}
-                            style={item.style}
-                            zIndex={item.zIndex}
-                            onNavigate={handleNavigateToStudent}
-                            isCoarse={isCoarsePointer}
-                          />
-                        ))}
-                        {overflowItems.map(item => (
-                          <OverflowBadge
-                            key={`${day.date}-overflow-${item.top}`}
-                            sessions={item.sessions}
-                            top={item.top}
-                            height={item.height}
-                            style={item.style}
-                            zIndex={item.zIndex}
-                            onNavigate={handleNavigateToStudent}
-                            isCoarse={isCoarsePointer}
-                          />
-                        ))}
-                      </div>
-                    )
-                  })}
-                </div>
+                  )
+                })}
               </div>
             </div>
           ) : null}
@@ -1121,6 +1232,7 @@ export default function WeeklyComplianceView({ orgId }) {
           ) : null}
         </>
       )}
-    </Card>
+      </Card>
+    </>
   )
 }
