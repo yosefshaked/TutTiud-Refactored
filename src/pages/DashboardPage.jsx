@@ -159,16 +159,6 @@ export default function DashboardPage() {
       subtitle="מה תרצו לעשות כעת?"
       className="space-y-xl"
     >
-      {tenantClientReady && activeOrgHasConnection ? (
-        <WeeklyComplianceView orgId={activeOrgId} />
-      ) : (
-        <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
-          <p className="text-sm text-muted-foreground">
-            לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
-          </p>
-        </Card>
-      )}
-
       <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
         <Link to={studentsLink} className="group focus-visible:outline-none">
           <Card
@@ -201,6 +191,16 @@ export default function DashboardPage() {
           </Card>
         </button>
       </div>
+
+      {tenantClientReady && activeOrgHasConnection ? (
+        <WeeklyComplianceView orgId={activeOrgId} />
+      ) : (
+        <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+          </p>
+        </Card>
+      )}
     </PageLayout>
   )
 }

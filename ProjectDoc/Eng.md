@@ -159,10 +159,11 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - **Weekly Compliance View** – `src/features/dashboard/components/WeeklyComplianceView.jsx` renders a role-aware, color-coded
   week grid fed by `/api/weekly-compliance`. The backend precomputes the legend, trims the vertical range to the organization’s
   active hours, and annotates each scheduled session with ✔ (complete) or ✖ (missing) icons for past dates only. Desktop users see
-  the full week at once, while the mobile layout collapses into a one-day focus with the same chips and legend styling.
+  the full week at once, while the mobile layout collapses into a one-day focus with the same chips and legend styling. Headers now
+  translate each day into Hebrew and stack the calendar date beneath every label so the schedule stays consistent across layouts.
 - **Dashboard actions** – `DashboardPage.jsx` still greets the user and surfaces the quick cards for “My Students” / “All Students”
-  and “New Session Record”. The compliance widget renders once the tenant connection is available; until then a placeholder card
-  explains why the grid is hidden.
+  and “New Session Record”. The compliance widget now renders beneath those quick actions once the tenant connection is available;
+  until then a placeholder card explains why the grid is hidden.
 - **Navigation glue** – the `AppShell` "ראשי" link continues pointing to `/`, and `/Dashboard` redirects to the landing page so
   the enhanced home experience remains the default after login. Auth redirects (login, org selection, invite acceptance) still
   converge on `/`, and the disabled "דוחות" item keeps its roadmap tooltip.

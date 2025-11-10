@@ -10,6 +10,26 @@ const STATUS_ICONS = {
   missing: '✖',
 }
 
+const HEBREW_DAY_LABELS = Object.freeze({
+  1: 'יום ראשון',
+  2: 'יום שני',
+  3: 'יום שלישי',
+  4: 'יום רביעי',
+  5: 'יום חמישי',
+  6: 'יום שישי',
+  7: 'יום שבת',
+})
+
+const ENGLISH_DAY_TO_INDEX = Object.freeze({
+  Sunday: 1,
+  Monday: 2,
+  Tuesday: 3,
+  Wednesday: 4,
+  Thursday: 5,
+  Friday: 6,
+  Saturday: 7,
+})
+
 function formatTimeLabel(minutes) {
   const value = Number(minutes) || 0
   const hoursPart = Math.floor(value / 60)
@@ -63,9 +83,26 @@ function parseMinutes(value) {
   return hours * 60 + minutes
 }
 
-function formatDisplayDate(isoDate, label) {
+function resolveHebrewDayLabel(dayOfWeek, fallbackLabel) {
+  const numericDay = Number.parseInt(dayOfWeek, 10)
+  if (numericDay && HEBREW_DAY_LABELS[numericDay]) {
+    return HEBREW_DAY_LABELS[numericDay]
+  }
+
+  const normalizedFallback = typeof fallbackLabel === 'string' ? fallbackLabel.trim() : ''
+  if (normalizedFallback && ENGLISH_DAY_TO_INDEX[normalizedFallback]) {
+    const index = ENGLISH_DAY_TO_INDEX[normalizedFallback]
+    if (HEBREW_DAY_LABELS[index]) {
+      return HEBREW_DAY_LABELS[index]
+    }
+  }
+
+  return normalizedFallback || ''
+}
+
+function formatHebrewDate(isoDate) {
   if (!isoDate) {
-    return label || ''
+    return ''
   }
   try {
     const formatter = new Intl.DateTimeFormat('he-IL', {
@@ -73,11 +110,24 @@ function formatDisplayDate(isoDate, label) {
       month: '2-digit',
       year: 'numeric',
     })
-    const formatted = formatter.format(new Date(`${isoDate}T00:00:00Z`))
-    return label ? `${label} ${formatted}` : formatted
+    return formatter.format(new Date(`${isoDate}T00:00:00Z`))
   } catch (error) {
     console.error('Failed to format date', error)
-    return label ? `${label} ${isoDate}` : isoDate
+    return isoDate
+  }
+}
+
+function buildDayDisplay(day) {
+  if (!day) {
+    return { label: '', date: '' }
+  }
+
+  const label = resolveHebrewDayLabel(day.dayOfWeek, day.label)
+  const date = formatHebrewDate(day.date)
+
+  return {
+    label: label || '',
+    date: date || '',
   }
 }
 
@@ -231,6 +281,7 @@ export default function WeeklyComplianceView({ orgId }) {
     return maps
   }, [days, timeSlots])
   const selectedDay = days[mobileDayIndex] || days[0]
+  const selectedDayDisplay = useMemo(() => buildDayDisplay(selectedDay), [selectedDay])
   const isCurrentWeek = weekStart === initialWeekStart
 
   const handlePreviousWeek = useCallback(() => {
@@ -266,7 +317,7 @@ export default function WeeklyComplianceView({ orgId }) {
           </p>
           {data?.weekStart && data?.weekEnd ? (
             <p className="mt-xs text-sm text-muted-foreground">
-              שבוע החל ב-{formatDisplayDate(data.weekStart, '')} • מסתיים ב-{formatDisplayDate(data.weekEnd, '')}
+              שבוע החל ב-{formatHebrewDate(data.weekStart) || '—'} • מסתיים ב-{formatHebrewDate(data.weekEnd) || '—'}
             </p>
           ) : null}
         </div>
@@ -315,11 +366,18 @@ export default function WeeklyComplianceView({ orgId }) {
           <div className="hidden md:block">
             <div className="grid" style={{ gridTemplateColumns: `minmax(80px, 120px) repeat(${days.length}, minmax(0, 1fr))` }}>
               <div className="sticky top-0 bg-surface font-semibold text-muted-foreground" />
-              {days.map(day => (
-                <div key={day.date} className="border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground">
-                  {formatDisplayDate(day.date, day.label)}
-                </div>
-              ))}
+              {days.map(day => {
+                const display = buildDayDisplay(day)
+                return (
+                  <div
+                    key={day.date}
+                    className="border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
+                  >
+                    <span className="block text-base font-semibold">{display.label || '—'}</span>
+                    <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+                  </div>
+                )
+              })}
               {timeSlots.map(minutes => {
                 const label = formatTimeLabel(minutes)
                 return (
@@ -369,21 +427,29 @@ export default function WeeklyComplianceView({ orgId }) {
 
           <div className="md:hidden">
             <div className="mb-sm flex gap-sm overflow-x-auto pb-sm">
-              {days.map((day, index) => (
-                <Button
-                  key={day.date}
-                  type="button"
-                  size="sm"
-                  variant={index === mobileDayIndex ? 'default' : 'outline'}
-                  onClick={() => setMobileDayIndex(index)}
-                >
-                  {formatDisplayDate(day.date, day.label)}
-                </Button>
-              ))}
+              {days.map((day, index) => {
+                const display = buildDayDisplay(day)
+                return (
+                  <Button
+                    key={day.date}
+                    type="button"
+                    size="sm"
+                    variant={index === mobileDayIndex ? 'default' : 'outline'}
+                    onClick={() => setMobileDayIndex(index)}
+                    className="flex-col gap-0 text-center leading-tight"
+                  >
+                    <span className="text-sm font-semibold">{display.label || '—'}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+                  </Button>
+                )
+              })}
             </div>
             <div>
-              <h3 className="mb-sm text-lg font-semibold text-foreground">
-                {formatDisplayDate(selectedDay?.date, selectedDay?.label)}
+              <h3 className="mb-sm text-lg font-semibold text-foreground leading-snug">
+                <span className="block">{selectedDayDisplay.label || '—'}</span>
+                <span className="mt-1 block text-sm font-normal text-muted-foreground">
+                  {selectedDayDisplay.date || '—'}
+                </span>
               </h3>
               <div className="space-y-xs">
                 {timeSlots.map(minutes => {
