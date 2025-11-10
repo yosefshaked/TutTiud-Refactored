@@ -44,6 +44,7 @@ const GRID_ROW_HEIGHT = 44
 const COLUMN_GAP_PX = 6
 const MAX_VISIBLE_CHIPS = 2
 const MAX_VISIBLE_COLUMNS = MAX_VISIBLE_CHIPS + 1
+const WEEK_VIEW_MIN_WIDTH = 1015
 
 function formatTimeLabel(minutes) {
   const value = Number(minutes) || 0
@@ -250,17 +251,67 @@ function InlineInstructorLegend({ legend, isLoading }) {
 }
 
 function FloatingInstructorLegend({ legend }) {
+  const legendRef = useRef(null)
+  const [isFloating, setIsFloating] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    let frame = null
+    const TOP_OFFSET = 24
+
+    const evaluate = () => {
+      frame = null
+      const node = legendRef.current
+      if (!node) {
+        return
+      }
+      if (node.getClientRects().length === 0) {
+        setIsFloating(prev => (prev === false ? prev : false))
+        return
+      }
+      const { top } = node.getBoundingClientRect()
+      const floating = top <= TOP_OFFSET + 1
+      setIsFloating(prev => (prev === floating ? prev : floating))
+    }
+
+    const handleScroll = () => {
+      if (frame !== null) {
+        return
+      }
+      frame = window.requestAnimationFrame(evaluate)
+    }
+
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('resize', handleScroll)
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('resize', handleScroll)
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame)
+      }
+    }
+  }, [])
+
   if (!legend?.length) {
     return null
   }
 
   return (
-    <div className="pointer-events-none fixed right-6 top-32 z-[55] hidden md:block">
-      <div className="pointer-events-auto w-64 space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-lg backdrop-blur">
-        <p className="text-sm font-semibold text-foreground">מקרא מדריכים</p>
-        <div className="space-y-xs">
-          <LegendEntries legend={legend} itemClassName="justify-between rounded-lg bg-muted/40 px-sm py-xxs" />
-        </div>
+    <div
+      ref={legendRef}
+      className={cn(
+        'hidden w-64 flex-shrink-0 space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out md:block md:sticky md:top-6 md:z-20',
+        isFloating ? 'translate-x-0 opacity-100 shadow-lg' : '-translate-x-2 opacity-95',
+      )}
+    >
+      <p className="text-sm font-semibold text-foreground">מקרא מדריכים</p>
+      <div className="space-y-xs">
+        <LegendEntries legend={legend} itemClassName="justify-between rounded-lg bg-muted/40 px-sm py-xxs" />
       </div>
     </div>
   )
@@ -704,7 +755,7 @@ function StudentChip({
   )
 }
 
-function OverflowBadge({ sessions, top, style, zIndex, onNavigate, isCoarse }) {
+function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoarse }) {
   const [open, setOpen] = useState(false)
 
   const sortedSessions = useMemo(
@@ -719,8 +770,10 @@ function OverflowBadge({ sessions, top, style, zIndex, onNavigate, isCoarse }) {
 
   const total = sortedSessions.length
   const computedStyle = useMemo(() => {
+    const baseTop = top + (height || 0)
     const result = {
-      top: `${top}px`,
+      top: `${baseTop}px`,
+      transform: 'translateY(-100%)',
       zIndex,
     }
     if (typeof style?.left !== 'undefined') {
@@ -730,7 +783,7 @@ function OverflowBadge({ sessions, top, style, zIndex, onNavigate, isCoarse }) {
       result.maxWidth = style.width
     }
     return result
-  }, [style?.left, style?.width, top, zIndex])
+  }, [height, style?.left, style?.width, top, zIndex])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -888,7 +941,7 @@ export default function WeeklyComplianceView({ orgId }) {
     }
 
     const updateForWidth = width => {
-      const below = width < 1450
+      const below = width < WEEK_VIEW_MIN_WIDTH
       setIsBelowBreakpoint(below)
       if (below) {
         manualSelectionRef.current = false
@@ -1052,187 +1105,192 @@ export default function WeeklyComplianceView({ orgId }) {
   )
 
   return (
-    <>
-      <FloatingInstructorLegend legend={legend} />
-      <Card ref={containerRef} className="relative rounded-2xl border border-border bg-surface p-lg shadow-sm">
-      <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
-          <p className="mt-xs text-sm text-muted-foreground">
-            מעקב חזותי אחר השיעורים המתוכננים והסטטוס של התיעוד שלהם.
-          </p>
-          {data?.weekStart && data?.weekEnd ? (
-            <p className="mt-xs text-sm text-muted-foreground">
-              שבוע החל ב-{formatHebrewDate(data.weekStart) || '—'} • מסתיים ב-{formatHebrewDate(data.weekEnd) || '—'}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-sm md:justify-end">
-          <div className="flex items-center gap-sm">
-            <Button type="button" variant="outline" onClick={handlePreviousWeek} aria-label="שבוע קודם">
-              ‹
-            </Button>
-            <Button type="button" variant="outline" onClick={handleToday} disabled={isCurrentWeek}>
-              היום
-            </Button>
-            <Button type="button" variant="outline" onClick={handleNextWeek} aria-label="שבוע הבא">
-              ›
-            </Button>
-          </div>
-          <div className="hidden items-center gap-xs rounded-full border border-border/60 bg-muted/40 p-xxs md:inline-flex">
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === 'week' ? 'default' : 'ghost'}
-              aria-pressed={viewMode === 'week'}
-              onClick={() => handleViewModeChange('week')}
-              disabled={isBelowBreakpoint}
-            >
-              שבוע
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={viewMode === 'day' ? 'default' : 'ghost'}
-              aria-pressed={viewMode === 'day'}
-              onClick={() => handleViewModeChange('day')}
-            >
-              יום
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <InlineInstructorLegend legend={legend} isLoading={isLoading} />
-
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">טוען נתונים...</p>
-      )}
-      {error && (
-        <p className="text-sm text-destructive">אירעה שגיאה בטעינת לוח הציות. אנא נסו שוב מאוחר יותר.</p>
-      )}
-
-      {!isLoading && !error && (!days.length || !gridSlots.length) && (
-        <p className="text-sm text-muted-foreground">אין מפגשים מתוכננים לשבוע זה.</p>
-      )}
-
-      {!isLoading && !error && days.length > 0 && gridSlots.length > 0 && (
-        <>
-          {viewMode === 'week' ? (
-            <div className="hidden md:block">
-              <div
-                className="grid"
-                style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(0, 1fr))` }}
-              >
-                <div className="sticky top-0 bg-surface" />
-                {days.map(day => {
-                  const display = buildDayDisplay(day)
-                  return (
-                    <div
-                      key={day.date}
-                      className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
-                    >
-                      <span className="block text-base font-semibold">{display.label || '—'}</span>
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
-                    </div>
-                  )
-                })}
-                <div
-                  className="relative border-l border-border"
-                  style={{ height: `${gridHeight}px` }}
-                >
-                  <div
-                    className="grid text-sm text-muted-foreground"
-                    style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+    <Card ref={containerRef} className="relative rounded-2xl border border-border bg-surface p-lg shadow-sm">
+      <div className="md:flex md:items-start md:gap-lg md:[direction:ltr]">
+        <FloatingInstructorLegend legend={legend} />
+        <div className="min-w-0 flex-1" dir="rtl">
+          <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
+              <p className="mt-xs text-sm text-muted-foreground">
+                מעקב חזותי אחר השיעורים המתוכננים והסטטוס של התיעוד שלהם.
+              </p>
+              {data?.weekStart && data?.weekEnd ? (
+                <p className="mt-xs text-sm text-muted-foreground">
+                  שבוע החל ב-{formatHebrewDate(data.weekStart) || '—'} • מסתיים ב-{formatHebrewDate(data.weekEnd) || '—'}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-sm md:justify-end">
+              <div className="flex items-center gap-sm">
+                <Button type="button" variant="outline" onClick={handlePreviousWeek} aria-label="שבוע קודם">
+                  ‹
+                </Button>
+                <Button type="button" variant="outline" onClick={handleToday} disabled={isCurrentWeek}>
+                  היום
+                </Button>
+                <Button type="button" variant="outline" onClick={handleNextWeek} aria-label="שבוע הבא">
+                  ›
+                </Button>
+              </div>
+              {!isBelowBreakpoint ? (
+                <div className="hidden items-center gap-xs rounded-full border border-border/60 bg-muted/40 p-xxs md:inline-flex">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={viewMode === 'week' ? 'default' : 'ghost'}
+                    aria-pressed={viewMode === 'week'}
+                    onClick={() => handleViewModeChange('week')}
                   >
-                    {gridSlots.map(minutes => (
-                      <div
-                        key={`time-${minutes}`}
-                        className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
-                      >
-                        {formatTimeLabel(minutes)}
-                      </div>
-                    ))}
-                  </div>
+                    שבוע
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={viewMode === 'day' ? 'default' : 'ghost'}
+                    aria-pressed={viewMode === 'day'}
+                    onClick={() => handleViewModeChange('day')}
+                  >
+                    יום
+                  </Button>
                 </div>
-                {days.map(day => {
-                  const layout = dayLayouts.get(day.date)
-                  const chipItems = layout?.chips ?? []
-                  const overflowItems = layout?.overflowBadges ?? []
-                  return (
+              ) : null}
+            </div>
+          </div>
+          <InlineInstructorLegend legend={legend} isLoading={isLoading} />
+          {isLoading ? (
+            <div className="flex justify-center py-xl">
+              <span className="text-sm text-muted-foreground">טוען נתוני שיעורים...</span>
+            </div>
+          ) : null}
+          {error ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-lg text-destructive">
+              <p className="text-base font-semibold">אירעה שגיאה בטעינת הנתונים.</p>
+              <p className="mt-xs text-sm">נסו לרענן את הדף או לחזור מאוחר יותר.</p>
+            </div>
+          ) : null}
+          {!isLoading && !error && days.length === 0 ? (
+            <p className="text-sm text-muted-foreground">אין מפגשים מתוכננים לשבוע זה.</p>
+          ) : null}
+
+          {!isLoading && !error && days.length > 0 && gridSlots.length > 0 && (
+            <>
+              {viewMode === 'week' ? (
+                <div className="hidden md:block">
+                  <div
+                    className="grid"
+                    style={{ gridTemplateColumns: `60px repeat(${days.length}, minmax(0, 1fr))` }}
+                  >
+                    <div className="sticky top-0 bg-surface" />
+                    {days.map(day => {
+                      const display = buildDayDisplay(day)
+                      return (
+                        <div
+                          key={day.date}
+                          className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
+                        >
+                          <span className="block text-base font-semibold">{display.label || '—'}</span>
+                          <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+                        </div>
+                      )
+                    })}
                     <div
-                      key={`column-${day.date}`}
-                      className="relative border-b border-l border-border bg-background/60"
+                      className="relative border-l border-border"
                       style={{ height: `${gridHeight}px` }}
                     >
                       <div
-                        className="grid"
-                        aria-hidden="true"
+                        className="grid text-sm text-muted-foreground"
                         style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
                       >
                         {gridSlots.map(minutes => (
                           <div
-                            key={`${day.date}-row-${minutes}`}
-                            className="border-b border-border/70"
-                          />
+                            key={`time-${minutes}`}
+                            className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
+                          >
+                            {formatTimeLabel(minutes)}
+                          </div>
                         ))}
                       </div>
-                      {chipItems.map(item => (
-                        <StudentChip
-                          key={`${item.session.studentId}-${item.session.time}`}
-                          session={item.session}
-                          top={item.top}
-                          height={item.height}
-                          style={item.style}
-                          zIndex={item.zIndex}
-                          onNavigate={handleNavigateToStudent}
-                          isCoarse={isCoarsePointer}
-                        />
-                      ))}
-                      {overflowItems.map(item => (
-                        <OverflowBadge
-                          key={`${day.date}-overflow-${item.top}`}
-                          sessions={item.sessions}
-                          top={item.top}
-                          height={item.height}
-                          style={item.style}
-                          zIndex={item.zIndex}
-                          onNavigate={handleNavigateToStudent}
-                          isCoarse={isCoarsePointer}
-                        />
-                      ))}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : null}
+                    {days.map(day => {
+                      const layout = dayLayouts.get(day.date)
+                      const chipItems = layout?.chips ?? []
+                      const overflowItems = layout?.overflowBadges ?? []
+                      return (
+                        <div
+                          key={`column-${day.date}`}
+                          className="relative border-b border-l border-border bg-background/60"
+                          style={{ height: `${gridHeight}px` }}
+                        >
+                          <div
+                            className="grid"
+                            aria-hidden="true"
+                            style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                          >
+                            {gridSlots.map(minutes => (
+                              <div
+                                key={`${day.date}-row-${minutes}`}
+                                className="border-b border-border/70"
+                              />
+                            ))}
+                          </div>
+                          {chipItems.map(item => (
+                            <StudentChip
+                              key={`${item.session.studentId}-${item.session.time}`}
+                              session={item.session}
+                              top={item.top}
+                              height={item.height}
+                              style={item.style}
+                              zIndex={item.zIndex}
+                              onNavigate={handleNavigateToStudent}
+                              isCoarse={isCoarsePointer}
+                            />
+                          ))}
+                          {overflowItems.map(item => (
+                            <OverflowBadge
+                              key={`${day.date}-overflow-${item.top}`}
+                              sessions={item.sessions}
+                              top={item.top}
+                              height={item.height}
+                              style={item.style}
+                              zIndex={item.zIndex}
+                              onNavigate={handleNavigateToStudent}
+                              isCoarse={isCoarsePointer}
+                            />
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
 
-          <DayScheduleView
-            className="block md:hidden"
-            days={days}
-            selectedDayIndex={selectedDayIndex}
-            onSelectDay={setSelectedDayIndex}
-            gridSlots={gridSlots}
-            sessionMaps={mobileSessionMaps}
-            onNavigate={handleNavigateToStudent}
-            isCoarse={isCoarsePointer}
-          />
-          {viewMode === 'day' ? (
-            <DayScheduleView
-              className="hidden md:block"
-              days={days}
-              selectedDayIndex={selectedDayIndex}
-              onSelectDay={setSelectedDayIndex}
-              gridSlots={gridSlots}
-              sessionMaps={mobileSessionMaps}
-              onNavigate={handleNavigateToStudent}
-              isCoarse={isCoarsePointer}
-            />
-          ) : null}
-        </>
-      )}
-      </Card>
-    </>
+              <DayScheduleView
+                className="block md:hidden"
+                days={days}
+                selectedDayIndex={selectedDayIndex}
+                onSelectDay={setSelectedDayIndex}
+                gridSlots={gridSlots}
+                sessionMaps={mobileSessionMaps}
+                onNavigate={handleNavigateToStudent}
+                isCoarse={isCoarsePointer}
+              />
+              {viewMode === 'day' ? (
+                <DayScheduleView
+                  className="hidden md:block"
+                  days={days}
+                  selectedDayIndex={selectedDayIndex}
+                  onSelectDay={setSelectedDayIndex}
+                  gridSlots={gridSlots}
+                  sessionMaps={mobileSessionMaps}
+                  onNavigate={handleNavigateToStudent}
+                  isCoarse={isCoarsePointer}
+                />
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
   )
 }

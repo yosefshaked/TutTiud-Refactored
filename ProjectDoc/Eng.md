@@ -167,10 +167,10 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
   contextual “+X נוספים” badge that opens a pop-over listing every student in that time block, now anchored to the bottom of the
   time cell for readability. Hover (desktop) or tap (touch) surfaces an interactive tooltip with the student name, instructor,
   scheduled time, and a “View Profile” link. Instructor rows flagged as inactive (`is_active = false`) inherit a striped overlay
-  so administrators can immediately spot follow-up items. The instructor legend now floats independently in the upper-right corner
-  on desktop, stays visible while the calendar scrolls, and collapses back into an inline list on mobile. A hard 1,450 px
-  breakpoint automatically switches desktop users into the day view (and disables the week toggle) to prevent cramped columns,
-  while wider layouts default to the week grid with a slimmer 64 px time column. Selected day buttons on mobile/day view tint both
+  so administrators can immediately spot follow-up items. The instructor legend now floats independently in the widget’s top-left corner
+  on desktop, sticking within the calendar card, fading/sliding into place as it detaches, and collapsing back into an inline list on mobile. A container-based 1,015 px
+  breakpoint automatically switches the view into the day layout (hiding the week/day toggle) to prevent cramped columns,
+  while wider layouts default to the week grid with a slimmer 60 px time column and an always-available toggle. Selected day buttons on mobile/day view tint both
   the label and date text for better contrast against the primary background.
 - **Dashboard actions** – `DashboardPage.jsx` still greets the user and surfaces the quick cards for “My Students” / “All Students”
   and “New Session Record”. The compliance widget now renders beneath those quick actions once the tenant connection is available;
