@@ -45,6 +45,8 @@ const COLUMN_GAP_PX = 6
 const MAX_VISIBLE_CHIPS = 2
 const MAX_VISIBLE_COLUMNS = MAX_VISIBLE_CHIPS + 1
 const WEEK_VIEW_MIN_WIDTH = 1015
+const DESKTOP_LEGEND_WIDTH = '16rem'
+const DESKTOP_LEGEND_GAP = '2rem'
 
 function formatTimeLabel(minutes) {
   const value = Number(minutes) || 0
@@ -302,16 +304,19 @@ function FloatingInstructorLegend({ legend }) {
   }
 
   return (
-    <div
-      ref={legendRef}
-      className={cn(
-        'hidden w-64 flex-shrink-0 space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out md:block md:sticky md:top-6 md:z-20',
-        isFloating ? 'translate-x-0 opacity-100 shadow-lg' : '-translate-x-2 opacity-95',
-      )}
-    >
-      <p className="text-sm font-semibold text-foreground">מקרא מדריכים</p>
-      <div className="space-y-xs">
-        <LegendEntries legend={legend} itemClassName="justify-between rounded-lg bg-muted/40 px-sm py-xxs" />
+    <div className="pointer-events-none absolute left-6 top-6 bottom-6 hidden md:block" aria-hidden="false">
+      <div
+        ref={legendRef}
+        className={cn(
+          'pointer-events-auto sticky top-0 w-64 space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
+          isFloating ? 'translate-y-0 opacity-100 shadow-lg' : 'translate-y-2 opacity-90',
+        )}
+        style={{ maxHeight: 'calc(100vh - 3rem)' }}
+      >
+        <p className="text-sm font-semibold text-foreground">מקרא מדריכים</p>
+        <div className="space-y-xs">
+          <LegendEntries legend={legend} itemClassName="justify-between rounded-lg bg-muted/40 px-sm py-xxs" />
+        </div>
       </div>
     </div>
   )
@@ -541,20 +546,11 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
 
     if (hiddenSessions.length) {
       const firstHidden = hiddenSessions.reduce((prev, current) => (current.start < prev.start ? current : prev), hiddenSessions[0])
-      const badgeLeftPercent = (visibleColumns - 1) * widthPercent
-      const badgeLeft = visibleColumns === 1
-        ? '0'
-        : `calc(${badgeLeftPercent}% + ${COLUMN_GAP_PX / 2}px)`
-
-      const overflowTop = Math.max(0, Math.round(firstHidden.top + chipHeight - 28))
       overflowBadges.push({
         sessions: hiddenSessions.map(entry => entry.session),
-        top: overflowTop,
+        top: Math.max(0, Math.round(firstHidden.top)),
         height: chipHeight,
-        style: {
-          left: badgeLeft,
-          width: visibleColumns === 1 ? '100%' : visibleWidth,
-        },
+        style: {},
         zIndex: visibleColumns + 1,
       })
     }
@@ -758,6 +754,9 @@ function StudentChip({
 function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoarse }) {
   const [open, setOpen] = useState(false)
 
+  void top
+  void height
+
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => {
       if (a.timeMinutes !== b.timeMinutes) {
@@ -769,21 +768,13 @@ function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoa
   )
 
   const total = sortedSessions.length
-  const computedStyle = useMemo(() => {
-    const baseTop = top + (height || 0)
-    const result = {
-      top: `${baseTop}px`,
-      transform: 'translateY(-100%)',
-      zIndex,
-    }
-    if (typeof style?.left !== 'undefined') {
-      result.left = style.left
-    }
-    if (style?.width) {
-      result.maxWidth = style.width
-    }
-    return result
-  }, [height, style?.left, style?.width, top, zIndex])
+  const computedStyle = useMemo(() => ({
+    bottom: '4px',
+    left: '50%',
+    transform: 'translate(-50%, 0)',
+    zIndex,
+    maxWidth: style?.maxWidth || 'calc(100% - 12px)',
+  }), [style?.maxWidth, zIndex])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -1104,11 +1095,16 @@ export default function WeeklyComplianceView({ orgId }) {
     [defaultViewMode, isBelowBreakpoint],
   )
 
+  const shouldOffsetLegend = !isBelowBreakpoint && legend.length > 0
+
   return (
     <Card ref={containerRef} className="relative rounded-2xl border border-border bg-surface p-lg shadow-sm">
-      <div className="md:flex md:items-start md:gap-lg md:[direction:ltr]">
-        <FloatingInstructorLegend legend={legend} />
-        <div className="min-w-0 flex-1" dir="rtl">
+      <FloatingInstructorLegend legend={legend} />
+      <div
+        className="relative min-w-0"
+        dir="rtl"
+        style={shouldOffsetLegend ? { paddingLeft: `calc(${DESKTOP_LEGEND_WIDTH} + ${DESKTOP_LEGEND_GAP})` } : undefined}
+      >
           <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
@@ -1290,7 +1286,6 @@ export default function WeeklyComplianceView({ orgId }) {
             </>
           )}
         </div>
-      </div>
     </Card>
   )
 }
