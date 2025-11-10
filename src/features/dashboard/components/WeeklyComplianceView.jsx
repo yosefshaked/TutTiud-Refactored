@@ -313,13 +313,13 @@ function buildStatusLabel(status) {
 
 function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MINUTES } = {}) {
   if (!day || !window) {
-    return []
+    return { chips: [], overflowBadges: [] }
   }
 
   const startMinutes = parseMinutes(window.startMinutes ?? window.start)
   const endMinutes = parseMinutes(window.endMinutes ?? window.end)
   if (startMinutes === null || endMinutes === null) {
-    return []
+    return { chips: [], overflowBadges: [] }
   }
 
   const duration = Math.max(15, Number(sessionDuration) || SESSION_DURATION_MINUTES)
@@ -345,7 +345,7 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
   }
 
   if (!events.length) {
-    return []
+    return { chips: [], overflowBadges: [] }
   }
 
   events.sort((a, b) => {
@@ -377,7 +377,8 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
     clusters.push(currentCluster)
   }
 
-  const items = []
+  const chips = []
+  const overflowBadges = []
 
   for (const cluster of clusters) {
     const columnEndTimes = []
@@ -414,8 +415,7 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
         continue
       }
 
-      items.push({
-        type: 'chip',
+      chips.push({
         session: event.session,
         top: Math.round(event.top),
         height: Math.max(GRID_ROW_HEIGHT - 8, GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8),
@@ -434,8 +434,7 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
         ? '0'
         : `calc(${badgeLeftPercent}% + ${COLUMN_GAP_PX / 2}px)`
 
-      items.push({
-        type: 'overflow',
+      overflowBadges.push({
         sessions: hiddenSessions.map(entry => entry.session),
         top: Math.round(firstHidden.top),
         height: Math.max(GRID_ROW_HEIGHT - 8, GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8),
@@ -448,17 +447,10 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
     }
   }
 
-  items.sort((a, b) => {
-    if (a.top !== b.top) {
-      return a.top - b.top
-    }
-    if (a.type === b.type) {
-      return 0
-    }
-    return a.type === 'chip' ? -1 : 1
-  })
+  chips.sort((a, b) => a.top - b.top)
+  overflowBadges.sort((a, b) => a.top - b.top)
 
-  return items
+  return { chips, overflowBadges }
 }
 
 function StudentDetailPopover({
@@ -470,6 +462,7 @@ function StudentDetailPopover({
   children,
 }) {
   const closeTimeoutRef = useRef(null)
+  const ignoreNextFocusRef = useRef(false)
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimeoutRef.current) {
@@ -484,6 +477,7 @@ function StudentDetailPopover({
     }
     clearCloseTimer()
     closeTimeoutRef.current = window.setTimeout(() => {
+      ignoreNextFocusRef.current = true
       setOpen(false)
     }, 120)
   }, [clearCloseTimer, isCoarse, setOpen])
@@ -492,12 +486,34 @@ function StudentDetailPopover({
 
   const handleViewProfile = useCallback(() => {
     clearCloseTimer()
+    ignoreNextFocusRef.current = true
     setOpen(false)
     onNavigate(session.studentId)
   }, [clearCloseTimer, onNavigate, session.studentId, setOpen])
 
+  const handleOpenChange = useCallback(
+    value => {
+      if (isCoarse) {
+        setOpen(value)
+        return
+      }
+      if (!value) {
+        clearCloseTimer()
+        ignoreNextFocusRef.current = true
+        setOpen(false)
+        return
+      }
+      if (ignoreNextFocusRef.current) {
+        ignoreNextFocusRef.current = false
+        return
+      }
+      setOpen(true)
+    },
+    [clearCloseTimer, isCoarse, setOpen],
+  )
+
   return (
-    <Popover open={open} onOpenChange={value => (isCoarse ? setOpen(value) : null)}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         {children({
           onMouseEnter: () => {
@@ -509,6 +525,10 @@ function StudentDetailPopover({
           onMouseLeave: scheduleClose,
           onFocus: () => {
             if (!isCoarse) {
+              if (ignoreNextFocusRef.current) {
+                ignoreNextFocusRef.current = false
+                return
+              }
               clearCloseTimer()
               setOpen(true)
             }
@@ -636,19 +656,28 @@ function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoa
   )
 
   const total = sortedSessions.length
+  const computedStyle = useMemo(() => {
+    const result = {
+      top: `${top}px`,
+      height: `${height}px`,
+      zIndex,
+    }
+    if (typeof style?.left !== 'undefined') {
+      result.left = style.left
+    }
+    if (style?.width) {
+      result.maxWidth = style.width
+    }
+    return result
+  }, [height, style?.left, style?.width, top, zIndex])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="absolute flex h-full w-full items-center justify-center rounded-md border border-dashed border-primary bg-primary/5 px-sm text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-          style={{
-            top: `${top}px`,
-            height: `${height}px`,
-            zIndex,
-            ...style,
-          }}
+          className="absolute flex h-full min-w-[64px] items-center justify-center rounded-full border border-dashed border-primary bg-primary/5 px-sm py-xxs text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          style={computedStyle}
         >
           +{total} נוספים
         </button>
@@ -682,6 +711,93 @@ function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoa
   )
 }
 
+function DayScheduleView({
+  className,
+  days,
+  selectedDayIndex,
+  onSelectDay,
+  gridSlots,
+  sessionMaps,
+  onNavigate,
+  isCoarse,
+}) {
+  const hasDays = Array.isArray(days) && days.length > 0
+  const hasSlots = Array.isArray(gridSlots) && gridSlots.length > 0
+  const safeDays = hasDays ? days : []
+  const safeSlots = hasSlots ? gridSlots : []
+  const selectedDay = safeDays[selectedDayIndex] || safeDays[0] || null
+  const selectedDayDisplay = useMemo(() => buildDayDisplay(selectedDay), [selectedDay])
+  const sessionMap = selectedDay && sessionMaps instanceof Map
+    ? sessionMaps.get(selectedDay.date)
+    : null
+
+  if (!hasDays || !hasSlots) {
+    return null
+  }
+
+  return (
+    <div className={cn('space-y-sm', className)}>
+      <div className="mb-sm flex gap-sm overflow-x-auto pb-sm">
+        {safeDays.map((day, index) => {
+          const display = buildDayDisplay(day)
+          return (
+            <Button
+              key={day.date}
+              type="button"
+              size="sm"
+              variant={index === selectedDayIndex ? 'default' : 'outline'}
+              aria-pressed={index === selectedDayIndex}
+              onClick={() => onSelectDay(index)}
+              className="flex-col gap-0 text-center leading-tight"
+            >
+              <span className="text-sm font-semibold">{display.label || '—'}</span>
+              <span className="text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+            </Button>
+          )
+        })}
+      </div>
+      <div>
+        <h3 className="mb-sm text-lg font-semibold text-foreground leading-snug">
+          <span className="block">{selectedDayDisplay.label || '—'}</span>
+          <span className="mt-1 block text-sm font-normal text-muted-foreground">
+            {selectedDayDisplay.date || '—'}
+          </span>
+        </h3>
+        <div className="space-y-xs">
+          {safeSlots.map(minutes => {
+            const label = formatTimeLabel(minutes)
+            const sessionsAtSlot = sessionMap?.get(minutes) || []
+            return (
+              <div key={`${selectedDay?.date}-${minutes}`} className="rounded-lg border border-border p-sm">
+                <p className="mb-xs text-sm font-medium text-muted-foreground">{label}</p>
+                <div className="flex flex-col gap-xs">
+                  {sessionsAtSlot.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">אין תלמידים בזמן זה.</span>
+                  ) : (
+                    sessionsAtSlot.map(session => (
+                      <StudentChip
+                        key={`${session.studentId}-${session.time}`}
+                        session={session}
+                        variant="list"
+                        top={0}
+                        height={GRID_ROW_HEIGHT - 8}
+                        style={{}}
+                        zIndex={1}
+                        onNavigate={onNavigate}
+                        isCoarse={isCoarse}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function WeeklyComplianceView({ orgId }) {
   const navigate = useNavigate()
   const initialWeekStart = useInitialWeekStart()
@@ -689,8 +805,15 @@ export default function WeeklyComplianceView({ orgId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [mobileDayIndex, setMobileDayIndex] = useState(0)
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0)
   const isCoarsePointer = useIsCoarsePointer()
+  const [viewMode, setViewMode] = useState('week')
+
+  useEffect(() => {
+    if (isCoarsePointer) {
+      setViewMode(current => (current === 'day' ? current : 'day'))
+    }
+  }, [isCoarsePointer])
 
   useEffect(() => {
     if (!orgId || !weekStart) {
@@ -735,17 +858,17 @@ export default function WeeklyComplianceView({ orgId }) {
 
   useEffect(() => {
     if (!data?.days?.length) {
-      setMobileDayIndex(0)
+      setSelectedDayIndex(0)
       return
     }
 
     const todayIndex = data.days.findIndex(day => day.date === data.today)
     if (todayIndex >= 0) {
-      setMobileDayIndex(todayIndex)
+      setSelectedDayIndex(todayIndex)
       return
     }
 
-    setMobileDayIndex(0)
+    setSelectedDayIndex(0)
   }, [data?.days, data?.today])
 
   const timeWindow = data?.timeWindow || null
@@ -773,8 +896,6 @@ export default function WeeklyComplianceView({ orgId }) {
     return result
   }, [days, gridSlots])
 
-  const selectedDay = days[mobileDayIndex] || days[0]
-  const selectedDayDisplay = useMemo(() => buildDayDisplay(selectedDay), [selectedDay])
   const isCurrentWeek = weekStart === initialWeekStart
 
   const handlePreviousWeek = useCallback(() => {
@@ -817,16 +938,38 @@ export default function WeeklyComplianceView({ orgId }) {
             </p>
           ) : null}
         </div>
-        <div className="flex items-center gap-sm">
-          <Button type="button" variant="outline" onClick={handlePreviousWeek} aria-label="שבוע קודם">
-            ‹
-          </Button>
-          <Button type="button" variant="outline" onClick={handleToday} disabled={isCurrentWeek}>
-            היום
-          </Button>
-          <Button type="button" variant="outline" onClick={handleNextWeek} aria-label="שבוע הבא">
-            ›
-          </Button>
+        <div className="flex flex-wrap items-center gap-sm md:justify-end">
+          <div className="flex items-center gap-sm">
+            <Button type="button" variant="outline" onClick={handlePreviousWeek} aria-label="שבוע קודם">
+              ‹
+            </Button>
+            <Button type="button" variant="outline" onClick={handleToday} disabled={isCurrentWeek}>
+              היום
+            </Button>
+            <Button type="button" variant="outline" onClick={handleNextWeek} aria-label="שבוע הבא">
+              ›
+            </Button>
+          </div>
+          <div className="hidden items-center gap-xs rounded-full border border-border/60 bg-muted/40 p-xxs md:inline-flex">
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'week' ? 'default' : 'ghost'}
+              aria-pressed={viewMode === 'week'}
+              onClick={() => setViewMode('week')}
+            >
+              שבוע
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'day' ? 'default' : 'ghost'}
+              aria-pressed={viewMode === 'day'}
+              onClick={() => setViewMode('day')}
+            >
+              יום
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -862,79 +1005,67 @@ export default function WeeklyComplianceView({ orgId }) {
 
       {!isLoading && !error && days.length > 0 && gridSlots.length > 0 && (
         <>
-          <div className="hidden md:block">
-            <div className="overflow-x-auto">
-              <div
-                className="grid min-w-max"
-                style={{ gridTemplateColumns: `minmax(80px, 100px) repeat(${days.length}, minmax(240px, 1fr))` }}
-              >
-                <div className="sticky top-0 bg-surface" />
-                {days.map(day => {
-                  const display = buildDayDisplay(day)
-                  return (
-                    <div
-                      key={day.date}
-                      className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
-                    >
-                      <span className="block text-base font-semibold">{display.label || '—'}</span>
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
-                    </div>
-                  )
-                })}
+          {viewMode === 'week' ? (
+            <div className="hidden md:block">
+              <div className="overflow-x-auto">
                 <div
-                  className="relative border-l border-border"
-                  style={{ height: `${gridHeight}px` }}
+                  className="grid"
+                  style={{ gridTemplateColumns: `80px repeat(${days.length}, minmax(0, 1fr))` }}
                 >
+                  <div className="sticky top-0 bg-surface" />
+                  {days.map(day => {
+                    const display = buildDayDisplay(day)
+                    return (
+                      <div
+                        key={day.date}
+                        className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
+                      >
+                        <span className="block text-base font-semibold">{display.label || '—'}</span>
+                        <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+                      </div>
+                    )
+                  })}
                   <div
-                    className="grid text-sm text-muted-foreground"
-                    style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                    className="relative border-l border-border"
+                    style={{ height: `${gridHeight}px` }}
                   >
-                    {gridSlots.map(minutes => (
-                      <div
-                        key={`time-${minutes}`}
-                        className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
-                      >
-                        {formatTimeLabel(minutes)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {days.map(day => {
-                  const layoutItems = dayLayouts.get(day.date) || []
-                  return (
                     <div
-                      key={`column-${day.date}`}
-                      className="relative border-b border-l border-border bg-background/60"
-                      style={{ height: `${gridHeight}px` }}
+                      className="grid text-sm text-muted-foreground"
+                      style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
                     >
+                      {gridSlots.map(minutes => (
+                        <div
+                          key={`time-${minutes}`}
+                          className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
+                        >
+                          {formatTimeLabel(minutes)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {days.map(day => {
+                    const layout = dayLayouts.get(day.date)
+                    const chipItems = layout?.chips ?? []
+                    const overflowItems = layout?.overflowBadges ?? []
+                    return (
                       <div
-                        className="grid"
-                        aria-hidden="true"
-                        style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                        key={`column-${day.date}`}
+                        className="relative border-b border-l border-border bg-background/60"
+                        style={{ height: `${gridHeight}px` }}
                       >
-                        {gridSlots.map(minutes => (
-                          <div
-                            key={`${day.date}-row-${minutes}`}
-                            className="border-b border-border/70"
-                          />
-                        ))}
-                      </div>
-                      {layoutItems.map(item => {
-                        if (item.type === 'overflow') {
-                          return (
-                            <OverflowBadge
-                              key={`${day.date}-overflow-${item.top}`}
-                              sessions={item.sessions}
-                              top={item.top}
-                              height={item.height}
-                              style={item.style}
-                              zIndex={item.zIndex}
-                              onNavigate={handleNavigateToStudent}
-                              isCoarse={isCoarsePointer}
+                        <div
+                          className="grid"
+                          aria-hidden="true"
+                          style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                        >
+                          {gridSlots.map(minutes => (
+                            <div
+                              key={`${day.date}-row-${minutes}`}
+                              className="border-b border-border/70"
                             />
-                          )
-                        }
-                        return (
+                          ))}
+                        </div>
+                        {chipItems.map(item => (
                           <StudentChip
                             key={`${item.session.studentId}-${item.session.time}`}
                             session={item.session}
@@ -945,74 +1076,49 @@ export default function WeeklyComplianceView({ orgId }) {
                             onNavigate={handleNavigateToStudent}
                             isCoarse={isCoarsePointer}
                           />
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="md:hidden">
-            <div className="mb-sm flex gap-sm overflow-x-auto pb-sm">
-              {days.map((day, index) => {
-                const display = buildDayDisplay(day)
-                return (
-                  <Button
-                    key={day.date}
-                    type="button"
-                    size="sm"
-                    variant={index === mobileDayIndex ? 'default' : 'outline'}
-                    onClick={() => setMobileDayIndex(index)}
-                    className="flex-col gap-0 text-center leading-tight"
-                  >
-                    <span className="text-sm font-semibold">{display.label || '—'}</span>
-                    <span className="text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
-                  </Button>
-                )
-              })}
-            </div>
-            <div>
-              <h3 className="mb-sm text-lg font-semibold text-foreground leading-snug">
-                <span className="block">{selectedDayDisplay.label || '—'}</span>
-                <span className="mt-1 block text-sm font-normal text-muted-foreground">
-                  {selectedDayDisplay.date || '—'}
-                </span>
-              </h3>
-              <div className="space-y-xs">
-                {gridSlots.map(minutes => {
-                  const label = formatTimeLabel(minutes)
-                  const sessionMap = selectedDay ? mobileSessionMaps.get(selectedDay.date) : null
-                  const sessionsAtSlot = sessionMap?.get(minutes) || []
-                  return (
-                    <div key={`${selectedDay?.date}-${minutes}`} className="rounded-lg border border-border p-sm">
-                      <p className="mb-xs text-sm font-medium text-muted-foreground">{label}</p>
-                      <div className="flex flex-col gap-xs">
-                        {sessionsAtSlot.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">אין תלמידים בזמן זה.</span>
-                        ) : (
-                          sessionsAtSlot.map(session => (
-                            <StudentChip
-                              key={`${session.studentId}-${session.time}`}
-                              session={session}
-                              variant="list"
-                              top={0}
-                              height={GRID_ROW_HEIGHT - 8}
-                              style={{}}
-                              zIndex={1}
-                              onNavigate={handleNavigateToStudent}
-                              isCoarse={isCoarsePointer}
-                            />
-                          ))
-                        )}
+                        ))}
+                        {overflowItems.map(item => (
+                          <OverflowBadge
+                            key={`${day.date}-overflow-${item.top}`}
+                            sessions={item.sessions}
+                            top={item.top}
+                            height={item.height}
+                            style={item.style}
+                            zIndex={item.zIndex}
+                            onNavigate={handleNavigateToStudent}
+                            isCoarse={isCoarsePointer}
+                          />
+                        ))}
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
+
+          <DayScheduleView
+            className="block md:hidden"
+            days={days}
+            selectedDayIndex={selectedDayIndex}
+            onSelectDay={setSelectedDayIndex}
+            gridSlots={gridSlots}
+            sessionMaps={mobileSessionMaps}
+            onNavigate={handleNavigateToStudent}
+            isCoarse={isCoarsePointer}
+          />
+          {viewMode === 'day' ? (
+            <DayScheduleView
+              className="hidden md:block"
+              days={days}
+              selectedDayIndex={selectedDayIndex}
+              onSelectDay={setSelectedDayIndex}
+              gridSlots={gridSlots}
+              sessionMaps={mobileSessionMaps}
+              onNavigate={handleNavigateToStudent}
+              isCoarse={isCoarsePointer}
+            />
+          ) : null}
         </>
       )}
     </Card>
