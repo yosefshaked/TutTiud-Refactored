@@ -142,21 +142,17 @@ export async function ensureInstructorColors(tenantClient, { context, columns = 
   }
 
   if (updates.length) {
-    const payload = updates.map(({ instructor, metadata }) => ({
-      id: instructor.id,
-      metadata,
-    }));
-
-    const { error: upsertError } = await tenantClient
-      .from('Instructors')
-      .upsert(payload, { onConflict: 'id' });
-
-    if (upsertError) {
-      context?.log?.error?.('ensureInstructorColors failed to persist metadata', { message: upsertError.message });
-      return { error: upsertError };
-    }
-
     for (const { instructor, metadata } of updates) {
+      const { error: updateError } = await tenantClient
+        .from('Instructors')
+        .update({ metadata })
+        .eq('id', instructor.id);
+
+      if (updateError) {
+        context?.log?.error?.('ensureInstructorColors failed to persist metadata', { message: updateError.message, id: instructor.id });
+        return { error: updateError };
+      }
+
       instructor.metadata = metadata;
     }
   }
