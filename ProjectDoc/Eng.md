@@ -161,6 +161,8 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
   active hours, and annotates each scheduled session with ✔ (complete) or ✖ (missing) icons for past dates only. Desktop users see
   the full week at once, while the mobile layout collapses into a one-day focus with the same chips and legend styling. Headers now
   translate each day into Hebrew and stack the calendar date beneath every label so the schedule stays consistent across layouts.
+  The desktop grid lives inside an internal horizontal scroll container so overflow stays within the widget and no longer forces
+  the entire dashboard to gain a horizontal scrollbar.
 - **Dashboard actions** – `DashboardPage.jsx` still greets the user and surfaces the quick cards for “My Students” / “All Students”
   and “New Session Record”. The compliance widget now renders beneath those quick actions once the tenant connection is available;
   until then a placeholder card explains why the grid is hidden.

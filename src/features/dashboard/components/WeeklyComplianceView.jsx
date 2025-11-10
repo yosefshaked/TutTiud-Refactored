@@ -364,64 +364,69 @@ export default function WeeklyComplianceView({ orgId }) {
       {!isLoading && !error && days.length > 0 && timeSlots.length > 0 && (
         <>
           <div className="hidden md:block">
-            <div className="grid" style={{ gridTemplateColumns: `minmax(80px, 120px) repeat(${days.length}, minmax(0, 1fr))` }}>
-              <div className="sticky top-0 bg-surface font-semibold text-muted-foreground" />
-              {days.map(day => {
-                const display = buildDayDisplay(day)
-                return (
-                  <div
-                    key={day.date}
-                    className="border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
-                  >
-                    <span className="block text-base font-semibold">{display.label || '—'}</span>
-                    <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
-                  </div>
-                )
-              })}
-              {timeSlots.map(minutes => {
-                const label = formatTimeLabel(minutes)
-                return (
-                  <React.Fragment key={minutes}>
-                    <div className="border-b border-border px-sm py-sm text-sm font-medium text-muted-foreground">
-                      {label}
+            <div className="overflow-x-auto">
+              <div
+                className="grid min-w-max"
+                style={{ gridTemplateColumns: `minmax(80px, 120px) repeat(${days.length}, minmax(0, 1fr))` }}
+              >
+                <div className="sticky top-0 bg-surface font-semibold text-muted-foreground" />
+                {days.map(day => {
+                  const display = buildDayDisplay(day)
+                  return (
+                    <div
+                      key={day.date}
+                      className="border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
+                    >
+                      <span className="block text-base font-semibold">{display.label || '—'}</span>
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
                     </div>
-                    {days.map(day => {
-                      const sessionMap = daySessionMaps.get(day.date) || new Map()
-                      const sessionsAtSlot = sessionMap.get(minutes) || []
-                      return (
-                        <div key={`${day.date}-${minutes}`} className="border-b border-l border-border px-sm py-xs align-top">
-                          <div className="flex flex-col gap-xs">
-                            {sessionsAtSlot.map(session => {
-                              const statusIcon = STATUS_ICONS[session.status]
-                              return (
-                                <button
-                                  key={`${session.studentId}-${session.time}`}
-                                  type="button"
-                                  onClick={() => handleChipClick(session.studentId)}
-                                  className="flex items-center justify-between gap-xs rounded-full px-sm py-xs text-xs font-medium text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                                  style={buildChipStyle(session.instructorColor)}
-                                >
-                                  <span className="truncate" title={`${session.studentName} • ${session.instructorName}`}>
-                                    {session.studentName || '—'}
-                                  </span>
-                                  {statusIcon ? (
-                                    <span className="text-base" aria-hidden="true">{statusIcon}</span>
-                                  ) : null}
-                                  <span className="sr-only">
-                                    {session.status === 'complete' && 'תיעוד הושלם'}
-                                    {session.status === 'missing' && 'תיעוד חסר'}
-                                    {session.status === 'upcoming' && 'תיעוד עתידי'}
-                                  </span>
-                                </button>
-                              )
-                            })}
+                  )
+                })}
+                {timeSlots.map(minutes => {
+                  const label = formatTimeLabel(minutes)
+                  return (
+                    <React.Fragment key={minutes}>
+                      <div className="border-b border-border px-sm py-sm text-sm font-medium text-muted-foreground">
+                        {label}
+                      </div>
+                      {days.map(day => {
+                        const sessionMap = daySessionMaps.get(day.date) || new Map()
+                        const sessionsAtSlot = sessionMap.get(minutes) || []
+                        return (
+                          <div key={`${day.date}-${minutes}`} className="border-b border-l border-border px-sm py-xs align-top">
+                            <div className="flex flex-col gap-xs">
+                              {sessionsAtSlot.map(session => {
+                                const statusIcon = STATUS_ICONS[session.status]
+                                return (
+                                  <button
+                                    key={`${session.studentId}-${session.time}`}
+                                    type="button"
+                                    onClick={() => handleChipClick(session.studentId)}
+                                    className="flex items-center justify-between gap-xs rounded-full px-sm py-xs text-xs font-medium text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                                    style={buildChipStyle(session.instructorColor)}
+                                  >
+                                    <span className="truncate" title={`${session.studentName} • ${session.instructorName}`}>
+                                      {session.studentName || '—'}
+                                    </span>
+                                    {statusIcon ? (
+                                      <span className="text-base" aria-hidden="true">{statusIcon}</span>
+                                    ) : null}
+                                    <span className="sr-only">
+                                      {session.status === 'complete' && 'תיעוד הושלם'}
+                                      {session.status === 'missing' && 'תיעוד חסר'}
+                                      {session.status === 'upcoming' && 'תיעוד עתידי'}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </React.Fragment>
-                )
-              })}
+                        )
+                      })}
+                    </React.Fragment>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
