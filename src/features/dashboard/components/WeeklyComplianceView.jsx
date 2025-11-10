@@ -1,9 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import Card from '@/components/ui/CustomCard.jsx'
 import { Button } from '@/components/ui/button.jsx'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.jsx'
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance.js'
+import { cn } from '@/lib/utils'
 
 const STATUS_ICONS = {
   complete: '✔',
@@ -29,6 +37,13 @@ const ENGLISH_DAY_TO_INDEX = Object.freeze({
   Friday: 6,
   Saturday: 7,
 })
+
+const GRID_INTERVAL_MINUTES = 30
+const SESSION_DURATION_MINUTES = 30
+const GRID_ROW_HEIGHT = 44
+const COLUMN_GAP_PX = 6
+const MAX_VISIBLE_CHIPS = 2
+const MAX_VISIBLE_COLUMNS = MAX_VISIBLE_CHIPS + 1
 
 function formatTimeLabel(minutes) {
   const value = Number(minutes) || 0
@@ -131,60 +146,540 @@ function buildDayDisplay(day) {
   }
 }
 
-function buildChipStyle(identifier) {
+function normalizeColorIdentifier(identifier) {
   if (!identifier || typeof identifier !== 'string') {
-    return {}
+    return []
   }
-  const parts = identifier.split(',').map(token => token.trim()).filter(Boolean)
-  if (!parts.length) {
-    return {}
+  return identifier
+    .split(',')
+    .map(token => token.trim())
+    .filter(Boolean)
+}
+
+function buildChipStyle(identifier, { inactive = false } = {}) {
+  const colors = normalizeColorIdentifier(identifier)
+  if (!colors.length) {
+    return { backgroundColor: '#6B7280', color: 'white' }
   }
-  if (parts.length === 1) {
-    return { backgroundColor: parts[0], color: 'white' }
+
+  if (colors.length === 1) {
+    const color = colors[0]
+    if (inactive) {
+      return {
+        color: 'white',
+        backgroundImage: `linear-gradient(135deg, ${color}, ${color}), repeating-linear-gradient(45deg, rgba(255,255,255,0.28) 0, rgba(255,255,255,0.28) 8px, transparent 8px, transparent 16px)`,
+      }
+    }
+    return { backgroundColor: color, color: 'white' }
+  }
+
+  const gradient = `linear-gradient(135deg, ${colors.join(', ')})`
+  if (inactive) {
+    return {
+      color: 'white',
+      backgroundImage: `linear-gradient(135deg, ${colors.join(', ')}), repeating-linear-gradient(45deg, rgba(255,255,255,0.28) 0, rgba(255,255,255,0.28) 8px, transparent 8px, transparent 16px)`,
+    }
   }
   return {
-    backgroundImage: `linear-gradient(135deg, ${parts.join(', ')})`,
     color: 'white',
+    backgroundImage: gradient,
   }
 }
 
-function buildLegendStyle(identifier) {
-  if (!identifier) {
+function buildLegendStyle(identifier, { inactive = false } = {}) {
+  const colors = normalizeColorIdentifier(identifier)
+  if (!colors.length) {
     return { backgroundColor: '#6B7280' }
   }
-  const parts = identifier.split(',').map(token => token.trim()).filter(Boolean)
-  if (!parts.length) {
-    return { backgroundColor: '#6B7280' }
+  if (colors.length === 1) {
+    const color = colors[0]
+    if (inactive) {
+      return {
+        backgroundImage: `linear-gradient(135deg, ${color}, ${color}), repeating-linear-gradient(45deg, rgba(255,255,255,0.32) 0, rgba(255,255,255,0.32) 6px, transparent 6px, transparent 12px)`,
+      }
+    }
+    return { backgroundColor: color }
   }
-  if (parts.length === 1) {
-    return { backgroundColor: parts[0] }
+  const gradient = `linear-gradient(135deg, ${colors.join(', ')})`
+  if (inactive) {
+    return {
+      backgroundImage: `${gradient}, repeating-linear-gradient(45deg, rgba(255,255,255,0.32) 0, rgba(255,255,255,0.32) 6px, transparent 6px, transparent 12px)`,
+    }
   }
-  return {
-    backgroundImage: `linear-gradient(135deg, ${parts.join(', ')})`,
-  }
+  return { backgroundImage: gradient }
 }
 
-function groupSessionsByTime(day, slots) {
+function createGridSlots(window) {
+  if (!window) {
+    return []
+  }
+  const start = parseMinutes(window.startMinutes ?? window.start)
+  const end = parseMinutes(window.endMinutes ?? window.end)
+  if (start === null || end === null || end <= start) {
+    return []
+  }
+  const slots = []
+  for (let minutes = start; minutes <= end; minutes += GRID_INTERVAL_MINUTES) {
+    slots.push(minutes)
+  }
+  return slots
+}
+
+function resolveMobileSlot(minutes, slots) {
+  if (!Array.isArray(slots) || !slots.length || minutes === null) {
+    return null
+  }
+  const sorted = [...slots].sort((a, b) => a - b)
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    if (minutes >= sorted[index]) {
+      return sorted[index]
+    }
+  }
+  return sorted[0]
+}
+
+function groupSessionsForMobile(day, slots) {
   const map = new Map()
   if (!Array.isArray(slots) || !slots.length) {
     return map
   }
-  const slotSet = new Set(slots)
   for (const slot of slots) {
     map.set(slot, [])
   }
   for (const session of day?.sessions || []) {
-    const key = parseMinutes(session.timeMinutes ?? session.time)
-    if (key === null || !slotSet.has(key)) {
+    const timeMinutes = Number(session?.timeMinutes ?? parseMinutes(session?.time))
+    if (!Number.isFinite(timeMinutes)) {
       continue
     }
-    map.get(key)?.push(session)
+    const slot = resolveMobileSlot(timeMinutes, slots)
+    if (slot === null) {
+      continue
+    }
+    const bucket = map.get(slot)
+    if (bucket) {
+      bucket.push(session)
+    }
+  }
+  for (const list of map.values()) {
+    list.sort((a, b) => {
+      if (a.timeMinutes !== b.timeMinutes) {
+        return a.timeMinutes - b.timeMinutes
+      }
+      return (a.studentName || '').localeCompare(b.studentName || '', 'he')
+    })
   }
   return map
 }
 
 function useInitialWeekStart() {
   return useMemo(() => formatUtcDate(startOfUtcWeek(new Date())), [])
+}
+
+function useIsCoarsePointer() {
+  const [isCoarse, setIsCoarse] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      setIsCoarse(false)
+      return
+    }
+
+    const query = window.matchMedia('(pointer: coarse)')
+    const update = event => {
+      setIsCoarse(Boolean(event?.matches))
+    }
+
+    setIsCoarse(query.matches)
+    query.addEventListener('change', update)
+    return () => {
+      query.removeEventListener('change', update)
+    }
+  }, [])
+
+  return isCoarse
+}
+
+function buildStatusLabel(status) {
+  switch (status) {
+    case 'complete':
+      return 'תיעוד הושלם'
+    case 'missing':
+      return 'תיעוד חסר'
+    case 'upcoming':
+    default:
+      return 'תיעוד עתידי'
+  }
+}
+
+function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MINUTES } = {}) {
+  if (!day || !window) {
+    return []
+  }
+
+  const startMinutes = parseMinutes(window.startMinutes ?? window.start)
+  const endMinutes = parseMinutes(window.endMinutes ?? window.end)
+  if (startMinutes === null || endMinutes === null) {
+    return []
+  }
+
+  const duration = Math.max(15, Number(sessionDuration) || SESSION_DURATION_MINUTES)
+  const events = []
+
+  for (const session of day.sessions || []) {
+    const timeMinutes = Number(session?.timeMinutes ?? parseMinutes(session?.time))
+    if (!Number.isFinite(timeMinutes)) {
+      continue
+    }
+    if (timeMinutes < startMinutes || timeMinutes > endMinutes) {
+      continue
+    }
+    const relativeStart = timeMinutes - startMinutes
+    const top = (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+    const end = timeMinutes + duration
+    events.push({
+      session,
+      start: timeMinutes,
+      end,
+      top,
+    })
+  }
+
+  if (!events.length) {
+    return []
+  }
+
+  events.sort((a, b) => {
+    if (a.start !== b.start) {
+      return a.start - b.start
+    }
+    return (a.session.studentName || '').localeCompare(b.session.studentName || '', 'he')
+  })
+
+  const clusters = []
+  let currentCluster = null
+
+  for (const event of events) {
+    if (!currentCluster) {
+      currentCluster = { events: [event], maxEnd: event.end }
+      continue
+    }
+
+    if (event.start < currentCluster.maxEnd) {
+      currentCluster.events.push(event)
+      currentCluster.maxEnd = Math.max(currentCluster.maxEnd, event.end)
+    } else {
+      clusters.push(currentCluster)
+      currentCluster = { events: [event], maxEnd: event.end }
+    }
+  }
+
+  if (currentCluster) {
+    clusters.push(currentCluster)
+  }
+
+  const items = []
+
+  for (const cluster of clusters) {
+    const columnEndTimes = []
+    for (const event of cluster.events) {
+      let assignedColumn = columnEndTimes.findIndex(end => event.start >= end)
+      if (assignedColumn === -1) {
+        assignedColumn = columnEndTimes.length
+        columnEndTimes.push(event.end)
+      } else {
+        columnEndTimes[assignedColumn] = event.end
+      }
+      event.columnIndex = assignedColumn
+    }
+
+    const totalColumns = columnEndTimes.length || 1
+    const visibleColumns = Math.min(totalColumns, MAX_VISIBLE_COLUMNS)
+    const hiddenSessions = []
+
+    const widthPercent = 100 / visibleColumns
+    const visibleWidth = visibleColumns === 1
+      ? '100%'
+      : `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
+
+    for (const event of cluster.events) {
+      const shouldHide = totalColumns > MAX_VISIBLE_CHIPS && event.columnIndex >= MAX_VISIBLE_CHIPS
+      const columnIndex = Math.min(event.columnIndex, visibleColumns - 1)
+      const leftPercent = columnIndex * widthPercent
+      const leftValue = visibleColumns === 1
+        ? '0'
+        : `calc(${leftPercent}% + ${COLUMN_GAP_PX / 2}px)`
+
+      if (shouldHide) {
+        hiddenSessions.push(event)
+        continue
+      }
+
+      items.push({
+        type: 'chip',
+        session: event.session,
+        top: Math.round(event.top),
+        height: Math.max(GRID_ROW_HEIGHT - 8, GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8),
+        style: {
+          left: leftValue,
+          width: visibleColumns === 1 ? '100%' : visibleWidth,
+        },
+        zIndex: visibleColumns - columnIndex,
+      })
+    }
+
+    if (hiddenSessions.length) {
+      const firstHidden = hiddenSessions.reduce((prev, current) => (current.start < prev.start ? current : prev), hiddenSessions[0])
+      const badgeLeftPercent = (visibleColumns - 1) * widthPercent
+      const badgeLeft = visibleColumns === 1
+        ? '0'
+        : `calc(${badgeLeftPercent}% + ${COLUMN_GAP_PX / 2}px)`
+
+      items.push({
+        type: 'overflow',
+        sessions: hiddenSessions.map(entry => entry.session),
+        top: Math.round(firstHidden.top),
+        height: Math.max(GRID_ROW_HEIGHT - 8, GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8),
+        style: {
+          left: badgeLeft,
+          width: visibleColumns === 1 ? '100%' : visibleWidth,
+        },
+        zIndex: visibleColumns + 1,
+      })
+    }
+  }
+
+  items.sort((a, b) => {
+    if (a.top !== b.top) {
+      return a.top - b.top
+    }
+    if (a.type === b.type) {
+      return 0
+    }
+    return a.type === 'chip' ? -1 : 1
+  })
+
+  return items
+}
+
+function StudentDetailPopover({
+  session,
+  open,
+  setOpen,
+  isCoarse,
+  onNavigate,
+  children,
+}) {
+  const closeTimeoutRef = useRef(null)
+
+  const clearCloseTimer = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      window.clearTimeout(closeTimeoutRef.current)
+      closeTimeoutRef.current = null
+    }
+  }, [])
+
+  const scheduleClose = useCallback(() => {
+    if (isCoarse) {
+      return
+    }
+    clearCloseTimer()
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setOpen(false)
+    }, 120)
+  }, [clearCloseTimer, isCoarse, setOpen])
+
+  useEffect(() => () => clearCloseTimer(), [clearCloseTimer])
+
+  const handleViewProfile = useCallback(() => {
+    clearCloseTimer()
+    setOpen(false)
+    onNavigate(session.studentId)
+  }, [clearCloseTimer, onNavigate, session.studentId, setOpen])
+
+  return (
+    <Popover open={open} onOpenChange={value => (isCoarse ? setOpen(value) : null)}>
+      <PopoverTrigger asChild>
+        {children({
+          onMouseEnter: () => {
+            if (!isCoarse) {
+              clearCloseTimer()
+              setOpen(true)
+            }
+          },
+          onMouseLeave: scheduleClose,
+          onFocus: () => {
+            if (!isCoarse) {
+              clearCloseTimer()
+              setOpen(true)
+            }
+          },
+          onBlur: scheduleClose,
+        })}
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-56 space-y-sm rounded-lg border border-border bg-popover p-md text-right shadow-lg"
+        onMouseEnter={clearCloseTimer}
+        onMouseLeave={scheduleClose}
+      >
+        <div className="space-y-xxs">
+          <p className="text-sm font-semibold text-foreground">{session.studentName || '—'}</p>
+          <p className="text-xs text-muted-foreground">{session.instructorName || '—'}</p>
+          <p className="text-xs text-muted-foreground">
+            {session.time ? `שעה ${session.time}` : null}
+          </p>
+        </div>
+        <Button type="button" variant="link" className="px-0" onClick={handleViewProfile}>
+          צפה בפרופיל
+        </Button>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+function StudentChip({
+  session,
+  top,
+  height,
+  style,
+  zIndex,
+  variant = 'grid',
+  onNavigate,
+  isCoarse,
+}) {
+  const [open, setOpen] = useState(false)
+
+  const handleClick = useCallback(
+    event => {
+      if (isCoarse) {
+        event.preventDefault()
+        setOpen(previous => !previous)
+        return
+      }
+      onNavigate(session.studentId)
+    },
+    [isCoarse, onNavigate, session.studentId],
+  )
+
+  const chipStyle = buildChipStyle(session.instructorColor, {
+    inactive: session.instructorIsActive === false,
+  })
+
+  const sharedClassName = cn(
+    'flex items-center justify-between gap-xs rounded-md px-sm py-xxs text-xs font-medium text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
+    {
+      'hover:opacity-90': !isCoarse,
+    },
+  )
+
+  const statusIcon = STATUS_ICONS[session.status]
+  const srLabel = buildStatusLabel(session.status)
+
+  const baseStyle = variant === 'grid'
+    ? {
+        position: 'absolute',
+        top: `${top}px`,
+        height: `${height}px`,
+        zIndex,
+        ...style,
+        ...chipStyle,
+      }
+    : {
+        position: 'relative',
+        width: '100%',
+        ...style,
+        ...chipStyle,
+      }
+
+  const renderTrigger = handlers => (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={sharedClassName}
+      style={baseStyle}
+      aria-label={`${session.studentName || '—'} • ${srLabel}`}
+      {...handlers}
+    >
+      <span className="truncate">{session.studentName || '—'}</span>
+      {statusIcon ? (
+        <span className="text-base" aria-hidden="true">{statusIcon}</span>
+      ) : null}
+      <span className="sr-only">{srLabel}</span>
+    </button>
+  )
+
+  return (
+    <StudentDetailPopover
+      session={session}
+      open={open}
+      setOpen={setOpen}
+      isCoarse={isCoarse}
+      onNavigate={onNavigate}
+    >
+      {renderTrigger}
+    </StudentDetailPopover>
+  )
+}
+
+function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoarse }) {
+  const [open, setOpen] = useState(false)
+
+  const sortedSessions = useMemo(
+    () => [...sessions].sort((a, b) => {
+      if (a.timeMinutes !== b.timeMinutes) {
+        return a.timeMinutes - b.timeMinutes
+      }
+      return (a.studentName || '').localeCompare(b.studentName || '', 'he')
+    }),
+    [sessions],
+  )
+
+  const total = sortedSessions.length
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="absolute flex h-full w-full items-center justify-center rounded-md border border-dashed border-primary bg-primary/5 px-sm text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          style={{
+            top: `${top}px`,
+            height: `${height}px`,
+            zIndex,
+            ...style,
+          }}
+        >
+          +{total} נוספים
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-60 space-y-sm rounded-lg border border-border bg-popover p-md text-right shadow-lg"
+      >
+        <p className="text-sm font-semibold text-foreground">תלמידים נוספים</p>
+        <div className="space-y-xs">
+          {sortedSessions.map(session => (
+            <StudentChip
+              key={`${session.studentId}-${session.time}`}
+              session={session}
+              variant="list"
+              top={0}
+              height={GRID_ROW_HEIGHT - 8}
+              style={{}}
+              zIndex={1}
+              onNavigate={id => {
+                setOpen(false)
+                onNavigate(id)
+              }}
+              isCoarse={isCoarse}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 export default function WeeklyComplianceView({ orgId }) {
@@ -195,6 +690,7 @@ export default function WeeklyComplianceView({ orgId }) {
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [mobileDayIndex, setMobileDayIndex] = useState(0)
+  const isCoarsePointer = useIsCoarsePointer()
 
   useEffect(() => {
     if (!orgId || !weekStart) {
@@ -252,34 +748,31 @@ export default function WeeklyComplianceView({ orgId }) {
     setMobileDayIndex(0)
   }, [data?.days, data?.today])
 
-  const timeSlots = useMemo(() => {
-    const window = data?.timeWindow
-    if (!window) {
-      return []
-    }
-    const start = parseMinutes(window.startMinutes ?? window.start)
-    const end = parseMinutes(window.endMinutes ?? window.end)
-    const interval = Number(window.intervalMinutes) || 15
-    if (start === null || end === null || end < start) {
-      return []
-    }
-    const slots = []
-    for (let minutes = start; minutes <= end; minutes += interval) {
-      slots.push(minutes)
-    }
-    return slots
-  }, [data?.timeWindow])
+  const timeWindow = data?.timeWindow || null
+  const gridSlots = useMemo(() => createGridSlots(timeWindow), [timeWindow])
+  const gridHeight = gridSlots.length * GRID_ROW_HEIGHT
+  const sessionDuration = data?.sessionDurationMinutes || SESSION_DURATION_MINUTES
 
   const legend = data?.legend || []
   const daysSource = data?.days
   const days = useMemo(() => (Array.isArray(daysSource) ? daysSource : []), [daysSource])
-  const daySessionMaps = useMemo(() => {
-    const maps = new Map()
+
+  const dayLayouts = useMemo(() => {
+    const layoutMap = new Map()
     for (const day of days) {
-      maps.set(day.date, groupSessionsByTime(day, timeSlots))
+      layoutMap.set(day.date, layoutDaySessions(day, timeWindow, { sessionDuration }))
     }
-    return maps
-  }, [days, timeSlots])
+    return layoutMap
+  }, [days, timeWindow, sessionDuration])
+
+  const mobileSessionMaps = useMemo(() => {
+    const result = new Map()
+    for (const day of days) {
+      result.set(day.date, groupSessionsForMobile(day, gridSlots))
+    }
+    return result
+  }, [days, gridSlots])
+
   const selectedDay = days[mobileDayIndex] || days[0]
   const selectedDayDisplay = useMemo(() => buildDayDisplay(selectedDay), [selectedDay])
   const isCurrentWeek = weekStart === initialWeekStart
@@ -300,12 +793,15 @@ export default function WeeklyComplianceView({ orgId }) {
     setWeekStart(initialWeekStart)
   }, [initialWeekStart])
 
-  const handleChipClick = useCallback(studentId => {
-    if (!studentId) {
-      return
-    }
-    navigate(`/students/${studentId}`)
-  }, [navigate])
+  const handleNavigateToStudent = useCallback(
+    studentId => {
+      if (!studentId) {
+        return
+      }
+      navigate(`/students/${studentId}`)
+    },
+    [navigate],
+  )
 
   return (
     <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
@@ -340,9 +836,12 @@ export default function WeeklyComplianceView({ orgId }) {
             <span
               aria-hidden="true"
               className="inline-block h-3 w-3 rounded-full border border-border"
-              style={buildLegendStyle(item.color)}
+              style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
             />
             <span>{item.name}</span>
+            {item.isActive === false ? (
+              <span className="text-xs text-destructive">מדריך לא פעיל</span>
+            ) : null}
           </div>
         ))}
         {!legend.length && !isLoading && (
@@ -357,73 +856,98 @@ export default function WeeklyComplianceView({ orgId }) {
         <p className="text-sm text-destructive">אירעה שגיאה בטעינת לוח הציות. אנא נסו שוב מאוחר יותר.</p>
       )}
 
-      {!isLoading && !error && (!days.length || !timeSlots.length) && (
+      {!isLoading && !error && (!days.length || !gridSlots.length) && (
         <p className="text-sm text-muted-foreground">אין מפגשים מתוכננים לשבוע זה.</p>
       )}
 
-      {!isLoading && !error && days.length > 0 && timeSlots.length > 0 && (
+      {!isLoading && !error && days.length > 0 && gridSlots.length > 0 && (
         <>
           <div className="hidden md:block">
             <div className="overflow-x-auto">
               <div
                 className="grid min-w-max"
-                style={{ gridTemplateColumns: `minmax(80px, 120px) repeat(${days.length}, minmax(0, 1fr))` }}
+                style={{ gridTemplateColumns: `minmax(80px, 100px) repeat(${days.length}, minmax(240px, 1fr))` }}
               >
-                <div className="sticky top-0 bg-surface font-semibold text-muted-foreground" />
+                <div className="sticky top-0 bg-surface" />
                 {days.map(day => {
                   const display = buildDayDisplay(day)
                   return (
                     <div
                       key={day.date}
-                      className="border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
+                      className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
                     >
                       <span className="block text-base font-semibold">{display.label || '—'}</span>
                       <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
                     </div>
                   )
                 })}
-                {timeSlots.map(minutes => {
-                  const label = formatTimeLabel(minutes)
-                  return (
-                    <React.Fragment key={minutes}>
-                      <div className="border-b border-border px-sm py-sm text-sm font-medium text-muted-foreground">
-                        {label}
+                <div
+                  className="relative border-l border-border"
+                  style={{ height: `${gridHeight}px` }}
+                >
+                  <div
+                    className="grid text-sm text-muted-foreground"
+                    style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                  >
+                    {gridSlots.map(minutes => (
+                      <div
+                        key={`time-${minutes}`}
+                        className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
+                      >
+                        {formatTimeLabel(minutes)}
                       </div>
-                      {days.map(day => {
-                        const sessionMap = daySessionMaps.get(day.date) || new Map()
-                        const sessionsAtSlot = sessionMap.get(minutes) || []
+                    ))}
+                  </div>
+                </div>
+                {days.map(day => {
+                  const layoutItems = dayLayouts.get(day.date) || []
+                  return (
+                    <div
+                      key={`column-${day.date}`}
+                      className="relative border-b border-l border-border bg-background/60"
+                      style={{ height: `${gridHeight}px` }}
+                    >
+                      <div
+                        className="grid"
+                        aria-hidden="true"
+                        style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
+                      >
+                        {gridSlots.map(minutes => (
+                          <div
+                            key={`${day.date}-row-${minutes}`}
+                            className="border-b border-border/70"
+                          />
+                        ))}
+                      </div>
+                      {layoutItems.map(item => {
+                        if (item.type === 'overflow') {
+                          return (
+                            <OverflowBadge
+                              key={`${day.date}-overflow-${item.top}`}
+                              sessions={item.sessions}
+                              top={item.top}
+                              height={item.height}
+                              style={item.style}
+                              zIndex={item.zIndex}
+                              onNavigate={handleNavigateToStudent}
+                              isCoarse={isCoarsePointer}
+                            />
+                          )
+                        }
                         return (
-                          <div key={`${day.date}-${minutes}`} className="border-b border-l border-border px-sm py-xs align-top">
-                            <div className="flex flex-col gap-xs">
-                              {sessionsAtSlot.map(session => {
-                                const statusIcon = STATUS_ICONS[session.status]
-                                return (
-                                  <button
-                                    key={`${session.studentId}-${session.time}`}
-                                    type="button"
-                                    onClick={() => handleChipClick(session.studentId)}
-                                    className="flex items-center justify-between gap-xs rounded-full px-sm py-xs text-xs font-medium text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                                    style={buildChipStyle(session.instructorColor)}
-                                  >
-                                    <span className="truncate" title={`${session.studentName} • ${session.instructorName}`}>
-                                      {session.studentName || '—'}
-                                    </span>
-                                    {statusIcon ? (
-                                      <span className="text-base" aria-hidden="true">{statusIcon}</span>
-                                    ) : null}
-                                    <span className="sr-only">
-                                      {session.status === 'complete' && 'תיעוד הושלם'}
-                                      {session.status === 'missing' && 'תיעוד חסר'}
-                                      {session.status === 'upcoming' && 'תיעוד עתידי'}
-                                    </span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
+                          <StudentChip
+                            key={`${item.session.studentId}-${item.session.time}`}
+                            session={item.session}
+                            top={item.top}
+                            height={item.height}
+                            style={item.style}
+                            zIndex={item.zIndex}
+                            onNavigate={handleNavigateToStudent}
+                            isCoarse={isCoarsePointer}
+                          />
                         )
                       })}
-                    </React.Fragment>
+                    </div>
                   )
                 })}
               </div>
@@ -457,10 +981,10 @@ export default function WeeklyComplianceView({ orgId }) {
                 </span>
               </h3>
               <div className="space-y-xs">
-                {timeSlots.map(minutes => {
+                {gridSlots.map(minutes => {
                   const label = formatTimeLabel(minutes)
-                  const sessionMap = selectedDay ? daySessionMaps.get(selectedDay.date) || new Map() : new Map()
-                  const sessionsAtSlot = sessionMap.get(minutes) || []
+                  const sessionMap = selectedDay ? mobileSessionMaps.get(selectedDay.date) : null
+                  const sessionsAtSlot = sessionMap?.get(minutes) || []
                   return (
                     <div key={`${selectedDay?.date}-${minutes}`} className="rounded-lg border border-border p-sm">
                       <p className="mb-xs text-sm font-medium text-muted-foreground">{label}</p>
@@ -468,30 +992,19 @@ export default function WeeklyComplianceView({ orgId }) {
                         {sessionsAtSlot.length === 0 ? (
                           <span className="text-xs text-muted-foreground">אין תלמידים בזמן זה.</span>
                         ) : (
-                          sessionsAtSlot.map(session => {
-                            const statusIcon = STATUS_ICONS[session.status]
-                            return (
-                              <button
-                                key={`${session.studentId}-${session.time}`}
-                                type="button"
-                                onClick={() => handleChipClick(session.studentId)}
-                                className="flex items-center justify-between gap-xs rounded-full px-sm py-xs text-xs font-medium text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                                style={buildChipStyle(session.instructorColor)}
-                              >
-                                <span className="truncate" title={`${session.studentName} • ${session.instructorName}`}>
-                                  {session.studentName || '—'}
-                                </span>
-                                {statusIcon ? (
-                                  <span className="text-base" aria-hidden="true">{statusIcon}</span>
-                                ) : null}
-                                <span className="sr-only">
-                                  {session.status === 'complete' && 'תיעוד הושלם'}
-                                  {session.status === 'missing' && 'תיעוד חסר'}
-                                  {session.status === 'upcoming' && 'תיעוד עתידי'}
-                                </span>
-                              </button>
-                            )
-                          })
+                          sessionsAtSlot.map(session => (
+                            <StudentChip
+                              key={`${session.studentId}-${session.time}`}
+                              session={session}
+                              variant="list"
+                              top={0}
+                              height={GRID_ROW_HEIGHT - 8}
+                              style={{}}
+                              zIndex={1}
+                              onNavigate={handleNavigateToStudent}
+                              isCoarse={isCoarsePointer}
+                            />
+                          ))
                         )}
                       </div>
                     </div>

@@ -162,7 +162,13 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
   the full week at once, while the mobile layout collapses into a one-day focus with the same chips and legend styling. Headers now
   translate each day into Hebrew and stack the calendar date beneath every label so the schedule stays consistent across layouts.
   The desktop grid lives inside an internal horizontal scroll container so overflow stays within the widget and no longer forces
-  the entire dashboard to gain a horizontal scrollbar.
+  the entire dashboard to gain a horizontal scrollbar. The November 2025 refresh adopts an “Outlook-style” 30-minute lattice – the
+  API now returns `sessionDurationMinutes` and a 30-minute `timeWindow.intervalMinutes`, and the frontend positions chips with
+  sub-slot precision (e.g., :15 and :45 land midway inside their rows). Overlapping sessions render side-by-side up to two
+  concurrent chips; additional conflicts collapse into a contextual “+X נוספים” badge that opens a pop-over listing every student
+  in that time block. Hover (desktop) or tap (touch) surfaces an interactive tooltip with the student name, instructor, scheduled
+  time, and a “View Profile” link. Instructor rows flagged as inactive (`is_active = false`) inherit a striped overlay so
+  administrators can immediately spot follow-up items.
 - **Dashboard actions** – `DashboardPage.jsx` still greets the user and surfaces the quick cards for “My Students” / “All Students”
   and “New Session Record”. The compliance widget now renders beneath those quick actions once the tenant connection is available;
   until then a placeholder card explains why the grid is hidden.
