@@ -13,6 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance.js'
 import { cn } from '@/lib/utils'
 
+import { buildChipStyle } from './color-utils.js'
+import { FloatingInstructorLegend, InlineInstructorLegend } from './InstructorLegend.jsx'
+
 const STATUS_ICONS = {
   complete: '✔',
   missing: '✖',
@@ -45,8 +48,6 @@ const COLUMN_GAP_PX = 6
 const MAX_VISIBLE_CHIPS = 2
 const MAX_VISIBLE_COLUMNS = MAX_VISIBLE_CHIPS + 1
 const WEEK_VIEW_MIN_WIDTH = 1015
-const DESKTOP_LEGEND_WIDTH = '16rem'
-const DESKTOP_LEGEND_GAP = '2rem'
 const OVERFLOW_BADGE_HEIGHT = 28
 const OVERFLOW_BADGE_VERTICAL_GAP = 4
 
@@ -189,187 +190,6 @@ function buildDayDisplay(day) {
     label: label || '',
     date: date || '',
   }
-}
-
-function normalizeColorIdentifier(identifier) {
-  if (!identifier || typeof identifier !== 'string') {
-    return []
-  }
-  return identifier
-    .split(',')
-    .map(token => token.trim())
-    .filter(Boolean)
-}
-
-function buildChipStyle(identifier, { inactive = false } = {}) {
-  const colors = normalizeColorIdentifier(identifier)
-  if (!colors.length) {
-    return { backgroundColor: '#6B7280', color: 'white' }
-  }
-
-  if (colors.length === 1) {
-    const color = colors[0]
-    if (inactive) {
-      return {
-        color: 'white',
-        backgroundImage: `linear-gradient(135deg, ${color}, ${color}), repeating-linear-gradient(45deg, rgba(255,255,255,0.28) 0, rgba(255,255,255,0.28) 8px, transparent 8px, transparent 16px)`,
-      }
-    }
-    return { backgroundColor: color, color: 'white' }
-  }
-
-  const gradient = `linear-gradient(135deg, ${colors.join(', ')})`
-  if (inactive) {
-    return {
-      color: 'white',
-      backgroundImage: `linear-gradient(135deg, ${colors.join(', ')}), repeating-linear-gradient(45deg, rgba(255,255,255,0.28) 0, rgba(255,255,255,0.28) 8px, transparent 8px, transparent 16px)`,
-    }
-  }
-  return {
-    color: 'white',
-    backgroundImage: gradient,
-  }
-}
-
-function buildLegendStyle(identifier, { inactive = false } = {}) {
-  const colors = normalizeColorIdentifier(identifier)
-  if (!colors.length) {
-    return { backgroundColor: '#6B7280' }
-  }
-  if (colors.length === 1) {
-    const color = colors[0]
-    if (inactive) {
-      return {
-        backgroundImage: `linear-gradient(135deg, ${color}, ${color}), repeating-linear-gradient(45deg, rgba(255,255,255,0.32) 0, rgba(255,255,255,0.32) 6px, transparent 6px, transparent 12px)`,
-      }
-    }
-    return { backgroundColor: color }
-  }
-  const gradient = `linear-gradient(135deg, ${colors.join(', ')})`
-  if (inactive) {
-    return {
-      backgroundImage: `${gradient}, repeating-linear-gradient(45deg, rgba(255,255,255,0.32) 0, rgba(255,255,255,0.32) 6px, transparent 6px, transparent 12px)`,
-    }
-  }
-  return { backgroundImage: gradient }
-}
-
-function LegendEntries({ legend, itemClassName = '' }) {
-  if (!Array.isArray(legend) || legend.length === 0) {
-    return null
-  }
-
-  return legend.map(item => (
-    <div key={item.id} className={cn('flex items-center gap-xs text-sm text-muted-foreground', itemClassName)}>
-      <span
-        aria-hidden="true"
-        className="inline-block h-3 w-3 rounded-full border border-border"
-        style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
-      />
-      <span className="truncate">{item.name}</span>
-      {item.isActive === false ? (
-        <span className="text-xs text-destructive">מדריך לא פעיל</span>
-      ) : null}
-    </div>
-  ))
-}
-
-function InlineInstructorLegend({ legend, isLoading }) {
-  if (!legend?.length && !isLoading) {
-    return (
-      <p className="mb-lg text-sm text-muted-foreground">
-        אין מדריכים להצגה בשבוע זה.
-      </p>
-    )
-  }
-
-  if (!legend?.length) {
-    return null
-  }
-
-  return (
-    <div className="mb-lg flex flex-wrap gap-sm md:hidden">
-      <LegendEntries legend={legend} />
-    </div>
-  )
-}
-
-function FloatingInstructorLegend({ legend }) {
-  const legendRef = useRef(null)
-  const [isFloating, setIsFloating] = useState(false)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined
-    }
-
-    let frame = null
-    const TOP_OFFSET = 24
-
-    const evaluate = () => {
-      frame = null
-      const node = legendRef.current
-      if (!node) {
-        return
-      }
-      if (node.getClientRects().length === 0) {
-        setIsFloating(prev => (prev === false ? prev : false))
-        return
-      }
-      const { top } = node.getBoundingClientRect()
-      const floating = top <= TOP_OFFSET + 1
-      setIsFloating(prev => (prev === floating ? prev : floating))
-    }
-
-    const handleScroll = () => {
-      if (frame !== null) {
-        return
-      }
-      frame = window.requestAnimationFrame(evaluate)
-    }
-
-    handleScroll()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    window.addEventListener('resize', handleScroll)
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('resize', handleScroll)
-      if (frame !== null) {
-        window.cancelAnimationFrame(frame)
-      }
-    }
-  }, [])
-
-  if (!legend?.length) {
-    return null
-  }
-
-  return (
-    <div
-      className="pointer-events-none absolute inset-y-6 hidden md:block z-20"
-      aria-hidden="false"
-      style={{
-        width: DESKTOP_LEGEND_WIDTH,
-        left: 0,
-        transform: `translateX(calc(-100% - ${DESKTOP_LEGEND_GAP}))`,
-      }}
-    >
-      <div
-        ref={legendRef}
-        className={cn(
-          'pointer-events-auto sticky top-0 w-full space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
-          isFloating ? 'translate-y-0 opacity-100 shadow-lg' : 'translate-y-2 opacity-90',
-        )}
-        style={{ maxHeight: 'calc(100vh - 3rem)' }}
-      >
-        <p className="text-sm font-semibold text-foreground">מקרא מדריכים</p>
-        <div className="space-y-xs">
-          <LegendEntries legend={legend} itemClassName="justify-between rounded-lg bg-muted/40 px-sm py-xxs" />
-        </div>
-      </div>
-    </div>
-  )
 }
 
 function createGridSlots(window) {
