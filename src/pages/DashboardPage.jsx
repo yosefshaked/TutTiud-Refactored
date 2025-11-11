@@ -15,7 +15,7 @@ import InstructorLegend from "@/features/dashboard/components/InstructorLegend.j
  * 1. Instructor name (from tenant DB Instructors table)
  * 2. Profile full_name (from control DB profiles table)
  * 3. Auth metadata display name (from Supabase Auth user_metadata)
- * 4. Email address
+ * 4. Email address 
  */
 function buildGreeting(instructorName, profileName, authName, email) {
   // Priority 1: Instructor name from tenant DB
