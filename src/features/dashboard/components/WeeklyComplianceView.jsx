@@ -47,12 +47,54 @@ const MAX_VISIBLE_COLUMNS = MAX_VISIBLE_CHIPS + 1
 const WEEK_VIEW_MIN_WIDTH = 1015
 const DESKTOP_LEGEND_WIDTH = '16rem'
 const DESKTOP_LEGEND_GAP = '2rem'
+const OVERFLOW_BADGE_HEIGHT = 28
+const OVERFLOW_BADGE_VERTICAL_GAP = 4
 
 function formatTimeLabel(minutes) {
   const value = Number(minutes) || 0
   const hoursPart = Math.floor(value / 60)
   const minutesPart = value % 60
   return `${String(hoursPart).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}`
+}
+
+function formatLocalDateIso(dateLike) {
+  const date = dateLike instanceof Date ? new Date(dateLike) : new Date(dateLike)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function startOfLocalWeek(dateLike) {
+  const date = dateLike instanceof Date ? new Date(dateLike) : new Date(dateLike)
+  if (Number.isNaN(date.getTime())) {
+    return new Date()
+  }
+  const result = new Date(date)
+  result.setHours(0, 0, 0, 0)
+  const day = result.getDay()
+  result.setDate(result.getDate() - day)
+  return result
+}
+
+function parseIsoToLocalDate(isoDate) {
+  if (typeof isoDate !== 'string') {
+    return null
+  }
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) {
+    return null
+  }
+  const year = Number.parseInt(match[1], 10)
+  const month = Number.parseInt(match[2], 10) - 1
+  const day = Number.parseInt(match[3], 10)
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+    return null
+  }
+  return new Date(year, month, day)
 }
 
 function startOfUtcDay(dateLike) {
@@ -304,11 +346,19 @@ function FloatingInstructorLegend({ legend }) {
   }
 
   return (
-    <div className="pointer-events-none absolute left-6 top-6 bottom-6 hidden md:block" aria-hidden="false">
+    <div
+      className="pointer-events-none absolute inset-y-6 hidden md:block z-20"
+      aria-hidden="false"
+      style={{
+        width: DESKTOP_LEGEND_WIDTH,
+        left: 0,
+        transform: `translateX(calc(-100% - ${DESKTOP_LEGEND_GAP}))`,
+      }}
+    >
       <div
         ref={legendRef}
         className={cn(
-          'pointer-events-auto sticky top-0 w-64 space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
+          'pointer-events-auto sticky top-0 w-full space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
           isFloating ? 'translate-y-0 opacity-100 shadow-lg' : 'translate-y-2 opacity-90',
         )}
         style={{ maxHeight: 'calc(100vh - 3rem)' }}
@@ -384,8 +434,11 @@ function groupSessionsForMobile(day, slots) {
   return map
 }
 
-function useInitialWeekStart() {
-  return useMemo(() => formatUtcDate(startOfUtcWeek(new Date())), [])
+function useInitialWeekStart(localTodayIso) {
+  return useMemo(() => {
+    const base = parseIsoToLocalDate(localTodayIso) || new Date()
+    return formatLocalDateIso(startOfLocalWeek(base))
+  }, [localTodayIso])
 }
 
 function useIsCoarsePointer() {
@@ -412,6 +465,38 @@ function useIsCoarsePointer() {
   return isCoarse
 }
 
+function useLocalTodayIso() {
+  const [todayIso, setTodayIso] = useState(() => formatLocalDateIso(new Date()))
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    let timeoutId = null
+
+    const scheduleNextUpdate = () => {
+      const now = new Date()
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      const delay = Math.max(1000, nextMidnight.getTime() - now.getTime())
+      timeoutId = window.setTimeout(() => {
+        setTodayIso(formatLocalDateIso(new Date()))
+        scheduleNextUpdate()
+      }, delay)
+    }
+
+    scheduleNextUpdate()
+
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId)
+      }
+    }
+  }, [])
+
+  return todayIso
+}
+
 function buildStatusLabel(status) {
   switch (status) {
     case 'complete':
@@ -436,6 +521,8 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
   }
 
   const duration = Math.max(15, Number(sessionDuration) || SESSION_DURATION_MINUTES)
+  const totalRows = Math.max(1, Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1)
+  const columnHeight = totalRows * GRID_ROW_HEIGHT
   const events = []
 
   for (const session of day.sessions || []) {
@@ -546,11 +633,24 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
 
     if (hiddenSessions.length) {
       const firstHidden = hiddenSessions.reduce((prev, current) => (current.start < prev.start ? current : prev), hiddenSessions[0])
+      const badgeTop = Math.round(firstHidden.top + chipHeight + OVERFLOW_BADGE_VERTICAL_GAP)
+      const constrainedTop = Math.min(
+        Math.max(0, columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP),
+        Math.max(0, badgeTop),
+      )
+      const horizontalInset = visibleColumns > 1 ? COLUMN_GAP_PX / 2 : 0
+      const summaryWidth = visibleColumns > 1
+        ? `calc(100% - ${COLUMN_GAP_PX}px)`
+        : '100%'
+
       overflowBadges.push({
         sessions: hiddenSessions.map(entry => entry.session),
-        top: Math.max(0, Math.round(firstHidden.top)),
+        top: constrainedTop,
         height: chipHeight,
-        style: {},
+        style: {
+          left: `${horizontalInset}px`,
+          width: summaryWidth,
+        },
         zIndex: visibleColumns + 1,
       })
     }
@@ -754,7 +854,6 @@ function StudentChip({
 function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoarse }) {
   const [open, setOpen] = useState(false)
 
-  void top
   void height
 
   const sortedSessions = useMemo(
@@ -768,20 +867,27 @@ function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoa
   )
 
   const total = sortedSessions.length
-  const computedStyle = useMemo(() => ({
-    bottom: '4px',
-    left: '50%',
-    transform: 'translate(-50%, 0)',
-    zIndex,
-    maxWidth: style?.maxWidth || 'calc(100% - 12px)',
-  }), [style?.maxWidth, zIndex])
+  const computedStyle = useMemo(() => {
+    const base = style && typeof style === 'object' ? { ...style } : {}
+    const resolvedTop = typeof top === 'number' ? `${top}px` : base.top || '0px'
+    base.top = resolvedTop
+    base.zIndex = zIndex
+    if (!base.maxWidth && base.width == null) {
+      base.maxWidth = 'calc(100% - 12px)'
+    }
+    if (base.left == null && base.right == null) {
+      base.left = '50%'
+      base.transform = [base.transform, 'translate(-50%, 0)'].filter(Boolean).join(' ')
+    }
+    return base
+  }, [style, top, zIndex])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="absolute flex min-h-[28px] min-w-[64px] items-center justify-center rounded-full border border-dashed border-primary bg-primary/5 px-sm py-xxs text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          className="absolute flex min-h-[28px] min-w-[64px] items-center justify-center rounded-md border border-dashed border-primary bg-primary/5 px-sm py-xxs text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           style={computedStyle}
         >
           +{total} נוספים
@@ -913,7 +1019,8 @@ function DayScheduleView({
 
 export default function WeeklyComplianceView({ orgId }) {
   const navigate = useNavigate()
-  const initialWeekStart = useInitialWeekStart()
+  const localTodayIso = useLocalTodayIso()
+  const initialWeekStart = useInitialWeekStart(localTodayIso)
   const [weekStart, setWeekStart] = useState(initialWeekStart)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -1011,19 +1118,21 @@ export default function WeeklyComplianceView({ orgId }) {
   }, [orgId, weekStart])
 
   useEffect(() => {
-    if (!data?.days?.length) {
+    if (!days.length) {
       setSelectedDayIndex(0)
       return
     }
 
-    const todayIndex = data.days.findIndex(day => day.date === data.today)
-    if (todayIndex >= 0) {
-      setSelectedDayIndex(todayIndex)
-      return
+    if (localTodayIso) {
+      const todayIndex = days.findIndex(day => day.date === localTodayIso)
+      if (todayIndex >= 0) {
+        setSelectedDayIndex(todayIndex)
+        return
+      }
     }
 
     setSelectedDayIndex(0)
-  }, [data?.days, data?.today])
+  }, [days, localTodayIso])
 
   const timeWindow = data?.timeWindow || null
   const gridSlots = useMemo(() => createGridSlots(timeWindow), [timeWindow])
@@ -1032,7 +1141,37 @@ export default function WeeklyComplianceView({ orgId }) {
 
   const legend = data?.legend || []
   const daysSource = data?.days
-  const days = useMemo(() => (Array.isArray(daysSource) ? daysSource : []), [daysSource])
+  const days = useMemo(() => {
+    if (!Array.isArray(daysSource)) {
+      return []
+    }
+    return daysSource.map(day => {
+      const dayDate = day?.date || ''
+      const isToday = Boolean(localTodayIso) && dayDate === localTodayIso
+      const normalizedSessions = Array.isArray(day?.sessions)
+        ? day.sessions.map(session => {
+            const hasRecord = session?.hasRecord === true
+            const resolvedStatus = hasRecord
+              ? 'complete'
+              : localTodayIso && dayDate
+                ? dayDate <= localTodayIso
+                  ? 'missing'
+                  : 'upcoming'
+                : session?.status || 'upcoming'
+            return {
+              ...session,
+              status: resolvedStatus,
+            }
+          })
+        : []
+
+      return {
+        ...day,
+        isToday,
+        sessions: normalizedSessions,
+      }
+    })
+  }, [daysSource, localTodayIso])
 
   const dayLayouts = useMemo(() => {
     const layoutMap = new Map()
@@ -1095,16 +1234,10 @@ export default function WeeklyComplianceView({ orgId }) {
     [defaultViewMode, isBelowBreakpoint],
   )
 
-  const shouldOffsetLegend = !isBelowBreakpoint && legend.length > 0
-
   return (
-    <Card ref={containerRef} className="relative rounded-2xl border border-border bg-surface p-lg shadow-sm">
+    <Card ref={containerRef} className="relative overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm">
       <FloatingInstructorLegend legend={legend} />
-      <div
-        className="relative min-w-0"
-        dir="rtl"
-        style={shouldOffsetLegend ? { paddingLeft: `calc(${DESKTOP_LEGEND_WIDTH} + ${DESKTOP_LEGEND_GAP})` } : undefined}
-      >
+      <div className="relative min-w-0" dir="rtl">
           <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
@@ -1183,10 +1316,22 @@ export default function WeeklyComplianceView({ orgId }) {
                       return (
                         <div
                           key={day.date}
-                          className="sticky top-0 z-10 border-b border-border bg-muted/30 px-sm py-xs text-center text-sm font-medium text-foreground"
+                          className={cn(
+                            'sticky top-0 z-10 border-b border-border px-sm py-xs text-center text-sm font-medium',
+                            day.isToday
+                              ? 'bg-primary text-primary-foreground shadow-sm'
+                              : 'bg-muted/30 text-foreground',
+                          )}
                         >
                           <span className="block text-base font-semibold">{display.label || '—'}</span>
-                          <span className="mt-1 block text-xs font-normal text-muted-foreground">{display.date || '—'}</span>
+                          <span
+                            className={cn(
+                              'mt-1 block text-xs font-normal',
+                              day.isToday ? 'text-primary-foreground/90' : 'text-muted-foreground',
+                            )}
+                          >
+                            {display.date || '—'}
+                          </span>
                         </div>
                       )
                     })}
@@ -1215,7 +1360,10 @@ export default function WeeklyComplianceView({ orgId }) {
                       return (
                         <div
                           key={`column-${day.date}`}
-                          className="relative border-b border-l border-border bg-background/60"
+                          className={cn(
+                            'relative border-b border-l border-border',
+                            day.isToday ? 'bg-primary/5' : 'bg-background/60',
+                          )}
                           style={{ height: `${gridHeight}px` }}
                         >
                           <div
