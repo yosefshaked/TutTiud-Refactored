@@ -221,7 +221,7 @@ export default function DashboardPage() {
 
       {/* Desktop xl+: 4-column grid layout */}
       <div className="hidden xl:block">
-        <div className="grid gap-lg px-sm py-md sm:px-md sm:py-lg lg:px-xl" style={{ gridTemplateColumns: "1fr 1fr 1fr 220px" }}>
+        <div className="grid gap-lg px-sm py-md sm:px-md sm:py-lg lg:px-xl" style={{ gridTemplateColumns: "1fr 640px 640px 220px" }}>
           {/* Row 1: Header spans all 4 columns */}
           <header className="col-span-4 flex flex-col gap-sm pb-sm sm:flex-row sm:items-end sm:justify-between sm:pb-md">
             <div className="space-y-xs">
