@@ -446,6 +446,9 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
           width: visibleColumns === 1 ? '100%' : visibleWidth,
         },
         zIndex: visibleColumns - columnIndex,
+        startMinutes: event.start,
+        widthPercent: visibleColumns === 1 ? 100 : widthPercent,
+        leftPercent: columnIndex * widthPercent,
       })
     }
 
@@ -458,7 +461,6 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
       overflowBadges.push({
         sessions: hiddenSessions.map(entry => entry.session),
         startMinutes: firstHidden.start,
-        chipHeight,
       })
     }
   }
@@ -658,7 +660,7 @@ function StudentChip({
   )
 }
 
-function OverflowBadge({ sessions, bottom, onNavigate, isCoarse }) {
+function OverflowBadge({ sessions, top, leftPercent, onNavigate, isCoarse }) {
   const [open, setOpen] = useState(false)
 
   const sortedSessions = useMemo(
@@ -672,12 +674,15 @@ function OverflowBadge({ sessions, bottom, onNavigate, isCoarse }) {
   )
 
   const total = sortedSessions.length
-  const computedStyle = useMemo(() => ({
-    bottom: typeof bottom === 'number' ? `${bottom}px` : '4px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 30,
-  }), [bottom])
+  const computedStyle = useMemo(
+    () => ({
+      top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
+      left: typeof leftPercent === 'number' ? `${leftPercent}%` : '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 30,
+    }),
+    [leftPercent, top],
+  )
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -1048,9 +1053,12 @@ export default function WeeklyComplianceView({ orgId }) {
   )
 
   return (
-    <div ref={containerRef} className="relative">
+    <div
+      ref={containerRef}
+      className="relative md:flex md:items-start md:gap-lg"
+    >
       <FloatingInstructorLegend legend={legend} />
-      <Card className="relative overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm">
+      <Card className="relative overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm md:flex-1">
         <div className="relative min-w-0" dir="rtl">
           <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
             <div>
@@ -1172,31 +1180,63 @@ export default function WeeklyComplianceView({ orgId }) {
                       const chipItems = layout?.chips ?? []
                       const overflowItems = layout?.overflowBadges ?? []
                       const overflowBadgePlacements = overflowItems.map(item => {
+                        const chipsForStart = chipItems.filter(
+                          chip => chip.startMinutes === item.startMinutes,
+                        )
+
+                        const computeClusterCenter = () => {
+                          if (!chipsForStart.length) {
+                            return 50
+                          }
+                          const minLeft = Math.min(
+                            ...chipsForStart.map(chip => chip.leftPercent ?? 0),
+                          )
+                          const maxRight = Math.max(
+                            ...chipsForStart.map(chip => {
+                              const width = chip.widthPercent ?? 100
+                              return (chip.leftPercent ?? 0) + width
+                            }),
+                          )
+                          const center = (minLeft + maxRight) / 2
+                          return Math.min(100, Math.max(0, center))
+                        }
+
+                        const clusterBottom = chipsForStart.length
+                          ? Math.max(...chipsForStart.map(chip => chip.top + chip.height))
+                          : null
+
                         if (!windowMetrics) {
+                          const fallbackTop = (clusterBottom ?? 0) + OVERFLOW_BADGE_VERTICAL_GAP
                           return {
                             sessions: item.sessions,
-                            bottom: OVERFLOW_BADGE_VERTICAL_GAP,
+                            top: fallbackTop,
+                            leftPercent: computeClusterCenter(),
                             startMinutes: item.startMinutes,
                           }
                         }
 
                         const relativeStart = Math.max(0, item.startMinutes - windowMetrics.startMinutes)
                         const baseTop = (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
-                        const estimatedHeight = Math.max(GRID_ROW_HEIGHT - 8, Number(item.chipHeight) || GRID_ROW_HEIGHT - 8)
-                        const badgeTop = Math.round(baseTop + estimatedHeight + OVERFLOW_BADGE_VERTICAL_GAP)
+                        const estimatedHeight = clusterBottom !== null
+                          ? clusterBottom - baseTop
+                          : Math.max(
+                              GRID_ROW_HEIGHT - 8,
+                              GRID_ROW_HEIGHT * (sessionDuration / GRID_INTERVAL_MINUTES) - 8,
+                            )
+                        const badgeTop = Math.round(
+                          (clusterBottom !== null ? clusterBottom : baseTop + estimatedHeight) +
+                            OVERFLOW_BADGE_VERTICAL_GAP,
+                        )
                         const maxTop = Math.max(
                           0,
                           windowMetrics.columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP,
                         )
                         const clampedTop = Math.min(maxTop, Math.max(0, badgeTop))
-                        const bottom = Math.max(
-                          OVERFLOW_BADGE_VERTICAL_GAP,
-                          windowMetrics.columnHeight - clampedTop - OVERFLOW_BADGE_HEIGHT,
-                        )
 
                         return {
                           sessions: item.sessions,
-                          bottom,
+                          top: clampedTop,
+                          leftPercent: computeClusterCenter(),
                           startMinutes: item.startMinutes,
                         }
                       })
@@ -1237,7 +1277,8 @@ export default function WeeklyComplianceView({ orgId }) {
                             <OverflowBadge
                               key={`${day.date}-overflow-${item.startMinutes}`}
                               sessions={item.sessions}
-                              bottom={item.bottom}
+                              top={item.top}
+                              leftPercent={item.leftPercent}
                               onNavigate={handleNavigateToStudent}
                               isCoarse={isCoarsePointer}
                             />

@@ -58,7 +58,7 @@ export function FloatingInstructorLegend({ legend }) {
     }
 
     let frame = null
-    const TOP_OFFSET = 24
+    const TOP_OFFSET = 16
 
     const evaluate = () => {
       frame = null
@@ -100,12 +100,12 @@ export function FloatingInstructorLegend({ legend }) {
   }
 
   return (
-    <div className="hidden md:block mb-md" aria-hidden="false">
+    <div className="hidden md:block md:shrink-0 md:basis-[16rem]" aria-hidden="false">
       <div
         ref={legendRef}
         className={cn(
-          'sticky top-6 z-30 w-[16rem] max-w-full space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
-          isFloating ? 'translate-y-0 opacity-100 shadow-lg' : 'translate-y-2 opacity-90',
+          'sticky top-4 z-30 w-[16rem] max-w-full space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
+          isFloating ? 'opacity-100 shadow-lg' : 'opacity-95',
         )}
         style={{ maxHeight: 'calc(100vh - 3rem)' }}
       >
