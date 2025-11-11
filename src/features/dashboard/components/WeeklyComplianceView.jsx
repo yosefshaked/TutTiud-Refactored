@@ -937,28 +937,6 @@ export default function WeeklyComplianceView({ orgId }) {
     }
   }, [orgId, weekStart])
 
-  useEffect(() => {
-    if (!days.length) {
-      setSelectedDayIndex(0)
-      return
-    }
-
-    if (localTodayIso) {
-      const todayIndex = days.findIndex(day => day.date === localTodayIso)
-      if (todayIndex >= 0) {
-        setSelectedDayIndex(todayIndex)
-        return
-      }
-    }
-
-    setSelectedDayIndex(0)
-  }, [days, localTodayIso])
-
-  const timeWindow = data?.timeWindow || null
-  const gridSlots = useMemo(() => createGridSlots(timeWindow), [timeWindow])
-  const gridHeight = gridSlots.length * GRID_ROW_HEIGHT
-  const sessionDuration = data?.sessionDurationMinutes || SESSION_DURATION_MINUTES
-
   const legend = data?.legend || []
   const daysSource = data?.days
   const days = useMemo(() => {
@@ -993,6 +971,11 @@ export default function WeeklyComplianceView({ orgId }) {
     })
   }, [daysSource, localTodayIso])
 
+  const timeWindow = data?.timeWindow || null
+  const gridSlots = useMemo(() => createGridSlots(timeWindow), [timeWindow])
+  const gridHeight = gridSlots.length * GRID_ROW_HEIGHT
+  const sessionDuration = data?.sessionDurationMinutes || SESSION_DURATION_MINUTES
+
   const dayLayouts = useMemo(() => {
     const layoutMap = new Map()
     for (const day of days) {
@@ -1010,6 +993,23 @@ export default function WeeklyComplianceView({ orgId }) {
   }, [days, gridSlots])
 
   const isCurrentWeek = weekStart === initialWeekStart
+
+  useEffect(() => {
+    if (!days.length) {
+      setSelectedDayIndex(0)
+      return
+    }
+
+    if (localTodayIso) {
+      const todayIndex = days.findIndex(day => day.date === localTodayIso)
+      if (todayIndex >= 0) {
+        setSelectedDayIndex(todayIndex)
+        return
+      }
+    }
+
+    setSelectedDayIndex(0)
+  }, [days, localTodayIso])
 
   const handlePreviousWeek = useCallback(() => {
     const current = startOfUtcWeek(`${weekStart}T00:00:00Z`)
