@@ -212,16 +212,18 @@ export default function DashboardPage() {
             <InstructorLegend orgId={activeOrgId} />
           </div>
 
-          {/* Desktop: full-width content with absolute positioned sidebar */}
-          <div className="relative hidden lg:block">
-            {/* Main content - full 1280px width, same as cards above */}
-            <div className="mx-auto w-full px-sm sm:px-md lg:px-xl" style={{ maxWidth: "min(1280px, 100vw)" }}>
-              <WeeklyComplianceView orgId={activeOrgId} />
-            </div>
-            
-            {/* Sidebar - positioned to the left of the content (right in RTL) */}
-            <div className="absolute top-0 hidden xl:block" style={{ width: "260px", right: "max(0px, calc((100vw - 1280px - 260px - 1.5rem) / 2))" }}>
-              <InstructorLegend orgId={activeOrgId} />
+          {/* Desktop: side-by-side layout */}
+          <div className="hidden lg:block">
+            <div className="mx-auto flex w-full items-start gap-lg" style={{ maxWidth: "calc(1280px + 260px + 1.5rem)" }}>
+              {/* Main content - full 1280px width, same as cards above */}
+              <div className="min-w-0 flex-shrink-0" style={{ width: "1280px" }}>
+                <WeeklyComplianceView orgId={activeOrgId} />
+              </div>
+              
+              {/* Sidebar - fixed width on the left (visual left in RTL) */}
+              <div className="w-[260px] flex-shrink-0">
+                <InstructorLegend orgId={activeOrgId} />
+              </div>
             </div>
           </div>
         </div>
