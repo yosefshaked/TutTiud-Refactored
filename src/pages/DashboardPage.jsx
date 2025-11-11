@@ -212,18 +212,22 @@ export default function DashboardPage() {
             <InstructorLegend orgId={activeOrgId} />
           </div>
 
-          {/* Desktop: side-by-side layout */}
-          <div className="hidden lg:block">
-            <div className="mx-auto flex w-full items-start gap-xl px-sm sm:px-md lg:px-xl" style={{ maxWidth: "min(1280px, 100vw)" }}>
-              {/* Main content - takes available space */}
-              <div className="min-w-0 flex-1">
-                <WeeklyComplianceView orgId={activeOrgId} />
-              </div>
-              
-              {/* Sidebar - narrower width, sticky positioning */}
-              <div className="w-[220px] flex-shrink-0">
-                <InstructorLegend orgId={activeOrgId} />
-              </div>
+          {/* Desktop: weekly view in container, legend outside */}
+          <div className="relative hidden lg:block">
+            {/* Main content - full 1280px width container */}
+            <div className="mx-auto w-full px-sm sm:px-md lg:px-xl" style={{ maxWidth: "min(1280px, 100vw)" }}>
+              <WeeklyComplianceView orgId={activeOrgId} />
+            </div>
+            
+            {/* Sidebar - positioned outside, to the right in RTL (visual left) */}
+            <div 
+              className="absolute top-0 hidden xl:block" 
+              style={{ 
+                width: "220px",
+                right: "calc((100vw - min(1280px, 100vw)) / 2 + min(1280px, 100vw) + 2rem)"
+              }}
+            >
+              <InstructorLegend orgId={activeOrgId} />
             </div>
           </div>
         </div>
