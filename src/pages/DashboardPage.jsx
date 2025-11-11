@@ -214,9 +214,9 @@ export default function DashboardPage() {
 
           {/* Desktop: sidebar layout that breaks container */}
           <div className="hidden lg:block">
-            <div className="relative flex w-full items-start gap-lg px-xl" style={{ paddingLeft: "max(1.5rem, calc((100vw - 1280px) / 2))", paddingRight: "max(1.5rem, calc((100vw - 1280px) / 2))" }}>
-              {/* Main content - constrained to content width */}
-              <div className="flex-1" style={{ maxWidth: "calc(1280px - 260px - 1.5rem)" }}>
+            <div className="relative mx-auto flex w-full max-w-[1280px] items-start gap-lg">
+              {/* Main content - uses remaining space */}
+              <div className="min-w-0 flex-1">
                 <WeeklyComplianceView orgId={activeOrgId} />
               </div>
               
