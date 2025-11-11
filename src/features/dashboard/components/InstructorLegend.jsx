@@ -8,9 +8,6 @@ import { cn } from '@/lib/utils'
 
 import { buildLegendStyle } from './color-utils.js'
 
-const DESKTOP_LEGEND_WIDTH = '16rem'
-const DESKTOP_LEGEND_GAP = '2rem'
-
 function LegendEntries({ legend, itemClassName = '' }) {
   if (!Array.isArray(legend) || legend.length === 0) {
     return null
@@ -103,19 +100,11 @@ export function FloatingInstructorLegend({ legend }) {
   }
 
   return (
-    <div
-      className="pointer-events-none absolute inset-y-6 hidden md:block z-20"
-      aria-hidden="false"
-      style={{
-        width: DESKTOP_LEGEND_WIDTH,
-        left: 0,
-        transform: `translateX(calc(-100% - ${DESKTOP_LEGEND_GAP}))`,
-      }}
-    >
+    <div className="hidden md:block mb-md" aria-hidden="false">
       <div
         ref={legendRef}
         className={cn(
-          'pointer-events-auto sticky top-0 w-full space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
+          'sticky top-6 z-30 w-[16rem] max-w-full space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
           isFloating ? 'translate-y-0 opacity-100 shadow-lg' : 'translate-y-2 opacity-90',
         )}
         style={{ maxHeight: 'calc(100vh - 3rem)' }}

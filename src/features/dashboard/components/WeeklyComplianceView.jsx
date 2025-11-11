@@ -341,8 +341,6 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
   }
 
   const duration = Math.max(15, Number(sessionDuration) || SESSION_DURATION_MINUTES)
-  const totalRows = Math.max(1, Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1)
-  const columnHeight = totalRows * GRID_ROW_HEIGHT
   const events = []
 
   for (const session of day.sessions || []) {
@@ -452,32 +450,21 @@ function layoutDaySessions(day, window, { sessionDuration = SESSION_DURATION_MIN
     }
 
     if (hiddenSessions.length) {
-      const firstHidden = hiddenSessions.reduce((prev, current) => (current.start < prev.start ? current : prev), hiddenSessions[0])
-      const badgeTop = Math.round(firstHidden.top + chipHeight + OVERFLOW_BADGE_VERTICAL_GAP)
-      const constrainedTop = Math.min(
-        Math.max(0, columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP),
-        Math.max(0, badgeTop),
+      const firstHidden = hiddenSessions.reduce(
+        (prev, current) => (current.start < prev.start ? current : prev),
+        hiddenSessions[0],
       )
-      const horizontalInset = visibleColumns > 1 ? COLUMN_GAP_PX / 2 : 0
-      const summaryWidth = visibleColumns > 1
-        ? `calc(100% - ${COLUMN_GAP_PX}px)`
-        : '100%'
 
       overflowBadges.push({
         sessions: hiddenSessions.map(entry => entry.session),
-        top: constrainedTop,
-        height: chipHeight,
-        style: {
-          left: `${horizontalInset}px`,
-          width: summaryWidth,
-        },
-        zIndex: visibleColumns + 1,
+        startMinutes: firstHidden.start,
+        chipHeight,
       })
     }
   }
 
   chips.sort((a, b) => a.top - b.top)
-  overflowBadges.sort((a, b) => a.top - b.top)
+  overflowBadges.sort((a, b) => a.startMinutes - b.startMinutes)
 
   return { chips, overflowBadges }
 }
@@ -671,10 +658,8 @@ function StudentChip({
   )
 }
 
-function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoarse }) {
+function OverflowBadge({ sessions, bottom, onNavigate, isCoarse }) {
   const [open, setOpen] = useState(false)
-
-  void height
 
   const sortedSessions = useMemo(
     () => [...sessions].sort((a, b) => {
@@ -687,20 +672,12 @@ function OverflowBadge({ sessions, top, height, style, zIndex, onNavigate, isCoa
   )
 
   const total = sortedSessions.length
-  const computedStyle = useMemo(() => {
-    const base = style && typeof style === 'object' ? { ...style } : {}
-    const resolvedTop = typeof top === 'number' ? `${top}px` : base.top || '0px'
-    base.top = resolvedTop
-    base.zIndex = zIndex
-    if (!base.maxWidth && base.width == null) {
-      base.maxWidth = 'calc(100% - 12px)'
-    }
-    if (base.left == null && base.right == null) {
-      base.left = '50%'
-      base.transform = [base.transform, 'translate(-50%, 0)'].filter(Boolean).join(' ')
-    }
-    return base
-  }, [style, top, zIndex])
+  const computedStyle = useMemo(() => ({
+    bottom: typeof bottom === 'number' ? `${bottom}px` : '4px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 30,
+  }), [bottom])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -973,7 +950,23 @@ export default function WeeklyComplianceView({ orgId }) {
 
   const timeWindow = data?.timeWindow || null
   const gridSlots = useMemo(() => createGridSlots(timeWindow), [timeWindow])
-  const gridHeight = gridSlots.length * GRID_ROW_HEIGHT
+  const windowMetrics = useMemo(() => {
+    if (!timeWindow) {
+      return null
+    }
+    const startMinutes = parseMinutes(timeWindow.startMinutes ?? timeWindow.start)
+    const endMinutes = parseMinutes(timeWindow.endMinutes ?? timeWindow.end)
+    if (startMinutes === null || endMinutes === null) {
+      return null
+    }
+    const totalRows = Math.max(1, Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1)
+    return {
+      startMinutes,
+      endMinutes,
+      columnHeight: totalRows * GRID_ROW_HEIGHT,
+    }
+  }, [timeWindow])
+  const gridHeight = windowMetrics?.columnHeight ?? gridSlots.length * GRID_ROW_HEIGHT
   const sessionDuration = data?.sessionDurationMinutes || SESSION_DURATION_MINUTES
 
   const dayLayouts = useMemo(() => {
@@ -1055,9 +1048,10 @@ export default function WeeklyComplianceView({ orgId }) {
   )
 
   return (
-    <Card ref={containerRef} className="relative overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm">
+    <div ref={containerRef} className="relative">
       <FloatingInstructorLegend legend={legend} />
-      <div className="relative min-w-0" dir="rtl">
+      <Card className="relative overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm">
+        <div className="relative min-w-0" dir="rtl">
           <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
@@ -1177,6 +1171,35 @@ export default function WeeklyComplianceView({ orgId }) {
                       const layout = dayLayouts.get(day.date)
                       const chipItems = layout?.chips ?? []
                       const overflowItems = layout?.overflowBadges ?? []
+                      const overflowBadgePlacements = overflowItems.map(item => {
+                        if (!windowMetrics) {
+                          return {
+                            sessions: item.sessions,
+                            bottom: OVERFLOW_BADGE_VERTICAL_GAP,
+                            startMinutes: item.startMinutes,
+                          }
+                        }
+
+                        const relativeStart = Math.max(0, item.startMinutes - windowMetrics.startMinutes)
+                        const baseTop = (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+                        const estimatedHeight = Math.max(GRID_ROW_HEIGHT - 8, Number(item.chipHeight) || GRID_ROW_HEIGHT - 8)
+                        const badgeTop = Math.round(baseTop + estimatedHeight + OVERFLOW_BADGE_VERTICAL_GAP)
+                        const maxTop = Math.max(
+                          0,
+                          windowMetrics.columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP,
+                        )
+                        const clampedTop = Math.min(maxTop, Math.max(0, badgeTop))
+                        const bottom = Math.max(
+                          OVERFLOW_BADGE_VERTICAL_GAP,
+                          windowMetrics.columnHeight - clampedTop - OVERFLOW_BADGE_HEIGHT,
+                        )
+
+                        return {
+                          sessions: item.sessions,
+                          bottom,
+                          startMinutes: item.startMinutes,
+                        }
+                      })
                       return (
                         <div
                           key={`column-${day.date}`}
@@ -1210,14 +1233,11 @@ export default function WeeklyComplianceView({ orgId }) {
                               isCoarse={isCoarsePointer}
                             />
                           ))}
-                          {overflowItems.map(item => (
+                          {overflowBadgePlacements.map(item => (
                             <OverflowBadge
-                              key={`${day.date}-overflow-${item.top}`}
+                              key={`${day.date}-overflow-${item.startMinutes}`}
                               sessions={item.sessions}
-                              top={item.top}
-                              height={item.height}
-                              style={item.style}
-                              zIndex={item.zIndex}
+                              bottom={item.bottom}
                               onNavigate={handleNavigateToStudent}
                               isCoarse={isCoarsePointer}
                             />
@@ -1254,6 +1274,7 @@ export default function WeeklyComplianceView({ orgId }) {
             </>
           )}
         </div>
-    </Card>
+      </Card>
+    </div>
   )
 }
