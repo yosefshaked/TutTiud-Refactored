@@ -219,8 +219,8 @@ export default function DashboardPage() {
               <WeeklyComplianceView orgId={activeOrgId} />
             </div>
             
-            {/* Sidebar - positioned to the left of the content */}
-            <div className="absolute left-0 top-0 hidden xl:block" style={{ width: "260px", left: "max(0px, calc((100vw - 1280px - 260px - 1.5rem) / 2))" }}>
+            {/* Sidebar - positioned to the left of the content (right in RTL) */}
+            <div className="absolute top-0 hidden xl:block" style={{ width: "260px", right: "max(0px, calc((100vw - 1280px - 260px - 1.5rem) / 2))" }}>
               <InstructorLegend orgId={activeOrgId} />
             </div>
           </div>
