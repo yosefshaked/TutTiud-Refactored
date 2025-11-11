@@ -212,21 +212,22 @@ export default function DashboardPage() {
             <InstructorLegend orgId={activeOrgId} />
           </div>
 
-          {/* Desktop: weekly view in container, legend adjacent */}
+          {/* Desktop: weekly view full width, legend positioned absolutely outside */}
           <div className="relative hidden lg:block">
-            {/* Container for both - allows legend to position relative to content */}
-            <div className="mx-auto w-full" style={{ maxWidth: "min(calc(1280px + 220px + 1.5rem), 100vw)" }}>
-              <div className="flex items-start gap-lg">
-                {/* Main content - full width up to 1280px */}
-                <div className="min-w-0 flex-1 px-sm sm:px-md lg:px-xl" style={{ maxWidth: "1280px" }}>
-                  <WeeklyComplianceView orgId={activeOrgId} />
-                </div>
-                
-                {/* Sidebar - only shows when there's enough space */}
-                <div className="hidden w-[220px] flex-shrink-0 xl:block">
-                  <InstructorLegend orgId={activeOrgId} />
-                </div>
-              </div>
+            {/* Main content - full 1280px width, centered */}
+            <div className="mx-auto w-full px-sm sm:px-md lg:px-xl" style={{ maxWidth: "min(1280px, 100vw)" }}>
+              <WeeklyComplianceView orgId={activeOrgId} />
+            </div>
+            
+            {/* Sidebar - positioned absolutely outside the content area, only on xl screens */}
+            <div 
+              className="absolute top-0 hidden xl:block" 
+              style={{ 
+                width: "220px",
+                right: "calc(50% + min(1280px, 100vw) / 2 + 1.5rem)"
+              }}
+            >
+              <InstructorLegend orgId={activeOrgId} />
             </div>
           </div>
         </div>
