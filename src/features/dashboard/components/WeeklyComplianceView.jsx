@@ -384,121 +384,114 @@ function layoutDaySessions(day, window, {
     return (a.session.studentName || '').localeCompare(b.session.studentName || '', 'he')
   })
 
-  const clusters = []
-  let currentCluster = null
+  // Build collision groups: sessions that visually overlap
+  const collisionGroups = []
+  let currentGroup = null
 
   for (const event of events) {
-    if (!currentCluster) {
-      currentCluster = { events: [event], maxEnd: event.end }
+    if (!currentGroup) {
+      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start }
       continue
     }
 
-    if (event.start < currentCluster.maxEnd) {
-      currentCluster.events.push(event)
-      currentCluster.maxEnd = Math.max(currentCluster.maxEnd, event.end)
+    // Check if this event overlaps with any event in the current group
+    const overlaps = event.start < currentGroup.maxEnd
+    
+    if (overlaps) {
+      currentGroup.events.push(event)
+      currentGroup.maxEnd = Math.max(currentGroup.maxEnd, event.end)
+      currentGroup.minStart = Math.min(currentGroup.minStart, event.start)
     } else {
-      clusters.push(currentCluster)
-      currentCluster = { events: [event], maxEnd: event.end }
+      collisionGroups.push(currentGroup)
+      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start }
     }
   }
 
-  if (currentCluster) {
-    clusters.push(currentCluster)
+  if (currentGroup) {
+    collisionGroups.push(currentGroup)
   }
 
   const chips = []
-  const hiddenByStart = new Map()
-  const visibleMetrics = new Map()
+  const overflowBadges = []
+  const maxBadgeTop = Math.max(0, columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP)
 
-  for (const cluster of clusters) {
-    const columnEndTimes = []
-    for (const event of cluster.events) {
-      let assignedColumn = columnEndTimes.findIndex(end => event.start >= end)
-      if (assignedColumn === -1) {
-        assignedColumn = columnEndTimes.length
-        columnEndTimes.push(event.end)
-      } else {
-        columnEndTimes[assignedColumn] = event.end
+  // Process each collision group with strict "Max 2" rule
+  for (const group of collisionGroups) {
+    const totalEvents = group.events.length
+
+    if (totalEvents <= MAX_VISIBLE_CHIPS) {
+      // No overflow: display all events side-by-side
+      const widthPercent = 100 / totalEvents
+      const visibleWidth = totalEvents === 1
+        ? '100%'
+        : `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
+      const horizontalOffsetPx = totalEvents === 1 ? 0 : COLUMN_GAP_PX / 2
+
+      for (let columnIndex = 0; columnIndex < totalEvents; columnIndex += 1) {
+        const event = group.events[columnIndex]
+        const leftPercent = columnIndex * widthPercent
+        const leftValue = totalEvents === 1
+          ? '0'
+          : `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
+        const top = Math.round(event.top)
+
+        chips.push({
+          session: event.session,
+          top,
+          height: chipHeight,
+          style: {
+            left: leftValue,
+            width: totalEvents === 1 ? '100%' : visibleWidth,
+          },
+          zIndex: totalEvents - columnIndex,
+          startMinutes: event.start,
+        })
       }
-      event.columnIndex = assignedColumn
-    }
+    } else {
+      // Overflow: show first 2 side-by-side + badge below
+      const widthPercent = 100 / MAX_VISIBLE_CHIPS
+      const visibleWidth = `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
+      const horizontalOffsetPx = COLUMN_GAP_PX / 2
 
-    const totalColumns = columnEndTimes.length || 1
-    const visibleColumns = Math.max(1, Math.min(totalColumns, MAX_VISIBLE_CHIPS))
-    const widthPercent = 100 / visibleColumns
-    const visibleWidth = visibleColumns === 1
-      ? '100%'
-      : `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
-    const horizontalOffsetPx = visibleColumns === 1 ? 0 : COLUMN_GAP_PX / 2
+      // Display first 2 chips
+      for (let columnIndex = 0; columnIndex < MAX_VISIBLE_CHIPS; columnIndex += 1) {
+        const event = group.events[columnIndex]
+        const leftPercent = columnIndex * widthPercent
+        const leftValue = `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
+        const top = Math.round(event.top)
 
-    for (const event of cluster.events) {
-      const shouldHide = totalColumns > MAX_VISIBLE_CHIPS && event.columnIndex >= MAX_VISIBLE_CHIPS
-      const columnIndex = Math.min(event.columnIndex, visibleColumns - 1)
-      const leftPercent = columnIndex * widthPercent
-      const leftValue = visibleColumns === 1
-        ? '0'
-        : `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
-      const top = Math.round(event.top)
-
-      if (shouldHide) {
-        const hidden = hiddenByStart.get(event.start) || []
-        hidden.push(event.session)
-        hiddenByStart.set(event.start, hidden)
-        continue
+        chips.push({
+          session: event.session,
+          top,
+          height: chipHeight,
+          style: {
+            left: leftValue,
+            width: visibleWidth,
+          },
+          zIndex: MAX_VISIBLE_CHIPS - columnIndex,
+          startMinutes: event.start,
+        })
       }
 
-      const metric = {
-        leftPercent,
-        rightPercent: leftPercent + widthPercent,
-        bottom: top + chipHeight,
-      }
-      const metricsForStart = visibleMetrics.get(event.start) || []
-      metricsForStart.push(metric)
-      visibleMetrics.set(event.start, metricsForStart)
+      // Collect hidden sessions (all after the first 2)
+      const hiddenSessions = group.events.slice(MAX_VISIBLE_CHIPS).map(e => e.session)
 
-      chips.push({
-        session: event.session,
-        top,
-        height: chipHeight,
-        style: {
-          left: leftValue,
-          width: visibleColumns === 1 ? '100%' : visibleWidth,
-        },
-        zIndex: visibleColumns - columnIndex,
-        startMinutes: event.start,
+      // Calculate badge position: directly below the visible chips
+      const relativeStart = Math.max(0, group.minStart - startMinutes)
+      const baseTop = (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+      const clusterBottom = baseTop + chipHeight
+      const badgeTop = Math.min(maxBadgeTop, clusterBottom + OVERFLOW_BADGE_VERTICAL_GAP)
+
+      overflowBadges.push({
+        sessions: hiddenSessions,
+        top: badgeTop,
+        centerPercent: 50, // Center the badge
+        startMinutes: group.minStart,
       })
     }
   }
 
   chips.sort((a, b) => a.top - b.top)
-
-  const overflowBadges = []
-  const maxBadgeTop = Math.max(0, columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP)
-
-  for (const [start, sessions] of hiddenByStart.entries()) {
-    const metrics = visibleMetrics.get(start) || []
-    const relativeStart = Math.max(0, start - startMinutes)
-    const baseTop = (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
-    const clusterBottom = metrics.length
-      ? Math.max(...metrics.map(metric => metric.bottom))
-      : baseTop + chipHeight
-    const badgeTop = Math.min(maxBadgeTop, clusterBottom + OVERFLOW_BADGE_VERTICAL_GAP)
-
-    let centerPercent = 50
-    if (metrics.length) {
-      const minLeft = Math.min(...metrics.map(metric => metric.leftPercent))
-      const maxRight = Math.max(...metrics.map(metric => metric.rightPercent))
-      centerPercent = Math.min(100, Math.max(0, (minLeft + maxRight) / 2))
-    }
-
-    overflowBadges.push({
-      sessions,
-      top: badgeTop,
-      centerPercent,
-      startMinutes: start,
-    })
-  }
-
   overflowBadges.sort((a, b) => a.startMinutes - b.startMinutes)
 
   return { chips, overflowBadges }
