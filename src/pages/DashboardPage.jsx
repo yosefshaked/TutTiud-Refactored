@@ -203,7 +203,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Weekly compliance section with sidebar - breaks out of max-width on desktop */}
+      {/* Weekly compliance section with sidebar - legend positioned outside content */}
       {tenantClientReady && activeOrgHasConnection ? (
         <div className="w-full">
           {/* Mobile: stacked layout within container */}
@@ -212,18 +212,16 @@ export default function DashboardPage() {
             <InstructorLegend orgId={activeOrgId} />
           </div>
 
-          {/* Desktop: sidebar layout that breaks container */}
-          <div className="hidden lg:block">
-            <div className="relative mx-auto flex w-full max-w-[1280px] items-start gap-lg">
-              {/* Main content - uses remaining space */}
-              <div className="min-w-0 flex-1">
-                <WeeklyComplianceView orgId={activeOrgId} />
-              </div>
-              
-              {/* Sidebar - fixed width, always visible */}
-              <div className="w-[260px] shrink-0">
-                <InstructorLegend orgId={activeOrgId} />
-              </div>
+          {/* Desktop: full-width content with absolute positioned sidebar */}
+          <div className="relative hidden lg:block">
+            {/* Main content - full 1280px width, same as cards above */}
+            <div className="mx-auto w-full px-sm sm:px-md lg:px-xl" style={{ maxWidth: "min(1280px, 100vw)" }}>
+              <WeeklyComplianceView orgId={activeOrgId} />
+            </div>
+            
+            {/* Sidebar - positioned to the left of the content */}
+            <div className="absolute left-0 top-0 hidden xl:block" style={{ width: "260px", left: "max(0px, calc((100vw - 1280px - 260px - 1.5rem) / 2))" }}>
+              <InstructorLegend orgId={activeOrgId} />
             </div>
           </div>
         </div>
