@@ -224,7 +224,7 @@ export default function DashboardPage() {
               className="absolute top-0 hidden xl:block" 
               style={{ 
                 width: "220px",
-                right: "calc(50% + min(1280px, 100vw) / 2 + 1.5rem)"
+                right: "calc(50% + min(1280px, 100vw) / 2 + 0.75rem)"
               }}
             >
               <InstructorLegend orgId={activeOrgId} />
