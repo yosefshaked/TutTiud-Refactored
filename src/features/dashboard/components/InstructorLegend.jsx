@@ -1,119 +1,123 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
+import Card from '@/components/ui/CustomCard.jsx'
+import { fetchInstructorLegend } from '@/api/weekly-compliance.js'
 import { cn } from '@/lib/utils'
 
 import { buildLegendStyle } from './color-utils.js'
 
-function LegendEntries({ legend, itemClassName = '' }) {
+function LegendList({ legend }) {
   if (!Array.isArray(legend) || legend.length === 0) {
     return null
   }
 
   return legend.map(item => (
-    <div key={item.id} className={cn('flex items-center gap-xs text-sm text-muted-foreground', itemClassName)}>
-      <span
-        aria-hidden="true"
-        className="inline-block h-3 w-3 rounded-full border border-border"
-        style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
-      />
-      <span className="truncate">{item.name}</span>
-      {item.isActive === false ? (
-        <span className="text-xs text-destructive">מדריך לא פעיל</span>
-      ) : null}
+    <div
+      key={item.id}
+      className="flex items-center justify-between gap-sm rounded-lg bg-muted/30 px-sm py-xxs text-sm text-foreground"
+    >
+      <span className="truncate" title={item.name}>
+        {item.name}
+      </span>
+      <span className="flex items-center gap-xs text-xs">
+        <span
+          aria-hidden="true"
+          className="inline-block h-3 w-3 shrink-0 rounded-full border border-border"
+          style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
+        />
+        {item.isActive === false ? (
+          <span className="text-destructive">מדריך לא פעיל</span>
+        ) : null}
+      </span>
     </div>
   ))
 }
 
-export function InlineInstructorLegend({ legend, isLoading }) {
-  if (!legend?.length && !isLoading) {
-    return (
-      <p className="mb-lg text-sm text-muted-foreground">
-        אין מדריכים להצגה בשבוע זה.
-      </p>
-    )
-  }
-
-  if (!legend?.length) {
-    return null
-  }
-
-  return (
-    <div className="mb-lg flex flex-wrap gap-sm md:hidden">
-      <LegendEntries legend={legend} />
-    </div>
-  )
-}
-
-export function FloatingInstructorLegend({ legend }) {
-  const legendRef = useRef(null)
-  const [isFloating, setIsFloating] = useState(false)
+export default function InstructorLegend({ orgId, className }) {
+  const [legend, setLegend] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    if (!orgId) {
+      setLegend([])
+      setError(null)
       return undefined
     }
 
-    let frame = null
-    const TOP_OFFSET = 16
+    let isMounted = true
+    const controller = new AbortController()
 
-    const evaluate = () => {
-      frame = null
-      const node = legendRef.current
-      if (!node) {
-        return
-      }
-      if (node.getClientRects().length === 0) {
-        setIsFloating(prev => (prev === false ? prev : false))
-        return
-      }
-      const { top } = node.getBoundingClientRect()
-      const floating = top <= TOP_OFFSET + 1
-      setIsFloating(prev => (prev === floating ? prev : floating))
-    }
+    setIsLoading(true)
+    setError(null)
 
-    const handleScroll = () => {
-      if (frame !== null) {
-        return
-      }
-      frame = window.requestAnimationFrame(evaluate)
-    }
-
-    handleScroll()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    window.addEventListener('resize', handleScroll)
+    fetchInstructorLegend({ orgId, signal: controller.signal })
+      .then(result => {
+        if (!isMounted) {
+          return
+        }
+        setLegend(Array.isArray(result) ? result : [])
+      })
+      .catch(fetchError => {
+        if (fetchError.name === 'AbortError') {
+          return
+        }
+        if (!isMounted) {
+          return
+        }
+        console.error('Failed to load instructor legend', fetchError)
+        setError(fetchError)
+        setLegend([])
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      })
 
     return () => {
-      window.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('resize', handleScroll)
-      if (frame !== null) {
-        window.cancelAnimationFrame(frame)
-      }
+      isMounted = false
+      controller.abort()
     }
-  }, [])
+  }, [orgId])
 
-  if (!legend?.length) {
-    return null
-  }
+  const content = useMemo(() => {
+    if (isLoading) {
+      return (
+        <p className="text-sm text-muted-foreground">טוען מדריכים...</p>
+      )
+    }
+
+    if (error) {
+      return (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-sm text-destructive">
+          <p className="text-sm font-medium">אירעה שגיאה בטעינת רשימת המדריכים.</p>
+          <p className="mt-xxs text-xs">נסו לרענן את הדף או לחזור מאוחר יותר.</p>
+        </div>
+      )
+    }
+
+    if (!legend.length) {
+      return (
+        <p className="text-sm text-muted-foreground">אין מדריכים להצגה.</p>
+      )
+    }
+
+    return (
+      <div className="space-y-xs">
+        <LegendList legend={legend} />
+      </div>
+    )
+  }, [error, isLoading, legend])
 
   return (
-    <div className="hidden md:block md:shrink-0 md:basis-[16rem]" aria-hidden="false">
-      <div
-        ref={legendRef}
-        className={cn(
-          'sticky top-4 z-30 w-[16rem] max-w-full space-y-sm rounded-xl border border-border bg-surface/95 p-md text-right shadow-sm transition-all duration-300 ease-out',
-          isFloating ? 'opacity-100 shadow-lg' : 'opacity-95',
-        )}
-        style={{ maxHeight: 'calc(100vh - 3rem)' }}
-      >
-        <p className="text-sm font-semibold text-foreground">מקרא מדריכים</p>
-        <div className="space-y-xs">
-          <LegendEntries legend={legend} itemClassName="justify-between rounded-lg bg-muted/40 px-sm py-xxs" />
+    <div className={cn('lg:sticky lg:top-4', className)}>
+      <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+        <h2 className="text-base font-semibold text-foreground">מקרא מדריכים</h2>
+        <div className="mt-sm space-y-sm">
+          {content}
         </div>
-      </div>
+      </Card>
     </div>
   )
 }

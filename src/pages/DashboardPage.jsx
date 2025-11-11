@@ -9,6 +9,7 @@ import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
 import WeeklyComplianceView from "@/features/dashboard/components/WeeklyComplianceView.jsx"
+import InstructorLegend from "@/features/dashboard/components/InstructorLegend.jsx"
 
 /**
  * Build greeting with proper fallback chain:
@@ -193,7 +194,10 @@ export default function DashboardPage() {
       </div>
 
       {tenantClientReady && activeOrgHasConnection ? (
-        <WeeklyComplianceView orgId={activeOrgId} />
+        <div className="grid gap-lg lg:grid-cols-[minmax(220px,260px)_1fr]">
+          <InstructorLegend orgId={activeOrgId} />
+          <WeeklyComplianceView orgId={activeOrgId} />
+        </div>
       ) : (
         <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
           <p className="text-sm text-muted-foreground">
