@@ -214,14 +214,14 @@ export default function DashboardPage() {
 
           {/* Desktop: side-by-side layout */}
           <div className="hidden lg:block">
-            <div className="mx-auto flex w-full items-start gap-lg" style={{ maxWidth: "calc(1280px + 260px + 1.5rem)" }}>
-              {/* Main content - full 1280px width, same as cards above */}
-              <div className="min-w-0 flex-shrink-0" style={{ width: "1280px" }}>
+            <div className="mx-auto flex w-full items-start gap-xl px-sm sm:px-md lg:px-xl" style={{ maxWidth: "min(1280px, 100vw)" }}>
+              {/* Main content - takes available space */}
+              <div className="min-w-0 flex-1">
                 <WeeklyComplianceView orgId={activeOrgId} />
               </div>
               
-              {/* Sidebar - fixed width on the left (visual left in RTL) */}
-              <div className="w-[260px] flex-shrink-0">
+              {/* Sidebar - narrower width, sticky positioning */}
+              <div className="w-[220px] flex-shrink-0">
                 <InstructorLegend orgId={activeOrgId} />
               </div>
             </div>
