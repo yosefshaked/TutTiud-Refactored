@@ -194,13 +194,9 @@ export default function DashboardPage() {
       </div>
 
       {tenantClientReady && activeOrgHasConnection ? (
-        <div className="relative">
-          <div className="lg:grid lg:grid-cols-[minmax(220px,260px)_1fr] lg:gap-lg">
-            <div className="lg:sticky lg:top-[calc(4rem+1px)] lg:self-start lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto">
-              <InstructorLegend orgId={activeOrgId} />
-            </div>
-            <WeeklyComplianceView orgId={activeOrgId} />
-          </div>
+        <div className="lg:grid lg:grid-cols-[minmax(220px,260px)_1fr] lg:gap-lg">
+          <InstructorLegend orgId={activeOrgId} />
+          <WeeklyComplianceView orgId={activeOrgId} />
         </div>
       ) : (
         <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">

@@ -46,7 +46,7 @@ const GRID_ROW_HEIGHT = 44
 const COLUMN_GAP_PX = 6
 const MAX_VISIBLE_CHIPS = 2
 const WEEK_VIEW_MIN_WIDTH = 1015
-const OVERFLOW_BADGE_HEIGHT = 28
+const OVERFLOW_BADGE_HEIGHT = 32
 const OVERFLOW_BADGE_VERTICAL_GAP = 4
 
 function formatTimeLabel(minutes) {
@@ -330,15 +330,16 @@ function buildStatusLabel(status) {
 function layoutDaySessions(day, window, {
   sessionDuration = SESSION_DURATION_MINUTES,
   columnHeight: providedColumnHeight,
+  slotPositions = null,
 } = {}) {
   if (!day || !window) {
-    return { chips: [], overflowBadges: [] }
+    return { chips: [], overflowBadges: [], slotHeights: new Map() }
   }
 
   const startMinutes = parseMinutes(window.startMinutes ?? window.start)
   const endMinutes = parseMinutes(window.endMinutes ?? window.end)
   if (startMinutes === null || endMinutes === null) {
-    return { chips: [], overflowBadges: [] }
+    return { chips: [], overflowBadges: [], slotHeights: new Map() }
   }
 
   const duration = Math.max(15, Number(sessionDuration) || SESSION_DURATION_MINUTES)
@@ -363,18 +364,25 @@ function layoutDaySessions(day, window, {
       continue
     }
     const relativeStart = timeMinutes - startMinutes
-    const top = (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+    const slotMinutes = startMinutes + Math.floor(relativeStart / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES
+    
+    // Use cumulative position if available, otherwise fall back to fixed grid
+    const top = slotPositions && slotPositions.has(slotMinutes)
+      ? slotPositions.get(slotMinutes)
+      : (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+    
     const end = timeMinutes + duration
     events.push({
       session,
       start: timeMinutes,
       end,
       top,
+      slotMinutes,
     })
   }
 
   if (!events.length) {
-    return { chips: [], overflowBadges: [] }
+    return { chips: [], overflowBadges: [], slotHeights: new Map() }
   }
 
   events.sort((a, b) => {
@@ -390,7 +398,7 @@ function layoutDaySessions(day, window, {
 
   for (const event of events) {
     if (!currentGroup) {
-      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start }
+      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start, slotMinutes: event.slotMinutes }
       continue
     }
 
@@ -403,7 +411,7 @@ function layoutDaySessions(day, window, {
       currentGroup.minStart = Math.min(currentGroup.minStart, event.start)
     } else {
       collisionGroups.push(currentGroup)
-      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start }
+      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start, slotMinutes: event.slotMinutes }
     }
   }
 
@@ -413,6 +421,15 @@ function layoutDaySessions(day, window, {
 
   const chips = []
   const overflowBadges = []
+  const slotHeights = new Map()
+  
+  // Initialize all slots with base height
+  const totalSlots = Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1
+  for (let i = 0; i < totalSlots; i += 1) {
+    const slotMinutes = startMinutes + (i * GRID_INTERVAL_MINUTES)
+    slotHeights.set(slotMinutes, GRID_ROW_HEIGHT)
+  }
+  
   const maxBadgeTop = Math.max(0, columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP)
 
   // Process each collision group with strict "Max 2" rule
@@ -476,17 +493,23 @@ function layoutDaySessions(day, window, {
       // Collect hidden sessions (all after the first 2)
       const hiddenSessions = group.events.slice(MAX_VISIBLE_CHIPS).map(e => e.session)
 
-      // Calculate badge position: directly below the visible chips
-      const relativeStart = Math.max(0, group.minStart - startMinutes)
-      const baseTop = (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+      // Calculate badge position and update slot height
+      const baseTop = group.events[0].top
       const clusterBottom = baseTop + chipHeight
-      const badgeTop = Math.min(maxBadgeTop, clusterBottom + OVERFLOW_BADGE_VERTICAL_GAP)
+      const badgeBottom = clusterBottom + OVERFLOW_BADGE_VERTICAL_GAP + OVERFLOW_BADGE_HEIGHT
+      
+      // Find which slot this overflow belongs to and increase its height
+      const slotMinutes = group.slotMinutes
+      const requiredHeight = badgeBottom - baseTop + 8 // Add some padding
+      const currentHeight = slotHeights.get(slotMinutes) || GRID_ROW_HEIGHT
+      slotHeights.set(slotMinutes, Math.max(currentHeight, requiredHeight))
 
       overflowBadges.push({
         sessions: hiddenSessions,
-        top: badgeTop,
+        top: clusterBottom + OVERFLOW_BADGE_VERTICAL_GAP,
         centerPercent: 50, // Center the badge
         startMinutes: group.minStart,
+        slotMinutes, // Track which slot this belongs to
       })
     }
   }
@@ -494,7 +517,7 @@ function layoutDaySessions(day, window, {
   chips.sort((a, b) => a.top - b.top)
   overflowBadges.sort((a, b) => a.startMinutes - b.startMinutes)
 
-  return { chips, overflowBadges }
+  return { chips, overflowBadges, slotHeights }
 }
 
 function StudentDetailPopover({
@@ -721,7 +744,7 @@ function OverflowBadge({ sessions, top, centerPercent, onNavigate }) {
         <button
           type="button"
           aria-label={`עוד ${total} תלמידים`}
-          className="absolute flex min-h-[28px] min-w-[72px] items-center justify-center rounded-md border border-dashed border-primary bg-primary/5 px-sm py-xxs text-xs font-semibold text-primary shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          className="absolute flex h-[32px] min-w-[88px] items-center justify-center rounded-md border border-dashed border-primary bg-primary/10 px-md py-xs text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           style={computedStyle}
         >
           +{total} נוספים
@@ -1000,7 +1023,8 @@ export default function WeeklyComplianceView({ orgId }) {
   const gridHeight = windowMetrics?.columnHeight ?? gridSlots.length * GRID_ROW_HEIGHT
   const sessionDuration = data?.sessionDurationMinutes || SESSION_DURATION_MINUTES
 
-  const dayLayouts = useMemo(() => {
+  // First pass: calculate layouts to determine required slot heights
+  const initialLayouts = useMemo(() => {
     const layoutMap = new Map()
     for (const day of days) {
       layoutMap.set(
@@ -1013,6 +1037,67 @@ export default function WeeklyComplianceView({ orgId }) {
     }
     return layoutMap
   }, [days, timeWindow, sessionDuration, windowMetrics?.columnHeight])
+
+  // Calculate unified slot heights across all days (max height for each slot)
+  const unifiedSlotHeights = useMemo(() => {
+    const merged = new Map()
+    
+    // Initialize with base heights
+    for (const slotMinutes of gridSlots) {
+      merged.set(slotMinutes, GRID_ROW_HEIGHT)
+    }
+    
+    // Find max height needed for each slot across all days
+    for (const layout of initialLayouts.values()) {
+      if (layout?.slotHeights) {
+        for (const [slotMinutes, height] of layout.slotHeights.entries()) {
+          const currentMax = merged.get(slotMinutes) || GRID_ROW_HEIGHT
+          merged.set(slotMinutes, Math.max(currentMax, height))
+        }
+      }
+    }
+    
+    return merged
+  }, [initialLayouts, gridSlots])
+
+  // Calculate cumulative positions for each slot start
+  const slotCumulativePositions = useMemo(() => {
+    const positions = new Map()
+    let cumulative = 0
+    
+    for (const slotMinutes of gridSlots) {
+      positions.set(slotMinutes, cumulative)
+      const slotHeight = unifiedSlotHeights.get(slotMinutes) || GRID_ROW_HEIGHT
+      cumulative += slotHeight
+    }
+    
+    return positions
+  }, [gridSlots, unifiedSlotHeights])
+
+  // Second pass: recalculate layouts with cumulative positions
+  const dayLayouts = useMemo(() => {
+    const layoutMap = new Map()
+    for (const day of days) {
+      layoutMap.set(
+        day.date,
+        layoutDaySessions(day, timeWindow, {
+          sessionDuration,
+          columnHeight: windowMetrics?.columnHeight,
+          slotPositions: slotCumulativePositions,
+        }),
+      )
+    }
+    return layoutMap
+  }, [days, timeWindow, sessionDuration, windowMetrics?.columnHeight, slotCumulativePositions])
+
+  // Calculate total grid height based on dynamic slot heights
+  const dynamicGridHeight = useMemo(() => {
+    let total = 0
+    for (const slotMinutes of gridSlots) {
+      total += unifiedSlotHeights.get(slotMinutes) || GRID_ROW_HEIGHT
+    }
+    return total
+  }, [gridSlots, unifiedSlotHeights])
 
   const mobileSessionMaps = useMemo(() => {
     const result = new Map()
@@ -1189,20 +1274,21 @@ export default function WeeklyComplianceView({ orgId }) {
                     })}
                     <div
                       className="relative border-l border-border"
-                      style={{ height: `${gridHeight}px` }}
+                      style={{ height: `${dynamicGridHeight}px` }}
                     >
-                      <div
-                        className="grid text-sm text-muted-foreground"
-                        style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
-                      >
-                        {gridSlots.map(minutes => (
-                          <div
-                            key={`time-${minutes}`}
-                            className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
-                          >
-                            {formatTimeLabel(minutes)}
-                          </div>
-                        ))}
+                      <div className="text-sm text-muted-foreground">
+                        {gridSlots.map(minutes => {
+                          const slotHeight = unifiedSlotHeights.get(minutes) || GRID_ROW_HEIGHT
+                          return (
+                            <div
+                              key={`time-${minutes}`}
+                              className="flex items-start justify-end border-b border-border pr-sm pt-xxs"
+                              style={{ height: `${slotHeight}px` }}
+                            >
+                              {formatTimeLabel(minutes)}
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                     {days.map(day => {
@@ -1216,19 +1302,19 @@ export default function WeeklyComplianceView({ orgId }) {
                             'relative border-b border-l border-border',
                             day.isToday ? 'bg-primary/5' : 'bg-background/60',
                           )}
-                          style={{ height: `${gridHeight}px` }}
+                          style={{ height: `${dynamicGridHeight}px` }}
                         >
-                          <div
-                            className="grid"
-                            aria-hidden="true"
-                            style={{ gridTemplateRows: `repeat(${gridSlots.length}, ${GRID_ROW_HEIGHT}px)` }}
-                          >
-                            {gridSlots.map(minutes => (
-                              <div
-                                key={`${day.date}-row-${minutes}`}
-                                className="border-b border-border/70"
-                              />
-                            ))}
+                          <div aria-hidden="true">
+                            {gridSlots.map(minutes => {
+                              const slotHeight = unifiedSlotHeights.get(minutes) || GRID_ROW_HEIGHT
+                              return (
+                                <div
+                                  key={`${day.date}-row-${minutes}`}
+                                  className="border-b border-border/70"
+                                  style={{ height: `${slotHeight}px` }}
+                                />
+                              )
+                            })}
                           </div>
                           {chipItems.map(item => (
                             <StudentChip
