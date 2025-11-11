@@ -111,7 +111,7 @@ export default function InstructorLegend({ orgId, className }) {
   }, [error, isLoading, legend])
 
   return (
-    <div className={cn('lg:sticky lg:top-4', className)}>
+    <div className={cn(className)}>
       <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
         <h2 className="text-base font-semibold text-foreground">מקרא מדריכים</h2>
         <div className="mt-sm space-y-sm">
