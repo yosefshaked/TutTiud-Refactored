@@ -411,52 +411,26 @@ function layoutDaySessions(day, window, {
     }
 
     const top = calculateChipTopPosition(timeMinutes, startMinutes, slotPositions)
-    
-    // For :15/:45 sessions, create a split-chip effect
-    const isSplitChip = isQuarterHour(timeMinutes)
-    
-    if (isSplitChip) {
-      // Calculate the slot boundary position
+
+    // Compute a boundary hint offset for :15/:45 sessions (visual-only divider inside single chip)
+    let boundaryHintOffset = null
+    if (isQuarterHour(timeMinutes)) {
       const slotIndex = Math.floor((timeMinutes - startMinutes) / GRID_INTERVAL_MINUTES)
       const nextSlotMinutes = startMinutes + ((slotIndex + 1) * GRID_INTERVAL_MINUTES)
       const boundaryTop = calculateChipTopPosition(nextSlotMinutes, startMinutes, slotPositions)
-      
-      // Bottom half (in first slot) - from session start to boundary
-      const bottomHalfHeight = boundaryTop - top
-      events.push({
-        session,
-        startTime: timeMinutes,
-        endTime: timeMinutes + duration,
-        top,
-        bottom: boundaryTop,
-        chipHeight: bottomHalfHeight,
-        isSplitBottom: true,
-        splitPairId: `${session.id}-${timeMinutes}`,
-      })
-      
-      // Top half (in second slot) - from boundary to end
-      const topHalfHeight = baseChipHeight - bottomHalfHeight
-      events.push({
-        session,
-        startTime: timeMinutes,
-        endTime: timeMinutes + duration,
-        top: boundaryTop,
-        bottom: boundaryTop + topHalfHeight,
-        chipHeight: topHalfHeight,
-        isSplitTop: true,
-        splitPairId: `${session.id}-${timeMinutes}`,
-      })
-    } else {
-      // Regular chip
-      events.push({
-        session,
-        startTime: timeMinutes,
-        endTime: timeMinutes + duration,
-        top,
-        bottom: top + baseChipHeight,
-        chipHeight: baseChipHeight,
-      })
+      boundaryHintOffset = Math.max(0, boundaryTop - top)
     }
+
+    // Single chip per session (Outlook-style)
+    events.push({
+      session,
+      startTime: timeMinutes,
+      endTime: timeMinutes + duration,
+      top,
+      bottom: top + baseChipHeight,
+      chipHeight: baseChipHeight,
+      boundaryHintOffset,
+    })
   }
 
   if (!events.length) {
@@ -471,39 +445,18 @@ function layoutDaySessions(day, window, {
     return (a.session.studentName || '').localeCompare(b.session.studentName || '', 'he')
   })
 
-  // Group split pairs together for unified processing
+  // Group sessions for unified processing (single event per session)
   const sessionGroups = []
-  const processedSplitPairs = new Set()
-  
   for (const event of events) {
-    if (event.splitPairId && processedSplitPairs.has(event.splitPairId)) {
-      continue // Already processed this split pair
-    }
-    
-    if (event.splitPairId) {
-      // Find both halves of the split pair
-      const pairEvents = events.filter(e => e.splitPairId === event.splitPairId)
-      sessionGroups.push({
-        events: pairEvents,
-        startTime: event.startTime,
-        session: event.session,
-        isSplit: true,
-        splitPairId: event.splitPairId,
-        minTop: Math.min(...pairEvents.map(e => e.top)),
-        maxBottom: Math.max(...pairEvents.map(e => e.bottom)),
-      })
-      processedSplitPairs.add(event.splitPairId)
-    } else {
-      // Regular single event
-      sessionGroups.push({
-        events: [event],
-        startTime: event.startTime,
-        session: event.session,
-        isSplit: false,
-        minTop: event.top,
-        maxBottom: event.bottom,
-      })
-    }
+    sessionGroups.push({
+      events: [event],
+      startTime: event.startTime,
+      session: event.session,
+      isSplit: false,
+      minTop: event.top,
+      maxBottom: event.bottom,
+      boundaryHintOffset: event.boundaryHintOffset,
+    })
   }
 
   // Build collision groups: session groups that visually overlap
@@ -559,7 +512,7 @@ function layoutDaySessions(day, window, {
   for (const group of collisionGroups) {
     const totalSessions = group.sessionGroups.length
 
-    if (totalSessions <= MAX_VISIBLE_CHIPS) {
+  if (totalSessions <= MAX_VISIBLE_CHIPS) {
       // No overflow: display all sessions side-by-side
       const widthPercent = 100 / totalSessions
       const visibleWidth = totalSessions === 1
@@ -574,23 +527,21 @@ function layoutDaySessions(day, window, {
           ? '0'
           : `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
 
-        // Render all events in this session group (both halves for split chips)
-        for (const event of sessionGroup.events) {
-          chips.push({
-            session: event.session,
-            top: Math.round(event.top),
-            height: event.chipHeight,
-            style: {
-              left: leftValue,
-              width: totalSessions === 1 ? '100%' : visibleWidth,
-            },
-            zIndex: totalSessions - columnIndex,
-            startMinutes: event.startTime,
-            isSplitBottom: event.isSplitBottom,
-            isSplitTop: event.isSplitTop,
-            splitPairId: event.splitPairId,
-          })
-        }
+        // Single chip per session group
+        const chipTop = Math.round(sessionGroup.minTop)
+        const chipHeight = Math.max(8, sessionGroup.maxBottom - sessionGroup.minTop)
+        chips.push({
+          session: sessionGroup.session,
+          top: chipTop,
+          height: chipHeight,
+          style: {
+            left: leftValue,
+            width: totalSessions === 1 ? '100%' : visibleWidth,
+          },
+          zIndex: totalSessions - columnIndex,
+          startMinutes: sessionGroup.startTime,
+          boundaryHintOffset: sessionGroup.boundaryHintOffset,
+        })
       }
 
       // Update slot heights for non-overflow groups
@@ -633,23 +584,21 @@ function layoutDaySessions(day, window, {
           const leftPercent = columnIndex * widthPercent
           const leftValue = `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
 
-          // Render all events in this session group (both halves for split chips)
-          for (const event of sessionGroup.events) {
-            chips.push({
-              session: event.session,
-              top: Math.round(event.top),
-              height: event.chipHeight,
-              style: {
-                left: leftValue,
-                width: visibleWidth,
-              },
-              zIndex: MAX_VISIBLE_CHIPS - columnIndex,
-              startMinutes: event.startTime,
-              isSplitBottom: event.isSplitBottom,
-              isSplitTop: event.isSplitTop,
-              splitPairId: event.splitPairId,
-            })
-          }
+          // Single chip per session group
+          const chipTop = Math.round(sessionGroup.minTop)
+          const chipHeight = Math.max(8, sessionGroup.maxBottom - sessionGroup.minTop)
+          chips.push({
+            session: sessionGroup.session,
+            top: chipTop,
+            height: chipHeight,
+            style: {
+              left: leftValue,
+              width: visibleWidth,
+            },
+            zIndex: MAX_VISIBLE_CHIPS - columnIndex,
+            startMinutes: sessionGroup.startTime,
+            boundaryHintOffset: sessionGroup.boundaryHintOffset,
+          })
 
           visibleSessionCount += 1
         }
@@ -666,28 +615,24 @@ function layoutDaySessions(day, window, {
       const groupChipStartIndex = chips.length - visibleSessionCount
       const groupChips = chips.slice(groupChipStartIndex)
       
-      // Count unique sessions per start time (deduplicating split pairs)
+      // Count visible sessions per start time
       const visibleSessionsPerTime = new Map()
       for (const chip of groupChips) {
-        const key = chip.splitPairId || `${chip.session.id}-${chip.startMinutes}`
-        if (!visibleSessionsPerTime.has(`counted-${key}`)) {
-          const count = visibleSessionsPerTime.get(chip.startMinutes) || 0
-          visibleSessionsPerTime.set(chip.startMinutes, count + 1)
-          visibleSessionsPerTime.set(`counted-${key}`, true)
-        }
+        const count = visibleSessionsPerTime.get(chip.startMinutes) || 0
+        visibleSessionsPerTime.set(chip.startMinutes, count + 1)
       }
       
       for (const startTime of startTimes) {
         const sessionsAtTime = sessionsByStartTime.get(startTime)
-        const firstSessionGroup = sessionsAtTime[0]
-        const firstEventAtTime = firstSessionGroup.events[0]
+  const firstSessionGroup = sessionsAtTime[0]
+  const firstEventAtTimeBottom = firstSessionGroup.maxBottom
         
         // Count how many sessions are visible vs hidden at this time
         const visibleAtThisTime = visibleSessionsPerTime.get(startTime) || 0
         const hiddenSessions = sessionsAtTime.slice(visibleAtThisTime)
 
         if (hiddenSessions.length > 0) {
-          const badgeTop = firstEventAtTime.bottom + OVERFLOW_BADGE_VERTICAL_GAP
+          const badgeTop = firstEventAtTimeBottom + OVERFLOW_BADGE_VERTICAL_GAP
           const badgeBottom = badgeTop + OVERFLOW_BADGE_HEIGHT
 
           // If all visible chips in THIS collision group are from the same start time,
@@ -856,8 +801,7 @@ function StudentChip({
   variant = 'grid',
   onNavigate,
   isCoarse,
-  isSplitBottom = false,
-  isSplitTop = false,
+  boundaryHintOffset = null,
 }) {
   const [open, setOpen] = useState(false)
 
@@ -878,13 +822,9 @@ function StudentChip({
   })
 
   const sharedClassName = cn(
-    'flex items-center justify-between gap-xs px-sm py-xxs text-xs font-medium text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
+    'flex items-center justify-between gap-xs px-sm py-xxs text-xs font-medium text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md',
     {
       'hover:opacity-90': !isCoarse,
-      // Split chip styling: round only the appropriate corners
-      'rounded-md': !isSplitBottom && !isSplitTop,
-      'rounded-t-md': isSplitBottom, // Bottom half: round top corners only
-      'rounded-b-md': isSplitTop,     // Top half: round bottom corners only
     },
   )
 
@@ -916,6 +856,13 @@ function StudentChip({
       aria-label={`${session.studentName || '—'} • ${srLabel}`}
       {...handlers}
     >
+      {typeof boundaryHintOffset === 'number' && boundaryHintOffset > 0 && boundaryHintOffset < height ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 h-px bg-white/50"
+          style={{ top: `${boundaryHintOffset}px` }}
+        />
+      ) : null}
       <span className="truncate">{session.studentName || '—'}</span>
       {statusIcon ? (
         <span className="text-base" aria-hidden="true">{statusIcon}</span>
@@ -1565,7 +1512,7 @@ export default function WeeklyComplianceView({ orgId }) {
                           </div>
                           {chipItems.map(item => (
                             <StudentChip
-                              key={item.splitPairId ? `${item.splitPairId}-${item.isSplitTop ? 'top' : 'bottom'}` : `${item.session.studentId}-${item.session.time}`}
+                              key={`${item.session?.studentId ?? item.session?.id}-${item.startMinutes}`}
                               session={item.session}
                               top={item.top}
                               height={item.height}
@@ -1573,8 +1520,7 @@ export default function WeeklyComplianceView({ orgId }) {
                               zIndex={item.zIndex}
                               onNavigate={handleNavigateToStudent}
                               isCoarse={isCoarsePointer}
-                              isSplitBottom={item.isSplitBottom}
-                              isSplitTop={item.isSplitTop}
+                              boundaryHintOffset={item.boundaryHintOffset}
                             />
                           ))}
                           {overflowItems.map(item => (

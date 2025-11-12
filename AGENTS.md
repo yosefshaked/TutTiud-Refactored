@@ -204,24 +204,12 @@
 - `src/components/layout/AppShell.jsx` is the new navigation shell. It renders the mobile bottom tabs + FAB and a desktop sidebar, so wrap future routes with it instead of the legacy `Layout.jsx`.
 
 ### Weekly Compliance Calendar Layout (2025-11)
-- Calendar chip positioning uses precise minute-level calculations in `calculateChipTopPosition()` for accurate "Outlook-style" layout
-- **Split-chip rendering for :15 and :45 sessions**: Quarter-hour sessions are rendered as two visual halves that span across slot boundaries:
-  - Bottom half: Positioned in the first slot (e.g., 16:15-16:30), rounded top corners only
-  - Top half: Positioned in the second slot (e.g., 16:30-16:45), rounded bottom corners only
-  - Both halves share the same `splitPairId` and session data, creating seamless visual "crossing" effect
-  - Both halves receive identical horizontal positioning (same left offset and width) to appear joined vertically
-- **Session-based collision detection**: Layout groups events into `sessionGroups` before collision detection:
-  - Split pairs are bundled together into a single session group using `splitPairId`
-  - Each session group contains all events (1 for regular, 2 for split pairs)
-  - Collision detection compares session groups (not individual events) for overlaps
-  - Split pairs count as ONE session in the MAX_VISIBLE_CHIPS=2 rule
-- Collision detection groups session groups that visually overlap: `sessionGroup.minTop < currentGroup.maxBottom`
-- Max 2 visible sessions per collision group (MAX_VISIBLE_CHIPS=2); remaining sessions shown in granular "+X more" badges
-- Overflow badges positioned per distinct start time within each collision group:
-  - Badge counting uses `visibleSessionsPerTime` Map to track unique sessions (deduplicating split pairs)
-  - When all visible chips in a collision group share same start time: badge centers at 50% to span under both chips
-  - When mixing start times: badge positions at centerPercent calculated from visible session count at that time
-- Dynamic slot height expansion: `slotHeights` Map tracks required height per 30-min slot to accommodate collision groups
+- Chip positioning uses precise minute-level calculations in `calculateChipTopPosition()` for an Outlook-style layout (chips can sit “between” rows).
+- Quarter-hour starts (:15/:45) use a single DOM chip with a subtle internal boundary hint line at the next slot boundary (visual-only; no logical split). This avoids over-counting and simplifies overflow math.
+- Session-based collision detection: events are grouped into `sessionGroups` (one event per session). Collision detection compares groups by `minTop`/`maxBottom`, and the MAX_VISIBLE_CHIPS=2 rule applies per collision group.
+- Max 2 visible sessions per collision group; remaining sessions appear in granular "+X more" badges per distinct start time.
+- Overflow badges: counted per start time; when both visible chips share the same start time, the badge is centered beneath both; otherwise it aligns beneath the corresponding column.
+- Dynamic slot height expansion: `slotHeights` tracks per-slot height to fit chips and badges.
 - Key constants: GRID_ROW_HEIGHT=44px, GRID_INTERVAL_MINUTES=30, SESSION_DURATION_MINUTES=60
 
 ### Onboarding Tour System (2025-10)
