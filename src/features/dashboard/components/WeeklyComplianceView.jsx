@@ -822,7 +822,7 @@ function StudentChip({
   })
 
   const sharedClassName = cn(
-    'flex items-center justify-between gap-xs px-sm py-xxs text-xs font-medium text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md',
+    'relative flex items-center justify-between gap-xs px-sm py-xxs text-xs font-medium text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 rounded-md',
     {
       'hover:opacity-90': !isCoarse,
     },
@@ -859,13 +859,13 @@ function StudentChip({
       {typeof boundaryHintOffset === 'number' && boundaryHintOffset > 0 && boundaryHintOffset < height ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 h-px bg-white/50"
+          className="pointer-events-none absolute left-0 right-0 h-px bg-white/40"
           style={{ top: `${boundaryHintOffset}px` }}
         />
       ) : null}
-      <span className="truncate">{session.studentName || '—'}</span>
+      <span className="relative z-10 truncate">{session.studentName || '—'}</span>
       {statusIcon ? (
-        <span className="text-base" aria-hidden="true">{statusIcon}</span>
+        <span className="relative z-10 text-base" aria-hidden="true">{statusIcon}</span>
       ) : null}
       <span className="sr-only">{srLabel}</span>
     </button>
