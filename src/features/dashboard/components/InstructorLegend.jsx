@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { forwardRef, useEffect, useMemo, useState } from 'react'
 
 import Card from '@/components/ui/CustomCard.jsx'
 import { fetchInstructorLegend } from '@/api/weekly-compliance.js'
@@ -33,7 +33,7 @@ function LegendList({ legend }) {
   ))
 }
 
-export default function InstructorLegend({ orgId, className }) {
+const InstructorLegend = forwardRef(function InstructorLegend({ orgId, className, style }, ref) {
   const [legend, setLegend] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -111,7 +111,7 @@ export default function InstructorLegend({ orgId, className }) {
   }, [error, isLoading, legend])
 
   return (
-    <div className={cn('w-full', className)}>
+    <div ref={ref} className={cn('w-full', className)} style={style}>
       <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
         <h2 className="text-base font-semibold text-foreground">מקרא מדריכים</h2>
         <div className="mt-sm max-h-[calc(100vh-12rem)] space-y-sm overflow-y-auto">
@@ -120,4 +120,6 @@ export default function InstructorLegend({ orgId, className }) {
       </Card>
     </div>
   )
-}
+})
+
+export default InstructorLegend

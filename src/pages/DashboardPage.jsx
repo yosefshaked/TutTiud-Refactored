@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 
 import Card from "@/components/ui/CustomCard.jsx"
@@ -9,6 +9,7 @@ import { useSessionModal } from "@/features/sessions/context/SessionModalContext
 import { authenticatedFetch } from "@/lib/api-client.js"
 import WeeklyComplianceView from "@/features/dashboard/components/WeeklyComplianceView.jsx"
 import InstructorLegend from "@/features/dashboard/components/InstructorLegend.jsx"
+import { useSmartLegendPosition } from "@/features/dashboard/hooks/useSmartLegendPosition.js"
 
 /**
  * Build greeting with proper fallback chain:
@@ -153,111 +154,15 @@ export default function DashboardPage() {
 
   const greeting = buildGreeting(instructorName, profileName, user?.name, user?.email)
 
-  const layoutRef = useRef(null)
-  const desktopColumnRef = useRef(null)
-  const weeklySectionRef = useRef(null)
-  const legendContainerRef = useRef(null)
-  const legendStickyRef = useRef(null)
+  const weeklyCalendarRef = useRef(null)
+  const legendRef = useRef(null)
 
   const legendEnabled = tenantClientReady && activeOrgHasConnection
-
-  const updateLegendPlacement = useCallback(() => {
-    if (!legendEnabled) {
-      return
-    }
-
-    const layoutElement = layoutRef.current
-    const columnElement = desktopColumnRef.current
-    const weeklyElement = weeklySectionRef.current
-    const legendContainer = legendContainerRef.current
-    const legendContent = legendStickyRef.current
-
-    if (!layoutElement || !columnElement || !weeklyElement || !legendContainer || !legendContent) {
-      return
-    }
-
-    const layoutRect = layoutElement.getBoundingClientRect()
-    const columnRect = columnElement.getBoundingClientRect()
-    const weeklyRect = weeklyElement.getBoundingClientRect()
-    const legendWidth = legendContent.offsetWidth
-
-    const horizontalGap = 24
-    const minimumViewportMargin = 16
-    const availableLeft = columnRect.left - layoutRect.left
-    const requiredSpace = legendWidth + horizontalGap + minimumViewportMargin
-
-    if (availableLeft <= requiredSpace) {
-      legendContainer.style.opacity = "0"
-      legendContainer.style.visibility = "hidden"
-      legendContainer.style.pointerEvents = "none"
-      legendContainer.style.width = `${legendWidth}px`
-      return
-    }
-
-    const leftPosition = Math.max(minimumViewportMargin, availableLeft - legendWidth - horizontalGap)
-    legendContainer.style.left = `${leftPosition}px`
-    legendContainer.style.top = `${weeklyRect.top - layoutRect.top}px`
-    legendContainer.style.height = `${weeklyRect.height}px`
-    legendContainer.style.width = `${legendWidth}px`
-    legendContainer.style.opacity = "1"
-    legendContainer.style.visibility = "visible"
-    legendContainer.style.pointerEvents = "auto"
-  }, [legendEnabled])
-
-  useLayoutEffect(() => {
-    const legendContainer = legendContainerRef.current
-    if (!legendEnabled) {
-      if (legendContainer) {
-        legendContainer.style.opacity = "0"
-        legendContainer.style.visibility = "hidden"
-        legendContainer.style.pointerEvents = "none"
-      }
-      return undefined
-    }
-
-    let frameId = null
-    const requestUpdate = () => {
-      if (frameId) {
-        cancelAnimationFrame(frameId)
-      }
-      frameId = requestAnimationFrame(updateLegendPlacement)
-    }
-
-    requestUpdate()
-
-    const resizeListeners = []
-
-    if (typeof window !== "undefined") {
-      const handleResize = () => requestUpdate()
-      window.addEventListener("resize", handleResize)
-      resizeListeners.push(() => window.removeEventListener("resize", handleResize))
-    }
-
-    const observers = []
-    if (typeof ResizeObserver !== "undefined") {
-      const targets = [desktopColumnRef.current, weeklySectionRef.current, legendStickyRef.current]
-      for (const target of targets) {
-        if (!target) {
-          continue
-        }
-        const observer = new ResizeObserver(() => requestUpdate())
-        observer.observe(target)
-        observers.push(observer)
-      }
-    }
-
-    return () => {
-      if (frameId) {
-        cancelAnimationFrame(frameId)
-      }
-      for (const cleanup of resizeListeners) {
-        cleanup()
-      }
-      for (const observer of observers) {
-        observer.disconnect()
-      }
-    }
-  }, [legendEnabled, updateLegendPlacement])
+  const legendStyle = useSmartLegendPosition({
+    calendarRef: weeklyCalendarRef,
+    legendRef,
+    isEnabled: legendEnabled,
+  })
 
   return (
     <div
@@ -329,9 +234,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Desktop xl+: floating legend with synchronized scrolling */}
-      <div ref={layoutRef} className="relative hidden xl:block">
+      <div className="relative hidden xl:block">
         <div
-          ref={desktopColumnRef}
           className="mx-auto flex w-full max-w-[1280px] flex-col gap-xl px-lg py-xl"
         >
           <header className="flex flex-col gap-sm sm:flex-row sm:items-end sm:justify-between">
@@ -374,7 +278,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <div ref={weeklySectionRef} className="relative">
+          <div ref={weeklyCalendarRef} className="relative">
             {legendEnabled ? (
               <WeeklyComplianceView orgId={activeOrgId} />
             ) : (
@@ -388,19 +292,12 @@ export default function DashboardPage() {
         </div>
 
         {legendEnabled ? (
-          <div
-            ref={legendContainerRef}
-            className="pointer-events-none absolute z-10 hidden xl:block"
-            style={{ opacity: 0, visibility: "hidden" }}
-          >
-            <div
-              ref={legendStickyRef}
-              className="pointer-events-auto sticky"
-              style={{ top: "calc(var(--app-shell-header-height, 0px) + 16px)" }}
-            >
-              <InstructorLegend orgId={activeOrgId} className="w-full max-w-xs" />
-            </div>
-          </div>
+          <InstructorLegend
+            ref={legendRef}
+            orgId={activeOrgId}
+            className="hidden xl:block"
+            style={legendStyle}
+          />
         ) : null}
       </div>
     </div>
