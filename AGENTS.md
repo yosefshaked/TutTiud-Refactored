@@ -203,12 +203,15 @@
 
 ### Weekly Compliance Calendar Layout (2025-11)
 - Calendar chip positioning uses precise minute-level calculations in `calculateChipTopPosition()` for accurate "Outlook-style" layout
-- Sessions at :15 and :45 receive enhanced visual height (+25% of GRID_ROW_HEIGHT) to span across slot boundaries, creating a visual "crossing" effect between adjacent 30-minute slots
+- **Split-chip rendering for :15 and :45 sessions**: Quarter-hour sessions are rendered as two visual halves that span across slot boundaries:
+  - Bottom half: Positioned in the first slot (e.g., 15:00-15:30), rounded top corners only
+  - Top half: Positioned in the second slot (e.g., 15:30-16:00), rounded bottom corners only
+  - Both halves share the same `splitPairId` and session data, creating seamless visual "crossing" effect
 - Collision detection groups events that visually overlap (not just time-based overlaps): `event.top < currentGroup.maxBottom`
 - Max 2 visible chips per collision group (MAX_VISIBLE_CHIPS=2); remaining sessions shown in granular "+X more" badges
-- Overflow badges positioned per distinct start time:
-  - When all visible chips share same start time: badge centers at 50% to span under both chips
-  - When mixing start times: badge positions at centerPercent calculated from chip positions
+- Overflow badges positioned per distinct start time within each collision group:
+  - When all visible chips in a collision group share same start time: badge centers at 50% to span under both chips
+  - When mixing start times: badge positions at centerPercent calculated from chip positions within that group
 - Dynamic slot height expansion: `slotHeights` Map tracks required height per 30-min slot to accommodate collision groups
 - Key constants: GRID_ROW_HEIGHT=44px, GRID_INTERVAL_MINUTES=30, SESSION_DURATION_MINUTES=60
 

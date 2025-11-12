@@ -393,17 +393,10 @@ function layoutDaySessions(day, window, {
   // Note: columnHeight computed but not used in current layout logic (reserved for future enhancements)
   void computedRows
 
-  // Helper to calculate chip height with visual spanning for :15/:45 sessions
-  const calculateChipHeight = (startTime) => {
-    const minuteWithinHour = startTime % 60
-    const isQuarterHour = minuteWithinHour === 15 || minuteWithinHour === 45
-    
-    // For :15 and :45, extend the chip height to visually span across slot boundaries
-    if (isQuarterHour) {
-      return baseChipHeight + (GRID_ROW_HEIGHT / 4) // Extend by 25% to cross boundary
-    }
-    
-    return baseChipHeight
+  // Helper to detect quarter-hour sessions
+  const isQuarterHour = (timeMinutes) => {
+    const minuteWithinHour = timeMinutes % 60
+    return minuteWithinHour === 15 || minuteWithinHour === 45
   }
 
   // Build events array with exact positioning
@@ -418,17 +411,52 @@ function layoutDaySessions(day, window, {
     }
 
     const top = calculateChipTopPosition(timeMinutes, startMinutes, slotPositions)
-    const chipHeight = calculateChipHeight(timeMinutes)
-    const bottom = top + chipHeight
-
-    events.push({
-      session,
-      startTime: timeMinutes,
-      endTime: timeMinutes + duration,
-      top,
-      bottom,
-      chipHeight,
-    })
+    
+    // For :15/:45 sessions, create a split-chip effect
+    const isSplitChip = isQuarterHour(timeMinutes)
+    
+    if (isSplitChip) {
+      // Calculate the slot boundary position
+      const slotIndex = Math.floor((timeMinutes - startMinutes) / GRID_INTERVAL_MINUTES)
+      const nextSlotMinutes = startMinutes + ((slotIndex + 1) * GRID_INTERVAL_MINUTES)
+      const boundaryTop = calculateChipTopPosition(nextSlotMinutes, startMinutes, slotPositions)
+      
+      // Bottom half (in first slot) - from session start to boundary
+      const bottomHalfHeight = boundaryTop - top
+      events.push({
+        session,
+        startTime: timeMinutes,
+        endTime: timeMinutes + duration,
+        top,
+        bottom: boundaryTop,
+        chipHeight: bottomHalfHeight,
+        isSplitBottom: true,
+        splitPairId: `${session.id}-${timeMinutes}`,
+      })
+      
+      // Top half (in second slot) - from boundary to end
+      const topHalfHeight = baseChipHeight - bottomHalfHeight
+      events.push({
+        session,
+        startTime: timeMinutes,
+        endTime: timeMinutes + duration,
+        top: boundaryTop,
+        bottom: boundaryTop + topHalfHeight,
+        chipHeight: topHalfHeight,
+        isSplitTop: true,
+        splitPairId: `${session.id}-${timeMinutes}`,
+      })
+    } else {
+      // Regular chip
+      events.push({
+        session,
+        startTime: timeMinutes,
+        endTime: timeMinutes + duration,
+        top,
+        bottom: top + baseChipHeight,
+        chipHeight: baseChipHeight,
+      })
+    }
   }
 
   if (!events.length) {
@@ -514,13 +542,16 @@ function layoutDaySessions(day, window, {
         chips.push({
           session: event.session,
           top: Math.round(event.top),
-          height: event.chipHeight, // Use dynamic chip height
+          height: event.chipHeight,
           style: {
             left: leftValue,
             width: totalEvents === 1 ? '100%' : visibleWidth,
           },
           zIndex: totalEvents - columnIndex,
           startMinutes: event.startTime,
+          isSplitBottom: event.isSplitBottom,
+          isSplitTop: event.isSplitTop,
+          splitPairId: event.splitPairId,
         })
       }
 
@@ -567,13 +598,16 @@ function layoutDaySessions(day, window, {
           chips.push({
             session: event.session,
             top: Math.round(event.top),
-            height: event.chipHeight, // Use dynamic chip height
+            height: event.chipHeight,
             style: {
               left: leftValue,
               width: visibleWidth,
             },
             zIndex: MAX_VISIBLE_CHIPS - columnIndex,
             startMinutes: event.startTime,
+            isSplitBottom: event.isSplitBottom,
+            isSplitTop: event.isSplitTop,
+            splitPairId: event.splitPairId,
           })
 
           visibleCount += 1
@@ -587,26 +621,30 @@ function layoutDaySessions(day, window, {
       // Create overflow badges per start time
       let maxBadgeBottom = group.minTop
       
+      // Get chips that belong to this collision group (recently added)
+      const groupChipStartIndex = chips.length - visibleCount
+      const groupChips = chips.slice(groupChipStartIndex)
+      
       for (const startTime of startTimes) {
         const eventsAtTime = eventsByStartTime.get(startTime)
         const firstEventAtTime = eventsAtTime[0]
         
         // Determine which events at this time are hidden
-        const visibleAtThisTime = chips.filter(c => c.startMinutes === startTime).length
+        const visibleAtThisTime = groupChips.filter(c => c.startMinutes === startTime).length
         const hiddenAtThisTime = eventsAtTime.slice(visibleAtThisTime)
 
         if (hiddenAtThisTime.length > 0) {
           const badgeTop = firstEventAtTime.bottom + OVERFLOW_BADGE_VERTICAL_GAP
           const badgeBottom = badgeTop + OVERFLOW_BADGE_HEIGHT
 
-          // If all visible chips in this collision group are from the same start time,
+          // If all visible chips in THIS collision group are from the same start time,
           // center the badge under both chips. Otherwise, position under the specific chip(s).
-          const allChipsFromSameTime = chips.every(c => c.startMinutes === startTime)
+          const allGroupChipsFromSameTime = groupChips.every(c => c.startMinutes === startTime)
           
           overflowBadges.push({
             sessions: hiddenAtThisTime.map(e => e.session),
             top: badgeTop,
-            centerPercent: allChipsFromSameTime ? 50 : (
+            centerPercent: allGroupChipsFromSameTime ? 50 : (
               visibleAtThisTime > 0 
                 ? ((visibleAtThisTime - 1) * widthPercent) + (widthPercent / 2)
                 : 50
@@ -764,6 +802,8 @@ function StudentChip({
   variant = 'grid',
   onNavigate,
   isCoarse,
+  isSplitBottom = false,
+  isSplitTop = false,
 }) {
   const [open, setOpen] = useState(false)
 
@@ -784,9 +824,13 @@ function StudentChip({
   })
 
   const sharedClassName = cn(
-    'flex items-center justify-between gap-xs rounded-md px-sm py-xxs text-xs font-medium text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
+    'flex items-center justify-between gap-xs px-sm py-xxs text-xs font-medium text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
     {
       'hover:opacity-90': !isCoarse,
+      // Split chip styling: round only the appropriate corners
+      'rounded-md': !isSplitBottom && !isSplitTop,
+      'rounded-t-md': isSplitBottom, // Bottom half: round top corners only
+      'rounded-b-md': isSplitTop,     // Top half: round bottom corners only
     },
   )
 
@@ -1461,7 +1505,7 @@ export default function WeeklyComplianceView({ orgId }) {
                           </div>
                           {chipItems.map(item => (
                             <StudentChip
-                              key={`${item.session.studentId}-${item.session.time}`}
+                              key={item.splitPairId ? `${item.splitPairId}-${item.isSplitTop ? 'top' : 'bottom'}` : `${item.session.studentId}-${item.session.time}`}
                               session={item.session}
                               top={item.top}
                               height={item.height}
@@ -1469,6 +1513,8 @@ export default function WeeklyComplianceView({ orgId }) {
                               zIndex={item.zIndex}
                               onNavigate={handleNavigateToStudent}
                               isCoarse={isCoarsePointer}
+                              isSplitBottom={item.isSplitBottom}
+                              isSplitTop={item.isSplitTop}
                             />
                           ))}
                           {overflowItems.map(item => (
