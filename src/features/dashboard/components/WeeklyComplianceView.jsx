@@ -388,6 +388,15 @@ function layoutDaySessions(day, window, {
     GRID_ROW_HEIGHT - 8,
     GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8,
   )
+  
+  // DEBUG: Log duration setup
+  console.log('[WeeklyCompliance] Duration setup:', {
+    sessionDuration,
+    duration,
+    baseChipHeight,
+    GRID_ROW_HEIGHT,
+    GRID_INTERVAL_MINUTES,
+  })
 
   const computedRows = Math.max(1, Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1)
   // Note: columnHeight computed but not used in current layout logic (reserved for future enhancements)
@@ -411,8 +420,17 @@ function layoutDaySessions(day, window, {
     }
 
     const top = calculateChipTopPosition(timeMinutes, startMinutes, slotPositions)
-    const endTime = timeMinutes + duration
-    const bottom = calculateChipTopPosition(endTime, startMinutes, slotPositions)
+    
+    // Calculate actual bottom position, clamped to the visible window
+    const endTime = Math.min(timeMinutes + duration, endMinutes)
+    let bottom
+    if (endTime > endMinutes) {
+      // Session extends beyond window - use base height calculation
+      bottom = top + baseChipHeight
+    } else {
+      // Session within window - calculate precise position
+      bottom = calculateChipTopPosition(endTime, startMinutes, slotPositions)
+    }
     const actualChipHeight = Math.max(GRID_ROW_HEIGHT - 8, bottom - top)
 
     // Compute a boundary hint offset for :15/:45 sessions (visual-only divider inside single chip)
@@ -429,6 +447,8 @@ function layoutDaySessions(day, window, {
         time: session.time,
         timeMinutes,
         endTime,
+        duration,
+        endMinutes,
         startMinutes,
         slotIndex,
         nextSlotMinutes,
@@ -660,8 +680,6 @@ function layoutDaySessions(day, window, {
       }
 
       // Create overflow badges per start time
-      let maxBadgeBottom = group.minTop
-      
       // Get chips that belong to this collision group (recently added)
       const groupChipStartIndex = chips.length - visibleSessionCount
       const groupChips = chips.slice(groupChipStartIndex)
@@ -675,46 +693,36 @@ function layoutDaySessions(day, window, {
       
       for (const startTime of startTimes) {
         const sessionsAtTime = sessionsByStartTime.get(startTime)
-  const firstSessionGroup = sessionsAtTime[0]
-  const firstEventAtTimeBottom = firstSessionGroup.maxBottom
+        const firstSessionGroup = sessionsAtTime[0]
         
         // Count how many sessions are visible vs hidden at this time
         const visibleAtThisTime = visibleSessionsPerTime.get(startTime) || 0
         const hiddenSessions = sessionsAtTime.slice(visibleAtThisTime)
 
         if (hiddenSessions.length > 0) {
-          const badgeTop = firstEventAtTimeBottom + OVERFLOW_BADGE_VERTICAL_GAP
-          const badgeBottom = badgeTop + OVERFLOW_BADGE_HEIGHT
-
-          // If all visible chips in THIS collision group are from the same start time,
-          // center the badge under both chips. Otherwise, position under the specific chip(s).
-          const uniqueStartTimes = new Set(groupChips.map(c => c.startMinutes))
-          const allGroupChipsFromSameTime = uniqueStartTimes.size === 1 && uniqueStartTimes.has(startTime)
+          // Find the chip(s) for this start time to position badge to the left
+          const chipsAtThisTime = groupChips.filter(c => c.startMinutes === startTime)
+          const chipTop = chipsAtThisTime.length > 0 ? chipsAtThisTime[0].top : firstSessionGroup.minTop
           
           overflowBadges.push({
             sessions: hiddenSessions.map(sg => sg.session),
-            top: badgeTop,
-            centerPercent: allGroupChipsFromSameTime ? 50 : (
-              visibleAtThisTime > 0 
-                ? ((visibleAtThisTime - 1) * widthPercent) + (widthPercent / 2)
-                : 50
-            ),
+            top: chipTop,
+            isLeftAligned: true, // Flag to position on left side
             startMinutes: startTime,
             slotMinutes: startMinutes + Math.floor((startTime - startMinutes) / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES,
           })
-
-          maxBadgeBottom = Math.max(maxBadgeBottom, badgeBottom)
         }
       }
 
-      // Update slot heights to accommodate all badges
+      // No need to update slot heights for left-aligned badges
+      // Keep original slot height logic for chips only
       const startSlotIndex = Math.floor((group.minStartTime - startMinutes) / GRID_INTERVAL_MINUTES)
-      const endSlotIndex = Math.floor((maxBadgeBottom / GRID_ROW_HEIGHT))
+      const endSlotIndex = Math.floor((group.maxBottom / GRID_ROW_HEIGHT))
       
       for (let i = startSlotIndex; i <= endSlotIndex && i < totalSlots; i += 1) {
         const affectedSlotMinutes = startMinutes + (i * GRID_INTERVAL_MINUTES)
         const slotBaseTop = slotPositions?.get(affectedSlotMinutes) ?? (i * GRID_ROW_HEIGHT)
-        const requiredHeight = maxBadgeBottom - slotBaseTop + 8
+        const requiredHeight = group.maxBottom - slotBaseTop + 8
         const currentHeight = slotHeights.get(affectedSlotMinutes) || GRID_ROW_HEIGHT
         slotHeights.set(affectedSlotMinutes, Math.max(currentHeight, requiredHeight))
       }
@@ -948,7 +956,7 @@ function StudentChip({
   )
 }
 
-function OverflowBadge({ sessions, top, centerPercent, onNavigate }) {
+function OverflowBadge({ sessions, top, centerPercent, isLeftAligned, onNavigate }) {
   const [open, setOpen] = useState(false)
 
   const sortedSessions = useMemo(
@@ -963,13 +971,25 @@ function OverflowBadge({ sessions, top, centerPercent, onNavigate }) {
 
   const total = sortedSessions.length
   const computedStyle = useMemo(
-    () => ({
-      top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
-      left: typeof centerPercent === 'number' ? `${centerPercent}%` : '50%',
-      transform: 'translate(-50%, 0)',
-      zIndex: 30,
-    }),
-    [centerPercent, top],
+    () => {
+      if (isLeftAligned) {
+        // Position to the left side of the day column
+        return {
+          top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
+          left: '4px',
+          transform: 'none',
+          zIndex: 30,
+        }
+      }
+      // Original centered positioning (fallback for compatibility)
+      return {
+        top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
+        left: typeof centerPercent === 'number' ? `${centerPercent}%` : '50%',
+        transform: 'translate(-50%, 0)',
+        zIndex: 30,
+      }
+    },
+    [centerPercent, isLeftAligned, top],
   )
 
   const handleNavigate = useCallback(id => {
@@ -983,10 +1003,15 @@ function OverflowBadge({ sessions, top, centerPercent, onNavigate }) {
         <button
           type="button"
           aria-label={`עוד ${total} תלמידים`}
-          className="absolute flex h-[32px] min-w-[88px] items-center justify-center rounded-md border border-dashed border-primary bg-primary/10 px-md py-xs text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          className={cn(
+            "absolute flex items-center justify-center rounded-md border border-dashed border-primary bg-primary/10 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+            isLeftAligned 
+              ? "h-[28px] min-w-[60px] px-sm py-xxs" // Compact for left side
+              : "h-[32px] min-w-[88px] px-md py-xs" // Original size for centered
+          )}
           style={computedStyle}
         >
-          +{total} נוספים
+          {isLeftAligned ? `+${total}` : `+${total} נוספים`}
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -1593,6 +1618,7 @@ export default function WeeklyComplianceView({ orgId }) {
                               sessions={item.sessions}
                               top={item.top}
                               centerPercent={item.centerPercent}
+                              isLeftAligned={item.isLeftAligned}
                               onNavigate={handleNavigateToStudent}
                             />
                           ))}
