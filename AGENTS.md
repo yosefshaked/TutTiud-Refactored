@@ -209,11 +209,18 @@
   - Bottom half: Positioned in the first slot (e.g., 15:00-15:30), rounded top corners only
   - Top half: Positioned in the second slot (e.g., 15:30-16:00), rounded bottom corners only
   - Both halves share the same `splitPairId` and session data, creating seamless visual "crossing" effect
+- **Session deduplication for split pairs**: 
+  - Layout algorithm groups events by `splitPairId` (or `sessionId-startTime` for regular chips)
+  - Split pairs count as ONE session in MAX_VISIBLE_CHIPS rule
+  - Both halves of split pairs receive identical horizontal positioning (same left offset and width)
+  - No-overflow case: `sessionMap` groups events by unique key before calculating widths
+  - Overflow case: `sessionsByStartTime` groups events into session entries that bundle split halves
 - Collision detection groups events that visually overlap (not just time-based overlaps): `event.top < currentGroup.maxBottom`
-- Max 2 visible chips per collision group (MAX_VISIBLE_CHIPS=2); remaining sessions shown in granular "+X more" badges
+- Max 2 visible sessions per collision group (MAX_VISIBLE_CHIPS=2); remaining sessions shown in granular "+X more" badges
 - Overflow badges positioned per distinct start time within each collision group:
+  - Badge counting uses `visibleSessionsPerTime` Map to track unique sessions (deduplicating split pairs)
   - When all visible chips in a collision group share same start time: badge centers at 50% to span under both chips
-  - When mixing start times: badge positions at centerPercent calculated from chip positions within that group
+  - When mixing start times: badge positions at centerPercent calculated from visible session count at that time
 - Dynamic slot height expansion: `slotHeights` Map tracks required height per 30-min slot to accommodate collision groups
 - Key constants: GRID_ROW_HEIGHT=44px, GRID_INTERVAL_MINUTES=30, SESSION_DURATION_MINUTES=60
 
