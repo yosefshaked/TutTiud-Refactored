@@ -419,6 +419,21 @@ function layoutDaySessions(day, window, {
       const nextSlotMinutes = startMinutes + ((slotIndex + 1) * GRID_INTERVAL_MINUTES)
       const boundaryTop = calculateChipTopPosition(nextSlotMinutes, startMinutes, slotPositions)
       boundaryHintOffset = Math.max(0, boundaryTop - top)
+      
+      // DEBUG: Log quarter-hour session details
+      console.log('[WeeklyCompliance] Quarter-hour session:', {
+        studentName: session.studentName,
+        time: session.time,
+        timeMinutes,
+        startMinutes,
+        slotIndex,
+        nextSlotMinutes,
+        top,
+        boundaryTop,
+        boundaryHintOffset,
+        baseChipHeight,
+        slotPositions: slotPositions ? Array.from(slotPositions.entries()) : null,
+      })
     }
 
     // Single chip per session (Outlook-style)
@@ -530,6 +545,21 @@ function layoutDaySessions(day, window, {
         // Single chip per session group
         const chipTop = Math.round(sessionGroup.minTop)
         const chipHeight = Math.max(8, sessionGroup.maxBottom - sessionGroup.minTop)
+        
+        // DEBUG: Log chip rendering details
+        if (sessionGroup.boundaryHintOffset) {
+          console.log('[WeeklyCompliance] Rendering quarter-hour chip (no overflow):', {
+            studentName: sessionGroup.session.studentName,
+            minTop: sessionGroup.minTop,
+            maxBottom: sessionGroup.maxBottom,
+            chipTop,
+            chipHeight,
+            boundaryHintOffset: sessionGroup.boundaryHintOffset,
+            leftValue,
+            width: totalSessions === 1 ? '100%' : visibleWidth,
+          })
+        }
+        
         chips.push({
           session: sessionGroup.session,
           top: chipTop,
@@ -587,6 +617,21 @@ function layoutDaySessions(day, window, {
           // Single chip per session group
           const chipTop = Math.round(sessionGroup.minTop)
           const chipHeight = Math.max(8, sessionGroup.maxBottom - sessionGroup.minTop)
+          
+          // DEBUG: Log chip rendering details (overflow case)
+          if (sessionGroup.boundaryHintOffset) {
+            console.log('[WeeklyCompliance] Rendering quarter-hour chip (with overflow):', {
+              studentName: sessionGroup.session.studentName,
+              minTop: sessionGroup.minTop,
+              maxBottom: sessionGroup.maxBottom,
+              chipTop,
+              chipHeight,
+              boundaryHintOffset: sessionGroup.boundaryHintOffset,
+              leftValue,
+              width: visibleWidth,
+            })
+          }
+          
           chips.push({
             session: sessionGroup.session,
             top: chipTop,
@@ -847,29 +892,42 @@ function StudentChip({
         ...chipStyle,
       }
 
-  const renderTrigger = handlers => (
-    <button
-      type="button"
-      onClick={handleClick}
-      className={sharedClassName}
-      style={baseStyle}
-      aria-label={`${session.studentName || '—'} • ${srLabel}`}
-      {...handlers}
-    >
-      {typeof boundaryHintOffset === 'number' && boundaryHintOffset > 0 && boundaryHintOffset < height ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute left-0 right-0 h-px bg-white/40"
-          style={{ top: `${boundaryHintOffset}px` }}
-        />
-      ) : null}
-      <span className="relative z-10 truncate">{session.studentName || '—'}</span>
-      {statusIcon ? (
-        <span className="relative z-10 text-base" aria-hidden="true">{statusIcon}</span>
-      ) : null}
-      <span className="sr-only">{srLabel}</span>
-    </button>
-  )
+  const renderTrigger = handlers => {
+    // DEBUG: Log chip rendering
+    if (typeof boundaryHintOffset === 'number' && boundaryHintOffset > 0) {
+      console.log('[StudentChip] Rendering with boundary hint:', {
+        studentName: session.studentName,
+        top,
+        height,
+        boundaryHintOffset,
+        willRender: boundaryHintOffset < height,
+      })
+    }
+    
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        className={sharedClassName}
+        style={baseStyle}
+        aria-label={`${session.studentName || '—'} • ${srLabel}`}
+        {...handlers}
+      >
+        {typeof boundaryHintOffset === 'number' && boundaryHintOffset > 0 && boundaryHintOffset < height ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute left-0 right-0 h-px bg-white/40"
+            style={{ top: `${boundaryHintOffset}px` }}
+          />
+        ) : null}
+        <span className="relative z-10 truncate">{session.studentName || '—'}</span>
+        {statusIcon ? (
+          <span className="relative z-10 text-base" aria-hidden="true">{statusIcon}</span>
+        ) : null}
+        <span className="sr-only">{srLabel}</span>
+      </button>
+    )
+  }
 
   return (
     <StudentDetailPopover
