@@ -84,10 +84,24 @@ function resolveNextIdentifier(used, generator) {
 export const INSTRUCTOR_COLOR_BANK = DEFAULT_COLOR_BANK;
 
 export async function ensureInstructorColors(tenantClient, { context, columns = 'id, metadata' } = {}) {
-  const { data, error } = await tenantClient
+  const selectColumns = typeof columns === 'string' && columns.trim() ? columns : 'id, metadata';
+
+  let query = tenantClient
     .from('Instructors')
-    .select(columns)
-    .order('created_at', { ascending: true });
+    .select(selectColumns);
+
+  // The Instructors table does not guarantee a created_at column across tenants. When
+  // ordering by a non-existent column Supabase responds with HTTP 400, which surfaces as
+  // `failed_to_prepare_instructors` in the weekly compliance endpoint. Prefer deterministic
+  // ordering by `name` when it is part of the requested projection and always fall back to
+  // the primary key to keep color assignments stable without triggering schema errors.
+  if (selectColumns.includes('name')) {
+    query = query.order('name', { ascending: true, nullsFirst: false });
+  }
+
+  query = query.order('id', { ascending: true, nullsFirst: false });
+
+  const { data, error } = await query;
 
   if (error) {
     context?.log?.error?.('ensureInstructorColors failed to fetch instructors', { message: error.message });
@@ -128,21 +142,17 @@ export async function ensureInstructorColors(tenantClient, { context, columns = 
   }
 
   if (updates.length) {
-    const payload = updates.map(({ instructor, metadata }) => ({
-      id: instructor.id,
-      metadata,
-    }));
-
-    const { error: upsertError } = await tenantClient
-      .from('Instructors')
-      .upsert(payload, { onConflict: 'id' });
-
-    if (upsertError) {
-      context?.log?.error?.('ensureInstructorColors failed to persist metadata', { message: upsertError.message });
-      return { error: upsertError };
-    }
-
     for (const { instructor, metadata } of updates) {
+      const { error: updateError } = await tenantClient
+        .from('Instructors')
+        .update({ metadata })
+        .eq('id', instructor.id);
+
+      if (updateError) {
+        context?.log?.error?.('ensureInstructorColors failed to persist metadata', { message: updateError.message, id: instructor.id });
+        return { error: updateError };
+      }
+
       instructor.metadata = metadata;
     }
   }

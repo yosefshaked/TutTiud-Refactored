@@ -22,7 +22,8 @@ const DAY_LABELS = Object.freeze([
   'Saturday',
 ]);
 
-const INTERVAL_MINUTES = 15;
+const GRID_INTERVAL_MINUTES = 30;
+const DEFAULT_SESSION_DURATION_MINUTES = 30;
 const UNASSIGNED_COLOR = '#6B7280';
 const UNASSIGNED_LABEL = 'לא משויך';
 
@@ -115,17 +116,31 @@ function minutesToTimeString(totalMinutes) {
   return `${String(hoursPart).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}`;
 }
 
+function alignToInterval(value, interval) {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  const size = Math.max(1, Number(interval) || GRID_INTERVAL_MINUTES);
+  return {
+    floor: Math.floor(value / size) * size,
+    ceil: Math.ceil(value / size) * size,
+  };
+}
+
 function buildTimeWindow(earliestMinutes, latestMinutes) {
   if (!Number.isFinite(earliestMinutes) || !Number.isFinite(latestMinutes)) {
     return null;
   }
 
-  const roundedStart = Math.max(0, Math.floor(earliestMinutes / 60) * 60);
-  let roundedEnd = Math.ceil((latestMinutes + 14) / 60) * 60;
-  roundedEnd = Math.min(24 * 60 - INTERVAL_MINUTES, roundedEnd);
+  const alignedStart = alignToInterval(Math.max(0, earliestMinutes), GRID_INTERVAL_MINUTES)?.floor;
+  const alignedEnd = alignToInterval(Math.min(24 * 60, latestMinutes + GRID_INTERVAL_MINUTES), GRID_INTERVAL_MINUTES)?.ceil;
+
+  const roundedStart = Number.isFinite(alignedStart) ? alignedStart : 0;
+  let roundedEnd = Number.isFinite(alignedEnd) ? alignedEnd : roundedStart + GRID_INTERVAL_MINUTES;
+  roundedEnd = Math.min(24 * 60, Math.max(roundedStart + GRID_INTERVAL_MINUTES, roundedEnd));
 
   if (roundedEnd <= roundedStart) {
-    roundedEnd = Math.min(24 * 60 - INTERVAL_MINUTES, roundedStart + 60);
+    roundedEnd = Math.min(24 * 60, roundedStart + GRID_INTERVAL_MINUTES);
   }
 
   return {
@@ -133,7 +148,7 @@ function buildTimeWindow(earliestMinutes, latestMinutes) {
     end: minutesToTimeString(roundedEnd),
     startMinutes: roundedStart,
     endMinutes: roundedEnd,
-    intervalMinutes: INTERVAL_MINUTES,
+    intervalMinutes: GRID_INTERVAL_MINUTES,
   };
 }
 
@@ -285,7 +300,8 @@ export default async function (context, req) {
       .from('SessionRecords')
       .select('id, student_id, date')
       .gte('date', formatUtcDate(weekStart))
-      .lte('date', formatUtcDate(weekEnd));
+      .lte('date', formatUtcDate(weekEnd))
+      .eq('deleted', false);
 
     recordQuery = recordQuery.in('student_id', studentIds);
 
@@ -346,11 +362,13 @@ export default async function (context, req) {
         instructorId: instructor?.id || null,
         instructorName,
         instructorColor: color,
+        instructorIsActive: instructor?.isActive !== false,
         time: minutesToTimeString(timeMinutes),
         timeMinutes,
         status,
         hasRecord,
         recordId: hasRecord ? recordsByKey.get(key) || null : null,
+        durationMinutes: DEFAULT_SESSION_DURATION_MINUTES,
       });
 
       if (timeMinutes < earliestMinutes) {
@@ -410,7 +428,8 @@ export default async function (context, req) {
     weekEnd: formatUtcDate(weekEnd),
     today: todayIso,
     scope: isAdminRole(role) ? 'organization' : 'instructor',
-    intervalMinutes: INTERVAL_MINUTES,
+    intervalMinutes: GRID_INTERVAL_MINUTES,
+    sessionDurationMinutes: DEFAULT_SESSION_DURATION_MINUTES,
     timeWindow,
     legend,
     days,
