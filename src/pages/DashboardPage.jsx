@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 
-import PageLayout from "@/components/ui/PageLayout.jsx"
 import Card from "@/components/ui/CustomCard.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
@@ -16,7 +15,7 @@ import InstructorLegend from "@/features/dashboard/components/InstructorLegend.j
  * 1. Instructor name (from tenant DB Instructors table)
  * 2. Profile full_name (from control DB profiles table)
  * 3. Auth metadata display name (from Supabase Auth user_metadata)
- * 4. Email address
+ * 4. Email address 
  */
 function buildGreeting(instructorName, profileName, authName, email) {
   // Priority 1: Instructor name from tenant DB
@@ -180,17 +179,143 @@ export default function DashboardPage() {
           className="group focus-visible:outline-none"
           aria-label="פתיחת טופס רישום מפגש חדש"
         >
-          <Card
-            className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
-          >
-            <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
-              תיעוד מפגש חדש
-            </h2>
-            <p className="mt-sm text-neutral-600">
-              פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
-            </p>
-          </Card>
-        </button>
+          {/* Header */}
+          <header className="flex flex-col gap-sm pb-sm sm:flex-row sm:items-end sm:justify-between sm:pb-md">
+            <div className="space-y-xs">
+              <h1 className="text-xl font-semibold text-neutral-900 sm:text-title-lg">{greeting}</h1>
+              <p className="max-w-2xl text-sm text-neutral-600 sm:text-body-md">מה תרצו לעשות כעת?</p>
+            </div>
+          </header>
+
+          {/* Quick action cards */}
+          <div className="grid grid-cols-1 gap-lg pb-xl md:grid-cols-2">
+            <Link to={studentsLink} className="group focus-visible:outline-none">
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  {studentsTitle}
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  {studentsDescription}
+                </p>
+              </Card>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => openSessionModal?.()}
+              className="group focus-visible:outline-none"
+              aria-label="פתיחת טופס רישום מפגש חדש"
+            >
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  תיעוד מפגש חדש
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
+                </p>
+              </Card>
+            </button>
+          </div>
+
+          {/* Weekly compliance - mobile */}
+          {tenantClientReady && activeOrgHasConnection ? (
+            <div className="space-y-lg">
+              <WeeklyComplianceView orgId={activeOrgId} />
+              <InstructorLegend orgId={activeOrgId} />
+            </div>
+          ) : (
+            <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+              <p className="text-sm text-muted-foreground">
+                לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Desktop xl+: Responsive grid layout - always visible, never overflows */}
+      <div className="hidden xl:block">
+        <div 
+          className="gap-lg px-sm py-md sm:px-md sm:py-lg lg:px-xl"
+          style={{
+              display: 'grid',
+              // 3-column layout: left padding | main content (max 1280px) | sidebar (180-220px)
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(auto, 1280px) minmax(180px, 220px)',
+              gridTemplateAreas: `
+                ". header ."
+                ". actions ."
+                ". content sidebar"
+              `
+            }}
+        >
+          {/* Header area */}
+          <header style={{ gridArea: 'header' }} className="flex flex-col gap-sm pb-sm sm:flex-row sm:items-end sm:justify-between sm:pb-md">
+            <div className="space-y-xs">
+              <h1 className="text-xl font-semibold text-neutral-900 sm:text-title-lg">{greeting}</h1>
+              <p className="max-w-2xl text-sm text-neutral-600 sm:text-body-md">מה תרצו לעשות כעת?</p>
+            </div>
+          </header>
+
+          {/* Actions area */}
+          <div style={{ gridArea: 'actions' }} className="grid grid-cols-2 gap-lg pb-xl">
+            <Link to={studentsLink} className="group focus-visible:outline-none">
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  {studentsTitle}
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  {studentsDescription}
+                </p>
+              </Card>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => openSessionModal?.()}
+              className="group focus-visible:outline-none"
+              aria-label="פתיחת טופס רישום מפגש חדש"
+            >
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  תיעוד מפגש חדש
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
+                </p>
+              </Card>
+            </button>
+          </div>
+
+          {/* Content area */}
+          {tenantClientReady && activeOrgHasConnection ? (
+            <div style={{ gridArea: 'content', minWidth: 0 }}>
+              <WeeklyComplianceView orgId={activeOrgId} />
+            </div>
+          ) : (
+            <div style={{ gridArea: 'content', minWidth: 0 }}>
+              <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+                <p className="text-sm text-muted-foreground">
+                  לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+                </p>
+              </Card>
+            </div>
+          )}
+
+          {/* Sidebar area */}
+          <div style={{ gridArea: 'sidebar', minWidth: 0 }}>
+            <div className="sticky top-0">
+              <InstructorLegend orgId={activeOrgId} />
+            </div>
+          </div>
+        </div>
       </div>
 
       {tenantClientReady && activeOrgHasConnection ? (

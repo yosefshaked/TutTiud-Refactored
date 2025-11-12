@@ -22,6 +22,7 @@
 - OAuth redirects must always include `options.redirectTo` when calling `supabase.auth.signInWithOAuth`. Resolve it from the full `window.location` URL (`origin + pathname + search + hash`) and fall back to `VITE_PUBLIC_APP_URL`, `VITE_APP_BASE_URL`, or `VITE_SITE_URL` when a browser location is unavailable.
 - Password reset flows must call `supabase.auth.resetPasswordForEmail` with a redirect that lands on `/#/update-password`, and the update form must rely on `AuthContext.updatePassword` so Supabase finalizes the session before returning users to the dashboard.
 - Login form submissions must set inline error state whenever Supabase rejects credentials so the page renders the design system's red alert with the failure message.
+- **Dashboard Layout Pattern (2025-11)**: The InstructorLegend sidebar must NEVER be in the same grid/flex container with max-width constraint as the WeeklyComplianceView widget. The weekly view needs its own centered `max-width: 1280px` container to use full width. Legend is positioned absolutely outside using calculated `right` positioning in RTL. If both share a container, they split the 1280px instead of the widget using it fully.
 
 ### Invitation and Password Reset Flow Improvements (2025-11)
 - **CompleteRegistrationPage** now distinguishes between different OTP error types:
