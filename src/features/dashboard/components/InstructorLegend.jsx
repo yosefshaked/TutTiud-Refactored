@@ -111,7 +111,7 @@ export default function InstructorLegend({ orgId, className }) {
   }, [error, isLoading, legend])
 
   return (
-    <div className={cn('lg:sticky lg:top-[calc(4rem+1px)] lg:self-start', className)}>
+    <div className={cn('w-full', className)}>
       <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
         <h2 className="text-base font-semibold text-foreground">מקרא מדריכים</h2>
         <div className="mt-sm max-h-[calc(100vh-12rem)] space-y-sm overflow-y-auto">

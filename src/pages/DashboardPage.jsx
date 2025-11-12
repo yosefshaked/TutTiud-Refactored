@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 
 import Card from "@/components/ui/CustomCard.jsx"
@@ -153,8 +153,117 @@ export default function DashboardPage() {
 
   const greeting = buildGreeting(instructorName, profileName, user?.name, user?.email)
 
+  const layoutRef = useRef(null)
+  const desktopColumnRef = useRef(null)
+  const weeklySectionRef = useRef(null)
+  const legendContainerRef = useRef(null)
+  const legendStickyRef = useRef(null)
+
+  const legendEnabled = tenantClientReady && activeOrgHasConnection
+
+  const updateLegendPlacement = useCallback(() => {
+    if (!legendEnabled) {
+      return
+    }
+
+    const layoutElement = layoutRef.current
+    const columnElement = desktopColumnRef.current
+    const weeklyElement = weeklySectionRef.current
+    const legendContainer = legendContainerRef.current
+    const legendContent = legendStickyRef.current
+
+    if (!layoutElement || !columnElement || !weeklyElement || !legendContainer || !legendContent) {
+      return
+    }
+
+    const layoutRect = layoutElement.getBoundingClientRect()
+    const columnRect = columnElement.getBoundingClientRect()
+    const weeklyRect = weeklyElement.getBoundingClientRect()
+    const legendWidth = legendContent.offsetWidth
+
+    const horizontalGap = 24
+    const minimumViewportMargin = 16
+    const availableLeft = columnRect.left - layoutRect.left
+    const requiredSpace = legendWidth + horizontalGap + minimumViewportMargin
+
+    if (availableLeft <= requiredSpace) {
+      legendContainer.style.opacity = "0"
+      legendContainer.style.visibility = "hidden"
+      legendContainer.style.pointerEvents = "none"
+      legendContainer.style.width = `${legendWidth}px`
+      return
+    }
+
+    const leftPosition = Math.max(minimumViewportMargin, availableLeft - legendWidth - horizontalGap)
+    legendContainer.style.left = `${leftPosition}px`
+    legendContainer.style.top = `${weeklyRect.top - layoutRect.top}px`
+    legendContainer.style.height = `${weeklyRect.height}px`
+    legendContainer.style.width = `${legendWidth}px`
+    legendContainer.style.opacity = "1"
+    legendContainer.style.visibility = "visible"
+    legendContainer.style.pointerEvents = "auto"
+  }, [legendEnabled])
+
+  useLayoutEffect(() => {
+    const legendContainer = legendContainerRef.current
+    if (!legendEnabled) {
+      if (legendContainer) {
+        legendContainer.style.opacity = "0"
+        legendContainer.style.visibility = "hidden"
+        legendContainer.style.pointerEvents = "none"
+      }
+      return undefined
+    }
+
+    let frameId = null
+    const requestUpdate = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+      }
+      frameId = requestAnimationFrame(updateLegendPlacement)
+    }
+
+    requestUpdate()
+
+    const resizeListeners = []
+
+    if (typeof window !== "undefined") {
+      const handleResize = () => requestUpdate()
+      window.addEventListener("resize", handleResize)
+      resizeListeners.push(() => window.removeEventListener("resize", handleResize))
+    }
+
+    const observers = []
+    if (typeof ResizeObserver !== "undefined") {
+      const targets = [desktopColumnRef.current, weeklySectionRef.current, legendStickyRef.current]
+      for (const target of targets) {
+        if (!target) {
+          continue
+        }
+        const observer = new ResizeObserver(() => requestUpdate())
+        observer.observe(target)
+        observers.push(observer)
+      }
+    }
+
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+      }
+      for (const cleanup of resizeListeners) {
+        cleanup()
+      }
+      for (const observer of observers) {
+        observer.disconnect()
+      }
+    }
+  }, [legendEnabled, updateLegendPlacement])
+
   return (
-    <div className="min-h-screen w-full bg-background text-neutral-900">
+    <div
+      data-page-layout="dashboard"
+      className="min-h-full w-full bg-background text-neutral-900"
+    >
       {/* Mobile: stacked layout */}
       <div className="xl:hidden">
         <div
@@ -219,31 +328,20 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Desktop xl+: Responsive grid layout - always visible, never overflows */}
-      <div className="hidden xl:block">
-        <div 
-          className="gap-lg px-sm py-md sm:px-md sm:py-lg lg:px-xl"
-          style={{
-              display: 'grid',
-              // 3-column layout: left padding | main content (max 1280px) | sidebar (180-220px)
-              gridTemplateColumns: 'minmax(0, 1fr) minmax(auto, 1280px) minmax(180px, 220px)',
-              gridTemplateAreas: `
-                ". header ."
-                ". actions ."
-                ". content sidebar"
-              `
-            }}
+      {/* Desktop xl+: floating legend with synchronized scrolling */}
+      <div ref={layoutRef} className="relative hidden xl:block">
+        <div
+          ref={desktopColumnRef}
+          className="mx-auto flex w-full max-w-[1280px] flex-col gap-xl px-lg py-xl"
         >
-          {/* Header area */}
-          <header style={{ gridArea: 'header' }} className="flex flex-col gap-sm pb-sm sm:flex-row sm:items-end sm:justify-between sm:pb-md">
+          <header className="flex flex-col gap-sm sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-xs">
               <h1 className="text-xl font-semibold text-neutral-900 sm:text-title-lg">{greeting}</h1>
               <p className="max-w-2xl text-sm text-neutral-600 sm:text-body-md">מה תרצו לעשות כעת?</p>
             </div>
           </header>
 
-          {/* Actions area */}
-          <div style={{ gridArea: 'actions' }} className="grid grid-cols-2 gap-lg pb-xl">
+          <div className="grid grid-cols-2 gap-lg">
             <Link to={studentsLink} className="group focus-visible:outline-none">
               <Card
                 className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
@@ -276,28 +374,34 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Content area */}
-          {tenantClientReady && activeOrgHasConnection ? (
-            <div style={{ gridArea: 'content', minWidth: 0 }}>
+          <div ref={weeklySectionRef} className="relative">
+            {legendEnabled ? (
               <WeeklyComplianceView orgId={activeOrgId} />
-            </div>
-          ) : (
-            <div style={{ gridArea: 'content', minWidth: 0 }}>
+            ) : (
               <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
                 <p className="text-sm text-muted-foreground">
                   לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
                 </p>
               </Card>
-            </div>
-          )}
-
-          {/* Sidebar area */}
-          <div style={{ gridArea: 'sidebar', minWidth: 0 }}>
-            <div className="sticky top-0">
-              <InstructorLegend orgId={activeOrgId} />
-            </div>
+            )}
           </div>
         </div>
+
+        {legendEnabled ? (
+          <div
+            ref={legendContainerRef}
+            className="pointer-events-none absolute z-10 hidden xl:block"
+            style={{ opacity: 0, visibility: "hidden" }}
+          >
+            <div
+              ref={legendStickyRef}
+              className="pointer-events-auto sticky"
+              style={{ top: "calc(var(--app-shell-header-height, 0px) + 16px)" }}
+            >
+              <InstructorLegend orgId={activeOrgId} className="w-full max-w-xs" />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   )
