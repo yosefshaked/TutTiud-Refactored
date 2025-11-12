@@ -154,30 +154,12 @@ export default function DashboardPage() {
   const greeting = buildGreeting(instructorName, profileName, user?.name, user?.email)
 
   return (
-    <PageLayout
-      title={greeting}
-      subtitle="מה תרצו לעשות כעת?"
-      className="space-y-xl"
-    >
-      <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
-        <Link to={studentsLink} className="group focus-visible:outline-none">
-          <Card
-            className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
-          >
-            <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
-              {studentsTitle}
-            </h2>
-            <p className="mt-sm text-neutral-600">
-              {studentsDescription}
-            </p>
-          </Card>
-        </Link>
-
-        <button
-          type="button"
-          onClick={() => openSessionModal?.()}
-          className="group focus-visible:outline-none"
-          aria-label="פתיחת טופס רישום מפגש חדש"
+    <div className="min-h-screen w-full bg-background text-neutral-900">
+      {/* Mobile: stacked layout */}
+      <div className="xl:hidden">
+        <div
+          className="mx-auto flex w-full flex-col px-sm py-md sm:px-md sm:py-lg lg:px-xl"
+          style={{ maxWidth: "min(1280px, 100vw)" }}
         >
           {/* Header */}
           <header className="flex flex-col gap-sm pb-sm sm:flex-row sm:items-end sm:justify-between sm:pb-md">
@@ -317,19 +299,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {tenantClientReady && activeOrgHasConnection ? (
-        <div className="grid gap-lg lg:grid-cols-[minmax(220px,260px)_1fr]">
-          <InstructorLegend orgId={activeOrgId} />
-          <WeeklyComplianceView orgId={activeOrgId} />
-        </div>
-      ) : (
-        <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
-          <p className="text-sm text-muted-foreground">
-            לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
-          </p>
-        </Card>
-      )}
-    </PageLayout>
+    </div>
   )
 }
