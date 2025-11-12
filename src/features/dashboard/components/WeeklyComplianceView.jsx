@@ -957,6 +957,7 @@ function DayScheduleView({
   sessionMaps,
   onNavigate,
   isCoarse,
+  orgId,
 }) {
   const hasDays = Array.isArray(days) && days.length > 0
   const hasSlots = Array.isArray(gridSlots) && gridSlots.length > 0
@@ -974,6 +975,11 @@ function DayScheduleView({
 
   return (
     <div className={cn('space-y-sm', className)}>
+      {/* Sticky header with instructor legend */}
+      <div className="sticky top-0 z-20 -mx-lg -mt-lg mb-sm bg-surface px-lg pt-lg pb-sm shadow-sm">
+        <InstructorLegend orgId={orgId} />
+      </div>
+      
       <div className="mb-sm flex gap-sm overflow-x-auto pb-sm">
         {safeDays.map((day, index) => {
           const display = buildDayDisplay(day)
@@ -1417,10 +1423,10 @@ export default function WeeklyComplianceView({ orgId }) {
               {viewMode === 'week' ? (
                 <div className="hidden md:block">
                   {/* Unified sticky header: Legend + Day headers */}
-                  <div className="sticky top-0 z-20 bg-surface shadow-sm">
+                  <div className="sticky top-0 z-20 bg-surface shadow-md">
                     <InstructorLegend orgId={orgId} />
                     <div
-                      className="grid border-b border-border"
+                      className="grid border-b border-border bg-surface"
                       style={{ gridTemplateColumns: `60px repeat(${days.length}, minmax(0, 1fr))` }}
                     >
                       <div className="bg-surface" />
@@ -1433,7 +1439,7 @@ export default function WeeklyComplianceView({ orgId }) {
                               'border-b border-border px-sm py-xs text-center text-sm font-medium',
                               day.isToday
                                 ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted/30 text-foreground',
+                                : 'bg-muted text-foreground',
                             )}
                           >
                             <span className="block text-base font-semibold">{display.label || '—'}</span>
@@ -1542,6 +1548,7 @@ export default function WeeklyComplianceView({ orgId }) {
                 sessionMaps={mobileSessionMaps}
                 onNavigate={handleNavigateToStudent}
                 isCoarse={isCoarsePointer}
+                orgId={orgId}
               />
               {viewMode === 'day' ? (
                 <DayScheduleView
@@ -1553,6 +1560,7 @@ export default function WeeklyComplianceView({ orgId }) {
                   sessionMaps={mobileSessionMaps}
                   onNavigate={handleNavigateToStudent}
                   isCoarse={isCoarsePointer}
+                  orgId={orgId}
                 />
               ) : null}
             </>

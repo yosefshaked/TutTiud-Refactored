@@ -23,6 +23,8 @@
 - Password reset flows must call `supabase.auth.resetPasswordForEmail` with a redirect that lands on `/#/update-password`, and the update form must rely on `AuthContext.updatePassword` so Supabase finalizes the session before returning users to the dashboard.
 - Login form submissions must set inline error state whenever Supabase rejects credentials so the page renders the design system's red alert with the failure message.
 - **Dashboard Layout Pattern (2025-11)**: The Weekly Compliance View uses a unified sticky header design. The InstructorLegend is integrated directly into the calendar widget (not a separate floating component) and appears as a horizontal bar at the top of the sticky header, above the day column headers. The entire header block (legend + day headers) uses `position: sticky` with `top: 0` and stays anchored while the calendar body scrolls. No complex JavaScript positioning logic is needed.
+  - **Day view integration**: The DayScheduleView (both mobile and desktop day mode) also includes the InstructorLegend in a sticky header that stays visible while scrolling through time slots.
+  - **Solid backgrounds**: Both week and day view sticky headers use solid `bg-surface` (no transparency or backdrop blur) to ensure clean visual separation when scrolling. Day header backgrounds changed from `bg-muted/30` to `bg-muted` for consistency.
 
 ### Invitation and Password Reset Flow Improvements (2025-11)
 - **CompleteRegistrationPage** now distinguishes between different OTP error types:

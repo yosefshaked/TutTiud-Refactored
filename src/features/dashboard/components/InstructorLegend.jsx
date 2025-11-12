@@ -99,7 +99,7 @@ export default function InstructorLegend({ orgId }) {
   }, [error, isLoading, legend])
 
   return (
-    <div className="border-b border-border bg-surface/95 px-lg py-sm backdrop-blur-sm">
+    <div className="border-b border-border bg-surface px-lg py-sm">
       {content}
     </div>
   )
