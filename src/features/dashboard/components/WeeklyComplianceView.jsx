@@ -471,36 +471,71 @@ function layoutDaySessions(day, window, {
     return (a.session.studentName || '').localeCompare(b.session.studentName || '', 'he')
   })
 
-  // Build collision groups: events that visually overlap
+  // Group split pairs together for unified processing
+  const sessionGroups = []
+  const processedSplitPairs = new Set()
+  
+  for (const event of events) {
+    if (event.splitPairId && processedSplitPairs.has(event.splitPairId)) {
+      continue // Already processed this split pair
+    }
+    
+    if (event.splitPairId) {
+      // Find both halves of the split pair
+      const pairEvents = events.filter(e => e.splitPairId === event.splitPairId)
+      sessionGroups.push({
+        events: pairEvents,
+        startTime: event.startTime,
+        session: event.session,
+        isSplit: true,
+        splitPairId: event.splitPairId,
+        minTop: Math.min(...pairEvents.map(e => e.top)),
+        maxBottom: Math.max(...pairEvents.map(e => e.bottom)),
+      })
+      processedSplitPairs.add(event.splitPairId)
+    } else {
+      // Regular single event
+      sessionGroups.push({
+        events: [event],
+        startTime: event.startTime,
+        session: event.session,
+        isSplit: false,
+        minTop: event.top,
+        maxBottom: event.bottom,
+      })
+    }
+  }
+
+  // Build collision groups: session groups that visually overlap
   const collisionGroups = []
   let currentGroup = null
 
-  for (const event of events) {
+  for (const sessionGroup of sessionGroups) {
     if (!currentGroup) {
       currentGroup = { 
-        events: [event], 
-        minTop: event.top,
-        maxBottom: event.bottom,
-        minStartTime: event.startTime,
+        sessionGroups: [sessionGroup], 
+        minTop: sessionGroup.minTop,
+        maxBottom: sessionGroup.maxBottom,
+        minStartTime: sessionGroup.startTime,
       }
       continue
     }
 
-    // Check if this event visually overlaps with the current group's range
-    const overlaps = event.top < currentGroup.maxBottom
+    // Check if this session group visually overlaps with the current collision group's range
+    const overlaps = sessionGroup.minTop < currentGroup.maxBottom
 
     if (overlaps) {
-      currentGroup.events.push(event)
-      currentGroup.minTop = Math.min(currentGroup.minTop, event.top)
-      currentGroup.maxBottom = Math.max(currentGroup.maxBottom, event.bottom)
-      currentGroup.minStartTime = Math.min(currentGroup.minStartTime, event.startTime)
+      currentGroup.sessionGroups.push(sessionGroup)
+      currentGroup.minTop = Math.min(currentGroup.minTop, sessionGroup.minTop)
+      currentGroup.maxBottom = Math.max(currentGroup.maxBottom, sessionGroup.maxBottom)
+      currentGroup.minStartTime = Math.min(currentGroup.minStartTime, sessionGroup.startTime)
     } else {
       collisionGroups.push(currentGroup)
       currentGroup = { 
-        events: [event], 
-        minTop: event.top,
-        maxBottom: event.bottom,
-        minStartTime: event.startTime,
+        sessionGroups: [sessionGroup], 
+        minTop: sessionGroup.minTop,
+        maxBottom: sessionGroup.maxBottom,
+        minStartTime: sessionGroup.startTime,
       }
     }
   }
@@ -522,37 +557,40 @@ function layoutDaySessions(day, window, {
 
   // Process each collision group
   for (const group of collisionGroups) {
-    const totalEvents = group.events.length
+    const totalSessions = group.sessionGroups.length
 
-    if (totalEvents <= MAX_VISIBLE_CHIPS) {
-      // No overflow: display all events side-by-side
-      const widthPercent = 100 / totalEvents
-      const visibleWidth = totalEvents === 1
+    if (totalSessions <= MAX_VISIBLE_CHIPS) {
+      // No overflow: display all sessions side-by-side
+      const widthPercent = 100 / totalSessions
+      const visibleWidth = totalSessions === 1
         ? '100%'
         : `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
-      const horizontalOffsetPx = totalEvents === 1 ? 0 : COLUMN_GAP_PX / 2
+      const horizontalOffsetPx = totalSessions === 1 ? 0 : COLUMN_GAP_PX / 2
 
-      for (let columnIndex = 0; columnIndex < totalEvents; columnIndex += 1) {
-        const event = group.events[columnIndex]
+      for (let columnIndex = 0; columnIndex < totalSessions; columnIndex += 1) {
+        const sessionGroup = group.sessionGroups[columnIndex]
         const leftPercent = columnIndex * widthPercent
-        const leftValue = totalEvents === 1
+        const leftValue = totalSessions === 1
           ? '0'
           : `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
 
-        chips.push({
-          session: event.session,
-          top: Math.round(event.top),
-          height: event.chipHeight,
-          style: {
-            left: leftValue,
-            width: totalEvents === 1 ? '100%' : visibleWidth,
-          },
-          zIndex: totalEvents - columnIndex,
-          startMinutes: event.startTime,
-          isSplitBottom: event.isSplitBottom,
-          isSplitTop: event.isSplitTop,
-          splitPairId: event.splitPairId,
-        })
+        // Render all events in this session group (both halves for split chips)
+        for (const event of sessionGroup.events) {
+          chips.push({
+            session: event.session,
+            top: Math.round(event.top),
+            height: event.chipHeight,
+            style: {
+              left: leftValue,
+              width: totalSessions === 1 ? '100%' : visibleWidth,
+            },
+            zIndex: totalSessions - columnIndex,
+            startMinutes: event.startTime,
+            isSplitBottom: event.isSplitBottom,
+            isSplitTop: event.isSplitTop,
+            splitPairId: event.splitPairId,
+          })
+        }
       }
 
       // Update slot heights for non-overflow groups
@@ -567,53 +605,56 @@ function layoutDaySessions(day, window, {
         slotHeights.set(affectedSlotMinutes, Math.max(currentHeight, requiredHeight))
       }
     } else {
-      // Overflow: Group events by start time, show max 2 total with per-time badges
-      const eventsByStartTime = new Map()
-      for (const event of group.events) {
-        if (!eventsByStartTime.has(event.startTime)) {
-          eventsByStartTime.set(event.startTime, [])
+      // Overflow: Group sessions by start time, show max 2 SESSIONS total with per-time badges
+      const sessionsByStartTime = new Map()
+      for (const sessionGroup of group.sessionGroups) {
+        if (!sessionsByStartTime.has(sessionGroup.startTime)) {
+          sessionsByStartTime.set(sessionGroup.startTime, [])
         }
-        eventsByStartTime.get(event.startTime).push(event)
+        sessionsByStartTime.get(sessionGroup.startTime).push(sessionGroup)
       }
 
-      const startTimes = Array.from(eventsByStartTime.keys()).sort((a, b) => a - b)
-      let visibleCount = 0
+      const startTimes = Array.from(sessionsByStartTime.keys()).sort((a, b) => a - b)
+      let visibleSessionCount = 0
       const widthPercent = 100 / MAX_VISIBLE_CHIPS
       const visibleWidth = `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
       const horizontalOffsetPx = COLUMN_GAP_PX / 2
 
-      // Render up to 2 chips total (prioritize earlier start times)
+      // Render up to 2 SESSIONS total (prioritize earlier start times)
       for (const startTime of startTimes) {
-        const eventsAtTime = eventsByStartTime.get(startTime)
+        const sessionsAtTime = sessionsByStartTime.get(startTime)
         
-        for (const event of eventsAtTime) {
-          if (visibleCount >= MAX_VISIBLE_CHIPS) {
+        for (const sessionGroup of sessionsAtTime) {
+          if (visibleSessionCount >= MAX_VISIBLE_CHIPS) {
             break
           }
 
-          const columnIndex = visibleCount
+          const columnIndex = visibleSessionCount
           const leftPercent = columnIndex * widthPercent
           const leftValue = `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
 
-          chips.push({
-            session: event.session,
-            top: Math.round(event.top),
-            height: event.chipHeight,
-            style: {
-              left: leftValue,
-              width: visibleWidth,
-            },
-            zIndex: MAX_VISIBLE_CHIPS - columnIndex,
-            startMinutes: event.startTime,
-            isSplitBottom: event.isSplitBottom,
-            isSplitTop: event.isSplitTop,
-            splitPairId: event.splitPairId,
-          })
+          // Render all events in this session group (both halves for split chips)
+          for (const event of sessionGroup.events) {
+            chips.push({
+              session: event.session,
+              top: Math.round(event.top),
+              height: event.chipHeight,
+              style: {
+                left: leftValue,
+                width: visibleWidth,
+              },
+              zIndex: MAX_VISIBLE_CHIPS - columnIndex,
+              startMinutes: event.startTime,
+              isSplitBottom: event.isSplitBottom,
+              isSplitTop: event.isSplitTop,
+              splitPairId: event.splitPairId,
+            })
+          }
 
-          visibleCount += 1
+          visibleSessionCount += 1
         }
 
-        if (visibleCount >= MAX_VISIBLE_CHIPS) {
+        if (visibleSessionCount >= MAX_VISIBLE_CHIPS) {
           break
         }
       }
@@ -622,27 +663,40 @@ function layoutDaySessions(day, window, {
       let maxBadgeBottom = group.minTop
       
       // Get chips that belong to this collision group (recently added)
-      const groupChipStartIndex = chips.length - visibleCount
+      const groupChipStartIndex = chips.length - visibleSessionCount
       const groupChips = chips.slice(groupChipStartIndex)
       
+      // Count unique sessions per start time (deduplicating split pairs)
+      const visibleSessionsPerTime = new Map()
+      for (const chip of groupChips) {
+        const key = chip.splitPairId || `${chip.session.id}-${chip.startMinutes}`
+        if (!visibleSessionsPerTime.has(`counted-${key}`)) {
+          const count = visibleSessionsPerTime.get(chip.startMinutes) || 0
+          visibleSessionsPerTime.set(chip.startMinutes, count + 1)
+          visibleSessionsPerTime.set(`counted-${key}`, true)
+        }
+      }
+      
       for (const startTime of startTimes) {
-        const eventsAtTime = eventsByStartTime.get(startTime)
-        const firstEventAtTime = eventsAtTime[0]
+        const sessionsAtTime = sessionsByStartTime.get(startTime)
+        const firstSessionGroup = sessionsAtTime[0]
+        const firstEventAtTime = firstSessionGroup.events[0]
         
-        // Determine which events at this time are hidden
-        const visibleAtThisTime = groupChips.filter(c => c.startMinutes === startTime).length
-        const hiddenAtThisTime = eventsAtTime.slice(visibleAtThisTime)
+        // Count how many sessions are visible vs hidden at this time
+        const visibleAtThisTime = visibleSessionsPerTime.get(startTime) || 0
+        const hiddenSessions = sessionsAtTime.slice(visibleAtThisTime)
 
-        if (hiddenAtThisTime.length > 0) {
+        if (hiddenSessions.length > 0) {
           const badgeTop = firstEventAtTime.bottom + OVERFLOW_BADGE_VERTICAL_GAP
           const badgeBottom = badgeTop + OVERFLOW_BADGE_HEIGHT
 
           // If all visible chips in THIS collision group are from the same start time,
           // center the badge under both chips. Otherwise, position under the specific chip(s).
-          const allGroupChipsFromSameTime = groupChips.every(c => c.startMinutes === startTime)
+          const uniqueStartTimes = new Set(groupChips.map(c => c.startMinutes))
+          const allGroupChipsFromSameTime = uniqueStartTimes.size === 1 && uniqueStartTimes.has(startTime)
           
           overflowBadges.push({
-            sessions: hiddenAtThisTime.map(e => e.session),
+            sessions: hiddenSessions.map(sg => sg.session),
             top: badgeTop,
             centerPercent: allGroupChipsFromSameTime ? 50 : (
               visibleAtThisTime > 0 
