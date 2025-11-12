@@ -219,19 +219,20 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Desktop xl+: Professional grid-template-areas layout (MDN recommended pattern) */}
+      {/* Desktop xl+: Responsive grid layout - always visible, never overflows */}
       <div className="hidden xl:block">
         <div 
           className="gap-lg px-sm py-md sm:px-md sm:py-lg lg:px-xl"
           style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1280px 220px 1fr',
-            gridTemplateAreas: `
-              ". header  header  ."
-              ". actions actions ."
-              ". content sidebar ."
-            `
-          }}
+              display: 'grid',
+              // 3-column layout: left padding | main content (max 1280px) | sidebar (180-220px)
+              gridTemplateColumns: 'minmax(0, 1fr) minmax(auto, 1280px) minmax(180px, 220px)',
+              gridTemplateAreas: `
+                ". header ."
+                ". actions ."
+                ". content sidebar"
+              `
+            }}
         >
           {/* Header area */}
           <header style={{ gridArea: 'header' }} className="flex flex-col gap-sm pb-sm sm:flex-row sm:items-end sm:justify-between sm:pb-md">
@@ -277,11 +278,11 @@ export default function DashboardPage() {
 
           {/* Content area */}
           {tenantClientReady && activeOrgHasConnection ? (
-            <div style={{ gridArea: 'content' }}>
+            <div style={{ gridArea: 'content', minWidth: 0 }}>
               <WeeklyComplianceView orgId={activeOrgId} />
             </div>
           ) : (
-            <div style={{ gridArea: 'content' }}>
+            <div style={{ gridArea: 'content', minWidth: 0 }}>
               <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
                 <p className="text-sm text-muted-foreground">
                   לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
@@ -291,7 +292,7 @@ export default function DashboardPage() {
           )}
 
           {/* Sidebar area */}
-          <div style={{ gridArea: 'sidebar' }}>
+          <div style={{ gridArea: 'sidebar', minWidth: 0 }}>
             <div className="sticky top-0">
               <InstructorLegend orgId={activeOrgId} />
             </div>
