@@ -339,7 +339,7 @@ export default function AppShell({ children }) {
   return (
     <SessionModalContext.Provider value={sessionModalContextValue}>
       <AccessibilityProvider>
-      <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden" dir="rtl">
+      <div className="flex min-h-screen bg-background text-foreground overflow-x-auto" dir="rtl">
         <SkipLink />
         <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
