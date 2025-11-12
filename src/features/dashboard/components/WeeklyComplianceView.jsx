@@ -411,6 +411,9 @@ function layoutDaySessions(day, window, {
     }
 
     const top = calculateChipTopPosition(timeMinutes, startMinutes, slotPositions)
+    const endTime = timeMinutes + duration
+    const bottom = calculateChipTopPosition(endTime, startMinutes, slotPositions)
+    const actualChipHeight = Math.max(GRID_ROW_HEIGHT - 8, bottom - top)
 
     // Compute a boundary hint offset for :15/:45 sessions (visual-only divider inside single chip)
     let boundaryHintOffset = null
@@ -425,12 +428,15 @@ function layoutDaySessions(day, window, {
         studentName: session.studentName,
         time: session.time,
         timeMinutes,
+        endTime,
         startMinutes,
         slotIndex,
         nextSlotMinutes,
         top,
+        bottom,
         boundaryTop,
         boundaryHintOffset,
+        actualChipHeight,
         baseChipHeight,
         slotPositions: slotPositions ? Array.from(slotPositions.entries()) : null,
       })
@@ -442,8 +448,8 @@ function layoutDaySessions(day, window, {
       startTime: timeMinutes,
       endTime: timeMinutes + duration,
       top,
-      bottom: top + baseChipHeight,
-      chipHeight: baseChipHeight,
+      bottom,
+      chipHeight: actualChipHeight,
       boundaryHintOffset,
     })
   }
