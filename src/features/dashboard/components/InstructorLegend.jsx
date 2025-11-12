@@ -1,39 +1,14 @@
-import React, { forwardRef, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
-import Card from '@/components/ui/CustomCard.jsx'
 import { fetchInstructorLegend } from '@/api/weekly-compliance.js'
-import { cn } from '@/lib/utils'
 
 import { buildLegendStyle } from './color-utils.js'
 
-function LegendList({ legend }) {
-  if (!Array.isArray(legend) || legend.length === 0) {
-    return null
-  }
-
-  return legend.map(item => (
-    <div
-      key={item.id}
-      className="flex items-center justify-between gap-sm rounded-lg bg-muted/30 px-sm py-xxs text-sm text-foreground"
-    >
-      <span className="truncate" title={item.name}>
-        {item.name}
-      </span>
-      <span className="flex items-center gap-xs text-xs">
-        <span
-          aria-hidden="true"
-          className="inline-block h-3 w-3 shrink-0 rounded-full border border-border"
-          style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
-        />
-        {item.isActive === false ? (
-          <span className="text-destructive">מדריך לא פעיל</span>
-        ) : null}
-      </span>
-    </div>
-  ))
-}
-
-const InstructorLegend = forwardRef(function InstructorLegend({ orgId, className, style }, ref) {
+/**
+ * Horizontal instructor legend bar - integrated into calendar header.
+ * Displays instructor names with color swatches in a clean, compact format.
+ */
+export default function InstructorLegend({ orgId }) {
   const [legend, setLegend] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -84,42 +59,48 @@ const InstructorLegend = forwardRef(function InstructorLegend({ orgId, className
   const content = useMemo(() => {
     if (isLoading) {
       return (
-        <p className="text-sm text-muted-foreground">טוען מדריכים...</p>
+        <p className="text-xs text-muted-foreground">טוען מדריכים...</p>
       )
     }
 
     if (error) {
       return (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-sm text-destructive">
-          <p className="text-sm font-medium">אירעה שגיאה בטעינת רשימת המדריכים.</p>
-          <p className="mt-xxs text-xs">נסו לרענן את הדף או לחזור מאוחר יותר.</p>
-        </div>
+        <p className="text-xs text-destructive">שגיאה בטעינת רשימת המדריכים</p>
       )
     }
 
     if (!legend.length) {
       return (
-        <p className="text-sm text-muted-foreground">אין מדריכים להצגה.</p>
+        <p className="text-xs text-muted-foreground">אין מדריכים להצגה</p>
       )
     }
 
     return (
-      <div className="space-y-xs">
-        <LegendList legend={legend} />
+      <div className="flex flex-wrap items-center gap-md">
+        <span className="text-xs font-semibold text-muted-foreground">מקרא מדריכים:</span>
+        {legend.map(item => (
+          <div
+            key={item.id}
+            className="flex items-center gap-xs"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block h-3 w-3 shrink-0 rounded-full border border-border shadow-sm"
+              style={buildLegendStyle(item.color, { inactive: item.isActive === false })}
+            />
+            <span className="text-xs text-foreground" title={item.name}>
+              {item.name}
+              {item.isActive === false ? ' (לא פעיל)' : ''}
+            </span>
+          </div>
+        ))}
       </div>
     )
   }, [error, isLoading, legend])
 
   return (
-    <div ref={ref} className={cn('w-full', className)} style={style}>
-      <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
-        <h2 className="text-base font-semibold text-foreground">מקרא מדריכים</h2>
-        <div className="mt-sm max-h-[calc(100vh-12rem)] space-y-sm overflow-y-auto">
-          {content}
-        </div>
-      </Card>
+    <div className="border-b border-border bg-surface/95 px-lg py-sm backdrop-blur-sm">
+      {content}
     </div>
   )
-})
-
-export default InstructorLegend
+}

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button.jsx'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.jsx'
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance.js'
 import { cn } from '@/lib/utils'
+import InstructorLegend from './InstructorLegend.jsx'
 
 import { buildChipStyle } from './color-utils.js'
 
@@ -1261,35 +1262,47 @@ export default function WeeklyComplianceView({ orgId }) {
             <>
               {viewMode === 'week' ? (
                 <div className="hidden md:block">
+                  {/* Unified sticky header: Legend + Day headers */}
+                  <div className="sticky top-0 z-20 bg-surface shadow-sm">
+                    <InstructorLegend orgId={orgId} />
+                    <div
+                      className="grid border-b border-border"
+                      style={{ gridTemplateColumns: `60px repeat(${days.length}, minmax(0, 1fr))` }}
+                    >
+                      <div className="bg-surface" />
+                      {days.map(day => {
+                        const display = buildDayDisplay(day)
+                        return (
+                          <div
+                            key={day.date}
+                            className={cn(
+                              'border-b border-border px-sm py-xs text-center text-sm font-medium',
+                              day.isToday
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted/30 text-foreground',
+                            )}
+                          >
+                            <span className="block text-base font-semibold">{display.label || '—'}</span>
+                            <span
+                              className={cn(
+                                'mt-1 block text-xs font-normal',
+                                day.isToday ? 'text-primary-foreground/90' : 'text-muted-foreground',
+                              )}
+                            >
+                              {display.date || '—'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Calendar grid body */}
                   <div
                     className="grid"
                     style={{ gridTemplateColumns: `60px repeat(${days.length}, minmax(0, 1fr))` }}
                   >
-                    <div className="sticky top-0 bg-surface" />
-                    {days.map(day => {
-                      const display = buildDayDisplay(day)
-                      return (
-                        <div
-                          key={day.date}
-                          className={cn(
-                            'sticky top-0 z-10 border-b border-border px-sm py-xs text-center text-sm font-medium',
-                            day.isToday
-                              ? 'bg-primary text-primary-foreground shadow-sm'
-                              : 'bg-muted/30 text-foreground',
-                          )}
-                        >
-                          <span className="block text-base font-semibold">{display.label || '—'}</span>
-                          <span
-                            className={cn(
-                              'mt-1 block text-xs font-normal',
-                              day.isToday ? 'text-primary-foreground/90' : 'text-muted-foreground',
-                            )}
-                          >
-                            {display.date || '—'}
-                          </span>
-                        </div>
-                      )
-                    })}
+                    {/* Time column */}
                     <div
                       className="relative border-l border-border"
                       style={{ height: `${dynamicGridHeight}px` }}
@@ -1309,6 +1322,8 @@ export default function WeeklyComplianceView({ orgId }) {
                         })}
                       </div>
                     </div>
+
+                    {/* Day columns */}
                     {days.map(day => {
                       const layout = dayLayouts.get(day.date)
                       const chipItems = layout?.chips ?? []

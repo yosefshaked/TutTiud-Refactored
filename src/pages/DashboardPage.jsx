@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 
 import Card from "@/components/ui/CustomCard.jsx"
@@ -8,8 +8,6 @@ import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
 import WeeklyComplianceView from "@/features/dashboard/components/WeeklyComplianceView.jsx"
-import InstructorLegend from "@/features/dashboard/components/InstructorLegend.jsx"
-import { useSmartLegendPosition } from "@/features/dashboard/hooks/useSmartLegendPosition.js"
 
 /**
  * Build greeting with proper fallback chain:
@@ -154,16 +152,6 @@ export default function DashboardPage() {
 
   const greeting = buildGreeting(instructorName, profileName, user?.name, user?.email)
 
-  const weeklyCalendarRef = useRef(null)
-  const legendRef = useRef(null)
-
-  const legendEnabled = tenantClientReady && activeOrgHasConnection
-  const legendStyle = useSmartLegendPosition({
-    calendarRef: weeklyCalendarRef,
-    legendRef,
-    isEnabled: legendEnabled,
-  })
-
   return (
     <div
       data-page-layout="dashboard"
@@ -219,10 +207,7 @@ export default function DashboardPage() {
 
           {/* Weekly compliance - mobile */}
           {tenantClientReady && activeOrgHasConnection ? (
-            <div className="space-y-lg">
-              <WeeklyComplianceView orgId={activeOrgId} />
-              <InstructorLegend orgId={activeOrgId} />
-            </div>
+            <WeeklyComplianceView orgId={activeOrgId} />
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">
@@ -233,8 +218,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Desktop xl+: floating legend with synchronized scrolling */}
-      <div className="relative hidden xl:block">
+      {/* Desktop xl+: simple centered layout */}
+      <div className="hidden xl:block">
         <div
           className="mx-auto flex w-full max-w-[1280px] flex-col gap-xl px-lg py-xl"
         >
@@ -278,27 +263,16 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <div ref={weeklyCalendarRef} className="relative">
-            {legendEnabled ? (
-              <WeeklyComplianceView orgId={activeOrgId} />
-            ) : (
-              <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
-                <p className="text-sm text-muted-foreground">
-                  לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
-                </p>
-              </Card>
-            )}
-          </div>
+          {tenantClientReady && activeOrgHasConnection ? (
+            <WeeklyComplianceView orgId={activeOrgId} />
+          ) : (
+            <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+              <p className="text-sm text-muted-foreground">
+                לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+              </p>
+            </Card>
+          )}
         </div>
-
-        {legendEnabled ? (
-          <InstructorLegend
-            ref={legendRef}
-            orgId={activeOrgId}
-            className="hidden xl:block"
-            style={legendStyle}
-          />
-        ) : null}
       </div>
     </div>
   )
