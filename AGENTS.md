@@ -201,6 +201,17 @@
 - The refreshed design system lives in `tailwind.config.js` (Nunito typography, primary/neutral/status palettes, spacing tokens) with base primitives in `src/components/ui/{Button,Card,Input,PageLayout}.jsx`. Prefer these when creating new mobile-first UI.
 - `src/components/layout/AppShell.jsx` is the new navigation shell. It renders the mobile bottom tabs + FAB and a desktop sidebar, so wrap future routes with it instead of the legacy `Layout.jsx`.
 
+### Weekly Compliance Calendar Layout (2025-11)
+- Calendar chip positioning uses precise minute-level calculations in `calculateChipTopPosition()` for accurate "Outlook-style" layout
+- Sessions at :15 and :45 receive enhanced visual height (+25% of GRID_ROW_HEIGHT) to span across slot boundaries, creating a visual "crossing" effect between adjacent 30-minute slots
+- Collision detection groups events that visually overlap (not just time-based overlaps): `event.top < currentGroup.maxBottom`
+- Max 2 visible chips per collision group (MAX_VISIBLE_CHIPS=2); remaining sessions shown in granular "+X more" badges
+- Overflow badges positioned per distinct start time:
+  - When all visible chips share same start time: badge centers at 50% to span under both chips
+  - When mixing start times: badge positions at centerPercent calculated from chip positions
+- Dynamic slot height expansion: `slotHeights` Map tracks required height per 30-min slot to accommodate collision groups
+- Key constants: GRID_ROW_HEIGHT=44px, GRID_INTERVAL_MINUTES=30, SESSION_DURATION_MINUTES=60
+
 ### Onboarding Tour System (2025-10)
 - Custom tour implementation lives in `src/features/onboarding/`:
   - `customTour.js`: Singleton tour bus with `openTour()`, `closeTour()`, `nextStep()`, `prevStep()`, `subscribe()`, `getState()`

@@ -384,7 +384,7 @@ function layoutDaySessions(day, window, {
   }
 
   const duration = Math.max(15, Number(sessionDuration) || SESSION_DURATION_MINUTES)
-  const chipHeight = Math.max(
+  const baseChipHeight = Math.max(
     GRID_ROW_HEIGHT - 8,
     GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8,
   )
@@ -392,6 +392,19 @@ function layoutDaySessions(day, window, {
   const computedRows = Math.max(1, Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1)
   // Note: columnHeight computed but not used in current layout logic (reserved for future enhancements)
   void computedRows
+
+  // Helper to calculate chip height with visual spanning for :15/:45 sessions
+  const calculateChipHeight = (startTime) => {
+    const minuteWithinHour = startTime % 60
+    const isQuarterHour = minuteWithinHour === 15 || minuteWithinHour === 45
+    
+    // For :15 and :45, extend the chip height to visually span across slot boundaries
+    if (isQuarterHour) {
+      return baseChipHeight + (GRID_ROW_HEIGHT / 4) // Extend by 25% to cross boundary
+    }
+    
+    return baseChipHeight
+  }
 
   // Build events array with exact positioning
   const events = []
@@ -405,6 +418,7 @@ function layoutDaySessions(day, window, {
     }
 
     const top = calculateChipTopPosition(timeMinutes, startMinutes, slotPositions)
+    const chipHeight = calculateChipHeight(timeMinutes)
     const bottom = top + chipHeight
 
     events.push({
@@ -413,6 +427,7 @@ function layoutDaySessions(day, window, {
       endTime: timeMinutes + duration,
       top,
       bottom,
+      chipHeight,
     })
   }
 
@@ -499,7 +514,7 @@ function layoutDaySessions(day, window, {
         chips.push({
           session: event.session,
           top: Math.round(event.top),
-          height: chipHeight,
+          height: event.chipHeight, // Use dynamic chip height
           style: {
             left: leftValue,
             width: totalEvents === 1 ? '100%' : visibleWidth,
@@ -552,7 +567,7 @@ function layoutDaySessions(day, window, {
           chips.push({
             session: event.session,
             top: Math.round(event.top),
-            height: chipHeight,
+            height: event.chipHeight, // Use dynamic chip height
             style: {
               left: leftValue,
               width: visibleWidth,
@@ -584,12 +599,18 @@ function layoutDaySessions(day, window, {
           const badgeTop = firstEventAtTime.bottom + OVERFLOW_BADGE_VERTICAL_GAP
           const badgeBottom = badgeTop + OVERFLOW_BADGE_HEIGHT
 
+          // If all visible chips in this collision group are from the same start time,
+          // center the badge under both chips. Otherwise, position under the specific chip(s).
+          const allChipsFromSameTime = chips.every(c => c.startMinutes === startTime)
+          
           overflowBadges.push({
             sessions: hiddenAtThisTime.map(e => e.session),
             top: badgeTop,
-            centerPercent: visibleAtThisTime > 0 
-              ? ((visibleAtThisTime - 1) * widthPercent) + (widthPercent / 2)
-              : 50,
+            centerPercent: allChipsFromSameTime ? 50 : (
+              visibleAtThisTime > 0 
+                ? ((visibleAtThisTime - 1) * widthPercent) + (widthPercent / 2)
+                : 50
+            ),
             startMinutes: startTime,
             slotMinutes: startMinutes + Math.floor((startTime - startMinutes) / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES,
           })
