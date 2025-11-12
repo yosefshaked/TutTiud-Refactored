@@ -327,9 +327,48 @@ function buildStatusLabel(status) {
   }
 }
 
+/**
+ * Calculate the exact vertical position for a session based on its precise start time.
+ * This creates an "in-between" effect where :15 and :45 sessions span across slot boundaries.
+ * 
+ * @param {number} startTime - Exact start time in minutes from midnight
+ * @param {number} windowStartMinutes - Start of the time window
+ * @param {Map} slotPositions - Cumulative positions for each slot (if using dynamic heights)
+ * @returns {number} Top position in pixels
+ */
+function calculateChipTopPosition(startTime, windowStartMinutes, slotPositions = null) {
+  const relativeMinutes = startTime - windowStartMinutes
+  
+  // If using cumulative slot positions (dynamic heights), we need a more complex calculation
+  if (slotPositions) {
+    // Find the base slot this time belongs to
+    const slotIndex = Math.floor(relativeMinutes / GRID_INTERVAL_MINUTES)
+    const slotMinutes = windowStartMinutes + (slotIndex * GRID_INTERVAL_MINUTES)
+    const slotBaseTop = slotPositions.get(slotMinutes) || (slotIndex * GRID_ROW_HEIGHT)
+    
+    // Calculate offset within the slot
+    const offsetWithinSlot = relativeMinutes % GRID_INTERVAL_MINUTES
+    const offsetPixels = (offsetWithinSlot / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+    
+    return slotBaseTop + offsetPixels
+  }
+  
+  // Simple fixed-height calculation: each minute = proportional pixel offset
+  // This creates the "in-between" effect naturally
+  return (relativeMinutes / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
+}
+
+/**
+ * Layout engine with sub-row positioning and granular overflow badges.
+ * 
+ * Key behaviors:
+ * 1. Sub-row positioning: Sessions at :15 and :45 are offset vertically within their 30-minute slot
+ * 2. Granular overflow: Each distinct start time gets its own "+X more" badge
+ * 3. Slot height expansion: Slots grow to accommodate chips + badges for each sub-row
+ */
 function layoutDaySessions(day, window, {
   sessionDuration = SESSION_DURATION_MINUTES,
-  columnHeight: providedColumnHeight,
+  // columnHeight parameter reserved for future enhancements
   slotPositions = null,
 } = {}) {
   if (!day || !window) {
@@ -349,11 +388,11 @@ function layoutDaySessions(day, window, {
   )
 
   const computedRows = Math.max(1, Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1)
-  const columnHeight = Number.isFinite(providedColumnHeight)
-    ? providedColumnHeight
-    : computedRows * GRID_ROW_HEIGHT
+  // Note: columnHeight computed but not used in current layout logic (reserved for future enhancements)
+  void computedRows
 
-  const events = []
+  // Group sessions by their exact start time (not just 30-min slot)
+  const sessionsByStartTime = new Map()
 
   for (const session of day.sessions || []) {
     const timeMinutes = Number(session?.timeMinutes ?? parseMinutes(session?.time))
@@ -363,60 +402,15 @@ function layoutDaySessions(day, window, {
     if (timeMinutes < startMinutes || timeMinutes > endMinutes) {
       continue
     }
-    const relativeStart = timeMinutes - startMinutes
-    const slotMinutes = startMinutes + Math.floor(relativeStart / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES
-    
-    // Use cumulative position if available, otherwise fall back to fixed grid
-    const top = slotPositions && slotPositions.has(slotMinutes)
-      ? slotPositions.get(slotMinutes)
-      : (relativeStart / GRID_INTERVAL_MINUTES) * GRID_ROW_HEIGHT
-    
-    const end = timeMinutes + duration
-    events.push({
-      session,
-      start: timeMinutes,
-      end,
-      top,
-      slotMinutes,
-    })
+
+    if (!sessionsByStartTime.has(timeMinutes)) {
+      sessionsByStartTime.set(timeMinutes, [])
+    }
+    sessionsByStartTime.get(timeMinutes).push(session)
   }
 
-  if (!events.length) {
+  if (sessionsByStartTime.size === 0) {
     return { chips: [], overflowBadges: [], slotHeights: new Map() }
-  }
-
-  events.sort((a, b) => {
-    if (a.start !== b.start) {
-      return a.start - b.start
-    }
-    return (a.session.studentName || '').localeCompare(b.session.studentName || '', 'he')
-  })
-
-  // Build collision groups: sessions that visually overlap
-  const collisionGroups = []
-  let currentGroup = null
-
-  for (const event of events) {
-    if (!currentGroup) {
-      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start, slotMinutes: event.slotMinutes }
-      continue
-    }
-
-    // Check if this event overlaps with any event in the current group
-    const overlaps = event.start < currentGroup.maxEnd
-    
-    if (overlaps) {
-      currentGroup.events.push(event)
-      currentGroup.maxEnd = Math.max(currentGroup.maxEnd, event.end)
-      currentGroup.minStart = Math.min(currentGroup.minStart, event.start)
-    } else {
-      collisionGroups.push(currentGroup)
-      currentGroup = { events: [event], maxEnd: event.end, minStart: event.start, slotMinutes: event.slotMinutes }
-    }
-  }
-
-  if (currentGroup) {
-    collisionGroups.push(currentGroup)
   }
 
   const chips = []
@@ -429,93 +423,118 @@ function layoutDaySessions(day, window, {
     const slotMinutes = startMinutes + (i * GRID_INTERVAL_MINUTES)
     slotHeights.set(slotMinutes, GRID_ROW_HEIGHT)
   }
-  
-  const maxBadgeTop = Math.max(0, columnHeight - OVERFLOW_BADGE_HEIGHT - OVERFLOW_BADGE_VERTICAL_GAP)
 
-  // Process each collision group with strict "Max 2" rule
-  for (const group of collisionGroups) {
-    const totalEvents = group.events.length
+  // Sort start times for consistent processing
+  const sortedStartTimes = Array.from(sessionsByStartTime.keys()).sort((a, b) => a - b)
 
-    if (totalEvents <= MAX_VISIBLE_CHIPS) {
-      // No overflow: display all events side-by-side
-      const widthPercent = 100 / totalEvents
-      const visibleWidth = totalEvents === 1
+  // Process each distinct start time
+  for (const startTime of sortedStartTimes) {
+    const sessionsAtTime = sessionsByStartTime.get(startTime)
+    if (!sessionsAtTime || sessionsAtTime.length === 0) {
+      continue
+    }
+
+    // Sort sessions by student name for consistent ordering
+    sessionsAtTime.sort((a, b) => 
+      (a.studentName || '').localeCompare(b.studentName || '', 'he')
+    )
+
+    // Calculate exact chip position (creates "in-between" effect for :15 and :45)
+    const chipTop = calculateChipTopPosition(startTime, startMinutes, slotPositions)
+    
+    // Determine which base slot this affects (for height tracking)
+    const relativeStart = startTime - startMinutes
+    const slotMinutes = startMinutes + Math.floor(relativeStart / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES
+    
+    const totalSessions = sessionsAtTime.length
+    const visibleCount = Math.min(totalSessions, MAX_VISIBLE_CHIPS)
+    const hiddenCount = Math.max(0, totalSessions - MAX_VISIBLE_CHIPS)
+
+    // Render visible chips (max 2)
+    if (visibleCount > 0) {
+      const widthPercent = 100 / visibleCount
+      const visibleWidth = visibleCount === 1
         ? '100%'
         : `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
-      const horizontalOffsetPx = totalEvents === 1 ? 0 : COLUMN_GAP_PX / 2
+      const horizontalOffsetPx = visibleCount === 1 ? 0 : COLUMN_GAP_PX / 2
 
-      for (let columnIndex = 0; columnIndex < totalEvents; columnIndex += 1) {
-        const event = group.events[columnIndex]
+      for (let columnIndex = 0; columnIndex < visibleCount; columnIndex += 1) {
+        const session = sessionsAtTime[columnIndex]
         const leftPercent = columnIndex * widthPercent
-        const leftValue = totalEvents === 1
+        const leftValue = visibleCount === 1
           ? '0'
           : `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
-        const top = Math.round(event.top)
 
         chips.push({
-          session: event.session,
-          top,
+          session,
+          top: Math.round(chipTop),
           height: chipHeight,
           style: {
             left: leftValue,
-            width: totalEvents === 1 ? '100%' : visibleWidth,
+            width: visibleCount === 1 ? '100%' : visibleWidth,
           },
-          zIndex: totalEvents - columnIndex,
-          startMinutes: event.start,
+          zIndex: visibleCount - columnIndex,
+          startMinutes: startTime,
         })
       }
-    } else {
-      // Overflow: show first 2 side-by-side + badge below
-      const widthPercent = 100 / MAX_VISIBLE_CHIPS
-      const visibleWidth = `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
-      const horizontalOffsetPx = COLUMN_GAP_PX / 2
+    }
 
-      // Display first 2 chips
-      for (let columnIndex = 0; columnIndex < MAX_VISIBLE_CHIPS; columnIndex += 1) {
-        const event = group.events[columnIndex]
-        const leftPercent = columnIndex * widthPercent
-        const leftValue = `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
-        const top = Math.round(event.top)
-
-        chips.push({
-          session: event.session,
-          top,
-          height: chipHeight,
-          style: {
-            left: leftValue,
-            width: visibleWidth,
-          },
-          zIndex: MAX_VISIBLE_CHIPS - columnIndex,
-          startMinutes: event.start,
-        })
-      }
-
-      // Collect hidden sessions (all after the first 2)
-      const hiddenSessions = group.events.slice(MAX_VISIBLE_CHIPS).map(e => e.session)
-
-      // Calculate badge position and update slot height
-      const baseTop = group.events[0].top
-      const clusterBottom = baseTop + chipHeight
-      const badgeBottom = clusterBottom + OVERFLOW_BADGE_VERTICAL_GAP + OVERFLOW_BADGE_HEIGHT
-      
-      // Find which slot this overflow belongs to and increase its height
-      const slotMinutes = group.slotMinutes
-      const requiredHeight = badgeBottom - baseTop + 8 // Add some padding
-      const currentHeight = slotHeights.get(slotMinutes) || GRID_ROW_HEIGHT
-      slotHeights.set(slotMinutes, Math.max(currentHeight, requiredHeight))
+    // Render overflow badge if needed (specific to this start time)
+    if (hiddenCount > 0) {
+      const hiddenSessions = sessionsAtTime.slice(MAX_VISIBLE_CHIPS)
+      const badgeTop = chipTop + chipHeight + OVERFLOW_BADGE_VERTICAL_GAP
 
       overflowBadges.push({
         sessions: hiddenSessions,
-        top: clusterBottom + OVERFLOW_BADGE_VERTICAL_GAP,
-        centerPercent: 50, // Center the badge
-        startMinutes: group.minStart,
-        slotMinutes, // Track which slot this belongs to
+        top: badgeTop,
+        centerPercent: 50,
+        startMinutes: startTime,
+        slotMinutes,
       })
+
+      // Calculate which slots are affected by this chip + badge combination
+      const badgeBottom = badgeTop + OVERFLOW_BADGE_HEIGHT
+      
+      // Update all affected slots to ensure enough height
+      const startSlotIndex = Math.floor((startTime - startMinutes) / GRID_INTERVAL_MINUTES)
+      const endSlotIndex = Math.floor((badgeBottom / GRID_ROW_HEIGHT))
+      
+      for (let i = startSlotIndex; i <= endSlotIndex && i < totalSlots; i += 1) {
+        const affectedSlotMinutes = startMinutes + (i * GRID_INTERVAL_MINUTES)
+        const slotBaseTop = slotPositions?.get(affectedSlotMinutes) ?? (i * GRID_ROW_HEIGHT)
+        const requiredHeightFromSlotBase = badgeBottom - slotBaseTop + 8
+        const currentHeight = slotHeights.get(affectedSlotMinutes) || GRID_ROW_HEIGHT
+        slotHeights.set(affectedSlotMinutes, Math.max(currentHeight, requiredHeightFromSlotBase))
+      }
+    } else {
+      // Even without overflow, ensure affected slots accommodate the chip
+      const chipBottom = chipTop + chipHeight
+      const startSlotIndex = Math.floor((startTime - startMinutes) / GRID_INTERVAL_MINUTES)
+      const endSlotIndex = Math.floor((chipBottom / GRID_ROW_HEIGHT))
+      
+      for (let i = startSlotIndex; i <= endSlotIndex && i < totalSlots; i += 1) {
+        const affectedSlotMinutes = startMinutes + (i * GRID_INTERVAL_MINUTES)
+        const slotBaseTop = slotPositions?.get(affectedSlotMinutes) ?? (i * GRID_ROW_HEIGHT)
+        const requiredHeightFromSlotBase = chipBottom - slotBaseTop + 8
+        const currentHeight = slotHeights.get(affectedSlotMinutes) || GRID_ROW_HEIGHT
+        slotHeights.set(affectedSlotMinutes, Math.max(currentHeight, requiredHeightFromSlotBase))
+      }
     }
   }
 
-  chips.sort((a, b) => a.top - b.top)
-  overflowBadges.sort((a, b) => a.startMinutes - b.startMinutes)
+  chips.sort((a, b) => {
+    if (a.top !== b.top) {
+      return a.top - b.top
+    }
+    return a.startMinutes - b.startMinutes
+  })
+  
+  overflowBadges.sort((a, b) => {
+    if (a.top !== b.top) {
+      return a.top - b.top
+    }
+    return a.startMinutes - b.startMinutes
+  })
 
   return { chips, overflowBadges, slotHeights }
 }
@@ -1020,7 +1039,6 @@ export default function WeeklyComplianceView({ orgId }) {
       columnHeight: totalRows * GRID_ROW_HEIGHT,
     }
   }, [timeWindow])
-  const gridHeight = windowMetrics?.columnHeight ?? gridSlots.length * GRID_ROW_HEIGHT
   const sessionDuration = data?.sessionDurationMinutes || SESSION_DURATION_MINUTES
 
   // First pass: calculate layouts to determine required slot heights
