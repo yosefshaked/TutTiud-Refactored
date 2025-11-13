@@ -74,19 +74,19 @@ export function DayTimelineView({ orgId, date, onBack }) {
     const minHour = minutesArray.length > 0 ? Math.floor(Math.min(...minutesArray) / 60) : 8
     const maxHour = minutesArray.length > 0 ? Math.ceil(Math.max(...minutesArray) / 60) : 18
 
-    // Build hours array in reverse for RTL timeline (latest hour first)
+    // Build hours array forward for LTR timeline (earliest hour first)
     const hours = []
-    for (let h = maxHour; h >= minHour; h--) {
+    for (let h = minHour; h <= maxHour; h++) {
       hours.push(`${String(h).padStart(2, '0')}:00`)
     }
 
     return { instructors, hours, minHour, maxHour }
   }, [data, date])
 
-  function calculatePosition(timeMinutes, minHour, maxHour) {
-    // For RTL: calculate from the right (max hour)
-    const minutesFromEnd = (maxHour * 60) - timeMinutes
-    return (minutesFromEnd / 60) * 120 // 120px per hour
+  function calculatePosition(timeMinutes, minHour) {
+    // For LTR: calculate from the left (min hour)
+    const minutesFromStart = timeMinutes - (minHour * 60)
+    return (minutesFromStart / 60) * 120 // 120px per hour
   }
 
   // Smart stacking: find the first available row for a session based on time overlap
@@ -172,7 +172,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
               {/* Timeline Grid */}
               <div className="relative">
                 {/* Time Header */}
-                <div className="flex border-b-2 border-border mb-2 pb-2" dir="rtl">
+                <div className="flex border-b-2 border-border mb-2 pb-2">
                   <div className="w-32 flex-shrink-0 pl-4 font-semibold text-sm text-right">
                     מדריך
                   </div>
@@ -180,7 +180,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
                     {timelineData.hours.map(hour => (
                       <div
                         key={hour}
-                        className="flex-shrink-0 w-[120px] text-center text-sm font-medium text-muted-foreground border-r border-border"
+                        className="flex-shrink-0 w-[120px] text-center text-sm font-medium text-muted-foreground border-l border-border"
                       >
                         {hour}
                       </div>
@@ -213,7 +213,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
                           {timelineData.hours.map(hour => (
                             <div
                               key={hour}
-                              className="flex-shrink-0 w-[120px] border-r border-border/50"
+                              className="flex-shrink-0 w-[120px] border-l border-border/50"
                             />
                           ))}
                         </div>
@@ -224,7 +224,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
                           const stackRow = calculateStackPosition(instructor.sessions, idx)
                           session._stackRow = stackRow // Store for overlap detection
                           
-                          const right = calculatePosition(session.timeMinutes, timelineData.minHour, timelineData.maxHour)
+                          const left = calculatePosition(session.timeMinutes, timelineData.minHour)
                           const width = 110 // 30 minutes = 60px (120px per hour), use full width minus small gap
                           const top = stackRow * 36 // 36px per row for proper spacing
                           const timeLabel = session.time || `${String(Math.floor(session.timeMinutes / 60)).padStart(2, '0')}:${String(session.timeMinutes % 60).padStart(2, '0')}`
@@ -235,7 +235,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
                               onClick={() => navigate(`/students/${session.studentId}`)}
                               className={`absolute rounded-md border-2 px-3 py-2 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
                               style={{
-                                right: `${right}px`,
+                                left: `${left}px`,
                                 width: `${width}px`,
                                 top: `${top}px`,
                                 zIndex: 10,

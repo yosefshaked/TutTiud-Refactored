@@ -108,28 +108,33 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
 
                       {/* Session Info (Right side in RTL) */}
                       <div className="flex-1 min-w-0 text-right">
-                        <div className="flex items-center justify-end gap-2 mb-1">
-                          <span className="font-semibold text-base truncate order-1">
+                        {/* Student Name (top) */}
+                        <div className="mb-1">
+                          <span className="font-semibold text-base truncate block">
                             {session.studentName}
                           </span>
-                          {session.instructorColor && (
-                            <div
-                              className="w-3 h-3 rounded-full border border-border shadow-sm flex-shrink-0 order-2"
-                              style={{ 
-                                background: session.instructorColor.includes('gradient')
-                                  ? session.instructorColor.replace('gradient-', 'linear-gradient(135deg, ')
-                                  : session.instructorColor
-                              }}
-                            />
-                          )}
                         </div>
+                        
+                        {/* Instructor Name with Color Dot (below student name) */}
                         {session.instructorName && (
-                          <div className="text-sm text-muted-foreground mb-1">
+                          <div className="flex items-center justify-end gap-2 mb-1">
                             <span className="text-sm text-muted-foreground">
                               {session.instructorName}
                             </span>
+                            {session.instructorColor && (
+                              <div
+                                className="w-3 h-3 rounded-full border border-border shadow-sm flex-shrink-0"
+                                style={{ 
+                                  background: session.instructorColor.includes('gradient')
+                                    ? session.instructorColor.replace('gradient-', 'linear-gradient(135deg, ')
+                                    : session.instructorColor
+                                }}
+                              />
+                            )}
                           </div>
                         )}
+                        
+                        {/* Status Text */}
                         <div className={`text-xs font-medium ${getStatusColor(session)}`}>
                           {getStatusText(session)}
                         </div>

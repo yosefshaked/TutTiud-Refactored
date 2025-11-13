@@ -102,8 +102,8 @@ export function ComplianceHeatmap({ orgId }) {
     if (total === 0 || complianceRate === null || isNaN(complianceRate)) {
       return '#E5E7EB'
     }
-    if (complianceRate >= 76) return '#22C55E' // Success Green
-    if (complianceRate >= 51) return '#FACC15' // Warning Yellow
+    if (complianceRate === 100) return '#22C55E' // Success Green (only 100%)
+    if (complianceRate >= 76) return '#FACC15' // Warning Yellow (76-99%)
     return '#F97316' // Warning Orange
   }
 
@@ -304,15 +304,15 @@ export function ComplianceHeatmap({ orgId }) {
             <div className="mt-md flex items-center justify-center gap-6 text-xs font-medium">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded bg-[#22C55E] border border-[#22C55E]"></div>
-                <span>76-100% ציות מעולה</span>
+                <span>100% ציות מושלם</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded bg-[#FACC15] border border-[#FACC15]"></div>
-                <span>51-75% דרוש תשומת לב</span>
+                <span>76-99% דרוש תשומת לב</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded bg-[#F97316] border border-[#F97316]"></div>
-                <span>0-50% דורש טיפול</span>
+                <span>0-75% דורש טיפול</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded bg-[#E5E7EB] border border-gray-300"></div>
