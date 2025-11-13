@@ -117,10 +117,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                         
                         {/* Instructor Name with Color Dot (below student name) */}
                         {session.instructorName && (
-                          <div className="flex items-center justify-end gap-2 mb-1">
-                            <span className="text-sm text-muted-foreground">
-                              {session.instructorName}
-                            </span>
+                          <div className="flex items-center gap-2 mb-1">
                             {session.instructorColor && (
                               <div
                                 className="w-3 h-3 rounded-full border border-border shadow-sm flex-shrink-0"
@@ -131,6 +128,9 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                                 }}
                               />
                             )}
+                            <span className="text-sm text-muted-foreground">
+                              {session.instructorName}
+                            </span>
                           </div>
                         )}
                         
