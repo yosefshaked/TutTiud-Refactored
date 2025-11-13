@@ -137,7 +137,7 @@ export default function SessionCardList({
                   <div className="flex-1 min-w-0 pr-3 text-right">
                     <p className="text-base font-semibold truncate">{session?.studentName || '—'}</p>
                     {session?.instructorName && (
-                      <div className="mt-1 flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                      <div className="mt-1 flex items-center justify-start gap-2 text-sm text-muted-foreground">
                         {session?.instructorColor && (
                           <span
                             className="inline-flex h-3 w-3 rounded-full border border-border shadow-sm"
