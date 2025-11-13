@@ -74,9 +74,9 @@ export function DayTimelineView({ orgId, date, onBack }) {
     const minHour = minutesArray.length > 0 ? Math.floor(Math.min(...minutesArray) / 60) : 8
     const maxHour = minutesArray.length > 0 ? Math.ceil(Math.max(...minutesArray) / 60) : 18
 
-    // Build hours array forward for LTR timeline (earliest hour first)
+    // Build hours array in reverse for RTL timeline (latest hour first on right)
     const hours = []
-    for (let h = minHour; h <= maxHour; h++) {
+    for (let h = maxHour; h >= minHour; h--) {
       hours.push(`${String(h).padStart(2, '0')}:00`)
     }
 
