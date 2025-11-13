@@ -4,19 +4,33 @@ import { he } from 'date-fns/locale'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance'
+import { fetchDailyCompliance } from '@/api/daily-compliance.js'
 import { SessionListDrawer } from './SessionListDrawer'
-import { DayTimelineView } from './DayTimelineView'
+import DayDetailView from './DayDetailView.jsx'
 
 export function ComplianceHeatmap({ orgId }) {
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedCell, setSelectedCell] = useState(null)
-  const [showTimeline, setShowTimeline] = useState(false)
-  const [timelineDate, setTimelineDate] = useState(null)
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => 
+  const [detailedDayData, setDetailedDayData] = useState(null)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState(null)
+  const [detailRequestDate, setDetailRequestDate] = useState(null)
+  const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { locale: he, weekStartsOn: 0 })
   )
+
+  const detailDateLabel = useMemo(() => {
+    if (!detailRequestDate) {
+      return ''
+    }
+    try {
+      return format(new Date(detailRequestDate), 'PPP', { locale: he })
+    } catch {
+      return detailRequestDate
+    }
+  }, [detailRequestDate])
 
   useEffect(() => {
     ;(async () => {
@@ -112,23 +126,27 @@ export function ComplianceHeatmap({ orgId }) {
     setSelectedCell({ timeSlot, ...dayData })
   }
 
-  function handleShowTimeline(date) {
-    setTimelineDate(date)
-    setShowTimeline(true)
+  async function handleShowDetailedDay(date) {
+    if (!date || !orgId) {
+      return
+    }
+    setDetailRequestDate(date)
+    setDetailError(null)
+    setDetailedDayData(null)
+    setIsDetailLoading(true)
+    try {
+      const result = await fetchDailyCompliance({ orgId, date })
+      setDetailedDayData(result)
+    } catch (detailErr) {
+      console.error('Failed to load detailed day view:', detailErr)
+      setDetailError(detailErr?.message || 'אירעה שגיאה בעת טעינת נתוני היום.')
+    } finally {
+      setIsDetailLoading(false)
+    }
   }
 
   function navigateWeek(direction) {
     setCurrentWeekStart(prev => addDays(prev, direction === 'next' ? 7 : -7))
-  }
-
-  if (showTimeline && timelineDate) {
-    return (
-      <DayTimelineView
-        orgId={orgId}
-        date={timelineDate}
-        onBack={() => setShowTimeline(false)}
-      />
-    )
   }
 
   return (
@@ -201,7 +219,7 @@ export function ComplianceHeatmap({ orgId }) {
                               variant="outline"
                               size="sm"
                               className="h-8 text-xs mt-1 bg-primary/5 hover:bg-primary/10 border-primary/30 hover:border-primary/50 font-semibold"
-                              onClick={() => handleShowTimeline(day.date)}
+                              onClick={() => handleShowDetailedDay(day.date)}
                             >
                               📊 תצוגה מפורטת
                             </Button>
@@ -321,6 +339,16 @@ export function ComplianceHeatmap({ orgId }) {
             </div>
           </>
         )}
+        {isDetailLoading ? (
+          <div className="mt-sm text-center text-xs text-muted-foreground" role="status">
+            טוען תצוגת יום מפורטת{detailDateLabel ? ` (${detailDateLabel})` : ''}...
+          </div>
+        ) : null}
+        {detailError ? (
+          <div className="mt-sm rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+            {detailError}
+          </div>
+        ) : null}
       </div>
 
       {/* Session List Drawer */}
@@ -332,6 +360,15 @@ export function ComplianceHeatmap({ orgId }) {
           orgId={orgId}
         />
       )}
+      {detailedDayData ? (
+        <DayDetailView
+          dayData={detailedDayData}
+          onClose={() => {
+            setDetailedDayData(null)
+            setDetailRequestDate(null)
+          }}
+        />
+      ) : null}
     </Card>
   )
 }

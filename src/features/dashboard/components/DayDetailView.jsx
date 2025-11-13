@@ -1,98 +1,48 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useMemo } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
+import { buildChipStyle } from './color-utils.js'
 
-import { Dialog, DialogContent } from '@/components/ui/dialog.jsx'
-import { Button } from '@/components/ui/button.jsx'
-import { fetchDailyCompliance } from '@/api/daily-compliance.js'
-import NewSessionModal from '@/features/sessions/components/NewSessionModal.jsx'
-import { cn } from '@/lib/utils'
-import { buildLegendStyle } from './color-utils.js'
-
-const STATUS_ICON = Object.freeze({
-  complete: '✔',
-  missing: '✖',
-  upcoming: '•',
-})
-
-const STATUS_TOKENS = Object.freeze({
+const STATUS_INFO = Object.freeze({
   complete: {
+    icon: '✔',
     label: 'תיעוד הושלם',
-    className: 'text-emerald-600 dark:text-emerald-400',
+    className: 'text-emerald-100',
   },
   missing: {
+    icon: '✖',
     label: 'חסר תיעוד',
-    className: 'text-red-600 dark:text-red-400',
+    className: 'text-red-100',
   },
   upcoming: {
+    icon: '•',
     label: 'מפגש עתידי',
-    className: 'text-muted-foreground',
+    className: 'text-white/80',
   },
 })
 
-function formatHebrewDate(isoDate) {
+function formatFullHebrewDate(isoDate) {
   if (!isoDate) {
     return ''
   }
   try {
     const formatter = new Intl.DateTimeFormat('he-IL', {
-      day: '2-digit',
-      month: '2-digit',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
       year: 'numeric',
     })
     return formatter.format(new Date(`${isoDate}T00:00:00Z`))
-  } catch (error) {
-    console.error('Failed to format date', error)
+  } catch {
     return isoDate
   }
 }
 
-function buildSummaryText(summary) {
-  if (!summary) {
-    return 'אין שיעורים מתוכננים ליום זה.'
+function buildSummary(summary) {
+  if (!summary || !summary.totalSessions) {
+    return ''
   }
-  const { totalSessions = 0, documentedSessions = 0 } = summary
-  if (!totalSessions) {
-    return 'אין שיעורים מתוכננים ליום זה.'
-  }
-  return `${documentedSessions} תלמידים מתועדים מתוך ${totalSessions} מפגשים`
-}
-
-function buildTimeGroups(slots, sessions) {
-  if (Array.isArray(slots) && slots.length > 0) {
-    return slots.map(slot => ({
-      timeMinutes: slot.timeMinutes,
-      timeLabel: slot.time,
-      sessions: slot.students || [],
-    }))
-  }
-
-  const fallback = new Map()
-  for (const session of sessions || []) {
-    const key = session?.timeMinutes ?? session?.time
-    if (!fallback.has(key)) {
-      fallback.set(key, [])
-    }
-    fallback.get(key).push(session)
-  }
-
-  return Array.from(fallback.entries())
-    .sort((a, b) => {
-      const minutesA = typeof a[0] === 'number' ? a[0] : parseMinutes(String(a[0]))
-      const minutesB = typeof b[0] === 'number' ? b[0] : parseMinutes(String(b[0]))
-      return (minutesA || 0) - (minutesB || 0)
-    })
-    .map(([key, group]) => ({
-      timeMinutes: typeof key === 'number' ? key : null,
-      timeLabel: typeof key === 'number' ? formatTimeLabel(key) : String(key),
-      sessions: group,
-    }))
-}
-
-function formatTimeLabel(minutes) {
-  const value = Number(minutes) || 0
-  const hoursPart = Math.floor(value / 60)
-  const minutesPart = value % 60
-  return `${String(hoursPart).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}`
+  const documented = summary.documentedSessions || 0
+  return `${documented} תלמידים מתועדים מתוך ${summary.totalSessions} מפגשים`
 }
 
 function parseMinutes(value) {
@@ -111,209 +61,142 @@ function parseMinutes(value) {
   if (Number.isNaN(hours) || Number.isNaN(minutes)) {
     return null
   }
-  return (hours * 60) + minutes
+  return hours * 60 + minutes
 }
 
-export default function DayDetailView({ orgId, date, open, onClose }) {
-  const [data, setData] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [refreshToken, setRefreshToken] = useState(0)
-  const [quickDocSession, setQuickDocSession] = useState(null)
-  const navigate = useNavigate()
+function formatTimeLabel(minutes) {
+  if (!Number.isFinite(minutes)) {
+    return ''
+  }
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+}
 
-  useEffect(() => {
-    if (!open) {
-      return undefined
-    }
-    if (!orgId || !date) {
-      setData(null)
-      setError(null)
-      return undefined
-    }
+function normalizeSlots(dayData) {
+  const slots = Array.isArray(dayData?.timeSlots) ? dayData.timeSlots : []
+  const sessions = Array.isArray(dayData?.sessions) ? dayData.sessions : []
 
-    const controller = new AbortController()
-    let isMounted = true
-    setIsLoading(true)
-    setError(null)
-
-    fetchDailyCompliance({ orgId, date, signal: controller.signal })
-      .then(result => {
-        if (!isMounted) {
-          return
-        }
-        setData(result)
-      })
-      .catch(fetchError => {
-        if (fetchError.name === 'AbortError') {
-          return
-        }
-        if (!isMounted) {
-          return
-        }
-        console.error('Failed to load day details', fetchError)
-        setError(fetchError)
-        setData(null)
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoading(false)
+  if (slots.length > 0) {
+    return slots
+      .map(slot => {
+        const timeMinutes = typeof slot.timeMinutes === 'number' ? slot.timeMinutes : parseMinutes(slot.time)
+        const timeLabel = slot.time || formatTimeLabel(timeMinutes)
+        const slotSessions = Array.isArray(slot.students) ? slot.students : []
+        return {
+          timeMinutes,
+          timeLabel,
+          sessions: slotSessions,
         }
       })
+      .filter(slot => slot.sessions.length > 0)
+      .sort((a, b) => (a.timeMinutes ?? 0) - (b.timeMinutes ?? 0))
+  }
 
-    return () => {
-      isMounted = false
-      controller.abort()
+  const map = new Map()
+  for (const session of sessions) {
+    const timeMinutes = typeof session?.timeMinutes === 'number' ? session.timeMinutes : parseMinutes(session?.time)
+    const timeLabel = session?.time || formatTimeLabel(timeMinutes)
+    const key = Number.isFinite(timeMinutes) ? timeMinutes : timeLabel
+    if (!map.has(key)) {
+      map.set(key, { timeMinutes, timeLabel, sessions: [] })
     }
-  }, [orgId, date, open, refreshToken])
+    map.get(key).sessions.push(session)
+  }
 
-  const groups = useMemo(() => buildTimeGroups(data?.timeSlots, data?.sessions), [data?.sessions, data?.timeSlots])
-  const summaryText = buildSummaryText(data?.summary)
-  const dayLabel = data?.dayLabel || ''
-  const hebrewDate = formatHebrewDate(data?.date)
+  return Array.from(map.values()).sort((a, b) => (a.timeMinutes ?? 0) - (b.timeMinutes ?? 0))
+}
 
-  const closeModal = useCallback(() => {
-    onClose?.()
-  }, [onClose])
+function buildHourGroups(slots) {
+  if (!slots.length) {
+    return []
+  }
+  const minuteValues = slots.map(slot => slot.timeMinutes ?? 0)
+  const minMinute = Math.floor(Math.min(...minuteValues) / 60) * 60
+  const endMinute = Math.ceil((Math.max(...minuteValues) + 1) / 60) * 60
+  const groups = []
 
-  const handleNavigate = useCallback(studentId => {
-    if (!studentId) {
-      return
-    }
-    navigate(`/students/${studentId}`)
-    closeModal()
-  }, [closeModal, navigate])
-
-  const handleDocumentNow = useCallback(session => {
-    if (!session?.studentId) {
-      return
-    }
-    setQuickDocSession({
-      studentId: session.studentId,
-      date: data?.date || date,
+  for (let minute = minMinute; minute < endMinute; minute += 60) {
+    const label = `${String(Math.floor(minute / 60)).padStart(2, '0')}:00`
+    const hourSlots = slots.filter(slot => {
+      const slotMinute = slot.timeMinutes ?? 0
+      return slotMinute >= minute && slotMinute < minute + 60
     })
-  }, [data?.date, date])
-
-  const handleQuickDocClose = useCallback(() => {
-    setQuickDocSession(null)
-  }, [])
-
-  const handleQuickDocComplete = useCallback(() => {
-    setQuickDocSession(null)
-    setRefreshToken(previous => previous + 1)
-  }, [])
-
-  const renderStatus = session => {
-    const token = STATUS_TOKENS[session?.status] || STATUS_TOKENS.upcoming
-    const icon = STATUS_ICON[session?.status] || STATUS_ICON.upcoming
-    return (
-      <div className="flex items-center gap-xs text-sm">
-        <span className={cn('text-base', token.className)} aria-hidden="true">
-          {icon}
-        </span>
-        <span className={token.className}>{token.label}</span>
-      </div>
-    )
+    groups.push({ label, slots: hourSlots })
   }
 
-  const renderAction = session => {
-    if (!session?.studentId) {
-      return null
-    }
-    if (session.status === 'missing') {
-      return (
-        <Button type="button" size="sm" onClick={() => handleDocumentNow(session)}>
-          תעד עכשיו
-        </Button>
-      )
-    }
-    return (
-      <Button type="button" variant="outline" size="sm" onClick={() => handleNavigate(session.studentId)}>
-        פתח
-      </Button>
-    )
-  }
+  return groups
+}
+
+export default function DayDetailView({ dayData, onClose }) {
+  const slots = useMemo(() => normalizeSlots(dayData), [dayData])
+  const hours = useMemo(() => buildHourGroups(slots), [slots])
+  const fullDate = formatFullHebrewDate(dayData?.date)
+  const summaryText = buildSummary(dayData?.summary)
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={value => { if (!value) { closeModal() } }}>
-        <DialogContent hideDefaultClose wide className="text-right">
-          <div className="-m-4 flex flex-1 sm:-m-6">
-            <div className="flex h-full w-full flex-col overflow-hidden rounded-3xl border border-border bg-surface shadow-2xl">
-              <div className="flex items-start justify-between gap-sm border-b border-border px-xl py-lg">
-                <div className="space-y-xs">
-                  <p className="text-xs font-semibold text-muted-foreground">תצוגת יום</p>
-                  <h2 className="text-2xl font-bold text-foreground">{dayLabel || '—'}</h2>
-                  <p className="text-sm text-muted-foreground">{hebrewDate || data?.date || '—'}</p>
-                  <p className="text-sm text-foreground">{summaryText}</p>
+    <Dialog open onOpenChange={value => { if (!value) { onClose?.() } }}>
+      <DialogContent wide className="text-right">
+        <DialogHeader>
+          <p className="text-sm text-muted-foreground">תצוגת יום מפורטת</p>
+          <DialogTitle className="text-2xl font-bold text-foreground">
+            {fullDate || dayData?.dayLabel || '—'}
+          </DialogTitle>
+          {summaryText ? (
+            <p className="text-sm text-muted-foreground">{summaryText}</p>
+          ) : null}
+        </DialogHeader>
+        {hours.length === 0 ? (
+          <p className="text-sm text-muted-foreground">אין שיעורים מתוכננים ליום זה.</p>
+        ) : (
+          <div className="relative space-y-8">
+            <div className="absolute right-[64px] top-0 bottom-0 w-px bg-border" aria-hidden="true" />
+            {hours.map(hour => (
+              <section key={hour.label} className="grid grid-cols-[70px,1fr] gap-4">
+                <div className="text-sm font-semibold text-muted-foreground mt-1">{hour.label}</div>
+                <div className="space-y-4">
+                  {hour.slots.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border/60 px-4 py-3 text-xs text-muted-foreground">
+                      אין שיעורים בשעה זו
+                    </div>
+                  ) : (
+                    hour.slots.map(slot => (
+                      <div key={`${hour.label}-${slot.timeLabel}`} className="space-y-2">
+                        <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
+                        <div className="space-y-2">
+                          {slot.sessions.map(session => {
+                            const token = STATUS_INFO[session?.status] || STATUS_INFO.upcoming
+                            const style = buildChipStyle(session?.instructorColor, {
+                              inactive: session?.instructorIsActive === false,
+                            })
+                            return (
+                              <article
+                                key={`${slot.timeLabel}-${session?.studentId}`}
+                                className="rounded-2xl p-4 shadow-sm text-white"
+                                style={style}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="space-y-1">
+                                    <p className="text-base font-semibold">{session?.studentName || '—'}</p>
+                                    <p className="text-xs text-white/80">{session?.instructorName || '—'}</p>
+                                  </div>
+                                  <span className={`text-lg font-bold ${token.className}`} aria-label={token.label}>
+                                    {token.icon}
+                                  </span>
+                                </div>
+                              </article>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-lg text-muted-foreground transition hover:bg-muted/50"
-                  aria-label="סגירת חלונית היום"
-                >
-                  ✖
-                </button>
-              </div>
-              <div className="h-[70vh] space-y-lg overflow-y-auto px-xl py-lg" dir="rtl">
-                {isLoading ? (
-                  <div className="flex justify-center py-lg">
-                    <span className="text-sm text-muted-foreground">טוען נתוני יום...</span>
-                  </div>
-                ) : null}
-                {error ? (
-                  <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-lg text-destructive">
-                    <p className="text-base font-semibold">אירעה שגיאה בטעינת הנתונים.</p>
-                    <p className="mt-xs text-sm">נסו לרענן את הדף או לחזור מאוחר יותר.</p>
-                  </div>
-                ) : null}
-                {!isLoading && !error && (!groups || groups.length === 0) ? (
-                  <p className="text-sm text-muted-foreground">אין שיעורים להצגה ביום זה.</p>
-                ) : null}
-                {!isLoading && !error && groups.map(group => (
-                  <div key={`${data?.date || date}-${group.timeMinutes ?? group.timeLabel}`} className="space-y-sm">
-                    <div className="sticky top-0 z-10 rounded-full bg-muted/40 px-md py-xxs text-xs font-semibold text-muted-foreground">
-                      {group.timeLabel || formatTimeLabel(group.timeMinutes)}
-                    </div>
-                    <div className="space-y-sm">
-                      {group.sessions.map(session => (
-                        <article
-                          key={`${session.studentId}-${session.time}`}
-                          className="relative flex flex-col gap-sm rounded-2xl border border-border bg-card/90 p-lg shadow-sm"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="absolute inset-y-0 right-0 w-1 rounded-r-2xl"
-                            style={buildLegendStyle(session.instructorColor, { inactive: session.instructorIsActive === false })}
-                          />
-                          <div className="flex flex-col gap-xs pr-3">
-                            <div className="flex flex-col">
-                              <span className="text-base font-semibold text-foreground">{session.studentName || '—'}</span>
-                              <span className="text-sm text-muted-foreground">{session.instructorName || '—'}</span>
-                            </div>
-                            {renderStatus(session)}
-                          </div>
-                          <div className="flex justify-end">{renderAction(session)}</div>
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+              </section>
+            ))}
           </div>
-        </DialogContent>
-      </Dialog>
-      {quickDocSession ? (
-        <NewSessionModal
-          open={Boolean(quickDocSession)}
-          onClose={handleQuickDocClose}
-          initialStudentId={quickDocSession.studentId}
-          initialDate={quickDocSession.date}
-          onCreated={handleQuickDocComplete}
-        />
-      ) : null}
-    </>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

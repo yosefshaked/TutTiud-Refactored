@@ -156,24 +156,18 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 
 ## 11. Focused Navigation Dashboard
 
-- **Weekly Compliance View** – `src/features/dashboard/components/WeeklyComplianceView.jsx` renders a role-aware, color-coded
-  week grid fed by `/api/weekly-compliance`. The backend precomputes session metadata, trims the vertical range to the
-  organization’s active hours, and annotates each scheduled session with ✔ (complete) or ✖ (missing) icons for past and same-day
-  meetings that lack documentation. Desktop users see the full week at once, while the mobile layout collapses into a one-day
-  focus with the same chips and interactions. Headers translate each day into Hebrew and stack the calendar date beneath every
-  label so the schedule stays consistent across layouts. The Outlook-style lattice places chips with sub-slot precision (e.g., :15
-  and :45 land midway inside their rows). Overlapping sessions render side-by-side up to two concurrent chips; additional
-  conflicts collapse into a contextual “+X נוספים” badge that sits directly beneath the visible chips and opens a pop-over listing
-  every student in that time block, with each name linking to the profile view. Hover (desktop) or tap (touch) surfaces an
-  interactive tooltip with the student name, instructor, scheduled time, and a “View Profile” link. Instructor rows flagged as
-  inactive (`is_active = false`) inherit a striped overlay so administrators can immediately spot follow-up items. The instructor
-  legend now lives in `src/features/dashboard/components/InstructorLegend.jsx`, a standalone sticky card that fetches its own
-  color assignments. `src/pages/DashboardPage.jsx` arranges the dashboard in a two-column grid on large screens so the legend
-  occupies the left column while the calendar uses the full right column; on smaller screens the legend stacks above the widget
-  but remains sticky within its column as the calendar scrolls. A container-based 1,015 px breakpoint automatically switches the
-  view into the day layout (hiding the week/day toggle) to prevent cramped columns, while wider layouts default to the week grid
-  with a slimmer 60 px time column and an always-available toggle. Selected day buttons on mobile/day view tint both the label
-  and date text for better contrast against the primary background.
+- **ComplianceHeatmap** – `src/features/dashboard/components/ComplianceHeatmap.jsx` renders the weekly compliance board that is
+  shown on the dashboard. It consumes `/api/weekly-compliance`, arranges the aggregated sessions in an hour-by-day table, and
+  keeps the quick-drawer interactions for drilling into a specific cell (`SessionListDrawer`). Each day column includes a
+  "תצוגה מפורטת" button that now triggers a modal day breakdown: the handler calls `/api/daily-compliance`, surfaces a loading
+  state inline, and renders `DayDetailView.jsx` once the payload arrives. Errors are shown directly inside the card so admins know
+  when a retry is required.
+- **DayDetailView** – `src/features/dashboard/components/DayDetailView.jsx` is a modal-only component that receives the
+  `/api/daily-compliance` payload (date metadata, grouped time slots, instructor colors, and session statuses) and presents a
+  vertical, hour-based timeline. A solid header displays the localized date plus a summary string (“documented out of total”).
+  Each hour shows its slots in chronological order, and every session renders as an instructor-colored chip that includes the
+  student name, instructor name, and a status icon (✔ documented, ✖ missing). Upcoming sessions fall back to a neutral dot. The
+  modal is controlled entirely by `ComplianceHeatmap`, so no extra fetch logic lives inside the detail component.
 - **Dashboard actions** – `DashboardPage.jsx` still greets the user and surfaces the quick cards for “My Students” / “All Students”
   and “New Session Record”. The compliance widget now renders beneath those quick actions once the tenant connection is available;
   until then a placeholder card explains why the grid is hidden.
