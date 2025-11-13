@@ -87,6 +87,38 @@ export function DayTimelineView({ orgId, date, onBack }) {
     return (minutesFromStart / 60) * 120 // 120px per hour
   }
 
+  // Smart stacking: find the first available row for a session based on time overlap
+  function calculateStackPosition(sessions, currentIndex) {
+    const current = sessions[currentIndex]
+    const currentStart = current.timeMinutes
+    const currentEnd = currentStart + 30 // 30-minute sessions
+    
+    // Track which rows (vertical positions) are occupied at each time range
+    const rows = []
+    
+    // Check all previous sessions to find overlaps
+    for (let i = 0; i < currentIndex; i++) {
+      const prev = sessions[i]
+      const prevStart = prev.timeMinutes
+      const prevEnd = prevStart + 30
+      
+      // Check if there's time overlap
+      if (currentStart < prevEnd && currentEnd > prevStart) {
+        // Find which row this session is in
+        const prevRow = prev._stackRow || 0
+        rows[prevRow] = true
+      }
+    }
+    
+    // Find first available row
+    let targetRow = 0
+    while (rows[targetRow]) {
+      targetRow++
+    }
+    
+    return targetRow
+  }
+
   function getStatusColor(session) {
     if (session.status === 'upcoming') return 'bg-muted border-muted-foreground/30'
     if (session.status === 'missing') return 'bg-red-100 dark:bg-red-950 border-red-400 dark:border-red-700'
@@ -172,7 +204,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
                       </div>
 
                       {/* Timeline Lane */}
-                      <div className="flex-1 relative overflow-hidden" style={{ minHeight: '80px' }} dir="ltr">
+                      <div className="flex-1 relative overflow-hidden" style={{ minHeight: '120px' }} dir="ltr">
                         {/* Hour Grid Lines */}
                         <div className="absolute inset-0 flex">
                           {timelineData.hours.map(hour => (
@@ -185,28 +217,32 @@ export function DayTimelineView({ orgId, date, onBack }) {
 
                         {/* Sessions */}
                         {instructor.sessions.map((session, idx) => {
+                          // Calculate smart stack position
+                          const stackRow = calculateStackPosition(instructor.sessions, idx)
+                          session._stackRow = stackRow // Store for overlap detection
+                          
                           const left = calculatePosition(session.timeMinutes, timelineData.minHour)
-                          const width = 110 // 1 hour = 120px, session = ~110px (leaving 10px gap)
-                          const top = Math.floor(idx / 2) * 36 // Stack in rows if too many (2 per row)
+                          const width = 55 // 30 minutes = 60px (120px per hour), leaving 5px gap
+                          const top = stackRow * 36 // 36px per row for proper spacing
                           const timeLabel = session.time || `${String(Math.floor(session.timeMinutes / 60)).padStart(2, '0')}:${String(session.timeMinutes % 60).padStart(2, '0')}`
 
                           return (
                             <button
                               key={session.id}
                               onClick={() => navigate(`/students/${session.studentId}`)}
-                              className={`absolute rounded-md border-2 px-3 py-2 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
+                              className={`absolute rounded-md border-2 px-2 py-1.5 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
                               style={{
                                 left: `${left}px`,
                                 width: `${width}px`,
                                 top: `${top}px`,
                                 zIndex: 10,
-                                maxWidth: '110px'
+                                maxWidth: '55px'
                               }}
                               title={`${session.studentName} - ${timeLabel}`}
                             >
-                              <div className="flex items-center gap-1.5 truncate" dir="rtl">
-                                <span className="text-sm">{getStatusIcon(session)}</span>
-                                <span className="truncate">{session.studentName}</span>
+                              <div className="flex items-center gap-1 truncate" dir="rtl">
+                                <span className="text-xs">{getStatusIcon(session)}</span>
+                                <span className="truncate text-[10px]">{session.studentName}</span>
                               </div>
                             </button>
                           )

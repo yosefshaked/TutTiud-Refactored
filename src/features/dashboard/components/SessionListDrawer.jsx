@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { format } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
@@ -10,9 +10,11 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import NewSessionModal from '@/features/sessions/components/NewSessionModal'
 
 export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
   const navigate = useNavigate()
+  const [quickDocModal, setQuickDocModal] = useState(null) // { studentId, date }
   // Intentionally unused for now; keep in signature for future enhancements
   void orgId
 
@@ -32,9 +34,14 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
 
   const sortedTimes = Object.keys(sessionsByTime).sort()
 
-  function handleDocumentNow(studentId) {
-    navigate(`/students/${studentId}`)
+  function handleDocumentNow(studentId, date) {
+    setQuickDocModal({ studentId, date })
+  }
+
+  function handleQuickDocComplete() {
+    setQuickDocModal(null)
     onClose()
+    // Optionally reload the compliance data
   }
 
   function handleViewStudent(studentId) {
@@ -62,7 +69,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-lg">
+      <SheetContent side="left" className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="text-right">
             {dayName} {fullDate} | {cellData.timeSlot}
@@ -138,7 +145,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                           <Button
                             size="sm"
                             variant="default"
-                            onClick={() => handleDocumentNow(session.studentId)}
+                            onClick={() => handleDocumentNow(session.studentId, cellData.date)}
                           >
                             תעד עכשיו
                           </Button>
@@ -159,6 +166,17 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
           </div>
         </div>
       </SheetContent>
+
+      {/* Quick Documentation Modal */}
+      {quickDocModal && (
+        <NewSessionModal
+          open={!!quickDocModal}
+          onClose={() => setQuickDocModal(null)}
+          initialStudentId={quickDocModal.studentId}
+          initialDate={quickDocModal.date}
+          onCreated={handleQuickDocComplete}
+        />
+      )}
     </Sheet>
   )
 }

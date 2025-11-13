@@ -212,16 +212,19 @@
   - ⚪ Gray: Upcoming sessions (not yet due)
 - **UI Design Principles (2025-11)**:
   - Each cell uses larger padding (p-4), border-2, and bold text for better visual hierarchy
+  - **Color saturation (2025-11)**: Upgraded from -100/-950 to -200/-900 for bolder, more visible states; text upgraded to -950/-50 for maximum contrast
+  - **Tight spacing (2025-11)**: Cell content uses gap-1 and leading-tight to reduce whitespace and improve density
   - "תצוגה מפורטת" button styled with outline variant, primary color accents, 📊 icon prefix for visibility
   - Instructor legend removed from week view to reduce visual clutter
   - Cell spacing increased (px-3 py-3) for better touch targets and readability
 - Each cell displays: status icon counts (✓×N ✗×N ⚠×N), ratio (documented/total), and percentage.
 - Click any cell opens `SessionListDrawer.jsx` showing detailed session list for that hour with:
+  - **Drawer placement (2025-11)**: Opens on left side (RTL convention: primary content right, secondary left)
   - Sessions grouped by exact time (handles :15/:45 naturally)
   - Status icons (✓ documented, ✗ missing, ⚠ upcoming)
   - **Instructor colors displayed** (2025-11): Color bar on right edge of card + color dot next to instructor name
   - Instructor color rendering handles both solid colors and gradients (gradient- prefix converted to linear-gradient CSS)
-  - Quick action buttons ("תעד עכשיו" for missing, "פתח" to view student)
+  - **Quick documentation (2025-11)**: "תעד עכשיו" button opens `NewSessionModal` with pre-filled student + date; default service auto-selected if configured
 - "תצוגה מפורטת" button per day opens `DayTimelineView.jsx` - resource timeline showing instructor lanes with sessions positioned precisely by time.
 - **Day timeline RTL fixes (2025-11)**:
   - Timeline lane uses `dir="ltr"` for left-to-right time progression (Western convention)
@@ -229,10 +232,11 @@
   - Grid lines use `border-l` (left border) instead of `border-r` for LTR layout
   - Time header also uses `dir="ltr"` for consistent directionality
   - Container includes `overflow-hidden` to prevent chips from sliding outside bounds
-  - Chip width increased to 110px (was 58px) with maxWidth constraint
-  - Stacking density reduced to 2 sessions per row (was 3) for better readability
-- Day timeline uses instructor rows with horizontal time grid (8 hours shown, 120px per hour).
-- Sessions positioned as clickable chips at exact times, stacking vertically if instructor has many concurrent sessions.
+  - **Session duration (2025-11)**: Chip width = 55px (30-minute sessions, 60px per 30min with 5px gap); position calculated at 120px per hour
+  - **Smart stacking (2025-11)**: `calculateStackPosition` detects time overlaps and fills gaps; sessions stack only when overlapping, reusing vertical space when prior sessions end
+  - Stacking uses 36px per row for comfortable spacing
+- Day timeline uses instructor rows with horizontal time grid (dynamic hours based on actual sessions, 120px per hour).
+- Sessions positioned as clickable chips at exact times, stacking intelligently to avoid wasted vertical space.
 - Scales infinitely: works with any number of instructors/students/sessions without overlap issues.
 - Mobile: Week heatmap remains functional; day timeline best viewed in landscape.
 - Legacy: React Big Calendar approach (ModernWeeklyCalendar.jsx) deprecated due to event density issues.

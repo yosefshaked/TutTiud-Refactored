@@ -100,11 +100,11 @@ export function ComplianceHeatmap({ orgId }) {
     if (total === 0) return 'bg-muted/30 text-muted-foreground'
     if (complianceRate === null || isNaN(complianceRate)) {
       // All upcoming
-      return 'bg-muted/50 text-muted-foreground'
+      return 'bg-muted/60 text-muted-foreground border-muted-foreground/40'
     }
-    if (complianceRate >= 80) return 'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100 border-green-300 dark:border-green-800'
-    if (complianceRate >= 50) return 'bg-yellow-100 dark:bg-yellow-950 text-yellow-900 dark:text-yellow-100 border-yellow-300 dark:border-yellow-800'
-    return 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-100 border-red-300 dark:border-red-800'
+    if (complianceRate >= 80) return 'bg-green-200 dark:bg-green-900 text-green-950 dark:text-green-50 border-green-400 dark:border-green-700'
+    if (complianceRate >= 50) return 'bg-yellow-200 dark:bg-yellow-900 text-yellow-950 dark:text-yellow-50 border-yellow-400 dark:border-yellow-700'
+    return 'bg-red-200 dark:bg-red-900 text-red-950 dark:text-red-50 border-red-400 dark:border-red-700'
   }
 
   function handleCellClick(timeSlot, dayData) {
@@ -227,32 +227,32 @@ export function ComplianceHeatmap({ orgId }) {
                               onClick={() => handleCellClick(row.timeSlot, dayData)}
                               className={`w-full rounded-lg border-2 p-4 transition-all hover:scale-105 hover:shadow-lg cursor-pointer ${getComplianceColor(dayData.complianceRate, dayData.upcoming > 0, dayData.total)}`}
                             >
-                              <div className="flex flex-col gap-2">
+                              <div className="flex flex-col gap-1">
                                 {/* Status Icons */}
-                                <div className="flex items-center justify-center gap-2 text-xs font-semibold">
+                                <div className="flex items-center justify-center gap-2 text-xs font-semibold leading-tight">
                                   {dayData.documented > 0 && (
-                                    <span className="text-green-700 dark:text-green-300">
+                                    <span className="text-green-800 dark:text-green-200">
                                       ✓×{dayData.documented}
                                     </span>
                                   )}
                                   {dayData.missing > 0 && (
-                                    <span className="text-red-700 dark:text-red-300">
+                                    <span className="text-red-800 dark:text-red-200">
                                       ✗×{dayData.missing}
                                     </span>
                                   )}
                                   {dayData.upcoming > 0 && (
-                                    <span className="text-muted-foreground/80">
+                                    <span className="text-muted-foreground">
                                       ⚠×{dayData.upcoming}
                                     </span>
                                   )}
                                 </div>
                                 {/* Ratio */}
-                                <div className="font-bold text-base">
+                                <div className="font-bold text-base leading-tight">
                                   {dayData.documented}/{dayData.total}
                                 </div>
                                 {/* Percentage */}
                                 {dayData.complianceRate !== null && !isNaN(dayData.complianceRate) && (
-                                  <div className="text-sm font-bold">
+                                  <div className="text-sm font-bold leading-tight">
                                     {Math.round(dayData.complianceRate)}%
                                   </div>
                                 )}
