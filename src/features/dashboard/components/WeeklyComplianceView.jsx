@@ -388,15 +388,6 @@ function layoutDaySessions(day, window, {
     GRID_ROW_HEIGHT - 8,
     GRID_ROW_HEIGHT * (duration / GRID_INTERVAL_MINUTES) - 8,
   )
-  
-  // DEBUG: Log duration setup
-  console.log('[WeeklyCompliance] Duration setup:', {
-    sessionDuration,
-    duration,
-    baseChipHeight,
-    GRID_ROW_HEIGHT,
-    GRID_INTERVAL_MINUTES,
-  })
 
   const computedRows = Math.max(1, Math.floor((endMinutes - startMinutes) / GRID_INTERVAL_MINUTES) + 1)
   // Note: columnHeight computed but not used in current layout logic (reserved for future enhancements)
@@ -421,48 +412,20 @@ function layoutDaySessions(day, window, {
 
     const top = calculateChipTopPosition(timeMinutes, startMinutes, slotPositions)
     
-    // Calculate actual bottom position, clamped to the visible window
-    const endTime = Math.min(timeMinutes + duration, endMinutes)
-    let bottom
-    if (endTime > endMinutes) {
-      // Session extends beyond window - use base height calculation
-      bottom = top + baseChipHeight
-    } else {
-      // Session within window - calculate precise position
-      bottom = calculateChipTopPosition(endTime, startMinutes, slotPositions)
-    }
-    const actualChipHeight = Math.max(GRID_ROW_HEIGHT - 8, bottom - top)
+    // Use consistent base height for clean UI - don't try to span multiple slots visually
+    // The chip represents a 30-minute session and should have a consistent, professional height
+    const actualChipHeight = baseChipHeight
+    const bottom = top + actualChipHeight
 
     // Compute a boundary hint offset for :15/:45 sessions (visual-only divider inside single chip)
     let boundaryHintOffset = null
     if (isQuarterHour(timeMinutes)) {
-      const slotIndex = Math.floor((timeMinutes - startMinutes) / GRID_INTERVAL_MINUTES)
-      const nextSlotMinutes = startMinutes + ((slotIndex + 1) * GRID_INTERVAL_MINUTES)
-      const boundaryTop = calculateChipTopPosition(nextSlotMinutes, startMinutes, slotPositions)
-      boundaryHintOffset = Math.max(0, boundaryTop - top)
-      
-      // DEBUG: Log quarter-hour session details
-      console.log('[WeeklyCompliance] Quarter-hour session:', {
-        studentName: session.studentName,
-        time: session.time,
-        timeMinutes,
-        endTime,
-        duration,
-        endMinutes,
-        startMinutes,
-        slotIndex,
-        nextSlotMinutes,
-        top,
-        bottom,
-        boundaryTop,
-        boundaryHintOffset,
-        actualChipHeight,
-        baseChipHeight,
-        slotPositions: slotPositions ? Array.from(slotPositions.entries()) : null,
-      })
+      // For quarter-hour sessions, the hint should appear halfway through the chip height
+      // This creates a subtle visual indication without complex calculations
+      boundaryHintOffset = actualChipHeight / 2
     }
 
-    // Single chip per session (Outlook-style)
+    // Single chip per session
     events.push({
       session,
       startTime: timeMinutes,
@@ -568,23 +531,9 @@ function layoutDaySessions(day, window, {
           ? '0'
           : `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
 
-        // Single chip per session group
+        // Single chip per session group - use consistent height
         const chipTop = Math.round(sessionGroup.minTop)
-        const chipHeight = Math.max(8, sessionGroup.maxBottom - sessionGroup.minTop)
-        
-        // DEBUG: Log chip rendering details
-        if (sessionGroup.boundaryHintOffset) {
-          console.log('[WeeklyCompliance] Rendering quarter-hour chip (no overflow):', {
-            studentName: sessionGroup.session.studentName,
-            minTop: sessionGroup.minTop,
-            maxBottom: sessionGroup.maxBottom,
-            chipTop,
-            chipHeight,
-            boundaryHintOffset: sessionGroup.boundaryHintOffset,
-            leftValue,
-            width: totalSessions === 1 ? '100%' : visibleWidth,
-          })
-        }
+        const chipHeight = sessionGroup.events[0].chipHeight // Use the event's calculated height
         
         chips.push({
           session: sessionGroup.session,
@@ -640,23 +589,9 @@ function layoutDaySessions(day, window, {
           const leftPercent = columnIndex * widthPercent
           const leftValue = `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
 
-          // Single chip per session group
+          // Single chip per session group - use consistent height
           const chipTop = Math.round(sessionGroup.minTop)
-          const chipHeight = Math.max(8, sessionGroup.maxBottom - sessionGroup.minTop)
-          
-          // DEBUG: Log chip rendering details (overflow case)
-          if (sessionGroup.boundaryHintOffset) {
-            console.log('[WeeklyCompliance] Rendering quarter-hour chip (with overflow):', {
-              studentName: sessionGroup.session.studentName,
-              minTop: sessionGroup.minTop,
-              maxBottom: sessionGroup.maxBottom,
-              chipTop,
-              chipHeight,
-              boundaryHintOffset: sessionGroup.boundaryHintOffset,
-              leftValue,
-              width: visibleWidth,
-            })
-          }
+          const chipHeight = sessionGroup.events[0].chipHeight // Use the event's calculated height
           
           chips.push({
             session: sessionGroup.session,
@@ -906,20 +841,8 @@ function StudentChip({
         ...chipStyle,
       }
 
-  const renderTrigger = handlers => {
-    // DEBUG: Log chip rendering
-    if (typeof boundaryHintOffset === 'number' && boundaryHintOffset > 0) {
-      console.log('[StudentChip] Rendering with boundary hint:', {
-        studentName: session.studentName,
-        top,
-        height,
-        boundaryHintOffset,
-        willRender: boundaryHintOffset < height,
-      })
-    }
-    
-    return (
-      <button
+  const renderTrigger = handlers => (
+    <button
         type="button"
         onClick={handleClick}
         className={sharedClassName}
@@ -941,7 +864,6 @@ function StudentChip({
         <span className="sr-only">{srLabel}</span>
       </button>
     )
-  }
 
   return (
     <StudentDetailPopover
@@ -973,10 +895,11 @@ function OverflowBadge({ sessions, top, centerPercent, isLeftAligned, onNavigate
   const computedStyle = useMemo(
     () => {
       if (isLeftAligned) {
-        // Position to the left side of the day column
+        // Position to the left side of the day column with proper RTL handling
         return {
           top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
-          left: '4px',
+          right: '4px', // Use 'right' for RTL layout
+          left: 'auto',
           transform: 'none',
           zIndex: 30,
         }
