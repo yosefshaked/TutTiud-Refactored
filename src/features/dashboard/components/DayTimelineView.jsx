@@ -241,7 +241,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
                                 zIndex: 10
                               }}
                               title={`${session.studentName} - ${timeLabel}`}
-                              dir="rtl"
+                              dir="ltr"
                             >
                               <div className="flex items-center gap-1 truncate">
                                 <span className="text-sm">{getStatusIcon(session)}</span>
