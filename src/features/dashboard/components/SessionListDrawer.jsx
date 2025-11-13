@@ -92,6 +92,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                     <div
                       key={session.id}
                       className="relative flex items-center gap-3 p-4 rounded-lg border-2 border-border bg-card hover:bg-muted/50 transition-all hover:shadow-md"
+                      dir="rtl"
                     >
                       {/* Instructor Color Bar */}
                       {session.instructorColor && (
@@ -105,30 +106,25 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                         />
                       )}
 
-                      {/* Status Icon */}
-                      <div className={`text-2xl ${getStatusColor(session)}`}>
-                        {getStatusIcon(session)}
-                      </div>
-
-                      {/* Session Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                      {/* Session Info (Right side in RTL) */}
+                      <div className="flex-1 min-w-0 text-right">
+                        <div className="flex items-center justify-end gap-2 mb-1">
+                          {session.instructorColor && (
+                            <div
+                              className="w-3 h-3 rounded-full border border-border shadow-sm flex-shrink-0"
+                              style={{ 
+                                background: session.instructorColor.includes('gradient')
+                                  ? session.instructorColor.replace('gradient-', 'linear-gradient(135deg, ')
+                                  : session.instructorColor
+                              }}
+                            />
+                          )}
                           <span className="font-semibold text-base truncate">
                             {session.studentName}
                           </span>
                         </div>
                         {session.instructorName && (
-                          <div className="flex items-center gap-1.5 mb-1">
-                            {session.instructorColor && (
-                              <div
-                                className="w-3 h-3 rounded-full border border-border shadow-sm"
-                                style={{ 
-                                  background: session.instructorColor.includes('gradient')
-                                    ? session.instructorColor.replace('gradient-', 'linear-gradient(135deg, ')
-                                    : session.instructorColor
-                                }}
-                              />
-                            )}
+                          <div className="text-sm text-muted-foreground mb-1">
                             <span className="text-sm text-muted-foreground">
                               {session.instructorName}
                             </span>
@@ -139,8 +135,20 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex gap-2">
+                      {/* Status Icon */}
+                      <div className={`text-2xl flex-shrink-0 ${getStatusColor(session)}`}>
+                        {getStatusIcon(session)}
+                      </div>
+
+                      {/* Action Buttons (Left side in RTL) */}
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewStudent(session.studentId)}
+                        >
+                          פתח
+                        </Button>
                         {session.status === 'missing' && (
                           <Button
                             size="sm"
@@ -150,13 +158,6 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                             תעד עכשיו
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleViewStudent(session.studentId)}
-                        >
-                          פתח
-                        </Button>
                       </div>
                     </div>
                   ))}

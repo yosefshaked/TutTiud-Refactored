@@ -74,17 +74,19 @@ export function DayTimelineView({ orgId, date, onBack }) {
     const minHour = minutesArray.length > 0 ? Math.floor(Math.min(...minutesArray) / 60) : 8
     const maxHour = minutesArray.length > 0 ? Math.ceil(Math.max(...minutesArray) / 60) : 18
 
+    // Build hours array in reverse for RTL timeline (latest hour first)
     const hours = []
-    for (let h = minHour; h <= maxHour; h++) {
+    for (let h = maxHour; h >= minHour; h--) {
       hours.push(`${String(h).padStart(2, '0')}:00`)
     }
 
     return { instructors, hours, minHour, maxHour }
   }, [data, date])
 
-  function calculatePosition(timeMinutes, minHour) {
-    const minutesFromStart = timeMinutes - (minHour * 60)
-    return (minutesFromStart / 60) * 120 // 120px per hour
+  function calculatePosition(timeMinutes, minHour, maxHour) {
+    // For RTL: calculate from the right (max hour)
+    const minutesFromEnd = (maxHour * 60) - timeMinutes
+    return (minutesFromEnd / 60) * 120 // 120px per hour
   }
 
   // Smart stacking: find the first available row for a session based on time overlap
@@ -170,15 +172,15 @@ export function DayTimelineView({ orgId, date, onBack }) {
               {/* Timeline Grid */}
               <div className="relative">
                 {/* Time Header */}
-                <div className="flex border-b-2 border-border mb-2 pb-2">
-                  <div className="w-48 flex-shrink-0 pr-4 font-semibold text-sm">
+                <div className="flex border-b-2 border-border mb-2 pb-2" dir="rtl">
+                  <div className="w-32 flex-shrink-0 pl-4 font-semibold text-sm text-right">
                     מדריך
                   </div>
-                  <div className="flex-1 flex" dir="ltr">
+                  <div className="flex-1 flex">
                     {timelineData.hours.map(hour => (
                       <div
                         key={hour}
-                        className="flex-shrink-0 w-[120px] text-center text-sm font-medium text-muted-foreground border-l border-border"
+                        className="flex-shrink-0 w-[120px] text-center text-sm font-medium text-muted-foreground border-r border-border"
                       >
                         {hour}
                       </div>
@@ -191,26 +193,27 @@ export function DayTimelineView({ orgId, date, onBack }) {
                   {timelineData.instructors.map(instructor => (
                     <div
                       key={instructor.id}
-                      className="flex items-start border-b border-border py-2 hover:bg-muted/30 transition-colors"
+                      className="flex items-start border-b border-border py-1 hover:bg-muted/30 transition-colors"
+                      dir="rtl"
                     >
                       {/* Instructor Name */}
-                      <div className="w-48 flex-shrink-0 pr-4 py-2">
-                        <div className="font-medium text-sm truncate">
+                      <div className="w-32 flex-shrink-0 pl-4 py-1 text-right">
+                        <div className="font-medium text-xs truncate">
                           {instructor.name}
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-[10px] text-muted-foreground">
                           {instructor.sessions.length} שיעורים
                         </div>
                       </div>
 
                       {/* Timeline Lane */}
-                      <div className="flex-1 relative overflow-hidden" style={{ minHeight: '120px' }} dir="ltr">
+                      <div className="flex-1 relative overflow-hidden" style={{ minHeight: '60px' }}>
                         {/* Hour Grid Lines */}
                         <div className="absolute inset-0 flex">
                           {timelineData.hours.map(hour => (
                             <div
                               key={hour}
-                              className="flex-shrink-0 w-[120px] border-l border-border/50"
+                              className="flex-shrink-0 w-[120px] border-r border-border/50"
                             />
                           ))}
                         </div>
@@ -221,8 +224,8 @@ export function DayTimelineView({ orgId, date, onBack }) {
                           const stackRow = calculateStackPosition(instructor.sessions, idx)
                           session._stackRow = stackRow // Store for overlap detection
                           
-                          const left = calculatePosition(session.timeMinutes, timelineData.minHour)
-                          const width = 55 // 30 minutes = 60px (120px per hour), leaving 5px gap
+                          const right = calculatePosition(session.timeMinutes, timelineData.minHour, timelineData.maxHour)
+                          const width = 110 // 30 minutes = 60px (120px per hour), use full width minus small gap
                           const top = stackRow * 36 // 36px per row for proper spacing
                           const timeLabel = session.time || `${String(Math.floor(session.timeMinutes / 60)).padStart(2, '0')}:${String(session.timeMinutes % 60).padStart(2, '0')}`
 
@@ -230,19 +233,19 @@ export function DayTimelineView({ orgId, date, onBack }) {
                             <button
                               key={session.id}
                               onClick={() => navigate(`/students/${session.studentId}`)}
-                              className={`absolute rounded-md border-2 px-2 py-1.5 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
+                              className={`absolute rounded-md border-2 px-3 py-2 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
                               style={{
-                                left: `${left}px`,
+                                right: `${right}px`,
                                 width: `${width}px`,
                                 top: `${top}px`,
                                 zIndex: 10,
-                                maxWidth: '55px'
+                                maxWidth: '110px'
                               }}
                               title={`${session.studentName} - ${timeLabel}`}
                             >
-                              <div className="flex items-center gap-1 truncate" dir="rtl">
-                                <span className="text-xs">{getStatusIcon(session)}</span>
-                                <span className="truncate text-[10px]">{session.studentName}</span>
+                              <div className="flex items-center gap-1.5 truncate" dir="rtl">
+                                <span className="text-sm">{getStatusIcon(session)}</span>
+                                <span className="truncate">{session.studentName}</span>
                               </div>
                             </button>
                           )

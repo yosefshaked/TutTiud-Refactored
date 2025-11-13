@@ -225,14 +225,18 @@
   - **Instructor colors displayed** (2025-11): Color bar on right edge of card + color dot next to instructor name
   - Instructor color rendering handles both solid colors and gradients (gradient- prefix converted to linear-gradient CSS)
   - **Quick documentation (2025-11)**: "תעד עכשיו" button opens `NewSessionModal` with pre-filled student + date; default service auto-selected if configured
+  - **RTL layout (2025-11)**: Cards use `dir="rtl"` with text on right, status icon center, buttons on left; proper Hebrew reading flow
 - "תצוגה מפורטת" button per day opens `DayTimelineView.jsx` - resource timeline showing instructor lanes with sessions positioned precisely by time.
 - **Day timeline RTL fixes (2025-11)**:
-  - Timeline lane uses `dir="ltr"` for left-to-right time progression (Western convention)
+  - Timeline flows right-to-left (RTL): latest hour on right, earliest on left (Hebrew reading direction)
+  - Hours array reversed (maxHour → minHour) for proper RTL display
+  - Position calculated from right edge: `(maxHour - timeMinutes) * 120px`
   - Session chips contain RTL content (`dir="rtl"`) for Hebrew text display
-  - Grid lines use `border-l` (left border) instead of `border-r` for LTR layout
-  - Time header also uses `dir="ltr"` for consistent directionality
+  - Grid lines use `border-r` (right border) for RTL layout
+  - Instructor column reduced from 192px to 128px for more timeline space and better student name visibility
+  - Vertical spacing optimized: py-1 for rows, minHeight 60px (was 120px) to eliminate unused space
   - Container includes `overflow-hidden` to prevent chips from sliding outside bounds
-  - **Session duration (2025-11)**: Chip width = 55px (30-minute sessions, 60px per 30min with 5px gap); position calculated at 120px per hour
+  - **Session duration (2025-11)**: Chip width = 110px (30-minute sessions, allowing full student names); positioned at 120px per hour scale
   - **Smart stacking (2025-11)**: `calculateStackPosition` detects time overlaps and fills gaps; sessions stack only when overlapping, reusing vertical space when prior sessions end
   - Stacking uses 36px per row for comfortable spacing
 - Day timeline uses instructor rows with horizontal time grid (dynamic hours based on actual sessions, 120px per hour).
