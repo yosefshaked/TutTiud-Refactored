@@ -142,11 +142,11 @@ export function DayTimelineView({ orgId, date, onBack }) {
                   <div className="w-48 flex-shrink-0 pr-4 font-semibold text-sm">
                     מדריך
                   </div>
-                  <div className="flex-1 flex">
+                  <div className="flex-1 flex" dir="ltr">
                     {timelineData.hours.map(hour => (
                       <div
                         key={hour}
-                        className="flex-shrink-0 w-[120px] text-center text-sm font-medium text-muted-foreground border-r border-border"
+                        className="flex-shrink-0 w-[120px] text-center text-sm font-medium text-muted-foreground border-l border-border"
                       >
                         {hour}
                       </div>
@@ -172,13 +172,13 @@ export function DayTimelineView({ orgId, date, onBack }) {
                       </div>
 
                       {/* Timeline Lane */}
-                      <div className="flex-1 relative" style={{ minHeight: '60px' }}>
+                      <div className="flex-1 relative overflow-hidden" style={{ minHeight: '80px' }} dir="ltr">
                         {/* Hour Grid Lines */}
                         <div className="absolute inset-0 flex">
                           {timelineData.hours.map(hour => (
                             <div
                               key={hour}
-                              className="flex-shrink-0 w-[120px] border-r border-border/50"
+                              className="flex-shrink-0 w-[120px] border-l border-border/50"
                             />
                           ))}
                         </div>
@@ -186,25 +186,26 @@ export function DayTimelineView({ orgId, date, onBack }) {
                         {/* Sessions */}
                         {instructor.sessions.map((session, idx) => {
                           const left = calculatePosition(session.timeMinutes, timelineData.minHour)
-                          const width = 58 // 1 hour = 120px, session = ~58px
-                          const top = Math.floor(idx / 3) * 32 // Stack in rows if too many
+                          const width = 110 // 1 hour = 120px, session = ~110px (leaving 10px gap)
+                          const top = Math.floor(idx / 2) * 36 // Stack in rows if too many (2 per row)
                           const timeLabel = session.time || `${String(Math.floor(session.timeMinutes / 60)).padStart(2, '0')}:${String(session.timeMinutes % 60).padStart(2, '0')}`
 
                           return (
                             <button
                               key={session.id}
                               onClick={() => navigate(`/students/${session.studentId}`)}
-                              className={`absolute rounded border-2 px-2 py-1 text-xs font-medium shadow-sm hover:shadow-md transition-all cursor-pointer ${getStatusColor(session)}`}
+                              className={`absolute rounded-md border-2 px-3 py-2 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
                               style={{
                                 left: `${left}px`,
                                 width: `${width}px`,
                                 top: `${top}px`,
-                                zIndex: 10
+                                zIndex: 10,
+                                maxWidth: '110px'
                               }}
                               title={`${session.studentName} - ${timeLabel}`}
                             >
-                              <div className="flex items-center gap-1 truncate">
-                                <span>{getStatusIcon(session)}</span>
+                              <div className="flex items-center gap-1.5 truncate" dir="rtl">
+                                <span className="text-sm">{getStatusIcon(session)}</span>
                                 <span className="truncate">{session.studentName}</span>
                               </div>
                             </button>

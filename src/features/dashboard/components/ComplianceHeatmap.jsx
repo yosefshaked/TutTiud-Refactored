@@ -4,7 +4,6 @@ import { he } from 'date-fns/locale'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance'
-import InstructorLegend from './InstructorLegend'
 import { SessionListDrawer } from './SessionListDrawer'
 import { DayTimelineView } from './DayTimelineView'
 
@@ -168,11 +167,6 @@ export function ComplianceHeatmap({ orgId }) {
           </div>
         </div>
 
-        {/* Instructor Legend */}
-        <div className="mb-md">
-          <InstructorLegend orgId={orgId} />
-        </div>
-
         {isLoading ? (
           <div className="flex justify-center py-xl">
             <span className="text-sm text-muted-foreground">טוען נתוני ציות...</span>
@@ -199,17 +193,17 @@ export function ComplianceHeatmap({ orgId }) {
                       const dayName = format(dateObj, 'EEEE', { locale: he })
                       const shortDate = format(dateObj, 'dd.MM', { locale: he })
                       return (
-                        <th key={day.date} className="px-4 py-3 text-center border-r border-border min-w-[140px]">
-                          <div className="flex flex-col gap-1">
-                            <div className="font-semibold text-sm">{dayName}</div>
+                        <th key={day.date} className="px-3 py-3 text-center border-r border-border min-w-[150px]">
+                          <div className="flex flex-col gap-2">
+                            <div className="font-semibold text-base">{dayName}</div>
                             <div className="text-xs text-muted-foreground">{shortDate}</div>
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="h-6 text-xs mt-1"
+                              className="h-8 text-xs mt-1 bg-primary/5 hover:bg-primary/10 border-primary/30 hover:border-primary/50 font-semibold"
                               onClick={() => handleShowTimeline(day.date)}
                             >
-                              תצוגה מפורטת
+                              📊 תצוגה מפורטת
                             </Button>
                           </div>
                         </th>
@@ -226,46 +220,46 @@ export function ComplianceHeatmap({ orgId }) {
                       {row.days.map((dayData, dayIdx) => (
                         <td
                           key={dayIdx}
-                          className="px-2 py-2 text-center border-r border-b border-border"
+                          className="px-3 py-3 text-center border-r border-b border-border"
                         >
                           {dayData.total > 0 ? (
                             <button
                               onClick={() => handleCellClick(row.timeSlot, dayData)}
-                              className={`w-full rounded-lg border p-3 transition-all hover:scale-105 hover:shadow-md cursor-pointer ${getComplianceColor(dayData.complianceRate, dayData.upcoming > 0, dayData.total)}`}
+                              className={`w-full rounded-lg border-2 p-4 transition-all hover:scale-105 hover:shadow-lg cursor-pointer ${getComplianceColor(dayData.complianceRate, dayData.upcoming > 0, dayData.total)}`}
                             >
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-2">
                                 {/* Status Icons */}
-                                <div className="flex items-center justify-center gap-1 text-xs mb-1">
+                                <div className="flex items-center justify-center gap-2 text-xs font-semibold">
                                   {dayData.documented > 0 && (
-                                    <span className="text-green-600 dark:text-green-400">
+                                    <span className="text-green-700 dark:text-green-300">
                                       ✓×{dayData.documented}
                                     </span>
                                   )}
                                   {dayData.missing > 0 && (
-                                    <span className="text-red-600 dark:text-red-400">
+                                    <span className="text-red-700 dark:text-red-300">
                                       ✗×{dayData.missing}
                                     </span>
                                   )}
                                   {dayData.upcoming > 0 && (
-                                    <span className="text-muted-foreground">
+                                    <span className="text-muted-foreground/80">
                                       ⚠×{dayData.upcoming}
                                     </span>
                                   )}
                                 </div>
                                 {/* Ratio */}
-                                <div className="font-semibold text-sm">
+                                <div className="font-bold text-base">
                                   {dayData.documented}/{dayData.total}
                                 </div>
                                 {/* Percentage */}
                                 {dayData.complianceRate !== null && !isNaN(dayData.complianceRate) && (
-                                  <div className="text-xs font-medium">
+                                  <div className="text-sm font-bold">
                                     {Math.round(dayData.complianceRate)}%
                                   </div>
                                 )}
                               </div>
                             </button>
                           ) : (
-                            <div className="text-muted-foreground text-sm py-3">-</div>
+                            <div className="text-muted-foreground text-sm py-4">-</div>
                           )}
                         </td>
                       ))}
@@ -280,8 +274,8 @@ export function ComplianceHeatmap({ orgId }) {
                     </td>
                     {data.days.map(day => {
                       const totalSessions = day.sessions.length
-                      const documented = day.sessions.filter(s => !s.is_missing && !s.is_upcoming).length
-                      const upcoming = day.sessions.filter(s => s.is_upcoming).length
+                      const documented = day.sessions.filter(s => s.status === 'complete').length
+                      const upcoming = day.sessions.filter(s => s.status === 'upcoming').length
                       const rate = totalSessions - upcoming > 0 
                         ? Math.round((documented / (totalSessions - upcoming)) * 100)
                         : null

@@ -210,12 +210,27 @@
   - 🟡 Yellow (50-79%): Needs attention
   - 🔴 Red (<50%): Critical gaps
   - ⚪ Gray: Upcoming sessions (not yet due)
+- **UI Design Principles (2025-11)**:
+  - Each cell uses larger padding (p-4), border-2, and bold text for better visual hierarchy
+  - "תצוגה מפורטת" button styled with outline variant, primary color accents, 📊 icon prefix for visibility
+  - Instructor legend removed from week view to reduce visual clutter
+  - Cell spacing increased (px-3 py-3) for better touch targets and readability
 - Each cell displays: status icon counts (✓×N ✗×N ⚠×N), ratio (documented/total), and percentage.
 - Click any cell opens `SessionListDrawer.jsx` showing detailed session list for that hour with:
   - Sessions grouped by exact time (handles :15/:45 naturally)
   - Status icons (✓ documented, ✗ missing, ⚠ upcoming)
+  - **Instructor colors displayed** (2025-11): Color bar on right edge of card + color dot next to instructor name
+  - Instructor color rendering handles both solid colors and gradients (gradient- prefix converted to linear-gradient CSS)
   - Quick action buttons ("תעד עכשיו" for missing, "פתח" to view student)
 - "תצוגה מפורטת" button per day opens `DayTimelineView.jsx` - resource timeline showing instructor lanes with sessions positioned precisely by time.
+- **Day timeline RTL fixes (2025-11)**:
+  - Timeline lane uses `dir="ltr"` for left-to-right time progression (Western convention)
+  - Session chips contain RTL content (`dir="rtl"`) for Hebrew text display
+  - Grid lines use `border-l` (left border) instead of `border-r` for LTR layout
+  - Time header also uses `dir="ltr"` for consistent directionality
+  - Container includes `overflow-hidden` to prevent chips from sliding outside bounds
+  - Chip width increased to 110px (was 58px) with maxWidth constraint
+  - Stacking density reduced to 2 sessions per row (was 3) for better readability
 - Day timeline uses instructor rows with horizontal time grid (8 hours shown, 120px per hour).
 - Sessions positioned as clickable chips at exact times, stacking vertically if instructor has many concurrent sessions.
 - Scales infinitely: works with any number of instructors/students/sessions without overlap issues.

@@ -84,26 +84,50 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                   {sessionsByTime[time].map(session => (
                     <div
                       key={session.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors"
+                      className="relative flex items-center gap-3 p-4 rounded-lg border-2 border-border bg-card hover:bg-muted/50 transition-all hover:shadow-md"
                     >
+                      {/* Instructor Color Bar */}
+                      {session.instructorColor && (
+                        <div
+                          className="w-1.5 h-full absolute right-0 top-0 bottom-0 rounded-r-lg"
+                          style={{ 
+                            background: session.instructorColor.includes('gradient')
+                              ? session.instructorColor.replace('gradient-', 'linear-gradient(135deg, ')
+                              : session.instructorColor
+                          }}
+                        />
+                      )}
+
                       {/* Status Icon */}
-                      <div className={`text-xl ${getStatusColor(session)}`}>
+                      <div className={`text-2xl ${getStatusColor(session)}`}>
                         {getStatusIcon(session)}
                       </div>
 
                       {/* Session Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm truncate">
+                          <span className="font-semibold text-base truncate">
                             {session.studentName}
                           </span>
-                          {session.instructorName && (
-                            <span className="text-xs text-muted-foreground">
-                              ← {session.instructorName}
-                            </span>
-                          )}
                         </div>
-                        <div className={`text-xs ${getStatusColor(session)}`}>
+                        {session.instructorName && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {session.instructorColor && (
+                              <div
+                                className="w-3 h-3 rounded-full border border-border shadow-sm"
+                                style={{ 
+                                  background: session.instructorColor.includes('gradient')
+                                    ? session.instructorColor.replace('gradient-', 'linear-gradient(135deg, ')
+                                    : session.instructorColor
+                                }}
+                              />
+                            )}
+                            <span className="text-sm text-muted-foreground">
+                              {session.instructorName}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`text-xs font-medium ${getStatusColor(session)}`}>
                           {getStatusText(session)}
                         </div>
                       </div>
@@ -121,7 +145,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                         )}
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           onClick={() => handleViewStudent(session.studentId)}
                         >
                           פתח
