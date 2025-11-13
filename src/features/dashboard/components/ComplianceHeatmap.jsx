@@ -97,14 +97,26 @@ export function ComplianceHeatmap({ orgId }) {
   }, [data])
 
   function getComplianceColor(complianceRate, hasUpcoming, total) {
-    if (total === 0) return 'bg-muted/30 text-muted-foreground'
+    // No sessions scheduled - neutral gray
+    if (total === 0) return 'bg-[#E5E7EB] text-gray-600 border-gray-300'
+    
+    // All upcoming sessions (not yet due) - neutral gray
     if (complianceRate === null || isNaN(complianceRate)) {
-      // All upcoming
-      return 'bg-muted/60 text-muted-foreground border-muted-foreground/40'
+      return 'bg-[#E5E7EB] text-gray-600 border-gray-300'
     }
-    if (complianceRate >= 80) return 'bg-green-200 dark:bg-green-900 text-green-950 dark:text-green-50 border-green-400 dark:border-green-700'
-    if (complianceRate >= 50) return 'bg-yellow-200 dark:bg-yellow-900 text-yellow-950 dark:text-yellow-50 border-yellow-400 dark:border-yellow-700'
-    return 'bg-red-200 dark:bg-red-900 text-red-950 dark:text-red-50 border-red-400 dark:border-red-700'
+    
+    // 76-100%: Success Green (#22C55E)
+    if (complianceRate >= 76) {
+      return 'bg-[#22C55E] text-white border-[#22C55E]'
+    }
+    
+    // 51-75%: Warning Yellow (#FACC15)
+    if (complianceRate >= 51) {
+      return 'bg-[#FACC15] text-gray-900 border-[#FACC15]'
+    }
+    
+    // 0-50%: Warning Orange (#F97316)
+    return 'bg-[#F97316] text-white border-[#F97316]'
   }
 
   function handleCellClick(timeSlot, dayData) {
@@ -229,19 +241,19 @@ export function ComplianceHeatmap({ orgId }) {
                             >
                               <div className="flex flex-col gap-1">
                                 {/* Status Icons */}
-                                <div className="flex items-center justify-center gap-2 text-xs font-semibold leading-tight">
+                                <div className="flex items-center justify-center gap-2 text-xs font-semibold leading-tight opacity-90">
                                   {dayData.documented > 0 && (
-                                    <span className="text-green-800 dark:text-green-200">
+                                    <span>
                                       ✓×{dayData.documented}
                                     </span>
                                   )}
                                   {dayData.missing > 0 && (
-                                    <span className="text-red-800 dark:text-red-200">
+                                    <span>
                                       ✗×{dayData.missing}
                                     </span>
                                   )}
                                   {dayData.upcoming > 0 && (
-                                    <span className="text-muted-foreground">
+                                    <span>
                                       ⚠×{dayData.upcoming}
                                     </span>
                                   )}
@@ -295,22 +307,22 @@ export function ComplianceHeatmap({ orgId }) {
             </div>
 
             {/* Legend */}
-            <div className="mt-md flex items-center justify-center gap-4 text-xs">
+            <div className="mt-md flex items-center justify-center gap-6 text-xs font-medium">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded bg-green-100 dark:bg-green-950 border border-green-300 dark:border-green-800"></div>
-                <span>≥80% ציות טוב</span>
+                <div className="w-6 h-6 rounded bg-[#22C55E] border border-[#22C55E]"></div>
+                <span>76-100% ציות מעולה</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded bg-yellow-100 dark:bg-yellow-950 border border-yellow-300 dark:border-yellow-800"></div>
-                <span>50-79% דרוש תשומת לב</span>
+                <div className="w-6 h-6 rounded bg-[#FACC15] border border-[#FACC15]"></div>
+                <span>51-75% דרוש תשומת לב</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded bg-red-100 dark:bg-red-950 border border-red-300 dark:border-red-800"></div>
-                <span>&lt;50% פערים משמעותיים</span>
+                <div className="w-6 h-6 rounded bg-[#F97316] border border-[#F97316]"></div>
+                <span>0-50% דורש טיפול</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded bg-muted/50 border border-border"></div>
-                <span>טרם התרחש</span>
+                <div className="w-6 h-6 rounded bg-[#E5E7EB] border border-gray-300"></div>
+                <span>ללא שיעורים / טרם התרחש</span>
               </div>
             </div>
           </>

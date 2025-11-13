@@ -206,10 +206,10 @@
 ### Weekly Compliance Calendar Layout (2025-11) - Heatmap Implementation
 - The Weekly Compliance View uses a **compliance heatmap** approach optimized for high-density session tracking.
 - Main view (`ComplianceHeatmap.jsx`): Grid showing days × time slots with color-coded cells indicating documentation compliance percentage:
-  - 🟢 Green (≥80%): Good compliance
-  - 🟡 Yellow (50-79%): Needs attention
-  - 🔴 Red (<50%): Critical gaps
-  - ⚪ Gray: Upcoming sessions (not yet due)
+  - 🟢 Success Green (#22C55E, 76-100%): Excellent compliance
+  - 🟡 Warning Yellow (#FACC15, 51-75%): Needs attention
+  - � Warning Orange (#F97316, 0-50%): Requires action
+  - ⚪ Neutral Gray (#E5E7EB): No sessions scheduled / Upcoming sessions (not yet due)
 - **UI Design Principles (2025-11)**:
   - Each cell uses larger padding (p-4), border-2, and bold text for better visual hierarchy
   - **Color saturation (2025-11)**: Upgraded from -100/-950 to -200/-900 for bolder, more visible states; text upgraded to -950/-50 for maximum contrast
