@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
 import { fetchInstructorLegend } from '@/api/weekly-compliance.js'
+import { cn } from '@/lib/utils'
 
 import { buildLegendStyle } from './color-utils.js'
 
@@ -8,7 +9,7 @@ import { buildLegendStyle } from './color-utils.js'
  * Horizontal instructor legend bar - integrated into calendar header.
  * Displays instructor names with color swatches in a clean, compact format.
  */
-export default function InstructorLegend({ orgId }) {
+export default function InstructorLegend({ orgId, weekStart, variant = 'floating', className = '' }) {
   const [legend, setLegend] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -26,7 +27,7 @@ export default function InstructorLegend({ orgId }) {
     setIsLoading(true)
     setError(null)
 
-    fetchInstructorLegend({ orgId, signal: controller.signal })
+    fetchInstructorLegend({ orgId, weekStart, signal: controller.signal })
       .then(result => {
         if (!isMounted) {
           return
@@ -54,7 +55,7 @@ export default function InstructorLegend({ orgId }) {
       isMounted = false
       controller.abort()
     }
-  }, [orgId])
+  }, [orgId, weekStart])
 
   const content = useMemo(() => {
     if (isLoading) {
@@ -98,8 +99,12 @@ export default function InstructorLegend({ orgId }) {
     )
   }, [error, isLoading, legend])
 
+  const containerClassName = variant === 'floating'
+    ? 'rounded-2xl border border-border bg-surface/95 px-lg py-md shadow-xl backdrop-blur'
+    : 'rounded-xl border border-border bg-muted/40 px-md py-sm shadow-sm'
+
   return (
-    <div className="border-b border-border bg-surface px-lg py-sm">
+    <div className={cn(containerClassName, className)}>
       {content}
     </div>
   )

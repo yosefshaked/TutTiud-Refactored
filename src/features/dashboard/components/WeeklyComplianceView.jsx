@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance.js'
 import { cn } from '@/lib/utils'
 import InstructorLegend from './InstructorLegend.jsx'
+import DayDetailView from './DayDetailView.jsx'
 
 import { buildChipStyle } from './color-utils.js'
 
@@ -205,52 +206,6 @@ function createGridSlots(window) {
     slots.push(minutes)
   }
   return slots
-}
-
-function resolveMobileSlot(minutes, slots) {
-  if (!Array.isArray(slots) || !slots.length || minutes === null) {
-    return null
-  }
-  const sorted = [...slots].sort((a, b) => a - b)
-  for (let index = sorted.length - 1; index >= 0; index -= 1) {
-    if (minutes >= sorted[index]) {
-      return sorted[index]
-    }
-  }
-  return sorted[0]
-}
-
-function groupSessionsForMobile(day, slots) {
-  const map = new Map()
-  if (!Array.isArray(slots) || !slots.length) {
-    return map
-  }
-  for (const slot of slots) {
-    map.set(slot, [])
-  }
-  for (const session of day?.sessions || []) {
-    const timeMinutes = Number(session?.timeMinutes ?? parseMinutes(session?.time))
-    if (!Number.isFinite(timeMinutes)) {
-      continue
-    }
-    const slot = resolveMobileSlot(timeMinutes, slots)
-    if (slot === null) {
-      continue
-    }
-    const bucket = map.get(slot)
-    if (bucket) {
-      bucket.push(session)
-    }
-  }
-  for (const list of map.values()) {
-    list.sort((a, b) => {
-      if (a.timeMinutes !== b.timeMinutes) {
-        return a.timeMinutes - b.timeMinutes
-      }
-      return (a.studentName || '').localeCompare(b.studentName || '', 'he')
-    })
-  }
-  return map
 }
 
 function useInitialWeekStart(localTodayIso) {
@@ -561,99 +516,51 @@ function layoutDaySessions(day, window, {
         slotHeights.set(affectedSlotMinutes, Math.max(currentHeight, requiredHeight))
       }
     } else {
-      // Overflow: Group sessions by start time, show max 2 SESSIONS total with per-time badges
-      const sessionsByStartTime = new Map()
-      for (const sessionGroup of group.sessionGroups) {
-        if (!sessionsByStartTime.has(sessionGroup.startTime)) {
-          sessionsByStartTime.set(sessionGroup.startTime, [])
-        }
-        sessionsByStartTime.get(sessionGroup.startTime).push(sessionGroup)
+      const visibleGroups = group.sessionGroups.slice(0, MAX_VISIBLE_CHIPS)
+      const hiddenGroups = group.sessionGroups.slice(MAX_VISIBLE_CHIPS)
+      const widthPercent = MAX_VISIBLE_CHIPS === 1 ? 100 : 100 / MAX_VISIBLE_CHIPS
+      const visibleWidth = MAX_VISIBLE_CHIPS === 1
+        ? '100%'
+        : `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
+      const horizontalOffsetPx = MAX_VISIBLE_CHIPS === 1 ? 0 : COLUMN_GAP_PX / 2
+
+      visibleGroups.forEach((sessionGroup, columnIndex) => {
+        const leftPercent = columnIndex * widthPercent
+        const leftValue = MAX_VISIBLE_CHIPS === 1
+          ? '0'
+          : `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
+        const chipTop = Math.round(sessionGroup.minTop)
+        const chipHeight = sessionGroup.events[0].chipHeight
+
+        chips.push({
+          session: sessionGroup.session,
+          top: chipTop,
+          height: chipHeight,
+          style: {
+            left: leftValue,
+            width: visibleWidth,
+          },
+          zIndex: MAX_VISIBLE_CHIPS - columnIndex,
+          startMinutes: sessionGroup.startTime,
+          boundaryHintOffset: sessionGroup.boundaryHintOffset,
+        })
+      })
+
+      const highestBottom = Math.max(...visibleGroups.map(groupItem => groupItem.maxBottom))
+
+      if (hiddenGroups.length > 0) {
+        const overflowTop = highestBottom + OVERFLOW_BADGE_VERTICAL_GAP
+        overflowBadges.push({
+          sessions: hiddenGroups.map(sg => sg.session),
+          top: overflowTop,
+          startMinutes: hiddenGroups[0]?.startTime ?? visibleGroups[0]?.startTime ?? group.minStartTime,
+        })
+        group.maxBottom = Math.max(group.maxBottom, overflowTop + OVERFLOW_BADGE_HEIGHT)
       }
 
-      const startTimes = Array.from(sessionsByStartTime.keys()).sort((a, b) => a - b)
-      let visibleSessionCount = 0
-      const widthPercent = 100 / MAX_VISIBLE_CHIPS
-      const visibleWidth = `calc(${widthPercent}% - ${COLUMN_GAP_PX}px)`
-      const horizontalOffsetPx = COLUMN_GAP_PX / 2
-
-      // Render up to 2 SESSIONS total (prioritize earlier start times)
-      for (const startTime of startTimes) {
-        const sessionsAtTime = sessionsByStartTime.get(startTime)
-        
-        for (const sessionGroup of sessionsAtTime) {
-          if (visibleSessionCount >= MAX_VISIBLE_CHIPS) {
-            break
-          }
-
-          const columnIndex = visibleSessionCount
-          const leftPercent = columnIndex * widthPercent
-          const leftValue = `calc(${leftPercent}% + ${horizontalOffsetPx}px)`
-
-          // Single chip per session group - use consistent height
-          const chipTop = Math.round(sessionGroup.minTop)
-          const chipHeight = sessionGroup.events[0].chipHeight // Use the event's calculated height
-          
-          chips.push({
-            session: sessionGroup.session,
-            top: chipTop,
-            height: chipHeight,
-            style: {
-              left: leftValue,
-              width: visibleWidth,
-            },
-            zIndex: MAX_VISIBLE_CHIPS - columnIndex,
-            startMinutes: sessionGroup.startTime,
-            boundaryHintOffset: sessionGroup.boundaryHintOffset,
-          })
-
-          visibleSessionCount += 1
-        }
-
-        if (visibleSessionCount >= MAX_VISIBLE_CHIPS) {
-          break
-        }
-      }
-
-      // Create overflow badges per start time
-      // Get chips that belong to this collision group (recently added)
-      const groupChipStartIndex = chips.length - visibleSessionCount
-      const groupChips = chips.slice(groupChipStartIndex)
-      
-      // Count visible sessions per start time
-      const visibleSessionsPerTime = new Map()
-      for (const chip of groupChips) {
-        const count = visibleSessionsPerTime.get(chip.startMinutes) || 0
-        visibleSessionsPerTime.set(chip.startMinutes, count + 1)
-      }
-      
-      for (const startTime of startTimes) {
-        const sessionsAtTime = sessionsByStartTime.get(startTime)
-        const firstSessionGroup = sessionsAtTime[0]
-        
-        // Count how many sessions are visible vs hidden at this time
-        const visibleAtThisTime = visibleSessionsPerTime.get(startTime) || 0
-        const hiddenSessions = sessionsAtTime.slice(visibleAtThisTime)
-
-        if (hiddenSessions.length > 0) {
-          // Find the chip(s) for this start time to position badge to the left
-          const chipsAtThisTime = groupChips.filter(c => c.startMinutes === startTime)
-          const chipTop = chipsAtThisTime.length > 0 ? chipsAtThisTime[0].top : firstSessionGroup.minTop
-          
-          overflowBadges.push({
-            sessions: hiddenSessions.map(sg => sg.session),
-            top: chipTop,
-            isLeftAligned: true, // Flag to position on left side
-            startMinutes: startTime,
-            slotMinutes: startMinutes + Math.floor((startTime - startMinutes) / GRID_INTERVAL_MINUTES) * GRID_INTERVAL_MINUTES,
-          })
-        }
-      }
-
-      // No need to update slot heights for left-aligned badges
-      // Keep original slot height logic for chips only
       const startSlotIndex = Math.floor((group.minStartTime - startMinutes) / GRID_INTERVAL_MINUTES)
       const endSlotIndex = Math.floor((group.maxBottom / GRID_ROW_HEIGHT))
-      
+
       for (let i = startSlotIndex; i <= endSlotIndex && i < totalSlots; i += 1) {
         const affectedSlotMinutes = startMinutes + (i * GRID_INTERVAL_MINUTES)
         const slotBaseTop = slotPositions?.get(affectedSlotMinutes) ?? (i * GRID_ROW_HEIGHT)
@@ -878,7 +785,7 @@ function StudentChip({
   )
 }
 
-function OverflowBadge({ sessions, top, centerPercent, isLeftAligned, onNavigate }) {
+function OverflowBadge({ sessions, top, onNavigate }) {
   const [open, setOpen] = useState(false)
 
   const sortedSessions = useMemo(
@@ -892,28 +799,12 @@ function OverflowBadge({ sessions, top, centerPercent, isLeftAligned, onNavigate
   )
 
   const total = sortedSessions.length
-  const computedStyle = useMemo(
-    () => {
-      if (isLeftAligned) {
-        // Position to the left side of the day column with proper RTL handling
-        return {
-          top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
-          right: '4px', // Use 'right' for RTL layout
-          left: 'auto',
-          transform: 'none',
-          zIndex: 30,
-        }
-      }
-      // Original centered positioning (fallback for compatibility)
-      return {
-        top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
-        left: typeof centerPercent === 'number' ? `${centerPercent}%` : '50%',
-        transform: 'translate(-50%, 0)',
-        zIndex: 30,
-      }
-    },
-    [centerPercent, isLeftAligned, top],
-  )
+  const computedStyle = useMemo(() => ({
+    top: typeof top === 'number' ? `${top}px` : `${OVERFLOW_BADGE_VERTICAL_GAP}px`,
+    left: '12px',
+    right: '12px',
+    zIndex: 30,
+  }), [top])
 
   const handleNavigate = useCallback(id => {
     setOpen(false)
@@ -927,14 +818,11 @@ function OverflowBadge({ sessions, top, centerPercent, isLeftAligned, onNavigate
           type="button"
           aria-label={`עוד ${total} תלמידים`}
           className={cn(
-            "absolute flex items-center justify-center rounded-md border border-dashed border-primary bg-primary/10 text-xs font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
-            isLeftAligned 
-              ? "h-[28px] min-w-[60px] px-sm py-xxs" // Compact for left side
-              : "h-[32px] min-w-[88px] px-md py-xs" // Original size for centered
+            'absolute flex h-9 items-center justify-center rounded-lg border border-dashed border-primary bg-primary/10 px-md text-sm font-semibold text-primary shadow-sm transition hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
           )}
           style={computedStyle}
         >
-          {isLeftAligned ? `+${total}` : `+${total} נוספים`}
+          {`+${total} נוספים`}
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -961,103 +849,43 @@ function OverflowBadge({ sessions, top, centerPercent, isLeftAligned, onNavigate
   )
 }
 
-function DayScheduleView({
-  className,
-  days,
-  selectedDayIndex,
-  onSelectDay,
-  gridSlots,
-  sessionMaps,
-  onNavigate,
-  isCoarse,
-  orgId,
-}) {
-  const hasDays = Array.isArray(days) && days.length > 0
-  const hasSlots = Array.isArray(gridSlots) && gridSlots.length > 0
-  const safeDays = hasDays ? days : []
-  const safeSlots = hasSlots ? gridSlots : []
-  const selectedDay = safeDays[selectedDayIndex] || safeDays[0] || null
-  const selectedDayDisplay = useMemo(() => buildDayDisplay(selectedDay), [selectedDay])
-  const sessionMap = selectedDay && sessionMaps instanceof Map
-    ? sessionMaps.get(selectedDay.date)
-    : null
-
-  if (!hasDays || !hasSlots) {
+function MobileWeekDayList({ days, onOpenDetail }) {
+  if (!Array.isArray(days) || days.length === 0) {
     return null
   }
 
   return (
-    <div className={cn('space-y-sm', className)}>
-      {/* Sticky header with instructor legend */}
-      <div className="sticky top-0 z-20 -mx-lg -mt-lg mb-sm bg-surface px-lg pt-lg pb-sm shadow-sm">
-        <InstructorLegend orgId={orgId} />
-      </div>
-      
-      <div className="mb-sm flex gap-sm overflow-x-auto pb-sm">
-        {safeDays.map((day, index) => {
-          const display = buildDayDisplay(day)
-          const isSelected = index === selectedDayIndex
-          return (
-            <Button
-              key={day.date}
-              type="button"
-              size="sm"
-              variant={isSelected ? 'default' : 'outline'}
-              aria-pressed={isSelected}
-              onClick={() => onSelectDay(index)}
-              className="flex-col gap-0 text-center leading-tight"
-            >
-              <span className="text-sm font-semibold">{display.label || '—'}</span>
-              <span
-                className={cn(
-                  'text-xs font-normal',
-                  isSelected ? 'text-primary-foreground' : 'text-muted-foreground',
-                )}
-              >
-                {display.date || '—'}
-              </span>
-            </Button>
-          )
-        })}
-      </div>
-      <div>
-        <h3 className="mb-sm text-lg font-semibold text-foreground leading-snug">
-          <span className="block">{selectedDayDisplay.label || '—'}</span>
-          <span className="mt-1 block text-sm font-normal text-muted-foreground">
-            {selectedDayDisplay.date || '—'}
-          </span>
-        </h3>
-        <div className="space-y-xs">
-          {safeSlots.map(minutes => {
-            const label = formatTimeLabel(minutes)
-            const sessionsAtSlot = sessionMap?.get(minutes) || []
-            return (
-              <div key={`${selectedDay?.date}-${minutes}`} className="rounded-lg border border-border p-sm">
-                <p className="mb-xs text-sm font-medium text-muted-foreground">{label}</p>
-                <div className="flex flex-col gap-xs">
-                  {sessionsAtSlot.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">אין תלמידים בזמן זה.</span>
-                  ) : (
-                    sessionsAtSlot.map(session => (
-                      <StudentChip
-                        key={`${session.studentId}-${session.time}`}
-                        session={session}
-                        variant="list"
-                        top={0}
-                        height={GRID_ROW_HEIGHT - 8}
-                        style={{}}
-                        zIndex={1}
-                        onNavigate={onNavigate}
-                        isCoarse={isCoarse}
-                      />
-                    ))
-                  )}
-                </div>
+    <div className="space-y-sm">
+      {days.map(day => {
+        const display = buildDayDisplay(day)
+        const summary = day.summary || {}
+        const total = summary.totalSessions ?? (day.sessions?.length ?? 0)
+        const documented = summary.documentedSessions ?? ((day.sessions || []).filter(session => session.hasRecord).length)
+        const missing = summary.missingSessions ?? ((day.sessions || []).filter(session => session.status === 'missing').length)
+        return (
+          <button
+            key={day.date}
+            type="button"
+            onClick={() => onOpenDetail(day.date)}
+            className={cn(
+              'w-full rounded-2xl border border-border bg-card px-lg py-md text-right shadow-sm transition hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+              day.isToday ? 'ring-2 ring-primary/40' : null,
+            )}
+            aria-label={`פתיחת תצוגת היום עבור ${display.label || ''}`}
+          >
+            <div className="flex items-center justify-between gap-sm">
+              <div>
+                <p className="text-base font-semibold text-foreground">{display.label || '—'}</p>
+                <p className="text-sm text-muted-foreground">{display.date || '—'}</p>
               </div>
-            )
-          })}
-        </div>
-      </div>
+              <div className="text-right text-sm text-muted-foreground">
+                <p>{`${documented}/${total} מתועדים`}</p>
+                {missing > 0 ? <p className="text-destructive">{`${missing} חסרים`}</p> : null}
+              </div>
+            </div>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -1070,12 +898,11 @@ export default function WeeklyComplianceView({ orgId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0)
+  const [detailDate, setDetailDate] = useState(null)
+  const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
   const isCoarsePointer = useIsCoarsePointer()
-  const [viewMode, setViewMode] = useState('week')
   const [isBelowBreakpoint, setIsBelowBreakpoint] = useState(false)
   const containerRef = useRef(null)
-  const manualSelectionRef = useRef(false)
 
   useEffect(() => {
     const element = containerRef.current
@@ -1084,14 +911,7 @@ export default function WeeklyComplianceView({ orgId }) {
     }
 
     const updateForWidth = width => {
-      const below = width < WEEK_VIEW_MIN_WIDTH
-      setIsBelowBreakpoint(below)
-      if (below) {
-        manualSelectionRef.current = false
-        setViewMode('day')
-      } else if (!manualSelectionRef.current) {
-        setViewMode('week')
-      }
+      setIsBelowBreakpoint(width < WEEK_VIEW_MIN_WIDTH)
     }
 
     updateForWidth(element.clientWidth)
@@ -1187,10 +1007,20 @@ export default function WeeklyComplianceView({ orgId }) {
           })
         : []
 
+      const documentedSessions = normalizedSessions.filter(session => session.hasRecord).length
+      const missingSessions = normalizedSessions.filter(session => session.status === 'missing').length
+      const upcomingSessions = normalizedSessions.filter(session => session.status === 'upcoming').length
+
       return {
         ...day,
         isToday,
         sessions: normalizedSessions,
+        summary: {
+          totalSessions: normalizedSessions.length,
+          documentedSessions,
+          missingSessions,
+          upcomingSessions,
+        },
       }
     })
   }, [daysSource, localTodayIso])
@@ -1291,32 +1121,7 @@ export default function WeeklyComplianceView({ orgId }) {
     return total
   }, [gridSlots, unifiedSlotHeights])
 
-  const mobileSessionMaps = useMemo(() => {
-    const result = new Map()
-    for (const day of days) {
-      result.set(day.date, groupSessionsForMobile(day, gridSlots))
-    }
-    return result
-  }, [days, gridSlots])
-
   const isCurrentWeek = weekStart === initialWeekStart
-
-  useEffect(() => {
-    if (!days.length) {
-      setSelectedDayIndex(0)
-      return
-    }
-
-    if (localTodayIso) {
-      const todayIndex = days.findIndex(day => day.date === localTodayIso)
-      if (todayIndex >= 0) {
-        setSelectedDayIndex(todayIndex)
-        return
-      }
-    }
-
-    setSelectedDayIndex(0)
-  }, [days, localTodayIso])
 
   const handlePreviousWeek = useCallback(() => {
     const current = startOfUtcWeek(`${weekStart}T00:00:00Z`)
@@ -1344,44 +1149,56 @@ export default function WeeklyComplianceView({ orgId }) {
     [navigate],
   )
 
-  const defaultViewMode = isBelowBreakpoint ? 'day' : 'week'
+  const handleOpenDayDetail = useCallback(dateValue => {
+    if (!dateValue) {
+      return
+    }
+    setDetailDate(dateValue)
+    setIsDayDetailOpen(true)
+  }, [])
 
-  const handleViewModeChange = useCallback(
-    nextMode => {
-      if (nextMode === 'week' && isBelowBreakpoint) {
-        return
-      }
-      if (nextMode === defaultViewMode) {
-        manualSelectionRef.current = false
-      } else {
-        manualSelectionRef.current = true
-      }
-      setViewMode(nextMode)
-    },
-    [defaultViewMode, isBelowBreakpoint],
-  )
+  const handleCloseDayDetail = useCallback(() => {
+    setIsDayDetailOpen(false)
+  }, [])
+
+  useEffect(() => {
+    if (!isDayDetailOpen || !detailDate) {
+      return
+    }
+    const exists = days.some(day => day.date === detailDate)
+    if (!exists) {
+      setIsDayDetailOpen(false)
+    }
+  }, [days, detailDate, isDayDetailOpen])
 
   return (
-    <div
-      ref={containerRef}
-      className="relative"
-    >
-      <Card className="relative overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm">
-        <div className="relative min-w-0" dir="rtl">
-          <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
-              <p className="mt-xs text-sm text-muted-foreground">
-                מעקב חזותי אחר השיעורים המתוכננים והסטטוס של התיעוד שלהם.
-              </p>
-              {data?.weekStart && data?.weekEnd ? (
-                <p className="mt-xs text-sm text-muted-foreground">
-                  שבוע החל ב-{formatHebrewDate(data.weekStart) || '—'} • מסתיים ב-{formatHebrewDate(data.weekEnd) || '—'}
-                </p>
-              ) : null}
+    <div ref={containerRef} className="relative">
+      <div className="flex flex-col gap-xl md:flex-row md:items-start">
+        {!isBelowBreakpoint ? (
+          <div className="md:w-[300px] md:flex-shrink-0">
+            <div
+              className="sticky"
+              style={{ top: 'calc(var(--app-shell-header-height, 64px) + 16px)' }}
+            >
+              <InstructorLegend orgId={orgId} weekStart={weekStart} variant="floating" />
             </div>
-            <div className="flex flex-wrap items-center gap-sm md:justify-end">
-              <div className="flex items-center gap-sm">
+          </div>
+        ) : null}
+        <Card className="relative flex-1 overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm">
+          <div className="relative min-w-0" dir="rtl">
+            <div className="mb-lg flex flex-col gap-md md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
+                <p className="mt-xs text-sm text-muted-foreground">
+                  מעקב חזותי אחר השיעורים המתוכננים והסטטוס של התיעוד שלהם.
+                </p>
+                {data?.weekStart && data?.weekEnd ? (
+                  <p className="mt-xs text-sm text-muted-foreground">
+                    שבוע החל ב-{formatHebrewDate(data.weekStart) || '—'} • מסתיים ב-{formatHebrewDate(data.weekEnd) || '—'}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-sm md:justify-end">
                 <Button type="button" variant="outline" onClick={handlePreviousWeek} aria-label="שבוע קודם">
                   ‹
                 </Button>
@@ -1392,52 +1209,26 @@ export default function WeeklyComplianceView({ orgId }) {
                   ›
                 </Button>
               </div>
-              {!isBelowBreakpoint ? (
-                <div className="hidden items-center gap-xs rounded-full border border-border/60 bg-muted/40 p-xxs md:inline-flex">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={viewMode === 'week' ? 'default' : 'ghost'}
-                    aria-pressed={viewMode === 'week'}
-                    onClick={() => handleViewModeChange('week')}
-                  >
-                    שבוע
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={viewMode === 'day' ? 'default' : 'ghost'}
-                    aria-pressed={viewMode === 'day'}
-                    onClick={() => handleViewModeChange('day')}
-                  >
-                    יום
-                  </Button>
-                </div>
-              ) : null}
             </div>
-          </div>
-          {isLoading ? (
-            <div className="flex justify-center py-xl">
-              <span className="text-sm text-muted-foreground">טוען נתוני שיעורים...</span>
-            </div>
-          ) : null}
-          {error ? (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-lg text-destructive">
-              <p className="text-base font-semibold">אירעה שגיאה בטעינת הנתונים.</p>
-              <p className="mt-xs text-sm">נסו לרענן את הדף או לחזור מאוחר יותר.</p>
-            </div>
-          ) : null}
-          {!isLoading && !error && days.length === 0 ? (
-            <p className="text-sm text-muted-foreground">אין מפגשים מתוכננים לשבוע זה.</p>
-          ) : null}
+            {isLoading ? (
+              <div className="flex justify-center py-xl">
+                <span className="text-sm text-muted-foreground">טוען נתוני שיעורים...</span>
+              </div>
+            ) : null}
+            {error ? (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-lg text-destructive">
+                <p className="text-base font-semibold">אירעה שגיאה בטעינת הנתונים.</p>
+                <p className="mt-xs text-sm">נסו לרענן את הדף או לחזור מאוחר יותר.</p>
+              </div>
+            ) : null}
+            {!isLoading && !error && days.length === 0 ? (
+              <p className="text-sm text-muted-foreground">אין מפגשים מתוכננים לשבוע זה.</p>
+            ) : null}
 
-          {!isLoading && !error && days.length > 0 && gridSlots.length > 0 && (
-            <>
-              {viewMode === 'week' ? (
+            {!isLoading && !error && days.length > 0 ? (
+              !isBelowBreakpoint && gridSlots.length > 0 ? (
                 <div className="hidden md:block">
-                  {/* Unified sticky header: Legend + Day headers */}
                   <div className="sticky top-0 z-20 bg-surface shadow-md">
-                    <InstructorLegend orgId={orgId} />
                     <div
                       className="grid border-b border-border bg-surface"
                       style={{ gridTemplateColumns: `60px repeat(${days.length}, minmax(0, 1fr))` }}
@@ -1446,10 +1237,12 @@ export default function WeeklyComplianceView({ orgId }) {
                       {days.map(day => {
                         const display = buildDayDisplay(day)
                         return (
-                          <div
+                          <button
                             key={day.date}
+                            type="button"
+                            onClick={() => handleOpenDayDetail(day.date)}
                             className={cn(
-                              'border-b border-border px-sm py-xs text-center text-sm font-medium',
+                              'border-b border-border px-sm py-xs text-center text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                               day.isToday
                                 ? 'bg-primary text-primary-foreground'
                                 : 'bg-muted text-foreground',
@@ -1464,18 +1257,16 @@ export default function WeeklyComplianceView({ orgId }) {
                             >
                               {display.date || '—'}
                             </span>
-                          </div>
+                          </button>
                         )
                       })}
                     </div>
                   </div>
 
-                  {/* Calendar grid body */}
                   <div
                     className="grid"
                     style={{ gridTemplateColumns: `60px repeat(${days.length}, minmax(0, 1fr))` }}
                   >
-                    {/* Time column */}
                     <div
                       className="relative border-l border-border"
                       style={{ height: `${dynamicGridHeight}px` }}
@@ -1496,7 +1287,6 @@ export default function WeeklyComplianceView({ orgId }) {
                       </div>
                     </div>
 
-                    {/* Day columns */}
                     {days.map(day => {
                       const layout = dayLayouts.get(day.date)
                       const chipItems = layout?.chips ?? []
@@ -1540,8 +1330,6 @@ export default function WeeklyComplianceView({ orgId }) {
                               key={`${day.date}-overflow-${item.startMinutes}`}
                               sessions={item.sessions}
                               top={item.top}
-                              centerPercent={item.centerPercent}
-                              isLeftAligned={item.isLeftAligned}
                               onNavigate={handleNavigateToStudent}
                             />
                           ))}
@@ -1550,36 +1338,19 @@ export default function WeeklyComplianceView({ orgId }) {
                     })}
                   </div>
                 </div>
-              ) : null}
-
-              <DayScheduleView
-                className="block md:hidden"
-                days={days}
-                selectedDayIndex={selectedDayIndex}
-                onSelectDay={setSelectedDayIndex}
-                gridSlots={gridSlots}
-                sessionMaps={mobileSessionMaps}
-                onNavigate={handleNavigateToStudent}
-                isCoarse={isCoarsePointer}
-                orgId={orgId}
-              />
-              {viewMode === 'day' ? (
-                <DayScheduleView
-                  className="hidden md:block"
-                  days={days}
-                  selectedDayIndex={selectedDayIndex}
-                  onSelectDay={setSelectedDayIndex}
-                  gridSlots={gridSlots}
-                  sessionMaps={mobileSessionMaps}
-                  onNavigate={handleNavigateToStudent}
-                  isCoarse={isCoarsePointer}
-                  orgId={orgId}
-                />
-              ) : null}
-            </>
-          )}
+              ) : (
+                <MobileWeekDayList days={days} onOpenDetail={handleOpenDayDetail} />
+              )
+            ) : null}
+          </div>
+        </Card>
+      </div>
+      {isBelowBreakpoint ? (
+        <div className="mt-md">
+          <InstructorLegend orgId={orgId} weekStart={weekStart} variant="inline" />
         </div>
-      </Card>
+      ) : null}
+      <DayDetailView orgId={orgId} date={detailDate} open={isDayDetailOpen} onClose={handleCloseDayDetail} />
     </div>
   )
 }

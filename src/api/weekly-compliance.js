@@ -22,8 +22,8 @@ export async function fetchWeeklyComplianceView({ orgId, weekStart, signal } = {
   return requestWeeklyCompliance({ orgId, weekStart, signal })
 }
 
-export async function fetchInstructorLegend({ orgId, signal } = {}) {
-  const response = await requestWeeklyCompliance({ orgId, signal })
+export async function fetchInstructorLegend({ orgId, weekStart, signal } = {}) {
+  const response = await requestWeeklyCompliance({ orgId, weekStart, signal })
   if (response && Array.isArray(response.legend)) {
     return response.legend
   }
