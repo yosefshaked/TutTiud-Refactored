@@ -1,23 +1,26 @@
 import React, { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { buildChipStyle, normalizeColorIdentifier } from './color-utils.js'
+import { normalizeColorIdentifier } from './color-utils.js'
 
 const STATUS_META = Object.freeze({
   complete: {
-    icon: '✔',
-    label: 'תיעוד הושלם',
-    className: 'text-emerald-100',
+    icon: '✓',
+    label: 'מתועד',
+    text: 'מתועד',
+    className: 'text-green-600 dark:text-green-400',
   },
   missing: {
-    icon: '✖',
+    icon: '✗',
     label: 'חסר תיעוד',
-    className: 'text-red-100',
+    text: 'חסר תיעוד',
+    className: 'text-red-600 dark:text-red-400',
   },
   upcoming: {
-    icon: '•',
-    label: 'מפגש עתידי',
-    className: 'text-white/80',
+    icon: '⚠',
+    label: 'קרוב',
+    text: 'קרוב',
+    className: 'text-muted-foreground',
   },
 })
 
@@ -83,37 +86,15 @@ function normalizeSlots({ sessions, timeSlots }) {
   return Array.from(grouped.values()).sort((a, b) => (a.timeMinutes ?? 0) - (b.timeMinutes ?? 0))
 }
 
-function buildHourGroups(slots) {
-  if (!slots.length) {
-    return []
-  }
-  const minuteValues = slots.map(slot => slot.timeMinutes ?? 0)
-  const minMinute = Math.floor(Math.min(...minuteValues) / 60) * 60
-  const maxMinute = Math.max(...minuteValues)
-  const endMinute = Math.ceil((maxMinute + 1) / 60) * 60
-  const groups = []
-
-  for (let minute = minMinute; minute <= endMinute; minute += 60) {
-    const label = `${String(Math.floor(minute / 60)).padStart(2, '0')}:00`
-    const hourSlots = slots.filter(slot => {
-      const slotMinute = slot.timeMinutes ?? 0
-      return slotMinute >= minute && slotMinute < minute + 60
-    })
-    groups.push({ label, slots: hourSlots })
-  }
-
-  return groups
-}
-
 function buildBarStyle(identifier) {
   const colors = normalizeColorIdentifier(identifier)
   if (!colors.length) {
-    return { backgroundColor: '#6B7280' }
+    return { background: '#6B7280' }
   }
   if (colors.length === 1) {
-    return { backgroundColor: colors[0] }
+    return { background: colors[0] }
   }
-  return { backgroundImage: `linear-gradient(135deg, ${colors.join(', ')})` }
+  return { background: `linear-gradient(135deg, ${colors.join(', ')})` }
 }
 
 export default function SessionCardList({
@@ -125,80 +106,72 @@ export default function SessionCardList({
   className = '',
 }) {
   const normalizedSlots = useMemo(() => normalizeSlots({ sessions, timeSlots }), [sessions, timeSlots])
-  const hourGroups = useMemo(() => buildHourGroups(normalizedSlots), [normalizedSlots])
 
   if (!normalizedSlots.length) {
     return <p className="text-sm text-muted-foreground">{emptyMessage}</p>
   }
 
   return (
-    <div className={cn('relative space-y-8', className)} dir="rtl">
-      <div className="absolute right-[64px] top-0 bottom-0 w-px bg-border" aria-hidden />
-      {hourGroups.map(hour => (
-        <section key={hour.label} className="grid grid-cols-[70px,1fr] gap-4">
-          <div className="mt-1 text-sm font-semibold text-muted-foreground">{hour.label}</div>
-          <div className="space-y-4">
-            {hour.slots.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border/60 px-4 py-3 text-xs text-muted-foreground">
-                אין שיעורים בשעה זו
-              </div>
-            ) : (
-              hour.slots.map(slot => (
-                <div key={`${hour.label}-${slot.timeLabel}`} className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground">{slot.timeLabel}</p>
-                  <div className="space-y-3">
-                    {slot.sessions.map(session => {
-                      const status = STATUS_META[session?.status] || STATUS_META.upcoming
-                      const chipStyle = buildChipStyle(session?.instructorColor, {
-                        inactive: session?.instructorIsActive === false,
-                      })
-                      const barStyle = buildBarStyle(session?.instructorColor)
-                      return (
-                        <article
-                          key={`${slot.timeLabel}-${session?.studentId}-${session?.id || ''}`}
-                          className="relative overflow-hidden rounded-2xl p-4 text-white shadow-sm"
-                          style={chipStyle}
-                        >
-                          <div className="absolute left-0 top-0 bottom-0 w-1.5" style={barStyle} aria-hidden />
-                          <div className="space-y-3 pl-2">
-                            <div className="flex flex-col items-start gap-1 text-right">
-                              <p className="text-base font-semibold">{session?.studentName || '—'}</p>
-                              <p className="text-xs text-white/80">{session?.instructorName || '—'}</p>
-                            </div>
-                            <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                              <span className={`text-lg font-bold ${status.className}`} aria-label={status.label}>
-                                {status.icon}
-                              </span>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="secondary"
-                                  className="border-white/30 bg-white/10 text-white hover:bg-white/20"
-                                  onClick={() => onOpenStudent?.(session)}
-                                >
-                                  פתח
-                                </Button>
-                                {session?.status === 'missing' && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="bg-white text-primary hover:bg-white/90"
-                                    onClick={() => onDocumentNow?.(session)}
-                                  >
-                                    תעד עכשיו
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </article>
-                      )
-                    })}
+    <div className={cn('space-y-6', className)} dir="rtl">
+      {normalizedSlots.map(slot => (
+        <section key={`${slot.timeLabel}-${slot.timeMinutes ?? 'na'}`} className="space-y-3">
+          <h3 className="sticky top-0 bg-background py-2 text-sm font-semibold text-muted-foreground">
+            {slot.timeLabel || '—'}
+          </h3>
+          <div className="space-y-3">
+            {slot.sessions.map(session => {
+              const status = STATUS_META[session?.status] || STATUS_META.upcoming
+              const barStyle = buildBarStyle(session?.instructorColor)
+              const canOpenStudent = typeof onOpenStudent === 'function'
+              const canDocument = typeof onDocumentNow === 'function' && session?.status === 'missing'
+
+              return (
+                <article
+                  key={`${slot.timeLabel}-${session?.studentId}-${session?.id || ''}`}
+                  className="relative flex flex-col gap-4 rounded-lg border-2 border-border bg-card p-4 text-foreground shadow-sm transition-all hover:bg-muted/50 hover:shadow-md sm:flex-row sm:items-center"
+                  dir="rtl"
+                >
+                  {session?.instructorColor && (
+                    <div className="absolute right-0 top-0 bottom-0 w-1.5 rounded-r-lg" style={barStyle} aria-hidden />
+                  )}
+                  <div className="flex-1 min-w-0 pr-3 text-right">
+                    <p className="text-base font-semibold truncate">{session?.studentName || '—'}</p>
+                    {session?.instructorName && (
+                      <div className="mt-1 flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                        {session?.instructorColor && (
+                          <span
+                            className="inline-flex h-3 w-3 rounded-full border border-border shadow-sm"
+                            style={barStyle}
+                            aria-hidden
+                          />
+                        )}
+                        <span className="truncate">{session?.instructorName}</span>
+                      </div>
+                    )}
+                    <p className={cn('mt-1 text-xs font-medium', status.className)}>{status.text}</p>
                   </div>
-                </div>
-              ))
-            )}
+                  <div className={cn('text-2xl font-semibold', status.className)} aria-label={status.label}>
+                    {status.icon}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!canOpenStudent}
+                      onClick={() => canOpenStudent && onOpenStudent(session)}
+                    >
+                      פתח
+                    </Button>
+                    {canDocument && (
+                      <Button type="button" size="sm" onClick={() => onDocumentNow(session)}>
+                        תעד עכשיו
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
           </div>
         </section>
       ))}
