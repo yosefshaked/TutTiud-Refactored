@@ -41,12 +41,25 @@ export function ComplianceHeatmap({ orgId }) {
   const heatmapData = useMemo(() => {
     if (!data?.days) return null
 
-    // Extract unique time slots across all days
+    // Extract unique time slots across all days (group to hours)
     const allTimeSlots = new Set()
+    const getHourString = (s) => {
+      if (!s) return null
+      const t = s.time
+      if (typeof t === 'string' && /^\d{2}:\d{2}/.test(t)) {
+        return `${t.slice(0, 2)}:00`
+      }
+      const m = Number(s.timeMinutes)
+      if (Number.isFinite(m)) {
+        const h = Math.floor(m / 60)
+        return `${String(h).padStart(2, '0')}:00`
+      }
+      return null
+    }
     data.days.forEach(day => {
       day.sessions.forEach(session => {
-        const hour = session.time_slot.split(':')[0]
-        allTimeSlots.add(`${hour}:00`)
+        const hourSlot = getHourString(session)
+        if (hourSlot) allTimeSlots.add(hourSlot)
       })
     })
 
@@ -58,14 +71,14 @@ export function ComplianceHeatmap({ orgId }) {
       
       data.days.forEach(day => {
         const sessionsInSlot = day.sessions.filter(s => {
-          const sessionHour = s.time_slot.split(':')[0]
-          return `${sessionHour}:00` === timeSlot
+          const hourSlot = getHourString(s)
+          return hourSlot === timeSlot
         })
 
         const total = sessionsInSlot.length
-        const documented = sessionsInSlot.filter(s => !s.is_missing).length
-        const upcoming = sessionsInSlot.filter(s => s.is_upcoming).length
-        const missing = total - documented - upcoming
+        const documented = sessionsInSlot.filter(s => s.status === 'complete').length
+        const upcoming = sessionsInSlot.filter(s => s.status === 'upcoming').length
+        const missing = sessionsInSlot.filter(s => s.status === 'missing').length
 
         row.days.push({
           date: day.date,
@@ -74,7 +87,7 @@ export function ComplianceHeatmap({ orgId }) {
           upcoming,
           missing,
           sessions: sessionsInSlot,
-          complianceRate: total > 0 ? (documented / (total - upcoming)) * 100 : null
+          complianceRate: total - upcoming > 0 ? (documented / (total - upcoming)) * 100 : null
         })
       })
 

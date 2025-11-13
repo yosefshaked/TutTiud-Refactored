@@ -42,14 +42,14 @@ export function DayTimelineView({ orgId, date, onBack }) {
     const instructorMap = new Map()
     
     targetDay.sessions.forEach(session => {
-      const instructorId = session.assigned_instructor_id
-      const instructorName = session.instructor_name || 'לא משויך'
+      const instructorId = session.instructorId || 'unassigned'
+      const instructorName = session.instructorName || 'לא משויך'
       
       if (!instructorMap.has(instructorId)) {
         instructorMap.set(instructorId, {
           id: instructorId,
           name: instructorName,
-          color: session.instructor_color,
+          color: session.instructorColor,
           sessions: []
         })
       }
@@ -60,46 +60,42 @@ export function DayTimelineView({ orgId, date, onBack }) {
     // Convert to array and sort sessions by time
     const instructors = Array.from(instructorMap.values())
     instructors.forEach(inst => {
-      inst.sessions.sort((a, b) => a.time_slot.localeCompare(b.time_slot))
+      inst.sessions.sort((a, b) => a.timeMinutes - b.timeMinutes)
     })
 
     // Sort instructors by name
     instructors.sort((a, b) => a.name.localeCompare(b.name, 'he'))
 
-    // Calculate time range
-    const allTimes = targetDay.sessions.map(s => s.time_slot)
-    const minTime = allTimes.length > 0 ? Math.min(...allTimes.map(t => {
-      const [h] = t.split(':')
-      return parseInt(h)
-    })) : 8
-    const maxTime = allTimes.length > 0 ? Math.max(...allTimes.map(t => {
-      const [h] = t.split(':')
-      return parseInt(h) + 1
-    })) : 18
+    // Calculate time range (using minutes-based positioning)
+    const minutesArray = targetDay.sessions
+      .map(s => (typeof s.timeMinutes === 'number' ? s.timeMinutes : null))
+      .filter(m => m !== null)
+
+    const minHour = minutesArray.length > 0 ? Math.floor(Math.min(...minutesArray) / 60) : 8
+    const maxHour = minutesArray.length > 0 ? Math.ceil(Math.max(...minutesArray) / 60) : 18
 
     const hours = []
-    for (let h = minTime; h <= maxTime; h++) {
+    for (let h = minHour; h <= maxHour; h++) {
       hours.push(`${String(h).padStart(2, '0')}:00`)
     }
 
-    return { instructors, hours, minTime, maxTime }
+    return { instructors, hours, minHour, maxHour }
   }, [data, date])
 
-  function calculatePosition(timeSlot, minTime) {
-    const [hours, minutes] = timeSlot.split(':').map(Number)
-    const totalMinutes = (hours - minTime) * 60 + minutes
-    return (totalMinutes / 60) * 120 // 120px per hour
+  function calculatePosition(timeMinutes, minHour) {
+    const minutesFromStart = timeMinutes - (minHour * 60)
+    return (minutesFromStart / 60) * 120 // 120px per hour
   }
 
   function getStatusColor(session) {
-    if (session.is_upcoming) return 'bg-muted border-muted-foreground/30'
-    if (session.is_missing) return 'bg-red-100 dark:bg-red-950 border-red-400 dark:border-red-700'
+    if (session.status === 'upcoming') return 'bg-muted border-muted-foreground/30'
+    if (session.status === 'missing') return 'bg-red-100 dark:bg-red-950 border-red-400 dark:border-red-700'
     return 'bg-green-100 dark:bg-green-950 border-green-400 dark:border-green-700'
   }
 
   function getStatusIcon(session) {
-    if (session.is_upcoming) return '⚠'
-    if (session.is_missing) return '✗'
+    if (session.status === 'upcoming') return '⚠'
+    if (session.status === 'missing') return '✗'
     return '✓'
   }
 
@@ -189,14 +185,15 @@ export function DayTimelineView({ orgId, date, onBack }) {
 
                         {/* Sessions */}
                         {instructor.sessions.map((session, idx) => {
-                          const left = calculatePosition(session.time_slot, timelineData.minTime)
+                          const left = calculatePosition(session.timeMinutes, timelineData.minHour)
                           const width = 58 // 1 hour = 120px, session = ~58px
                           const top = Math.floor(idx / 3) * 32 // Stack in rows if too many
+                          const timeLabel = session.time || `${String(Math.floor(session.timeMinutes / 60)).padStart(2, '0')}:${String(session.timeMinutes % 60).padStart(2, '0')}`
 
                           return (
                             <button
                               key={session.id}
-                              onClick={() => navigate(`/students/${session.student_id}`)}
+                              onClick={() => navigate(`/students/${session.studentId}`)}
                               className={`absolute rounded border-2 px-2 py-1 text-xs font-medium shadow-sm hover:shadow-md transition-all cursor-pointer ${getStatusColor(session)}`}
                               style={{
                                 left: `${left}px`,
@@ -204,11 +201,11 @@ export function DayTimelineView({ orgId, date, onBack }) {
                                 top: `${top}px`,
                                 zIndex: 10
                               }}
-                              title={`${session.student_name} - ${session.time_slot}`}
+                              title={`${session.studentName} - ${timeLabel}`}
                             >
                               <div className="flex items-center gap-1 truncate">
                                 <span>{getStatusIcon(session)}</span>
-                                <span className="truncate">{session.student_name}</span>
+                                <span className="truncate">{session.studentName}</span>
                               </div>
                             </button>
                           )

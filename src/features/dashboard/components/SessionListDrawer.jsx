@@ -24,7 +24,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
 
   // Group sessions by exact time
   const sessionsByTime = cellData.sessions.reduce((acc, session) => {
-    const time = session.time_slot
+    const time = session.time || (typeof session.timeMinutes === 'number' ? `${String(Math.floor(session.timeMinutes/60)).padStart(2,'0')}:${String(session.timeMinutes%60).padStart(2,'0')}` : '00:00')
     if (!acc[time]) acc[time] = []
     acc[time].push(session)
     return acc
@@ -43,20 +43,20 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
   }
 
   function getStatusIcon(session) {
-    if (session.is_upcoming) return '⚠'
-    if (session.is_missing) return '✗'
+    if (session.status === 'upcoming') return '⚠'
+    if (session.status === 'missing') return '✗'
     return '✓'
   }
 
   function getStatusColor(session) {
-    if (session.is_upcoming) return 'text-muted-foreground'
-    if (session.is_missing) return 'text-red-600 dark:text-red-400'
+    if (session.status === 'upcoming') return 'text-muted-foreground'
+    if (session.status === 'missing') return 'text-red-600 dark:text-red-400'
     return 'text-green-600 dark:text-green-400'
   }
 
   function getStatusText(session) {
-    if (session.is_upcoming) return 'קרוב'
-    if (session.is_missing) return 'חסר תיעוד'
+    if (session.status === 'upcoming') return 'קרוב'
+    if (session.status === 'missing') return 'חסר תיעוד'
     return 'מתועד'
   }
 
@@ -95,11 +95,11 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-sm truncate">
-                            {session.student_name}
+                            {session.studentName}
                           </span>
-                          {session.instructor_name && (
+                          {session.instructorName && (
                             <span className="text-xs text-muted-foreground">
-                              ← {session.instructor_name}
+                              ← {session.instructorName}
                             </span>
                           )}
                         </div>
@@ -110,11 +110,11 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
 
                       {/* Action Buttons */}
                       <div className="flex gap-2">
-                        {session.is_missing && !session.is_upcoming && (
+                        {session.status === 'missing' && (
                           <Button
                             size="sm"
                             variant="default"
-                            onClick={() => handleDocumentNow(session.student_id)}
+                            onClick={() => handleDocumentNow(session.studentId)}
                           >
                             תעד עכשיו
                           </Button>
@@ -122,7 +122,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleViewStudent(session.student_id)}
+                          onClick={() => handleViewStudent(session.studentId)}
                         >
                           פתח
                         </Button>
