@@ -225,7 +225,7 @@ export function DayTimelineView({ orgId, date, onBack }) {
                           session._stackRow = stackRow // Store for overlap detection
                           
                           const left = calculatePosition(session.timeMinutes, timelineData.minHour)
-                          const width = 110 // 30 minutes = 60px (120px per hour), use full width minus small gap
+                          const width = 60 // 30 minutes = 60px (120px per hour = 1 hour)
                           const top = stackRow * 36 // 36px per row for proper spacing
                           const timeLabel = session.time || `${String(Math.floor(session.timeMinutes / 60)).padStart(2, '0')}:${String(session.timeMinutes % 60).padStart(2, '0')}`
 
@@ -233,17 +233,17 @@ export function DayTimelineView({ orgId, date, onBack }) {
                             <button
                               key={session.id}
                               onClick={() => navigate(`/students/${session.studentId}`)}
-                              className={`absolute rounded-md border-2 px-3 py-2 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
+                              className={`absolute rounded-md border-2 px-2 py-2 text-xs font-semibold shadow-sm hover:shadow-lg transition-all cursor-pointer ${getStatusColor(session)}`}
                               style={{
                                 left: `${left}px`,
                                 width: `${width}px`,
                                 top: `${top}px`,
-                                zIndex: 10,
-                                maxWidth: '110px'
+                                zIndex: 10
                               }}
                               title={`${session.studentName} - ${timeLabel}`}
+                              dir="rtl"
                             >
-                              <div className="flex items-center gap-1.5 truncate" dir="rtl">
+                              <div className="flex items-center gap-1 truncate">
                                 <span className="text-sm">{getStatusIcon(session)}</span>
                                 <span className="truncate">{session.studentName}</span>
                               </div>
