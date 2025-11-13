@@ -96,27 +96,15 @@ export function ComplianceHeatmap({ orgId }) {
     return { grid, sortedSlots }
   }, [data])
 
-  function getComplianceColor(complianceRate, hasUpcoming, total) {
-    // No sessions scheduled - neutral gray
-    if (total === 0) return 'bg-[#E5E7EB] text-gray-600 border-gray-300'
-    
-    // All upcoming sessions (not yet due) - neutral gray
-    if (complianceRate === null || isNaN(complianceRate)) {
-      return 'bg-[#E5E7EB] text-gray-600 border-gray-300'
+  // Returns the stripe color for a cell, using the simplified palette
+  function getStripeColor(complianceRate, total) {
+    // No sessions or all upcoming → neutral gray
+    if (total === 0 || complianceRate === null || isNaN(complianceRate)) {
+      return '#E5E7EB'
     }
-    
-    // 76-100%: Success Green (#22C55E)
-    if (complianceRate >= 76) {
-      return 'bg-[#22C55E] text-white border-[#22C55E]'
-    }
-    
-    // 51-75%: Warning Yellow (#FACC15)
-    if (complianceRate >= 51) {
-      return 'bg-[#FACC15] text-gray-900 border-[#FACC15]'
-    }
-    
-    // 0-50%: Warning Orange (#F97316)
-    return 'bg-[#F97316] text-white border-[#F97316]'
+    if (complianceRate >= 76) return '#22C55E' // Success Green
+    if (complianceRate >= 51) return '#FACC15' // Warning Yellow
+    return '#F97316' // Warning Orange
   }
 
   function handleCellClick(timeSlot, dayData) {
@@ -237,8 +225,14 @@ export function ComplianceHeatmap({ orgId }) {
                           {dayData.total > 0 ? (
                             <button
                               onClick={() => handleCellClick(row.timeSlot, dayData)}
-                              className={`w-full rounded-lg border-2 p-4 transition-all hover:scale-105 hover:shadow-lg cursor-pointer ${getComplianceColor(dayData.complianceRate, dayData.upcoming > 0, dayData.total)}`}
+                              className="relative w-full rounded-lg border-2 p-4 transition-all hover:scale-105 hover:shadow-lg cursor-pointer bg-card text-foreground"
                             >
+                              {/* Colored stripe on the right */}
+                              <div
+                                className="absolute right-0 top-0 bottom-0 w-1.5 rounded-r-lg"
+                                style={{ backgroundColor: getStripeColor(dayData.complianceRate, dayData.total) }}
+                                aria-hidden
+                              />
                               <div className="flex flex-col gap-1">
                                 {/* Status Icons */}
                                 <div className="flex items-center justify-center gap-2 text-xs font-semibold leading-tight opacity-90">

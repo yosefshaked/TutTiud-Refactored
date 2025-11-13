@@ -109,9 +109,12 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                       {/* Session Info (Right side in RTL) */}
                       <div className="flex-1 min-w-0 text-right">
                         <div className="flex items-center justify-end gap-2 mb-1">
+                          <span className="font-semibold text-base truncate order-1">
+                            {session.studentName}
+                          </span>
                           {session.instructorColor && (
                             <div
-                              className="w-3 h-3 rounded-full border border-border shadow-sm flex-shrink-0"
+                              className="w-3 h-3 rounded-full border border-border shadow-sm flex-shrink-0 order-2"
                               style={{ 
                                 background: session.instructorColor.includes('gradient')
                                   ? session.instructorColor.replace('gradient-', 'linear-gradient(135deg, ')
@@ -119,9 +122,6 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
                               }}
                             />
                           )}
-                          <span className="font-semibold text-base truncate">
-                            {session.studentName}
-                          </span>
                         </div>
                         {session.instructorName && (
                           <div className="text-sm text-muted-foreground mb-1">
