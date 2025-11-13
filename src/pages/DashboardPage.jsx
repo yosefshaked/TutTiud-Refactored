@@ -7,7 +7,7 @@ import { useOrg } from "@/org/OrgContext.jsx"
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
-import WeeklyComplianceView from "@/features/dashboard/components/WeeklyComplianceView.jsx"
+import ModernWeeklyCalendar from "@/features/dashboard/components/ModernWeeklyCalendar.jsx"
 
 /**
  * Build greeting with proper fallback chain:
@@ -207,7 +207,7 @@ export default function DashboardPage() {
 
           {/* Weekly compliance - mobile */}
           {tenantClientReady && activeOrgHasConnection ? (
-            <WeeklyComplianceView orgId={activeOrgId} />
+            <ModernWeeklyCalendar orgId={activeOrgId} />
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">
@@ -264,7 +264,7 @@ export default function DashboardPage() {
           </div>
 
           {tenantClientReady && activeOrgHasConnection ? (
-            <WeeklyComplianceView orgId={activeOrgId} />
+            <ModernWeeklyCalendar orgId={activeOrgId} />
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">

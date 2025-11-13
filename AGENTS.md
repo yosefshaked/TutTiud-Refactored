@@ -203,7 +203,7 @@
 - The refreshed design system lives in `tailwind.config.js` (Nunito typography, primary/neutral/status palettes, spacing tokens) with base primitives in `src/components/ui/{Button,Card,Input,PageLayout}.jsx`. Prefer these when creating new mobile-first UI.
 - `src/components/layout/AppShell.jsx` is the new navigation shell. It renders the mobile bottom tabs + FAB and a desktop sidebar, so wrap future routes with it instead of the legacy `Layout.jsx`.
 
-### Weekly Compliance Calendar Layout (2025-11)
+### Weekly Compliance Calendar Layout (2025-11) - Modern Implementation
 - Chip positioning uses precise minute-level calculations in `calculateChipTopPosition()` for an Outlook-style layout (chips can sit “between” rows).
 - Quarter-hour starts (:15/:45) use a single DOM chip with a subtle internal boundary hint line at the next slot boundary (visual-only; no logical split). This avoids over-counting and simplifies overflow math.
 - Session-based collision detection: events are grouped into `sessionGroups` (one event per session). Collision detection compares groups by `minTop`/`maxBottom`, and the MAX_VISIBLE_CHIPS=2 rule applies per collision group.
