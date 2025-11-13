@@ -74,9 +74,9 @@ export function DayTimelineView({ orgId, date, onBack }) {
     const minHour = minutesArray.length > 0 ? Math.floor(Math.min(...minutesArray) / 60) : 8
     const maxHour = minutesArray.length > 0 ? Math.ceil(Math.max(...minutesArray) / 60) : 18
 
-    // Build hours array forward (earliest hour first) - hour labels stay LTR
+    // Build hours array in reverse for RTL timeline (latest hour first on right)
     const hours = []
-    for (let h = minHour; h <= maxHour; h++) {
+    for (let h = maxHour; h >= minHour; h--) {
       hours.push(`${String(h).padStart(2, '0')}:00`)
     }
 
@@ -84,17 +84,10 @@ export function DayTimelineView({ orgId, date, onBack }) {
   }, [data, date])
 
   function calculatePosition(timeMinutes, minHour, maxHour) {
-    // Calculate the total timeline width
-    const totalMinutes = (maxHour - minHour) * 60
-    const timelineWidth = (totalMinutes / 60) * 120 // Total width in pixels
-    
-    // For RTL student ordering: later times (higher timeMinutes) should be on the RIGHT
-    // Calculate position from LEFT, then convert to RIGHT positioning
-    const minutesFromStart = timeMinutes - (minHour * 60)
-    const leftPosition = (minutesFromStart / 60) * 120
-    
-    // Convert to right position: subtract from total width
-    return timelineWidth - leftPosition - 60 // 60 is the chip width
+    // For RTL student positioning: calculate from the right (max hour)
+    // This makes students appear right-to-left while keeping hour labels left-to-right
+    const minutesFromEnd = (maxHour * 60) - timeMinutes
+    return (minutesFromEnd / 60) * 120 // 120px per hour
   }
 
   // Smart stacking: find the first available row for a session based on time overlap
