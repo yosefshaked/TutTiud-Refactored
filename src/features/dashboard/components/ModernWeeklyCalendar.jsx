@@ -136,6 +136,24 @@ function ModernToolbar({ label, onNavigate, onView, view, views }) {
   )
 }
 
+// Custom header component to show full dates
+function CustomHeader({ date, label }) {
+  const dayName = format(date, 'EEEE', { locale: he })
+  const fullDate = format(date, 'dd.MM.yyyy')
+  const isToday = format(new Date(), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+  
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div className={isToday ? 'font-bold' : 'font-semibold'}>
+        {dayName}
+      </div>
+      <div className={`text-xs ${isToday ? 'font-semibold' : 'font-normal text-muted-foreground'}`}>
+        {fullDate}
+      </div>
+    </div>
+  )
+}
+
 export default function ModernWeeklyCalendar({ orgId }) {
   const navigate = useNavigate()
   const [date, setDate] = useState(new Date())
@@ -317,6 +335,12 @@ export default function ModernWeeklyCalendar({ orgId }) {
               components={{
                 toolbar: ModernToolbar,
                 event: ModernEvent,
+                week: {
+                  header: CustomHeader,
+                },
+                day: {
+                  header: CustomHeader,
+                },
               }}
               eventPropGetter={() => ({
                 className: 'modern-calendar-event',

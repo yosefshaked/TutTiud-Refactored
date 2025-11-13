@@ -51,14 +51,20 @@
   border: 1px solid hsl(var(--border) / 0.6);
 }
 
-/* Week/Day View Header */
+/* Week/Day View Header - Full Date Display */
 .modern-calendar-wrapper .rbc-header {
   background: var(--calendar-muted);
-  border-bottom: 1px solid var(--calendar-border);
-  padding: 0.75rem 0.5rem;
+  border-bottom: 2px solid var(--calendar-border);
+  padding: 1rem 0.5rem;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: var(--calendar-foreground);
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
 }
 
 .modern-calendar-wrapper .rbc-today {
@@ -98,25 +104,40 @@
   background: var(--calendar-bg);
 }
 
-/* Modern Event Styling */
+/* Modern Event Styling - Prevent Overlap */
 .modern-calendar-wrapper .rbc-event {
   background: transparent !important;
   border: none !important;
   border-radius: 0.5rem;
-  padding: 0;
+  padding: 0 !important;
+  margin: 0 !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   cursor: pointer;
+  /* Prevent overlap - force each event to take its own space */
+  position: relative !important;
 }
 
 .modern-calendar-wrapper .rbc-event:hover {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   transform: translateY(-1px);
+  z-index: 10;
 }
 
 .modern-calendar-wrapper .rbc-event:focus {
   outline: 2px solid var(--calendar-primary);
   outline-offset: 2px;
+  z-index: 10;
+}
+
+/* Force events to stack side-by-side, not overlap */
+.modern-calendar-wrapper .rbc-events-container {
+  margin: 0 !important;
+}
+
+.modern-calendar-wrapper .rbc-event-content {
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .modern-event-content {
@@ -124,13 +145,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.375rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   height: 100%;
   border-radius: 0.5rem;
   color: white;
   font-size: 0.75rem;
   font-weight: 600;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .event-student-name {
