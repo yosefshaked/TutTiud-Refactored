@@ -203,14 +203,25 @@
 - The refreshed design system lives in `tailwind.config.js` (Nunito typography, primary/neutral/status palettes, spacing tokens) with base primitives in `src/components/ui/{Button,Card,Input,PageLayout}.jsx`. Prefer these when creating new mobile-first UI.
 - `src/components/layout/AppShell.jsx` is the new navigation shell. It renders the mobile bottom tabs + FAB and a desktop sidebar, so wrap future routes with it instead of the legacy `Layout.jsx`.
 
-### Weekly Compliance Calendar Layout (2025-11) - Modern Implementation
-- Chip positioning uses precise minute-level calculations in `calculateChipTopPosition()` for an Outlook-style layout (chips can sit “between” rows).
-- Quarter-hour starts (:15/:45) use a single DOM chip with a subtle internal boundary hint line at the next slot boundary (visual-only; no logical split). This avoids over-counting and simplifies overflow math.
-- Session-based collision detection: events are grouped into `sessionGroups` (one event per session). Collision detection compares groups by `minTop`/`maxBottom`, and the MAX_VISIBLE_CHIPS=2 rule applies per collision group.
-- Max 2 visible sessions per collision group; remaining sessions appear in granular "+X more" badges per distinct start time.
-- Overflow badges: counted per start time; when both visible chips share the same start time, the badge is centered beneath both; otherwise it aligns beneath the corresponding column.
-- Dynamic slot height expansion: `slotHeights` tracks per-slot height to fit chips and badges.
-- Key constants: GRID_ROW_HEIGHT=44px, GRID_INTERVAL_MINUTES=30, SESSION_DURATION_MINUTES=60
+### Weekly Compliance Calendar Layout (2025-11) - Heatmap Implementation
+- The Weekly Compliance View uses a **compliance heatmap** approach optimized for high-density session tracking.
+- Main view (`ComplianceHeatmap.jsx`): Grid showing days × time slots with color-coded cells indicating documentation compliance percentage:
+  - 🟢 Green (≥80%): Good compliance
+  - 🟡 Yellow (50-79%): Needs attention
+  - 🔴 Red (<50%): Critical gaps
+  - ⚪ Gray: Upcoming sessions (not yet due)
+- Each cell displays: status icon counts (✓×N ✗×N ⚠×N), ratio (documented/total), and percentage.
+- Click any cell opens `SessionListDrawer.jsx` showing detailed session list for that hour with:
+  - Sessions grouped by exact time (handles :15/:45 naturally)
+  - Status icons (✓ documented, ✗ missing, ⚠ upcoming)
+  - Quick action buttons ("תעד עכשיו" for missing, "פתח" to view student)
+- "תצוגה מפורטת" button per day opens `DayTimelineView.jsx` - resource timeline showing instructor lanes with sessions positioned precisely by time.
+- Day timeline uses instructor rows with horizontal time grid (8 hours shown, 120px per hour).
+- Sessions positioned as clickable chips at exact times, stacking vertically if instructor has many concurrent sessions.
+- Scales infinitely: works with any number of instructors/students/sessions without overlap issues.
+- Mobile: Week heatmap remains functional; day timeline best viewed in landscape.
+- Legacy: React Big Calendar approach (ModernWeeklyCalendar.jsx) deprecated due to event density issues.
+- Demo: `demo-resource-timeline-week.html` shows what a full week resource timeline would look like (horizontal scroll, all days visible).
 
 ### Onboarding Tour System (2025-10)
 - Custom tour implementation lives in `src/features/onboarding/`:
