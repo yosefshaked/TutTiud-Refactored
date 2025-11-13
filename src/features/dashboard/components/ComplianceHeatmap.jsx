@@ -20,22 +20,23 @@ export function ComplianceHeatmap({ orgId }) {
   )
 
   useEffect(() => {
-    loadData()
+    ;(async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const result = await fetchWeeklyComplianceView({
+          orgId,
+          weekStart: format(currentWeekStart, 'yyyy-MM-dd'),
+        })
+        setData(result)
+      } catch (err) {
+        console.error('Failed to load compliance data:', err)
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
+    })()
   }, [orgId, currentWeekStart])
-
-  async function loadData() {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const result = await fetchWeeklyComplianceView(orgId, currentWeekStart)
-      setData(result)
-    } catch (err) {
-      console.error('Failed to load compliance data:', err)
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const heatmapData = useMemo(() => {
     if (!data?.days) return null

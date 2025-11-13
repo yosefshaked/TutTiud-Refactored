@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { format, startOfDay, parseISO } from 'date-fns'
+import { format, startOfDay, parseISO, startOfWeek } from 'date-fns'
 import { he } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/card'
@@ -13,22 +13,24 @@ export function DayTimelineView({ orgId, date, onBack }) {
   const navigate = useNavigate()
 
   useEffect(() => {
-    loadData()
+    ;(async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const weekStart = startOfWeek(startOfDay(parseISO(date)))
+        const result = await fetchWeeklyComplianceView({
+          orgId,
+          weekStart: format(weekStart, 'yyyy-MM-dd'),
+        })
+        setData(result)
+      } catch (err) {
+        console.error('Failed to load day data:', err)
+        setError(err.message)
+      } finally {
+        setIsLoading(false)
+      }
+    })()
   }, [orgId, date])
-
-  async function loadData() {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const result = await fetchWeeklyComplianceView(orgId, startOfDay(parseISO(date)))
-      setData(result)
-    } catch (err) {
-      console.error('Failed to load day data:', err)
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const timelineData = useMemo(() => {
     if (!data?.days) return null

@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button'
 
 export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
   const navigate = useNavigate()
+  // Intentionally unused for now; keep in signature for future enhancements
+  void orgId
 
   if (!cellData) return null
 
