@@ -138,6 +138,7 @@ function ModernToolbar({ label, onNavigate, onView, view, views }) {
 
 // Custom header component to show full dates
 function CustomHeader({ date, label }) {
+  void label
   const dayName = format(date, 'EEEE', { locale: he })
   const fullDate = format(date, 'dd.MM.yyyy')
   const isToday = format(new Date(), 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')

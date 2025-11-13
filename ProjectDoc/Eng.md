@@ -156,18 +156,18 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 
 ## 11. Focused Navigation Dashboard
 
-- **ComplianceHeatmap** – `src/features/dashboard/components/ComplianceHeatmap.jsx` renders the weekly compliance board that is
-  shown on the dashboard. It consumes `/api/weekly-compliance`, arranges the aggregated sessions in an hour-by-day table, and
-  keeps the quick-drawer interactions for drilling into a specific cell (`SessionListDrawer`). Each day column includes a
-  "תצוגה מפורטת" button that now triggers a modal day breakdown: the handler calls `/api/daily-compliance`, surfaces a loading
-  state inline, and renders `DayDetailView.jsx` once the payload arrives. Errors are shown directly inside the card so admins know
-  when a retry is required.
-- **DayDetailView** – `src/features/dashboard/components/DayDetailView.jsx` is a modal-only component that receives the
-  `/api/daily-compliance` payload (date metadata, grouped time slots, instructor colors, and session statuses) and presents a
-  vertical, hour-based timeline. A solid header displays the localized date plus a summary string (“documented out of total”).
-  Each hour shows its slots in chronological order, and every session renders as an instructor-colored chip that includes the
-  student name, instructor name, and a status icon (✔ documented, ✖ missing). Upcoming sessions fall back to a neutral dot. The
-  modal is controlled entirely by `ComplianceHeatmap`, so no extra fetch logic lives inside the detail component.
+- **ComplianceHeatmap** – `src/features/dashboard/components/ComplianceHeatmap.jsx` now behaves as an integrated drill-down.
+  The widget still consumes `/api/weekly-compliance`, paints the hour-by-day heatmap, and exposes `SessionListDrawer` per cell,
+  but it also tracks an internal view state so "תצוגה מפורטת" swaps the content into an inline day timeline instead of opening a
+  modal. Desktop users default to the full weekly board, while sub-1015px screens render a single-day heatmap with a date
+  picker. When the detail view is active the component fetches `/api/daily-compliance`, shows loading/error/empty states inline,
+  and lets admins and instructors review the instructor-colored session list without leaving the dashboard. Both compliance
+  endpoints continue enforcing role-based filtering on the backend so members only receive their assigned students.
+- **SessionCardList** – `src/features/dashboard/components/SessionCardList.jsx` renders the reusable vertical timeline that both
+  the inline day view and `SessionListDrawer` rely on. It groups sessions by time slots, paints each card with the instructor’s
+  palette, surfaces ✔/✖/• status icons, and keeps the "פתח" / "תעד עכשיו" actions wired into the rest of the dashboard. Reusing
+  this component keeps the design language and action affordances identical whether the user opens the drawer or drills down
+  inline.
 - **Dashboard actions** – `DashboardPage.jsx` still greets the user and surfaces the quick cards for “My Students” / “All Students”
   and “New Session Record”. The compliance widget now renders beneath those quick actions once the tenant connection is available;
   until then a placeholder card explains why the grid is hidden.
