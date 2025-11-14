@@ -150,7 +150,14 @@ export default function SessionCardList({
                     )}
                     <p className={cn('mt-1 text-xs font-medium', status.className)}>{status.text}</p>
                   </div>
-                  <div className={cn('text-2xl font-semibold', status.className)} aria-label={status.label}>
+                  <div
+                    className={cn(
+                      'text-2xl font-semibold flex w-full justify-start sm:w-auto sm:justify-center',
+                      status.className,
+                    )}
+                    aria-label={status.label}
+                    dir="ltr"
+                  >
                     {status.icon}
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row">
