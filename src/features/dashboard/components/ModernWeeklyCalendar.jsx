@@ -288,7 +288,7 @@ export default function ModernWeeklyCalendar({ orgId }) {
     <Card className="relative overflow-visible rounded-2xl border border-border bg-surface p-lg shadow-sm">
       <div className="relative min-w-0" dir="rtl">
         <div className="mb-lg">
-          <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
+          <h2 className="text-2xl font-semibold text-foreground">מעקב מצב התיעודים</h2>
           <p className="mt-xs text-sm text-muted-foreground">
             מעקב חזותי אחר השיעורים המתוכננים והסטטוס של התיעוד שלהם.
           </p>

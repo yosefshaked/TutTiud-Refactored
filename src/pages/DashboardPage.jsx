@@ -211,7 +211,7 @@ export default function DashboardPage() {
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">
-                לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+                לוח מעקב התיעודים השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
               </p>
             </Card>
           )}
@@ -268,7 +268,7 @@ export default function DashboardPage() {
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">
-                לוח הציות השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+                לוח מעקב התיעודים השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
               </p>
             </Card>
           )}

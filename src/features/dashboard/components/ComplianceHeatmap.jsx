@@ -248,7 +248,7 @@ export function ComplianceHeatmap({ orgId }) {
       <div className="p-lg space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-foreground">תצוגת ציות שבועית</h2>
+            <h2 className="text-2xl font-semibold text-foreground">מעקב מצב התיעודים</h2>
             <p className="mt-xs text-sm text-muted-foreground">
               מעקב אחר מילוי תיעוד שיעורים לפי שעות
             </p>
@@ -297,7 +297,7 @@ export function ComplianceHeatmap({ orgId }) {
         {viewMode === 'heatmap' ? (
           isLoading ? (
             <div className="flex justify-center py-xl">
-              <span className="text-sm text-muted-foreground">טוען נתוני ציות...</span>
+              <span className="text-sm text-muted-foreground">טוען נתוני תיעוד...</span>
             </div>
           ) : error ? (
             <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-lg text-destructive">
@@ -433,11 +433,11 @@ export function ComplianceHeatmap({ orgId }) {
               <div className="mt-md flex flex-wrap items-center justify-center gap-6 text-xs font-medium">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-[#22C55E] border border-[#22C55E]"></div>
-                  <span>100% ציות מושלם</span>
+                  <span>100% תיעודים הושלמו</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-[#FACC15] border border-[#FACC15]"></div>
-                  <span>76-99% דרוש תשומת לב</span>
+                  <span>76-99% נדרש להשלים</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-[#F97316] border border-[#F97316]"></div>
@@ -445,7 +445,7 @@ export function ComplianceHeatmap({ orgId }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-[#E5E7EB] border border-gray-300"></div>
-                  <span>ללא שיעורים / טרם התרחש</span>
+                  <span>ללא שיעורים/טרם התרחש</span>
                 </div>
               </div>
             </>
