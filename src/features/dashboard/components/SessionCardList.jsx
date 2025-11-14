@@ -136,23 +136,33 @@ export default function SessionCardList({
                   )}
                   <div className="flex-1 min-w-0 pr-3 text-right">
                     <p className="text-base font-semibold truncate">{session?.studentName || '—'}</p>
-                    {session?.instructorName && (
-                      <div className="mt-1 flex items-center justify-start gap-2 text-sm text-muted-foreground">
+                    <div className="mt-1 flex items-center justify-between gap-3 text-sm text-muted-foreground sm:justify-start">
+                      <div className="flex min-h-[1.5rem] min-w-0 items-center gap-2">
                         {session?.instructorColor && (
                           <span
-                            className="inline-flex h-3 w-3 rounded-full border border-border shadow-sm"
+                            className="inline-flex h-3 w-3 flex-shrink-0 rounded-full border border-border shadow-sm"
                             style={barStyle}
                             aria-hidden
                           />
                         )}
-                        <span className="truncate">{session?.instructorName}</span>
+                        {session?.instructorName && <span className="truncate">{session?.instructorName}</span>}
                       </div>
-                    )}
+                      <div
+                        className={cn(
+                          'text-2xl font-semibold flex flex-shrink-0 items-center justify-center text-left sm:hidden',
+                          status.className,
+                        )}
+                        aria-label={status.label}
+                        dir="ltr"
+                      >
+                        {status.icon}
+                      </div>
+                    </div>
                     <p className={cn('mt-1 text-xs font-medium', status.className)}>{status.text}</p>
                   </div>
                   <div
                     className={cn(
-                      'text-2xl font-semibold flex w-full justify-start sm:w-auto sm:justify-center',
+                      'text-2xl font-semibold hidden w-full justify-start sm:flex sm:w-auto sm:justify-center',
                       status.className,
                     )}
                     aria-label={status.label}
