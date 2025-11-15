@@ -20,6 +20,7 @@ export default function NewSessionModal({
   onClose,
   initialStudentId = '',
   initialStudentStatus = 'active',
+  initialDate = '', // YYYY-MM-DD format
   onCreated,
 }) {
   const { loading: supabaseLoading } = useSupabase();
@@ -393,6 +394,7 @@ export default function NewSessionModal({
             canViewInactive={canViewInactive}
             visibilityLoaded={visibilityLoaded}
             initialStudentId={initialStudentId}
+            initialDate={initialDate}
             isLoadingStudents={isLoadingStudents}
             onSubmit={handleSubmit}
             onCancel={onClose}
