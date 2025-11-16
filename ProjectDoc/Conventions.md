@@ -213,6 +213,7 @@ Prefer **validation errors (4xx)** with precise, machine-readable message codes:
   - `content` (JSON of answers)
   - `service_context` (optional text)
   - `instructor_id` (FK to Instructors)
+  - `is_legacy` (boolean, defaults to false; marks imported historical records)
 - **Instructor resolution:**
   - **Members:** Must be the student's assigned instructor.
   - **Admins/owners:** Prefer student's assigned instructor; fallback to acting user only if they're a valid Instructor in this tenant. Otherwise, return `student_missing_instructor`.

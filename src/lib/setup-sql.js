@@ -157,13 +157,15 @@ CREATE TABLE IF NOT EXISTS tuttiud."SessionRecords" (
   "updated_at" timestamptz DEFAULT now(),
   "deleted" boolean NOT NULL DEFAULT false,
   "deleted_at" timestamptz,
+  "is_legacy" boolean NOT NULL DEFAULT false,
   "metadata" jsonb
 );
 ALTER TABLE tuttiud."SessionRecords"
   ADD COLUMN IF NOT EXISTS "service_context" text,
   ADD COLUMN IF NOT EXISTS "content" jsonb,
   ADD COLUMN IF NOT EXISTS "deleted" boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS "deleted_at" timestamptz;
+  ADD COLUMN IF NOT EXISTS "deleted_at" timestamptz,
+  ADD COLUMN IF NOT EXISTS "is_legacy" boolean NOT NULL DEFAULT false;
 DO $$
 DECLARE
   column_type text;

@@ -39,7 +39,7 @@ Key characteristics:
 | :---- | :------ | :---------- |
 | `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` (`instructor_color` stores the permanent palette assignment) |
 | `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
-| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, timestamps, `metadata` |
+| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, `is_legacy` (marks imported historical rows), timestamps, `metadata` |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
 
 Supporting indexes:
@@ -83,6 +83,7 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 
 - **Weekly compliance status timing:** The `/api/weekly-compliance` handler marks undocumented sessions scheduled for the current day as `missing` immediately after midnight UTC. Only future-dated sessions remain `upcoming`, so today's column instantly reflects whether a record exists even before the scheduled time occurs.
 - **Daily compliance status timing:** `/api/daily-compliance` follows the same rule. Undocumented sessions with `isoDate` less than or equal to today's UTC date are flagged as `missing`, keeping the daily timeline aligned with the heatmap and preventing same-day gaps from appearing as `upcoming`.
+- **Permission registry:** Control DB registry now includes `can_reupload_legacy_reports` (default `false`) for gating repeated legacy session imports at the organization level.
 
 > **Schema guardrails:** `/api/settings` now inspects `tuttiud.setup_assistant_diagnostics()` whenever Supabase reports missing tables or insufficient permissions. Schema or policy gaps surface as HTTP 424 with `settings_schema_incomplete` / `settings_schema_unverified` and include the failing diagnostic rows so admins can rerun the setup script before retrying.
 

@@ -39,7 +39,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | :--- | :---- | :------------- |
 | `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK ששומר את `auth.users.id` ומנוהל ברמת האפליקציה), `name`, פרטי קשר, `is_active`, `metadata` (כולל `instructor_color` עבור צבע קבוע וייחודי) |
 | `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `is_active` (boolean, ברירת מחדל `true`), `tags`, `notes`, `metadata` |
-| `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, חותמות זמן, `metadata` |
+| `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, `is_legacy` (מסמן שורות עבר שיובאו), חותמות זמן, `metadata` |
 | `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` |
 
 אינדקסים תומכים:
@@ -83,6 +83,8 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - **תזמון סטטוס הציות השבועי:** נקודת הקצה `/api/weekly-compliance` מסמנת מפגשים ללא תיעוד שתוזמנו לאותו היום כ-`missing` כבר מחצות (UTC). רק מפגשים עתידיים נשארים כ-`upcoming`, כך שהעמודה של היום מציגה מיד אם התיעוד הושלם גם לפני שעת המפגש.
 - **תזמון סטטוס הציות היומי:** נקודת הקצה `/api/daily-compliance` מאמצת את אותו כלל. מפגשים ללא תיעוד עם `isoDate` הקטן או שווה לתאריך של היום (UTC) מסומנים כ-`missing`, כך שהטיימליין היומי נשאר מסונכרן עם מפת החום ומונע מפערים של אותו היום להופיע כ-`upcoming`.
+
+- **רישום הרשאות:** טבלת השליטה כוללת כעת `can_reupload_legacy_reports` (ברירת מחדל `false`) כדי לשלוט ביכולת לבצע העלאות חוזרות של נתוני עבר.
 
 > **אמצעי הגנה על הסכימה:** ‎`/api/settings` מריץ כעת את `tuttiud.setup_assistant_diagnostics()` בכל פעם ש-Supabase מדווח על טבלאות חסרות או הרשאות חסרות. פערים בסכימה או במדיניות מוחזרים כ-HTTP ‎424 עם ‎`settings_schema_incomplete` / `settings_schema_unverified` וכוללים את שורות הדיאגנוסטיקה כדי שהאדמין יריץ מחדש את הסקריפט לפני ניסיון נוסף.
 
