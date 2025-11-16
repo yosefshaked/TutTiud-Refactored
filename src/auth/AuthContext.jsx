@@ -75,8 +75,7 @@ function resolvePasswordResetRedirectUrl() {
   let baseUrl = null;
 
   if (typeof window !== 'undefined' && window.location?.origin) {
-    const pathname = typeof window.location.pathname === 'string' ? window.location.pathname : '/';
-    baseUrl = `${window.location.origin}${pathname}`;
+    baseUrl = window.location.origin;
   } else if (FALLBACK_REDIRECT_URL) {
     baseUrl = FALLBACK_REDIRECT_URL;
   }
@@ -86,7 +85,7 @@ function resolvePasswordResetRedirectUrl() {
   }
 
   const sanitizedBase = baseUrl.split('#')[0].replace(/\/+$/, '');
-  return `${sanitizedBase}${PASSWORD_RESET_HASH_PATH}`;
+  return `${sanitizedBase}/${PASSWORD_RESET_HASH_PATH}`;
 }
 
 export function AuthProvider({ children }) {
