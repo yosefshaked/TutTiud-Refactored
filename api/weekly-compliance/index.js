@@ -156,7 +156,7 @@ function determineStatus(hasRecord, isoDate, todayIso) {
   if (!isoDate || !todayIso) {
     return hasRecord ? 'complete' : 'upcoming';
   }
-  if (isoDate < todayIso) {
+  if (isoDate <= todayIso) {
     return hasRecord ? 'complete' : 'missing';
   }
   return hasRecord ? 'complete' : 'upcoming';

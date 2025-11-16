@@ -81,6 +81,8 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/settings` | GET/POST/PUT/PATCH/DELETE | Admin/Owner (read allowed to members) | Provides full CRUD for tenant settings, supporting creation of new keys like `session_form_config`. |
 | `/api/user-context` | GET | Authenticated users | Returns the caller's organization memberships (with connection flags) and pending invitations, using the Supabase admin client to bypass RLS so invitees can still see organization names. |
 
+- **Weekly compliance status timing:** The `/api/weekly-compliance` handler marks undocumented sessions scheduled for the current day as `missing` immediately after midnight UTC. Only future-dated sessions remain `upcoming`, so today's column instantly reflects whether a record exists even before the scheduled time occurs.
+
 > **Schema guardrails:** `/api/settings` now inspects `tuttiud.setup_assistant_diagnostics()` whenever Supabase reports missing tables or insufficient permissions. Schema or policy gaps surface as HTTP 424 with `settings_schema_incomplete` / `settings_schema_unverified` and include the failing diagnostic rows so admins can rerun the setup script before retrying.
 
 All endpoints expect the tenant identifier (`org_id`) in the request body or query string. Authentication is enforced with the Supabase JWT provided by the desktop/web client, and every handler builds the tenant Supabase client through `api/_shared/org-bff.js` to reuse encryption, membership, and error handling routines.
