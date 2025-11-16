@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 1.2.1**
-**Last Updated: 2025-11-07**
+**Version: 1.4.0**
+**Last Updated: 2025-11-18**
 
 > **Developer Conventions:** For folder structure, naming rules, API patterns, and feature organization, refer to [Conventions.md](./Conventions.md).
 
@@ -37,7 +37,7 @@ Key characteristics:
 
 | Table | Purpose | Key Columns |
 | :---- | :------ | :---------- |
-| `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` |
+| `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` (`instructor_color` stores the permanent palette assignment) |
 | `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
 | `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, timestamps, `metadata` |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
@@ -76,9 +76,13 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/students` | POST | Admin/Owner | Inserts a student (name + optional contact data, scheduling defaults, instructor assignment) and echoes the created row. |
 | `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor, `is_active`) and returns the refreshed row or 404. |
 | `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.id` (Supabase auth UUID) and hides inactive students unless the organization enables instructor visibility; supports optional `status` query parity with the admin endpoint. |
+| `/api/weekly-compliance` | GET | Member/Admin/Owner | Returns the aggregated “Weekly Compliance View” data set with instructor color identifiers, weekly schedule chips, dynamic time window metadata, and per-session documentation status (✔ complete / ✖ missing). |
 | `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry (JSON answer payload + optional service context) after confirming members only write for students assigned to them. |
 | `/api/settings` | GET/POST/PUT/PATCH/DELETE | Admin/Owner (read allowed to members) | Provides full CRUD for tenant settings, supporting creation of new keys like `session_form_config`. |
 | `/api/user-context` | GET | Authenticated users | Returns the caller's organization memberships (with connection flags) and pending invitations, using the Supabase admin client to bypass RLS so invitees can still see organization names. |
+
+- **Weekly compliance status timing:** The `/api/weekly-compliance` handler marks undocumented sessions scheduled for the current day as `missing` immediately after midnight UTC. Only future-dated sessions remain `upcoming`, so today's column instantly reflects whether a record exists even before the scheduled time occurs.
+- **Daily compliance status timing:** `/api/daily-compliance` follows the same rule. Undocumented sessions with `isoDate` less than or equal to today's UTC date are flagged as `missing`, keeping the daily timeline aligned with the heatmap and preventing same-day gaps from appearing as `upcoming`.
 
 > **Schema guardrails:** `/api/settings` now inspects `tuttiud.setup_assistant_diagnostics()` whenever Supabase reports missing tables or insufficient permissions. Schema or policy gaps surface as HTTP 424 with `settings_schema_incomplete` / `settings_schema_unverified` and include the failing diagnostic rows so admins can rerun the setup script before retrying.
 
@@ -117,6 +121,8 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 - The setup script now includes `Students.is_active boolean default true` (with backfill) to support inactive lifecycle flows; rerunning it on legacy tenants is safe because every `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` stays idempotent.
 - `verifyOrgConnection` (`src/runtime/verification.js`) now expects a Supabase data client and returns the diagnostics array so callers can render pass/fail status.
 - All onboarding status updates should call `recordVerification(orgId, timestamp)` to persist `setup_completed` / `verified_at` on the control-plane organization row.
+- `api/_shared/instructor-colors.js` exposes the permanent color bank and gradient fallback generator used to populate `metadata.instructor_color`. Call `ensureInstructorColors()` before returning instructor lists from new endpoints.
+- `/api/weekly-compliance` aggregates default student schedules, cross-references `SessionRecords`, and returns the dynamic time window + legend consumed by the dashboard widget.
 - Documentation must remain bilingual (see `ProjectDoc/Heb.md`) and the README should highlight the onboarding checklist for quick reference.
 - OAuth flows call `supabase.auth.signInWithOAuth` with `options.redirectTo`, resolving to the full browser URL (`origin + pathname + search + hash`) when `window.location` is available or falling back to `VITE_PUBLIC_APP_URL`/`VITE_APP_BASE_URL`/`VITE_SITE_URL` so each shell returns users to the exact page that initiated the Tuttiud login after third-party authentication.
 - `bootstrapSupabaseCallback()` (`src/auth/bootstrapSupabaseCallback.js`) executes before `<HashRouter>` mounts, shifting Supabase callback parameters into the `#/login/?…` hash format and caching the payload in `sessionStorage` so the login screen always loads instead of the marketing page.
@@ -153,13 +159,24 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 
 ## 11. Focused Navigation Dashboard
 
-- **DashboardPage.jsx** – located at `src/pages/DashboardPage.jsx`, this lightweight home view greets the authenticated user and
-  presents two prominent actions: navigating to `/my-students` and opening the session registration modal via the floating + button.
-- **Home routing** – the `AppShell` "ראשי" link now points to `/`, and `/Dashboard` redirects to the new landing page so the
-  simplified experience becomes the default route after login. All auth redirects (login, org selection, invite acceptance)
-  now target `/` as the canonical destination.
-- **Reports link state** – the "דוחות" navigation item is disabled in both mobile and desktop shells. Hovering or long-pressing
-  shows the tooltip "Reporting features coming soon!", preventing dead-end navigation while communicating the roadmap.
+- **ComplianceHeatmap** – `src/features/dashboard/components/ComplianceHeatmap.jsx` now behaves as an integrated drill-down.
+  The widget still consumes `/api/weekly-compliance`, paints the hour-by-day heatmap, and exposes `SessionListDrawer` per cell,
+  but it also tracks an internal view state so "תצוגה מפורטת" swaps the content into an inline day timeline instead of opening a
+  modal. Desktop users default to the full weekly board, while sub-1015px screens render a single-day heatmap with a date
+  picker. When the detail view is active the component fetches `/api/daily-compliance`, shows loading/error/empty states inline,
+  and lets admins and instructors review the instructor-colored session list without leaving the dashboard. Both compliance
+  endpoints continue enforcing role-based filtering on the backend so members only receive their assigned students.
+- **SessionCardList** – `src/features/dashboard/components/SessionCardList.jsx` renders the reusable vertical timeline that both
+  the inline day view and `SessionListDrawer` rely on. It groups sessions by time slots, paints each card with the instructor’s
+  palette, surfaces ✔/✖/• status icons, and keeps the "פתח" / "תעד עכשיו" actions wired into the rest of the dashboard. Reusing
+  this component keeps the design language and action affordances identical whether the user opens the drawer or drills down
+  inline.
+- **Dashboard actions** – `DashboardPage.jsx` still greets the user and surfaces the quick cards for “My Students” / “All Students”
+  and “New Session Record”. The compliance widget now renders beneath those quick actions once the tenant connection is available;
+  until then a placeholder card explains why the grid is hidden.
+- **Navigation glue** – the `AppShell` "ראשי" link continues pointing to `/`, and `/Dashboard` redirects to the landing page so
+  the enhanced home experience remains the default after login. Auth redirects (login, org selection, invite acceptance) still
+  converge on `/`, and the disabled "דוחות" item keeps its roadmap tooltip.
 
 ## 12. Design System Foundations (Mobile-First UI Kit)
 

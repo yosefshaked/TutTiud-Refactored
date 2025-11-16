@@ -11,6 +11,10 @@
 - Run `npm run build` to ensure the project builds.
 - No test script is configured; note this in your testing summary.
 - Run `npm run check:schema` before adding new persistence logic; if it reports missing columns, add a checklist note to the PR instead of coding around the gap.
+- Instructor color assignments live in `api/_shared/instructor-colors.js`. Use `ensureInstructorColors()` before returning instructor records or aggregations so every row keeps a unique `metadata.instructor_color` (solid or gradient).
+- `/api/weekly-compliance` powers the dashboard widget with aggregated schedules, legend entries, and dynamic hour ranges. Frontend work should consume its payload instead of duplicating aggregation logic.
+- Weekly compliance status logic: `/api/weekly-compliance` marks undocumented sessions scheduled for the current day as `missing`; only future days are returned as `upcoming`.
+- Daily compliance status logic: `/api/daily-compliance` also marks undocumented sessions scheduled for today (UTC) as `missing`; `upcoming` applies strictly to future dates.
 - Add any important information learned into this AGENTS.md file.
 	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
 	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.
@@ -20,6 +24,9 @@
 - OAuth redirects must always include `options.redirectTo` when calling `supabase.auth.signInWithOAuth`. Resolve it from the full `window.location` URL (`origin + pathname + search + hash`) and fall back to `VITE_PUBLIC_APP_URL`, `VITE_APP_BASE_URL`, or `VITE_SITE_URL` when a browser location is unavailable.
 - Password reset flows must call `supabase.auth.resetPasswordForEmail` with a redirect that lands on `/#/update-password`, and the update form must rely on `AuthContext.updatePassword` so Supabase finalizes the session before returning users to the dashboard.
 - Login form submissions must set inline error state whenever Supabase rejects credentials so the page renders the design system's red alert with the failure message.
+- **Dashboard Layout Pattern (2025-11)**: The Weekly Compliance View uses a unified sticky header design. The InstructorLegend is integrated directly into the calendar widget (not a separate floating component) and appears as a horizontal bar at the top of the sticky header, above the day column headers. The entire header block (legend + day headers) uses `position: sticky` with `top: 0` and stays anchored while the calendar body scrolls. No complex JavaScript positioning logic is needed.
+  - **Day view integration**: The DayScheduleView (both mobile and desktop day mode) also includes the InstructorLegend in a sticky header that stays visible while scrolling through time slots.
+  - **Solid backgrounds**: Both week and day view sticky headers use solid `bg-surface` (no transparency or backdrop blur) to ensure clean visual separation when scrolling. Day header backgrounds changed from `bg-muted/30` to `bg-muted` for consistency.
 
 ### Invitation and Password Reset Flow Improvements (2025-11)
 - **CompleteRegistrationPage** now distinguishes between different OTP error types:
@@ -197,6 +204,49 @@
 - Admin UI is migrating to feature slices. Place admin-only components under `src/features/admin/components/` and mount full pages from `src/features/admin/pages/`. Reusable primitives still belong in `src/components/ui`.
 - The refreshed design system lives in `tailwind.config.js` (Nunito typography, primary/neutral/status palettes, spacing tokens) with base primitives in `src/components/ui/{Button,Card,Input,PageLayout}.jsx`. Prefer these when creating new mobile-first UI.
 - `src/components/layout/AppShell.jsx` is the new navigation shell. It renders the mobile bottom tabs + FAB and a desktop sidebar, so wrap future routes with it instead of the legacy `Layout.jsx`.
+
+### Weekly Compliance Calendar Layout (2025-11) - Heatmap Implementation
+- The Weekly Compliance View uses a **compliance heatmap** approach optimized for high-density session tracking.
+- Main view (`ComplianceHeatmap.jsx`): Grid showing days × time slots with color-coded cells indicating documentation compliance percentage:
+  - 🟢 Success Green (#22C55E, 100%): Excellent compliance
+  - 🟡 Warning Yellow (#FACC15, 76-99%): Needs attention
+  - � Warning Orange (#F97316, 0-75%): Requires action
+  - ⚪ Neutral Gray (#E5E7EB): No sessions scheduled / Upcoming sessions (not yet due)
+- **UI Design Principles (2025-11)**:
+  - Each cell uses larger padding (p-4), border-2, and bold text for better visual hierarchy
+  - **Color saturation (2025-11)**: Upgraded from -100/-950 to -200/-900 for bolder, more visible states; text upgraded to -950/-50 for maximum contrast
+  - **Tight spacing (2025-11)**: Cell content uses gap-1 and leading-tight to reduce whitespace and improve density
+  - "תצוגה מפורטת" button styled with outline variant, primary color accents, 📊 icon prefix for visibility
+  - Instructor legend removed from week view to reduce visual clutter
+  - Cell spacing increased (px-3 py-3) for better touch targets and readability
+- Each cell displays: status icon counts (✓×N ✗×N ⚠×N), ratio (documented/total), and percentage.
+- Click any cell opens `SessionListDrawer.jsx` showing detailed session list for that hour with:
+  - **Drawer placement (2025-11)**: Opens on left side (RTL convention: primary content right, secondary left)
+  - Sessions grouped by exact time (handles :15/:45 naturally)
+  - Status icons (✓ documented, ✗ missing, ⚠ upcoming)
+  - **Instructor colors displayed** (2025-11): Color bar on right edge of card + color dot next to instructor name
+  - Instructor color rendering handles both solid colors and gradients (gradient- prefix converted to linear-gradient CSS)
+  - **Quick documentation (2025-11)**: "תעד עכשיו" button opens `NewSessionModal` with pre-filled student + date; default service auto-selected if configured
+  - **RTL layout (2025-11)**: Cards use `dir="rtl"` with text on right, status icon center, buttons on left; proper Hebrew reading flow
+- "תצוגה מפורטת" button per day opens `DayTimelineView.jsx` - resource timeline showing instructor lanes with sessions positioned precisely by time.
+- **Day timeline RTL fixes (2025-11)**:
+  - Timeline flows right-to-left (RTL): latest hour on right, earliest on left (Hebrew reading direction)
+  - Hours array reversed (maxHour → minHour) for proper RTL display
+  - Position calculated from right edge: `(maxHour - timeMinutes) * 120px`
+  - Session chips contain RTL content (`dir="rtl"`) for Hebrew text display
+  - Grid lines use `border-r` (right border) for RTL layout
+  - Instructor column reduced from 192px to 128px for more timeline space and better student name visibility
+  - Vertical spacing optimized: py-1 for rows, minHeight 60px (was 120px) to eliminate unused space
+  - Container includes `overflow-hidden` to prevent chips from sliding outside bounds
+  - **Session duration (2025-11)**: Chip width = 110px (30-minute sessions, allowing full student names); positioned at 120px per hour scale
+  - **Smart stacking (2025-11)**: `calculateStackPosition` detects time overlaps and fills gaps; sessions stack only when overlapping, reusing vertical space when prior sessions end
+  - Stacking uses 36px per row for comfortable spacing
+- Day timeline uses instructor rows with horizontal time grid (dynamic hours based on actual sessions, 120px per hour).
+- Sessions positioned as clickable chips at exact times, stacking intelligently to avoid wasted vertical space.
+- Scales infinitely: works with any number of instructors/students/sessions without overlap issues.
+- Mobile: Week heatmap remains functional; day timeline best viewed in landscape.
+- Legacy: React Big Calendar approach (ModernWeeklyCalendar.jsx) deprecated due to event density issues.
+- Demo: `demo-resource-timeline-week.html` shows what a full week resource timeline would look like (horizontal scroll, all days visible).
 
 ### Onboarding Tour System (2025-10)
 - Custom tour implementation lives in `src/features/onboarding/`:

@@ -11,6 +11,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { parseJsonBodyWithLimit, validateInstructorCreate, validateInstructorUpdate } from '../_shared/validation.js';
+import { ensureInstructorColors } from '../_shared/instructor-colors.js';
 
       // Intentionally ignore profile fetch errors; fallback to provided values.
 export default async function (context, req) {
@@ -78,6 +79,11 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
+    const colorResult = await ensureInstructorColors(tenantClient, { context });
+    if (colorResult?.error) {
+      context.log?.error?.('instructors failed to ensure color assignments', { message: colorResult.error.message });
+    }
+
     const includeInactive = normalizeString(req?.query?.include_inactive).toLowerCase() === 'true';
 
     let builder = tenantClient

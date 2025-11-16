@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react"
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Link, NavLink, Outlet, useLocation, matchPath } from "react-router-dom"
 import { Plus, LayoutDashboard, Users, BarChart3, Settings, LogOut, Megaphone } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -35,13 +35,13 @@ function buildNavItems(role) {
       to: "/dashboard",
       icon: LayoutDashboard,
       end: true,
-  tourKey: "dashboard",
+      tourKey: "dashboard",
     },
     {
       label: "תלמידים",
       to: studentsDestination,
       icon: Users,
-  tourKey: isAdminRole ? "admin-students" : "my-students",
+      tourKey: isAdminRole ? "admin-students" : "my-students",
     },
     {
       label: "דוחות",
@@ -53,7 +53,7 @@ function buildNavItems(role) {
       label: "הגדרות",
       to: "/Settings",
       icon: Settings,
-  tourKey: "settings",
+      tourKey: "settings",
     },
   ]
 }
@@ -334,17 +334,86 @@ export default function AppShell({ children }) {
     }
   }
 
+  const shellRef = useRef(null)
+  const headerRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const shellElement = shellRef.current
+    const headerElement = headerRef.current
+
+    if (!shellElement || !headerElement) {
+      return
+    }
+
+    const updateHeaderHeight = () => {
+      const rect = headerElement.getBoundingClientRect()
+      const height = Math.max(0, Math.round(rect.height))
+      shellElement.style.setProperty("--app-shell-header-height", `${height}px`)
+    }
+
+    let frameId = null
+    const scheduleUpdate = () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+      }
+      frameId = requestAnimationFrame(updateHeaderHeight)
+    }
+
+    scheduleUpdate()
+
+    if (typeof ResizeObserver !== "undefined") {
+      const resizeObserver = new ResizeObserver(scheduleUpdate)
+      resizeObserver.observe(headerElement)
+      const cleanupObserver = () => resizeObserver.disconnect()
+      const cleanupResize = () => {
+        if (typeof window !== "undefined") {
+          window.removeEventListener("resize", scheduleUpdate)
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        window.addEventListener("resize", scheduleUpdate)
+      }
+
+      return () => {
+        if (frameId) {
+          cancelAnimationFrame(frameId)
+        }
+        cleanupResize()
+        cleanupObserver()
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", scheduleUpdate)
+    }
+
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId)
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", scheduleUpdate)
+      }
+    }
+  }, [])
+
   const content = children ?? <Outlet />
+  const pageLayoutMode = React.isValidElement(content) ? content.props?.["data-page-layout"] : null
+  const useCustomLayout = pageLayoutMode === "dashboard"
 
   return (
     <SessionModalContext.Provider value={sessionModalContextValue}>
       <AccessibilityProvider>
-      <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden" dir="rtl">
+      <div ref={shellRef} className="flex min-h-screen bg-background text-foreground overflow-x-hidden" dir="rtl">
         <SkipLink />
         <DesktopNavigation navItems={navItems} onSignOut={handleSignOut} onOpenSessionModal={openSessionModal} />
 
         <div className="relative flex min-h-screen flex-1 flex-col pb-[88px] md:h-screen md:pb-0">
-          <header className="sticky top-0 z-20 border-b border-border bg-surface/80 px-sm py-sm backdrop-blur md:border-none md:bg-transparent md:px-md md:py-sm">
+          <header
+            ref={headerRef}
+            className="sticky top-0 z-20 border-b border-border bg-surface/80 px-sm py-sm backdrop-blur md:border-none md:bg-transparent md:px-md md:py-sm"
+          >
             <div className="flex items-center justify-between gap-xs">
               <div className="flex items-center gap-xs sm:gap-sm">
                 <OrgLogo />
@@ -381,15 +450,19 @@ export default function AppShell({ children }) {
           <OrgSelectionBanner />
           <OrgConfigBanner />
 
-          <main id="main-content" role="main" className="flex-1 overflow-y-auto overflow-x-hidden">
-            <PageLayout
-              fullHeight={false}
-              className="min-h-full pb-0"
-              contentClassName="pb-xl"
-              headerClassName="pb-sm"
-            >
-              {content}
-            </PageLayout>
+          <main id="main-content" role="main" className="flex-1 overflow-y-auto">
+            {useCustomLayout ? (
+              content
+            ) : (
+              <PageLayout
+                fullHeight={false}
+                className="min-h-full pb-0"
+                contentClassName="pb-xl"
+                headerClassName="pb-sm"
+              >
+                {content}
+              </PageLayout>
+            )}
           </main>
         </div>
         <MobileNavigation navItems={navItems} onOpenSessionModal={openSessionModal} />

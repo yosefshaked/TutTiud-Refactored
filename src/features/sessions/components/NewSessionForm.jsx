@@ -26,6 +26,7 @@ export default function NewSessionForm({
   canViewInactive = false,
   visibilityLoaded = false,
   initialStudentId = '',
+  initialDate = '', // YYYY-MM-DD format
   isLoadingStudents = false,
   onSubmit,
   onCancel,
@@ -38,7 +39,7 @@ export default function NewSessionForm({
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
   const [studentDayFilter, setStudentDayFilter] = useState(null);
-  const [sessionDate, setSessionDate] = useState('');
+  const [sessionDate, setSessionDate] = useState(initialDate || '');
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
   const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);

@@ -1,20 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 
-import PageLayout from "@/components/ui/PageLayout.jsx"
 import Card from "@/components/ui/CustomCard.jsx"
 import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
+import { ComplianceHeatmap } from "@/features/dashboard/components/ComplianceHeatmap.jsx"
 
 /**
  * Build greeting with proper fallback chain:
  * 1. Instructor name (from tenant DB Instructors table)
  * 2. Profile full_name (from control DB profiles table)
  * 3. Auth metadata display name (from Supabase Auth user_metadata)
- * 4. Email address
+ * 4. Email address 
  */
 function buildGreeting(instructorName, profileName, authName, email) {
   // Priority 1: Instructor name from tenant DB
@@ -153,43 +153,127 @@ export default function DashboardPage() {
   const greeting = buildGreeting(instructorName, profileName, user?.name, user?.email)
 
   return (
-    <PageLayout
-      title={greeting}
-      subtitle="מה תרצו לעשות כעת?"
-      className="space-y-xl"
+    <div
+      data-page-layout="dashboard"
+      className="min-h-full w-full bg-background text-neutral-900"
     >
-      <div className="grid grid-cols-1 gap-lg md:grid-cols-2">
-        <Link to={studentsLink} className="group focus-visible:outline-none">
-          <Card
-            className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
-          >
-            <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
-              {studentsTitle}
-            </h2>
-            <p className="mt-sm text-neutral-600">
-              {studentsDescription}
-            </p>
-          </Card>
-        </Link>
-
-        <button
-          type="button"
-          onClick={() => openSessionModal?.()}
-          className="group focus-visible:outline-none"
-          aria-label="פתיחת טופס רישום מפגש חדש"
+      {/* Mobile: stacked layout */}
+      <div className="xl:hidden">
+        <div
+          className="mx-auto flex w-full flex-col px-sm py-md sm:px-md sm:py-lg lg:px-xl"
+          style={{ maxWidth: "min(1280px, 100vw)" }}
         >
-          <Card
-            className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
-          >
-            <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
-              תיעוד מפגש חדש
-            </h2>
-            <p className="mt-sm text-neutral-600">
-              פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
-            </p>
-          </Card>
-        </button>
+          {/* Header */}
+          <header className="flex flex-col gap-sm pb-sm sm:flex-row sm:items-end sm:justify-between sm:pb-md">
+            <div className="space-y-xs">
+              <h1 className="text-xl font-semibold text-neutral-900 sm:text-title-lg">{greeting}</h1>
+              <p className="max-w-2xl text-sm text-neutral-600 sm:text-body-md">מה תרצו לעשות כעת?</p>
+            </div>
+          </header>
+
+          {/* Quick action cards */}
+          <div className="grid grid-cols-1 gap-lg pb-xl md:grid-cols-2">
+            <Link to={studentsLink} className="group focus-visible:outline-none">
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  {studentsTitle}
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  {studentsDescription}
+                </p>
+              </Card>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => openSessionModal?.()}
+              className="group focus-visible:outline-none"
+              aria-label="פתיחת טופס רישום מפגש חדש"
+            >
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  תיעוד מפגש חדש
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
+                </p>
+              </Card>
+            </button>
+          </div>
+
+          {/* Weekly compliance - mobile */}
+          {tenantClientReady && activeOrgHasConnection ? (
+          <ComplianceHeatmap orgId={activeOrgId} />
+          ) : (
+            <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+              <p className="text-sm text-muted-foreground">
+                לוח מעקב התיעודים השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+              </p>
+            </Card>
+          )}
+        </div>
       </div>
-    </PageLayout>
+
+      {/* Desktop xl+: simple centered layout */}
+      <div className="hidden xl:block">
+        <div
+          className="mx-auto flex w-full max-w-[1280px] flex-col gap-xl px-lg py-xl"
+        >
+          <header className="flex flex-col gap-sm sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-xs">
+              <h1 className="text-xl font-semibold text-neutral-900 sm:text-title-lg">{greeting}</h1>
+              <p className="max-w-2xl text-sm text-neutral-600 sm:text-body-md">מה תרצו לעשות כעת?</p>
+            </div>
+          </header>
+
+          <div className="grid grid-cols-2 gap-lg">
+            <Link to={studentsLink} className="group focus-visible:outline-none">
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  {studentsTitle}
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  {studentsDescription}
+                </p>
+              </Card>
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => openSessionModal?.()}
+              className="group focus-visible:outline-none"
+              aria-label="פתיחת טופס רישום מפגש חדש"
+            >
+              <Card
+                className="group h-full cursor-pointer rounded-2xl border border-border bg-surface p-lg text-right shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-primary/40"
+              >
+                <h2 className="text-2xl font-semibold text-foreground group-hover:text-primary">
+                  תיעוד מפגש חדש
+                </h2>
+                <p className="mt-sm text-neutral-600">
+                  פתיחת טופס התיעוד בדיוק כמו לחצן הפלוס המרכזי.
+                </p>
+              </Card>
+            </button>
+          </div>
+
+          {tenantClientReady && activeOrgHasConnection ? (
+          <ComplianceHeatmap orgId={activeOrgId} />
+          ) : (
+            <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
+              <p className="text-sm text-muted-foreground">
+                לוח מעקב התיעודים השבועי יהיה זמין לאחר יצירת חיבור למסד הנתונים של הארגון.
+              </p>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
