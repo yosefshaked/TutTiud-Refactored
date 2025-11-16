@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil, Download } from 'lucide-react';
+import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil, Download, FileUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import EditStudentModal from '@/features/admin/components/EditStudentModal.jsx';
 import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } from '@/features/students/utils/tags.js';
 import { exportStudentPdf, downloadPdfBlob } from '@/api/students-export.js';
+import LegacyImportModal from '@/features/students/components/LegacyImportModal.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -139,6 +140,8 @@ export default function StudentDetailPage() {
   const [tagsError, setTagsError] = useState('');
 
   const [instructors, setInstructors] = useState([]);
+
+  const [isLegacyModalOpen, setIsLegacyModalOpen] = useState(false);
 
   // Edit student modal state
   const [studentForEdit, setStudentForEdit] = useState(null);
@@ -373,6 +376,39 @@ export default function StudentDetailPage() {
 
   const backDestination = isAdminRole(membershipRole) ? '/admin/students' : '/my-students';
   const canEdit = isAdminRole(membershipRole);
+  const canManageLegacyImport = canEdit;
+  const canReuploadLegacy = permissions?.can_reupload_legacy_reports === true;
+
+  const hasLegacyImport = useMemo(() => {
+    return sessions.some((record) => record?.is_legacy === true);
+  }, [sessions]);
+
+  const legacyImportDisabled =
+    (!canReuploadLegacy && hasLegacyImport) ||
+    studentLoadError ||
+    isStudentLoading ||
+    isSessionsLoading ||
+    sessionsLoadError;
+
+  const legacyImportReason = !canReuploadLegacy && hasLegacyImport
+    ? 'בוצע כבר ייבוא דוחות היסטוריים עבור תלמיד זה. ניתן לאפשר ייבוא חוזר דרך הרשאת can_reupload_legacy_reports בארגון.'
+    : '';
+
+  const handleOpenLegacyModal = () => {
+    if (legacyImportDisabled) {
+      return;
+    }
+    setIsLegacyModalOpen(true);
+  };
+
+  const handleCloseLegacyModal = () => {
+    setIsLegacyModalOpen(false);
+  };
+
+  const handleLegacySubmit = async () => {
+    toast.info('ממשק הייבוא יחובר ל-API לאחר השלמת פיתוח צד השרת.');
+    setIsLegacyModalOpen(false);
+  };
 
   const handleOpenEdit = () => {
     if (student && canEdit) {
@@ -521,25 +557,8 @@ export default function StudentDetailPage() {
           <p className="text-xs text-neutral-600 sm:text-sm">סקירת הפרטים והמפגשים של {student?.name || 'תלמיד ללא שם'}.</p>
         </div>
         <div className="flex gap-2 self-start flex-wrap">
-        {canEdit ? (
-          <>
-            {permissions?.can_export_pdf_reports ? (
-              <Button
-                type="button"
-                className="self-start text-sm"
-                size="sm"
-                onClick={handleExportPdf}
-                disabled={studentLoadError || isStudentLoading || !student || isExporting || questionsState === REQUEST_STATE.loading}
-                variant="outline"
-              >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                <span className="ml-1">{isExporting ? 'מייצא...' : 'ייצוא ל-PDF'}</span>
-              </Button>
-            ) : (
+          {canManageLegacyImport ? (
+            legacyImportReason ? (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -547,41 +566,93 @@ export default function StudentDetailPage() {
                       type="button"
                       className="self-start text-sm"
                       size="sm"
-                      disabled
                       variant="outline"
+                      disabled
                     >
-                      <Download className="h-4 w-4" />
-                      <span className="ml-1">ייצוא ל-PDF (Premium)</span>
+                      <FileUp className="h-4 w-4" />
+                      <span className="ml-1">ייבוא דוחות היסטוריים</span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs">
-                    <p className="text-sm">ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו.</p>
+                  <TooltipContent side="bottom" className="max-w-xs text-right">
+                    <p className="text-sm leading-relaxed">{legacyImportReason}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )}
-            <Button
-              type="button"
-              className="self-start text-sm"
-              size="sm"
-              onClick={handleOpenEdit}
-              disabled={studentLoadError || isStudentLoading || !student}
-              variant="outline"
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="ml-1">עריכת תלמיד</span>
-            </Button>
-          </>
-        ) : null}
-        <Button
-          type="button"
-          className="self-start text-sm"
-          size="sm"
-          onClick={handleOpenSessionModal}
-          disabled={studentLoadError || isStudentLoading || !student}
-        >
-          תעד מפגש חדש
-        </Button>
+            ) : (
+              <Button
+                type="button"
+                className="self-start text-sm"
+                size="sm"
+                variant="outline"
+                onClick={handleOpenLegacyModal}
+                disabled={legacyImportDisabled}
+              >
+                <FileUp className="h-4 w-4" />
+                <span className="ml-1">ייבוא דוחות היסטוריים</span>
+              </Button>
+            )
+          ) : null}
+          {canEdit ? (
+            <>
+              {permissions?.can_export_pdf_reports ? (
+                <Button
+                  type="button"
+                  className="self-start text-sm"
+                  size="sm"
+                  onClick={handleExportPdf}
+                  disabled={studentLoadError || isStudentLoading || !student || isExporting || questionsState === REQUEST_STATE.loading}
+                  variant="outline"
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  <span className="ml-1">{isExporting ? 'מייצא...' : 'ייצוא ל-PDF'}</span>
+                </Button>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        className="self-start text-sm"
+                        size="sm"
+                        disabled
+                        variant="outline"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span className="ml-1">ייצוא ל-PDF (Premium)</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="text-sm">ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <Button
+                type="button"
+                className="self-start text-sm"
+                size="sm"
+                onClick={handleOpenEdit}
+                disabled={studentLoadError || isStudentLoading || !student}
+                variant="outline"
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="ml-1">עריכת תלמיד</span>
+              </Button>
+            </>
+          ) : null}
+          <Button
+            type="button"
+            className="self-start text-sm"
+            size="sm"
+            onClick={handleOpenSessionModal}
+            disabled={studentLoadError || isStudentLoading || !student}
+          >
+            תעד מפגש חדש
+          </Button>
         </div>
       </div>
 
@@ -805,6 +876,15 @@ export default function StudentDetailPage() {
       onSubmit={handleUpdateStudent}
       isSubmitting={isUpdatingStudent}
       error={updateError}
+    />
+    <LegacyImportModal
+      open={isLegacyModalOpen}
+      onClose={handleCloseLegacyModal}
+      studentName={student?.name}
+      questions={questions}
+      canReupload={canReuploadLegacy}
+      hasLegacyImport={hasLegacyImport}
+      onSubmit={handleLegacySubmit}
     />
     </>
   );

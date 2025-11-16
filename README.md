@@ -40,6 +40,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - **Org context** (`src/org/OrgContext.jsx`) stores the encrypted dedicated key timestamp (`dedicated_key_saved_at`) and still toggles `setup_completed` after verification, complementing the server-side persistence added to `/api/save-org-credentials`.
 - **Runtime verification helpers** (`src/runtime/verification.js`) expose `verifyOrgConnection({ dataClient })` which runs `tuttiud.setup_assistant_diagnostics()` and returns the diagnostic rows for custom UI messaging.
 - Feature modules (students, instructors, sessions) must load data exclusively through secure `/api/*` endpoints. The frontend never uses the dedicated JWT directly.
+- **Legacy import workflow (Phase 2 UI):** Admin/Owner users see an "ייבוא דוחות היסטוריים" button on `StudentDetailPage`. The dialog enforces a backup warning, asks whether the CSV matches the current session questionnaire, and renders either dropdown-based mappings against `session_form_config` or custom text fields with a required session-date column. If a legacy import already exists and `can_reupload_legacy_reports` is false, the entry point is disabled.
 
 ## 🎨 Design system foundations
 
@@ -62,6 +63,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 
 - English & Hebrew project docs live in [`ProjectDoc/Eng.md`](ProjectDoc/Eng.md) and [`ProjectDoc/Heb.md`](ProjectDoc/Heb.md). Update both together.
 - Any onboarding or AI-related insights belong in [`AGENTS.md`](AGENTS.md).
+- Legacy import progress is tracked in [`FEATURE_PROGRESS.md`](FEATURE_PROGRESS.md) at the project root.
 
 ## 🛠 Local development
 
