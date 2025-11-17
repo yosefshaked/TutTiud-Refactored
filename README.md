@@ -42,6 +42,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - Feature modules (students, instructors, sessions) must load data exclusively through secure `/api/*` endpoints. The frontend never uses the dedicated JWT directly.
 - **Legacy import workflow (Phase 2 UI):** Admin/Owner users see an "ייבוא דוחות היסטוריים" button on `StudentDetailPage`. The dialog enforces a backup warning, asks whether the CSV matches the current session questionnaire, and renders either dropdown-based mappings against `session_form_config` or custom text fields with a required session-date column. If a legacy import already exists and `can_reupload_legacy_reports` is false, the entry point is disabled.
 - **Legacy import backend:** `/api/students/{id}/legacy-import` is now available for admins/owners. It checks `can_reupload_legacy_reports`, clears prior `is_legacy` rows when allowed, and ingests CSV text (`csv_text` + mapping payload) to create new `SessionRecords` flagged as legacy.
+- **Legacy display logic:** Session renderers now branch on `is_legacy`, mapping structured answers through `session_form_config` for standard records and using raw column names for legacy imports. This applies to the student profile history, dashboard day detail view, and PDF export.
 
 ## 🎨 Design system foundations
 

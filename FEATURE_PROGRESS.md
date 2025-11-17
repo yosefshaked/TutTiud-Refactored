@@ -41,5 +41,5 @@ This feature will introduce a new CSV import workflow that allows an admin to up
 *   [x] After deletion, it will proceed to parse the new CSV file and create the new rows in the `SessionRecords` table, each with `is_legacy` set to `true`.
 
 **5. Universal Display Logic for Legacy Records:**
-*   [ ] The application's rendering logic for session records must be updated to handle the two possible data structures within the `content` (JSONB) column, based on the `is_legacy` flag.
-*   [ ] **The user-facing outcome is the key requirement:** a legacy session record must be displayed correctly, with its custom question names, in **every single place** a user can view session records.
+*   [x] The application's rendering logic for session records must be updated to handle the two possible data structures within the `content` (JSONB) column, based on the `is_legacy` flag.
+*   [x] **The user-facing outcome is the key requirement:** a legacy session record must be displayed correctly, with its custom question names, in **every single place** a user can view session records.

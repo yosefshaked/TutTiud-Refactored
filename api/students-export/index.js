@@ -77,33 +77,43 @@ function extractQuestionLabelRaw(entry) {
   return '';
 }
 
-function buildAnswerList(content, questions) {
+function buildAnswerList(content, questions, { isLegacy = false } = {}) {
   const answers = parseSessionContent(content);
   const entries = [];
   const seenKeys = new Set();
 
-  // Create a lookup map for questions by ID, key, and label (including slugged variants)
-  const questionMap = new Map();
-  for (const question of questions) {
-    const qLabel = extractQuestionLabelRaw(question);
-    const qId = typeof question.id === 'string' ? question.id : '';
-    const qKey = typeof question.key === 'string' ? question.key : '';
-
-    if (qLabel) {
-      questionMap.set(qLabel, qLabel);
-      questionMap.set(toKey(qLabel), qLabel);
-    }
-    if (qId) {
-      questionMap.set(qId, qLabel || qId);
-      questionMap.set(toKey(qId), qLabel || qId);
-    }
-    if (qKey) {
-      questionMap.set(qKey, qLabel || qKey);
-      questionMap.set(toKey(qKey), qLabel || qKey);
-    }
-  }
-
   if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
+    if (isLegacy) {
+      for (const [answerKey, answerValue] of Object.entries(answers)) {
+        if (answerValue === undefined || answerValue === null || answerValue === '') {
+          continue;
+        }
+        entries.push({ label: String(answerKey), value: String(answerValue) });
+      }
+      return entries;
+    }
+
+    // Create a lookup map for questions by ID, key, and label (including slugged variants)
+    const questionMap = new Map();
+    for (const question of questions) {
+      const qLabel = extractQuestionLabelRaw(question);
+      const qId = typeof question.id === 'string' ? question.id : '';
+      const qKey = typeof question.key === 'string' ? question.key : '';
+
+      if (qLabel) {
+        questionMap.set(qLabel, qLabel);
+        questionMap.set(toKey(qLabel), qLabel);
+      }
+      if (qId) {
+        questionMap.set(qId, qLabel || qId);
+        questionMap.set(toKey(qId), qLabel || qId);
+      }
+      if (qKey) {
+        questionMap.set(qKey, qLabel || qKey);
+        questionMap.set(toKey(qKey), qLabel || qKey);
+      }
+    }
+
     // Process all answers and look up their labels from the question map
     for (const [answerKey, answerValue] of Object.entries(answers)) {
       if (answerValue === undefined || answerValue === null || answerValue === '') {
@@ -111,7 +121,7 @@ function buildAnswerList(content, questions) {
       }
       const rawKey = String(answerKey);
       // Try to find the human-readable label for this answer
-      let label = questionMap.get(rawKey) || questionMap.get(toKey(rawKey)) || rawKey;
+      const label = questionMap.get(rawKey) || questionMap.get(toKey(rawKey)) || rawKey;
 
       if (!seenKeys.has(rawKey)) {
         entries.push({ label, value: String(answerValue) });
@@ -184,7 +194,7 @@ function generatePdfHtml(student, sessions, formConfig, logoUrl, customLogoUrl) 
     // Get questions for this specific session's form version (using shared utility)
     const questions = extractQuestionsForVersion(formConfig, formVersion);
     
-  const answers = buildAnswerList(session.content, questions);
+  const answers = buildAnswerList(session.content, questions, { isLegacy: Boolean(session?.is_legacy) });
     const answersHtml = answers.length ? answers.map(entry => `
       <div class="answer-item">
         <div class="answer-label">${escapeHtml(entry.label)}</div>

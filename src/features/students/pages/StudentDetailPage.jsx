@@ -76,36 +76,76 @@ function formatSessionDate(value) {
   return value;
 }
 
-function buildAnswerList(content, questions) {
+function extractQuestionLabelRaw(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  if (typeof entry.label === 'string' && entry.label.trim()) return entry.label.trim();
+  if (typeof entry.title === 'string' && entry.title.trim()) return entry.title.trim();
+  if (typeof entry.question === 'string' && entry.question.trim()) return entry.question.trim();
+  return '';
+}
+
+function toKey(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const str = String(value);
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9א-ת]+/gi, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function buildAnswerList(content, questions, { isLegacy = false } = {}) {
   const answers = parseSessionContent(content);
   const entries = [];
   const seenKeys = new Set();
 
   if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
-    for (const question of questions) {
-      const key = question.key;
-      const label = question.label;
-      let value = answers[key];
-      if (value === undefined && typeof answers[label] !== 'undefined') {
-        value = answers[label];
+    if (isLegacy) {
+      for (const [rawKey, rawValue] of Object.entries(answers)) {
+        if (rawValue === undefined || rawValue === null || rawValue === '') {
+          continue;
+        }
+        const label = String(rawKey);
+        entries.push({ label, value: String(rawValue) });
       }
-      if (value === undefined || value === null || value === '') {
-        continue;
-      }
-      entries.push({ label, value: String(value) });
-      seenKeys.add(key);
-      seenKeys.add(label);
+      return entries;
     }
 
-    for (const [rawKey, rawValue] of Object.entries(answers)) {
-      if (rawValue === undefined || rawValue === null || rawValue === '') {
+    const questionMap = new Map();
+    for (const question of questions) {
+      const qLabel = extractQuestionLabelRaw(question);
+      const qId = typeof question.id === 'string' ? question.id : '';
+      const qKey = typeof question.key === 'string' ? question.key : '';
+
+      if (qLabel) {
+        questionMap.set(qLabel, qLabel);
+        questionMap.set(toKey(qLabel), qLabel);
+      }
+      if (qId) {
+        questionMap.set(qId, qLabel || qId);
+        questionMap.set(toKey(qId), qLabel || qId);
+      }
+      if (qKey) {
+        questionMap.set(qKey, qLabel || qKey);
+        questionMap.set(toKey(qKey), qLabel || qKey);
+      }
+    }
+
+    for (const [answerKey, answerValue] of Object.entries(answers)) {
+      if (answerValue === undefined || answerValue === null || answerValue === '') {
         continue;
       }
-      const normalizedKey = String(rawKey);
-      if (seenKeys.has(normalizedKey)) {
+      const rawKey = String(answerKey);
+      if (seenKeys.has(rawKey)) {
         continue;
       }
-      entries.push({ label: normalizedKey, value: String(rawValue) });
+
+      const label = questionMap.get(rawKey) || questionMap.get(toKey(rawKey)) || rawKey;
+      entries.push({ label, value: String(answerValue) });
+      seenKeys.add(rawKey);
     }
   } else if (typeof answers === 'string' && answers.trim()) {
     entries.push({ label: 'תוכן המפגש', value: answers.trim() });
@@ -859,7 +899,9 @@ export default function StudentDetailPage() {
                 }
               }
               
-              const answers = buildAnswerList(record.content, versionedQuestions);
+              const answers = buildAnswerList(record.content, versionedQuestions, {
+                isLegacy: Boolean(record?.is_legacy),
+              });
               const key = record.id || record.date;
               const isOpen = Boolean(expandedById[key]);
               return (
