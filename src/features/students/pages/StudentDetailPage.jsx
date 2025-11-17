@@ -529,25 +529,96 @@ export default function StudentDetailPage() {
       setIsLegacyModalOpen(false);
       await loadSessions();
     } catch (error) {
-      const rowDetail = error?.data?.row ? ` (שורה ${error.data.row})` : '';
-      const apiMessage = error?.data?.message || error?.message;
       const friendlyDateHint =
         'ודאו שתאריך המפגש כתוב כ-YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY או כמספר תאריך של Excel.';
+      const apiMessage = error?.data?.message || error?.message;
+      const rowDetail = error?.data?.row ? ` (שורה ${error.data.row})` : '';
 
-      let message = apiMessage || 'ייבוא הדוח נכשל. נסו שוב.';
+      let message = 'ייבוא הדוח נכשל. נסו שוב.';
 
-      if (apiMessage === 'invalid_session_date') {
-        message = `תאריך מפגש לא תקין${rowDetail}. ${friendlyDateHint}`;
-      } else if (apiMessage === 'missing_service_column' || apiMessage === 'service_column_not_found') {
-        message = 'בחרו עמודת שירות מתוך הכותרות שהועלו.';
-      } else if (apiMessage === 'invalid_service_context') {
-        message = `ערך שירות לא תקין${rowDetail}. ודאו שהשדה מכיל טקסט קריא או השאירו אותו ריק כדי לשמור ללא שירות.`;
-      } else if (apiMessage === 'invalid_service_strategy') {
-        message = 'בחרו האם ליישם שירות אחד קבוע או למפות שירות מתוך הקובץ.';
+      switch (apiMessage) {
+        case 'server_misconfigured':
+          message = 'שרת הייבוא לא הוגדר כראוי. נסו שוב או פנו לתמיכה.';
+          break;
+        case 'missing bearer':
+        case 'invalid or expired token':
+          message = 'פג תוקף ההתחברות. התחברו מחדש ונסו שוב.';
+          break;
+        case 'invalid org id':
+          message = 'מזהה הארגון לא תקין. רעננו את הדף ונסו שוב.';
+          break;
+        case 'invalid student id':
+          message = 'מזהה התלמיד לא תקין. חזרו לרשימת התלמידים ונסו שוב.';
+          break;
+        case 'failed_to_verify_membership':
+          message = 'אימות ההרשאות נכשל. ודאו שיש לכם גישה כמתאימים לארגון זה.';
+          break;
+        case 'forbidden':
+          message = 'אין לכם הרשאה לייבא דוחות היסטוריים בארגון זה.';
+          break;
+        case 'failed_to_load_settings':
+          message = 'טעינת הגדרות הארגון נכשלה. נסו לרענן את הדף.';
+          break;
+        case 'failed_to_load_student':
+          message = 'טעינת פרטי התלמיד נכשלה. נסו לרענן את הדף.';
+          break;
+        case 'student_not_found':
+          message = 'התלמיד לא נמצא. חזרו לרשימה ונסו שוב.';
+          break;
+        case 'student_missing_instructor':
+          message = 'לא הוקצה מדריך לתלמיד. עדכנו מדריך משובץ לפני ייבוא הדוחות.';
+          break;
+        case 'failed_to_check_legacy_records':
+          message = 'בדיקת ייבוא היסטורי קודם נכשלה. נסו שוב.';
+          break;
+        case 'legacy_import_already_exists':
+          message = 'בוצע כבר ייבוא דוחות היסטוריים לתלמיד זה. ניתן לאפשר ייבוא חוזר בהרשאת can_reupload_legacy_reports.';
+          break;
+        case 'invalid_structure_choice':
+          message = 'בחרו האם מבנה ה-CSV תואם את השאלון או אם תרצו להזין כותרות מותאמות.';
+          break;
+        case 'missing_session_date_column':
+        case 'session_date_column_not_found':
+          message = 'בחרו עמודת תאריך מפגש מתוך כותרות הקובץ.';
+          break;
+        case 'invalid_session_date':
+          message = `תאריך מפגש לא תקין${rowDetail}. ${friendlyDateHint}`;
+          break;
+        case 'invalid_service_strategy':
+          message = 'בחרו האם ליישם שירות אחד קבוע או למפות שירות מתוך עמודה בקובץ.';
+          break;
+        case 'missing_service_column':
+        case 'service_column_not_found':
+          message = 'בחרו עמודת שירות מתוך כותרות הקובץ.';
+          break;
+        case 'invalid_service_context':
+          message = `ערך שירות לא תקין${rowDetail}. ודאו שהשדה מכיל טקסט קריא או השאירו אותו ריק כדי לשמור ללא שירות.`;
+          break;
+        case 'missing_csv':
+        case 'empty_csv':
+          message = 'קובץ ה-CSV חסר או ריק. העלו קובץ עם כותרות ושורות נתונים.';
+          break;
+        case 'no_rows_to_import':
+          message = 'לא נמצאו שורות לייבוא לאחר המיפוי. ודאו שהעמודות כוללות נתונים.';
+          break;
+        case 'failed_to_clear_legacy_records':
+          message = 'מחיקת הדוחות ההיסטוריים הישנים נכשלה. נסו שוב.';
+          break;
+        case 'failed_to_insert_legacy_records':
+          message = 'שמירת הדוחות ההיסטוריים החדשים נכשלה. נסו שוב.';
+          break;
+        default: {
+          if (apiMessage && apiMessage !== 'Error') {
+            message = `ייבוא הדוח נכשל: ${apiMessage}`;
+          }
+        }
       }
 
       toast.error(message);
-      throw error;
+      const forwardedError = new Error(message);
+      forwardedError.data = error?.data;
+      forwardedError.status = error?.status;
+      throw forwardedError;
     }
   };
 
