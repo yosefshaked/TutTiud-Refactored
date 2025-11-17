@@ -181,6 +181,16 @@ INSERT INTO public.permission_registry (
     'false'::jsonb,
     'branding',
     true
+  ),
+  (
+    'can_reupload_legacy_reports',
+    'Re-upload Legacy Session Reports',
+    'העלאה חוזרת של דוחות עבר',
+    'Allow organization admins/owners to upload legacy session records for a student more than once (subsequent uploads replace previous legacy data).',
+    'מאפשר למנהלי ובעלי הארגון להעלות מחדש נתוני מפגשי עבר לתלמיד יותר מפעם אחת (העלאה חדשה מחליפה נתונים קודמים).',
+    'false'::jsonb,
+    'features',
+    true
   )
 ON CONFLICT (permission_key) DO UPDATE SET
   display_name_en = EXCLUDED.display_name_en,

@@ -39,6 +39,7 @@ Centralized permissions management system using a control DB table as the source
 | `backup_cooldown_override` | backup | false | One-time 7-day cooldown bypass (auto-resets) |
 | `backup_oauth_enabled` | backup | false | Cloud backup to Google Drive/OneDrive/Dropbox |
 | `logo_enabled` | branding | false | Custom logo upload |
+| `can_reupload_legacy_reports` | features | false | Allow admins/owners to import legacy session records multiple times (new uploads replace previous legacy data) |
 
 ## Usage
 

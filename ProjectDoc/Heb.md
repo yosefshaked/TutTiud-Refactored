@@ -39,7 +39,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | :--- | :---- | :------------- |
 | `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK ששומר את `auth.users.id` ומנוהל ברמת האפליקציה), `name`, פרטי קשר, `is_active`, `metadata` (כולל `instructor_color` עבור צבע קבוע וייחודי) |
 | `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `is_active` (boolean, ברירת מחדל `true`), `tags`, `notes`, `metadata` |
-| `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, חותמות זמן, `metadata` |
+| `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, `is_legacy` (מסמן שורות עבר שיובאו), חותמות זמן, `metadata` |
 | `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` |
 
 אינדקסים תומכים:
@@ -83,6 +83,13 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - **תזמון סטטוס הציות השבועי:** נקודת הקצה `/api/weekly-compliance` מסמנת מפגשים ללא תיעוד שתוזמנו לאותו היום כ-`missing` כבר מחצות (UTC). רק מפגשים עתידיים נשארים כ-`upcoming`, כך שהעמודה של היום מציגה מיד אם התיעוד הושלם גם לפני שעת המפגש.
 - **תזמון סטטוס הציות היומי:** נקודת הקצה `/api/daily-compliance` מאמצת את אותו כלל. מפגשים ללא תיעוד עם `isoDate` הקטן או שווה לתאריך של היום (UTC) מסומנים כ-`missing`, כך שהטיימליין היומי נשאר מסונכרן עם מפת החום ומונע מפערים של אותו היום להופיע כ-`upcoming`.
+
+- **רישום הרשאות:** טבלת השליטה כוללת כעת `can_reupload_legacy_reports` (ברירת מחדל `false`) כדי לשלוט ביכולת לבצע העלאות חוזרות של נתוני עבר.
+- **ממשק ייבוא דוחות היסטוריים (פרטי תלמיד):** משתמשי Admin/Owner רואים כפתור "ייבוא דוחות היסטוריים" בדף התלמיד. הכפתור מנוטרל אם כבר בוצע ייבוא Legacy אלא אם הופעלה ההרשאה `can_reupload_legacy_reports`. המודל פותח באזהרת גיבוי, שואל האם מבנה ה-CSV תואם את טופס השאלון הנוכחי, ומציג ממשק מיפוי מתאים (תפריטי שאלות מול `session_form_config` או שמות מותאמים) עם בחירת עמודת תאריך חובה ואזהרת החלפה בעת העלאה חוזרת. בנוסף, המשתמש בוחר שיוך שירות: שירות אחיד לכל השורות (או ללא שירות) או עמודת שירות מתוך קובץ ה-CSV.
+- **צד שרת לייבוא Legacy (`POST /api/students/{id}/legacy-import`):** נקודה למנהלים/בעלי ארגון בלבד שבודקת את `can_reupload_legacy_reports` לפני שמאפשרת החלפה. כשמתאפשר ייבוא המערכת מוחקת רשומות `is_legacy` קיימות לתלמיד, קוראת את ה-CSV שנשלח (גוף JSON עם `csv_text`, `structure_choice`, `session_date_column` ו-`column_mappings` או `custom_labels`) ומכניסה רשומות `SessionRecords` חדשות עם `is_legacy=true`. ניתן להעביר `service_strategy=fixed` עם `service_context_value` ליישום שירות אחיד או `service_strategy=column` עם `service_context_column` כדי למפות שירות לפי שורה; ערכים ריקים נשמרים ללא שירות.
+- **שיוך ומטא־דאטה בייבוא Legacy:** הרשומות המיובאות מקבלות מטא־דאטה כמו דיווח רגיל: `metadata` תמיד שומר `created_by`, `created_role` ו-`source='legacy_import'`. כאשר מבנה ה-CSV תואם לטופס הנוכחי נרשם גם `form_version`; בזרימת מבנה מותאם אישית השדה לא נכתב כדי לא לרמוז על התאמה לסכימה. כל שורה כותבת `instructor_id` מהמדריך המשויך לתלמיד. ייבוא נכשל עם `student_missing_instructor` אם אין לתלמיד מדריך משויך.
+- **לוגיקת הצגה של ייבוא Legacy:** בכל הצגת היסטוריית מפגשים נבדק `is_legacy`. רשומות רגילות מתרגמות את מפתחי התשובות לשמות השאלות מתוך `session_form_config` (כולל גרסאות), בעוד שרשומות Legacy מציגות את שמות העמודות כפי שהועלו. המימוש המשותף מכסה את היסטוריית התלמיד, תצוגת היום בלוח הבקרה וייצוא ה-PDF.
+- **נרמול תאריכים לייבוא Legacy:** המערכת מקבלת תאריכים נפוצים (`YYYY-MM-DD`, `DD/MM/YYYY`, `DD.MM.YYYY`) וגם מספרי תאריך של Excel וממירה אותם ל-ISO לפני השמירה.
 
 > **אמצעי הגנה על הסכימה:** ‎`/api/settings` מריץ כעת את `tuttiud.setup_assistant_diagnostics()` בכל פעם ש-Supabase מדווח על טבלאות חסרות או הרשאות חסרות. פערים בסכימה או במדיניות מוחזרים כ-HTTP ‎424 עם ‎`settings_schema_incomplete` / `settings_schema_unverified` וכוללים את שורות הדיאגנוסטיקה כדי שהאדמין יריץ מחדש את הסקריפט לפני ניסיון נוסף.
 
