@@ -468,7 +468,7 @@ export default function StudentDetailPage() {
     sessionsLoadError;
 
   const legacyImportReason = !canReuploadLegacy && hasLegacyImport
-    ? 'בוצע כבר ייבוא דוחות היסטוריים עבור תלמיד זה. ניתן לאפשר ייבוא חוזר דרך הרשאת can_reupload_legacy_reports בארגון.'
+    ? 'ייבוא דוחות היסטוריים מתאפשר פעם אחת בלבד. ייבוא חוזר הוא תכונת פרימיום וניתן להפעיל אותה בהרשאת can_reupload_legacy_reports בארגון.'
     : '';
 
   const handleOpenLegacyModal = () => {
