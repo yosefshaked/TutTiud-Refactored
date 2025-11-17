@@ -13,6 +13,7 @@ import {
   UUID_PATTERN,
 } from '../_shared/org-bff.js';
 import { coerceOptionalText, parseJsonBodyWithLimit } from '../_shared/validation.js';
+import { buildSessionMetadata } from '../_shared/session-metadata.js';
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
@@ -328,7 +329,7 @@ export default async function legacyImport(context, req) {
 
   const { data: studentRecord, error: studentError } = await tenantClient
     .from('Students')
-    .select('id')
+    .select('id, assigned_instructor_id')
     .eq('id', studentId)
     .maybeSingle();
 
@@ -339,6 +340,11 @@ export default async function legacyImport(context, req) {
 
   if (!studentRecord) {
     return respond(context, 404, { message: 'student_not_found' });
+  }
+
+  const assignedInstructorId = normalizeString(studentRecord.assigned_instructor_id);
+  if (!assignedInstructorId) {
+    return respond(context, 400, { message: 'student_missing_instructor' });
   }
 
   const { count: legacyCount, error: legacyCheckError } = await tenantClient
@@ -426,6 +432,14 @@ export default async function legacyImport(context, req) {
   const columnMappings = isMatchFlow ? parseColumnMappings(body?.column_mappings) : {};
   const customLabels = isCustomFlow ? parseColumnMappings(body?.custom_labels) : {};
 
+  const { metadata } = await buildSessionMetadata({
+    tenantClient,
+    userId,
+    role,
+    source: 'legacy_import',
+    logger: context.log,
+  });
+
   const records = [];
   for (let index = 0; index < parsedCsv.rows.length; index += 1) {
     const row = parsedCsv.rows[index];
@@ -483,11 +497,12 @@ export default async function legacyImport(context, req) {
 
     records.push({
       student_id: studentId,
+      instructor_id: assignedInstructorId,
       date: normalizedDate,
       content: Object.keys(content).length ? content : null,
       is_legacy: true,
       service_context: serviceContext,
-      metadata: { source: 'legacy_import' },
+      metadata,
     });
   }
 

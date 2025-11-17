@@ -10,6 +10,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { parseJsonBodyWithLimit, validateSessionWrite } from '../_shared/validation.js';
+import { buildSessionMetadata } from '../_shared/session-metadata.js';
 
 const MAX_BODY_BYTES = 128 * 1024; // observe-only for now
 
@@ -18,72 +19,6 @@ const MAX_BODY_BYTES = 128 * 1024; // observe-only for now
 function isMemberRole(role) {
   const normalized = normalizeString(role).toLowerCase();
   return normalized === 'member';
-}
-
-function extractSessionFormVersion(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  let payload = value;
-  if (typeof payload === 'string') {
-    const trimmed = payload.trim();
-    if (!trimmed) {
-      return null;
-    }
-    try {
-      payload = JSON.parse(trimmed);
-    } catch {
-      return null;
-    }
-  }
-
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return null;
-  }
-
-  // Check nested structure first (current format): payload.current.version
-  let candidate = null;
-  if (payload.current && typeof payload.current === 'object' && !Array.isArray(payload.current)) {
-    if (Object.prototype.hasOwnProperty.call(payload.current, 'version')) {
-      candidate = payload.current.version;
-    }
-  }
-
-  // Fall back to legacy format: payload.version
-  if (candidate === null || candidate === undefined) {
-    if (Object.prototype.hasOwnProperty.call(payload, 'version')) {
-      candidate = payload.version;
-    }
-  }
-
-  if (candidate === null || candidate === undefined) {
-    return null;
-  }
-
-  const numeric = typeof candidate === 'number'
-    ? candidate
-    : Number.parseInt(String(candidate).trim(), 10);
-
-  if (Number.isInteger(numeric) && numeric >= 0) {
-    return numeric;
-  }
-
-  return null;
-}
-
-async function resolveSessionFormVersion(tenantClient) {
-  const { data, error } = await tenantClient
-    .from('Settings')
-    .select('settings_value')
-    .eq('key', 'session_form_config')
-    .maybeSingle();
-
-  if (error) {
-    return { error };
-  }
-
-  return { version: extractSessionFormVersion(data?.settings_value) };
 }
 
 export default async function (context, req) {
@@ -213,26 +148,12 @@ export default async function (context, req) {
     return respond(context, 400, { message: 'student_missing_instructor' });
   }
 
-  const formVersionResult = await resolveSessionFormVersion(tenantClient);
-  if (formVersionResult.error) {
-    context.log?.error?.('sessions failed to resolve form version', {
-      message: formVersionResult.error.message,
-    });
-  }
-
-  const metadataPayload = {};
-  if (formVersionResult.version !== null) {
-    metadataPayload.form_version = formVersionResult.version;
-  }
-  if (normalizedUserId) {
-    metadataPayload.created_by = normalizedUserId;
-  }
-  const normalizedRole = normalizeString(role);
-  if (normalizedRole) {
-    metadataPayload.created_role = normalizedRole.toLowerCase();
-  }
-
-  const metadata = Object.keys(metadataPayload).length ? metadataPayload : null;
+  const { metadata } = await buildSessionMetadata({
+    tenantClient,
+    userId: normalizedUserId,
+    role,
+    logger: context.log,
+  });
 
   const { data, error } = await tenantClient
     .from('SessionRecords')
