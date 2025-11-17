@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { FileSpreadsheet, ShieldAlert, Upload, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, ShieldAlert, Upload, ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 
 const STEPS = Object.freeze({
   warning: 'warning',
@@ -45,6 +45,10 @@ export default function LegacyImportModal({
   questions,
   canReupload,
   hasLegacyImport,
+  services = [],
+  servicesLoading = false,
+  servicesError = '',
+  onReloadServices,
   onSubmit,
 }) {
   const navigate = useNavigate();
@@ -56,11 +60,34 @@ export default function LegacyImportModal({
   const [sessionDateColumn, setSessionDateColumn] = useState('');
   const [columnMappings, setColumnMappings] = useState({});
   const [customLabels, setCustomLabels] = useState({});
+  const [serviceMode, setServiceMode] = useState('fixed');
+  const [selectedService, setSelectedService] = useState('');
+  const [customService, setCustomService] = useState('');
+  const [serviceColumn, setServiceColumn] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
 
   const questionOptions = useMemo(() => buildQuestionOptions(questions), [questions]);
+  const serviceOptions = useMemo(() => {
+    if (!Array.isArray(services)) {
+      return [];
+    }
+    const unique = new Set();
+    const options = [];
+    services.forEach((service) => {
+      if (typeof service !== 'string') {
+        return;
+      }
+      const trimmed = service.trim();
+      if (!trimmed || unique.has(trimmed)) {
+        return;
+      }
+      unique.add(trimmed);
+      options.push(trimmed);
+    });
+    return options;
+  }, [services]);
   const isMatchFlow = structureChoice === 'match';
   const hasColumns = csvColumns.length > 0;
   const hasDateSelection = Boolean(sessionDateColumn);
@@ -72,7 +99,34 @@ export default function LegacyImportModal({
     return Object.values(customLabels).some((value) => typeof value === 'string' && value.trim());
   }, [isMatchFlow, columnMappings, customLabels]);
 
-  const canAdvanceFromMapping = hasColumns && hasDateSelection && hasMappings;
+  const serviceSelectionValid = useMemo(() => {
+    if (!hasColumns) {
+      return false;
+    }
+
+    if (serviceMode === 'column') {
+      return Boolean(serviceColumn) && csvColumns.includes(serviceColumn);
+    }
+
+    const typed = customService.trim();
+    if (typed) {
+      return true;
+    }
+
+    return Boolean(selectedService);
+  }, [hasColumns, serviceMode, serviceColumn, csvColumns, selectedService, customService]);
+
+  const effectiveServiceValue = useMemo(() => {
+    if (customService.trim()) {
+      return customService.trim();
+    }
+    if (selectedService === '__none__') {
+      return '';
+    }
+    return selectedService;
+  }, [customService, selectedService]);
+
+  const canAdvanceFromMapping = hasColumns && hasDateSelection && hasMappings && serviceSelectionValid;
 
   useEffect(() => {
     if (!open) {
@@ -84,6 +138,10 @@ export default function LegacyImportModal({
       setSessionDateColumn('');
       setColumnMappings({});
       setCustomLabels({});
+      setServiceMode('fixed');
+      setSelectedService('');
+      setCustomService('');
+      setServiceColumn('');
       setIsSubmitting(false);
       setSubmitError('');
       setSelectedFile(null);
@@ -95,8 +153,24 @@ export default function LegacyImportModal({
       setSessionDateColumn('');
       setColumnMappings({});
       setCustomLabels({});
+      setServiceColumn('');
     }
   }, [hasColumns]);
+
+  useEffect(() => {
+    if (serviceMode === 'column') {
+      setSelectedService('');
+      setCustomService('');
+    } else {
+      setServiceColumn('');
+    }
+  }, [serviceMode]);
+
+  useEffect(() => {
+    if (serviceMode === 'fixed' && !selectedService && !customService && serviceOptions.length === 0) {
+      setSelectedService('__none__');
+    }
+  }, [serviceMode, selectedService, customService, serviceOptions.length]);
 
   const handleNavigateToBackup = () => {
     navigate('/settings#backup');
@@ -114,6 +188,10 @@ export default function LegacyImportModal({
     setSessionDateColumn('');
     setColumnMappings({});
     setCustomLabels({});
+    setServiceMode('fixed');
+    setSelectedService('');
+    setCustomService('');
+    setServiceColumn('');
 
     if (!file) {
       return;
@@ -189,6 +267,9 @@ export default function LegacyImportModal({
         sessionDateColumn,
         columnMappings,
         customLabels,
+        serviceMode,
+        serviceValue: effectiveServiceValue,
+        serviceColumn,
       });
     } catch (error) {
       const message = error?.message || 'ייבוא הדוח נכשל. נסו שוב.';
@@ -336,6 +417,123 @@ export default function LegacyImportModal({
     </div>
   );
 
+  const renderServiceSelection = () => (
+    <div className="space-y-3 rounded-md bg-neutral-50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h4 className="text-sm font-semibold text-foreground">שיוך שירות למפגשים</h4>
+          <p className="text-xs text-neutral-600">
+            בחרו אם כל השורות יקבלו אותו שירות או אם יש עמודה בקובץ שמגדירה שירות לכל מפגש.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {servicesLoading ? <Loader2 className="h-4 w-4 animate-spin text-neutral-500" aria-hidden="true" /> : null}
+          {onReloadServices ? (
+            <Button type="button" size="sm" variant="ghost" onClick={onReloadServices} disabled={servicesLoading}>
+              רענון
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      {servicesError ? (
+        <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
+          <AlertTitle className="text-sm font-semibold">שגיאת טעינת שירותים</AlertTitle>
+          <AlertDescription className="text-sm">{servicesError}</AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Button
+          type="button"
+          variant={serviceMode === 'fixed' ? 'secondary' : 'outline'}
+          className="justify-between"
+          onClick={() => setServiceMode('fixed')}
+        >
+          <div className="flex flex-col items-start text-right">
+            <span className="font-semibold">שירות אחיד לכל השורות</span>
+            <span className="text-xs text-neutral-600">בחרו שירות אחד או הקלידו שם שירות מותאם</span>
+          </div>
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant={serviceMode === 'column' ? 'secondary' : 'outline'}
+          className="justify-between"
+          disabled={!hasColumns}
+          onClick={() => setServiceMode('column')}
+        >
+          <div className="flex flex-col items-start text-right">
+            <span className="font-semibold">שירות לפי עמודה בקובץ</span>
+            <span className="text-xs text-neutral-600">בחרו עמודת שירות מתוך הכותרות שהועלו</span>
+          </div>
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </div>
+
+      {serviceMode === 'fixed' ? (
+        <div className="space-y-3 rounded-md border border-neutral-200 bg-white p-3">
+          {serviceOptions.length ? (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-foreground" htmlFor="fixed-service-select">
+                בחירת שירות מהרשימה
+              </Label>
+              <Select value={selectedService} onValueChange={setSelectedService}>
+                <SelectTrigger id="fixed-service-select">
+                  <SelectValue placeholder="בחרו שירות שיוחל על כל השורות" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">ללא שירות</SelectItem>
+                  {serviceOptions.map((service) => (
+                    <SelectItem key={service} value={service}>
+                      {service}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-neutral-600">השארת שדה ריק תשמור את המפגשים ללא שירות מוגדר.</p>
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-700">לא נמצאו שירותים שמורים בארגון. ניתן להקליד שירות מותאם ידנית.</p>
+          )}
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold text-foreground" htmlFor="custom-service-input">
+              או הקלידו שם שירות מותאם
+            </Label>
+            <Input
+              id="custom-service-input"
+              value={customService}
+              onChange={(event) => setCustomService(event.target.value)}
+              placeholder="לדוגמה: שירות ייעוצי / סדנה / פעילות"
+            />
+            <p className="text-[11px] text-neutral-600">ערך זה יגבר על הבחירה מהרשימה אם מולא.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2 rounded-md border border-neutral-200 bg-white p-3">
+          <Label className="text-sm font-semibold text-foreground" htmlFor="service-column-select">
+            עמודת שירות מתוך הקובץ
+          </Label>
+          <Select
+            value={serviceColumn}
+            onValueChange={setServiceColumn}
+            disabled={!hasColumns}
+          >
+            <SelectTrigger id="service-column-select">
+              <SelectValue placeholder="בחרו את העמודה שמייצגת את השירות" />
+            </SelectTrigger>
+            <SelectContent>
+              {csvColumns.map((column) => (
+                <SelectItem key={column} value={column}>
+                  {column}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-neutral-600">ערכים ריקים בעמודה יישמרו ללא שיוך שירות.</p>
+        </div>
+      )}
+    </div>
+  );
+
   const renderMatchMapping = () => (
     <div className="space-y-3">
       <div className="space-y-1">
@@ -402,6 +600,7 @@ export default function LegacyImportModal({
       {hasColumns ? (
         <div className="space-y-4">
           {renderSessionDatePicker()}
+          {renderServiceSelection()}
           <Separator />
           {isMatchFlow ? renderMatchMapping() : renderCustomMapping()}
         </div>
@@ -433,6 +632,11 @@ export default function LegacyImportModal({
           <span>קובץ: {fileName}</span>
         </div>
         <div className="text-sm text-neutral-800">תאריך מפגש מתוך: {sessionDateColumn}</div>
+        <div className="text-sm text-neutral-800">
+          {serviceMode === 'column'
+            ? `שירות לפי עמודה: ${serviceColumn}`
+            : `שירות לכל המפגשים: ${effectiveServiceValue ? effectiveServiceValue : 'ללא שירות מוגדר'}`}
+        </div>
         <div className="space-y-2 text-sm text-neutral-800">
           <p className="font-semibold">שדות מיובאים</p>
           {isMatchFlow ? (

@@ -180,6 +180,9 @@ export default function StudentDetailPage() {
   const [tagsError, setTagsError] = useState('');
 
   const [instructors, setInstructors] = useState([]);
+  const [services, setServices] = useState([]);
+  const [servicesState, setServicesState] = useState(REQUEST_STATE.idle);
+  const [servicesError, setServicesError] = useState('');
 
   const [isLegacyModalOpen, setIsLegacyModalOpen] = useState(false);
 
@@ -332,12 +335,37 @@ export default function StudentDetailPage() {
     }
   }, [canFetch, activeOrgId]);
 
+  const loadServices = useCallback(async () => {
+    if (!canFetch) {
+      return;
+    }
+
+    try {
+      setServicesState(REQUEST_STATE.loading);
+      setServicesError('');
+      const searchParams = new URLSearchParams({ keys: 'available_services' });
+      if (activeOrgId) {
+        searchParams.set('org_id', activeOrgId);
+      }
+      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
+      const settingsValue = payload?.settings?.available_services;
+      setServices(Array.isArray(settingsValue) ? settingsValue : []);
+      setServicesState(REQUEST_STATE.idle);
+    } catch (error) {
+      console.error('Failed to load services', error);
+      setServices([]);
+      setServicesState(REQUEST_STATE.error);
+      setServicesError(error?.message || 'טעינת רשימת השירותים נכשלה.');
+    }
+  }, [canFetch, activeOrgId]);
+
   useEffect(() => {
     if (canFetch) {
       void loadStudent();
       void loadQuestions();
       void loadSessions();
       void loadInstructors();
+      void loadServices();
     } else {
       setStudentState(REQUEST_STATE.idle);
       setStudentError('');
@@ -349,8 +377,11 @@ export default function StudentDetailPage() {
       setSessionError('');
       setSessions([]);
       setInstructors([]);
+      setServices([]);
+      setServicesState(REQUEST_STATE.idle);
+      setServicesError('');
     }
-  }, [canFetch, loadStudent, loadQuestions, loadSessions, loadInstructors]);
+  }, [canFetch, loadStudent, loadQuestions, loadSessions, loadInstructors, loadServices]);
 
   const hasStudentTags = Array.isArray(student?.tags) && student.tags.length > 0;
   const studentIdentifier = student?.id || '';
@@ -418,6 +449,7 @@ export default function StudentDetailPage() {
   const studentLoadError = studentState === REQUEST_STATE.error;
   const isSessionsLoading = sessionState === REQUEST_STATE.loading;
   const sessionsLoadError = sessionState === REQUEST_STATE.error;
+  const isServicesLoading = servicesState === REQUEST_STATE.loading;
 
   const backDestination = isAdminRole(membershipRole) ? '/admin/students' : '/my-students';
   const canEdit = isAdminRole(membershipRole);
@@ -463,7 +495,16 @@ export default function StudentDetailPage() {
     });
   }, []);
 
-  const handleLegacySubmit = async ({ file, structureChoice, sessionDateColumn, columnMappings, customLabels }) => {
+  const handleLegacySubmit = async ({
+    file,
+    structureChoice,
+    sessionDateColumn,
+    columnMappings,
+    customLabels,
+    serviceMode,
+    serviceValue,
+    serviceColumn,
+  }) => {
     if (!file || !activeOrgId || !studentId) {
       throw new Error('חסרים פרטי ייבוא נדרשים.');
     }
@@ -476,6 +517,9 @@ export default function StudentDetailPage() {
       session_date_column: sessionDateColumn,
       column_mappings: columnMappings,
       custom_labels: customLabels,
+      service_strategy: serviceMode,
+      service_context_value: serviceValue,
+      service_context_column: serviceColumn,
       csv_text: csvText,
     };
 
@@ -490,9 +534,17 @@ export default function StudentDetailPage() {
       const friendlyDateHint =
         'ודאו שתאריך המפגש כתוב כ-YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY או כמספר תאריך של Excel.';
 
-      const message = apiMessage === 'invalid_session_date'
-        ? `תאריך מפגש לא תקין${rowDetail}. ${friendlyDateHint}`
-        : apiMessage || 'ייבוא הדוח נכשל. נסו שוב.';
+      let message = apiMessage || 'ייבוא הדוח נכשל. נסו שוב.';
+
+      if (apiMessage === 'invalid_session_date') {
+        message = `תאריך מפגש לא תקין${rowDetail}. ${friendlyDateHint}`;
+      } else if (apiMessage === 'missing_service_column' || apiMessage === 'service_column_not_found') {
+        message = 'בחרו עמודת שירות מתוך הכותרות שהועלו.';
+      } else if (apiMessage === 'invalid_service_context') {
+        message = `ערך שירות לא תקין${rowDetail}. ודאו שהשדה מכיל טקסט קריא או השאירו אותו ריק כדי לשמור ללא שירות.`;
+      } else if (apiMessage === 'invalid_service_strategy') {
+        message = 'בחרו האם ליישם שירות אחד קבוע או למפות שירות מתוך הקובץ.';
+      }
 
       toast.error(message);
       throw error;
@@ -971,6 +1023,10 @@ export default function StudentDetailPage() {
       questions={questions}
       canReupload={canReuploadLegacy}
       hasLegacyImport={hasLegacyImport}
+      services={services}
+      servicesLoading={isServicesLoading}
+      servicesError={servicesError}
+      onReloadServices={loadServices}
       onSubmit={handleLegacySubmit}
     />
     </>

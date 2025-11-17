@@ -39,6 +39,7 @@ This feature will introduce a new CSV import workflow that allows an admin to up
 *   [x] The endpoint must first check the organization's `can_reupload_legacy_reports` permission. If it's `false` and legacy records already exist for the student, the request must be rejected.
 *   [x] If the upload is permitted, the function must first **delete all existing records** from `SessionRecords` where `student_id` matches and `is_legacy` is `true`.
 *   [x] After deletion, it will proceed to parse the new CSV file and create the new rows in the `SessionRecords` table, each with `is_legacy` set to `true`.
+*   [x] Import requests may set a single `service_context` for all rows or map a `service_context` column from the CSV; blank values remain without a service.
 
 **5. Universal Display Logic for Legacy Records:**
 *   [x] The application's rendering logic for session records must be updated to handle the two possible data structures within the `content` (JSONB) column, based on the `is_legacy` flag.

@@ -12,7 +12,7 @@ import {
   resolveTenantClient,
   UUID_PATTERN,
 } from '../_shared/org-bff.js';
-import { parseJsonBodyWithLimit } from '../_shared/validation.js';
+import { coerceOptionalText, parseJsonBodyWithLimit } from '../_shared/validation.js';
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
@@ -215,6 +215,40 @@ function parseColumnMappings(raw) {
   );
 }
 
+function normalizeServiceStrategy(raw) {
+  const normalized = normalizeString(raw);
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized === 'fixed' || normalized === 'single' || normalized === 'global') {
+    return 'fixed';
+  }
+
+  if (normalized === 'column' || normalized === 'per_row' || normalized === 'csv_column') {
+    return 'column';
+  }
+
+  return '';
+}
+
+function coerceServiceValue(value) {
+  if (value === null || value === undefined) {
+    return { value: null, valid: true };
+  }
+
+  if (typeof value === 'string') {
+    return { value: value.trim() || null, valid: true };
+  }
+
+  try {
+    const stringified = String(value);
+    return { value: stringified.trim() || null, valid: true };
+  } catch {
+    return { value: null, valid: false };
+  }
+}
+
 export default async function legacyImport(context, req) {
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
@@ -335,6 +369,42 @@ export default async function legacyImport(context, req) {
     return respond(context, 400, { message: 'missing_session_date_column' });
   }
 
+  const serviceStrategy = normalizeServiceStrategy(
+    body?.service_strategy
+      || body?.service_mode
+      || body?.service_mapping,
+  );
+
+  if (!serviceStrategy) {
+    return respond(context, 400, { message: 'invalid_service_strategy' });
+  }
+
+  let serviceContextValue = null;
+  let serviceContextColumn = '';
+
+  if (serviceStrategy === 'fixed') {
+    const serviceResult = coerceOptionalText(
+      body?.service_context_value
+        || body?.service_value
+        || body?.service_context
+        || body?.service,
+    );
+
+    if (!serviceResult.valid) {
+      return respond(context, 400, { message: 'invalid_service_context' });
+    }
+
+    serviceContextValue = serviceResult.value;
+  }
+
+  if (serviceStrategy === 'column') {
+    serviceContextColumn = normalizeString(body?.service_context_column || body?.service_column);
+
+    if (!serviceContextColumn) {
+      return respond(context, 400, { message: 'missing_service_column' });
+    }
+  }
+
   const csvText = extractCsvText(body);
   if (!csvText) {
     return respond(context, 400, { message: 'missing_csv' });
@@ -347,6 +417,10 @@ export default async function legacyImport(context, req) {
 
   if (!parsedCsv.columns.includes(sessionDateColumn)) {
     return respond(context, 400, { message: 'session_date_column_not_found' });
+  }
+
+  if (serviceStrategy === 'column' && !parsedCsv.columns.includes(serviceContextColumn)) {
+    return respond(context, 400, { message: 'service_column_not_found' });
   }
 
   const columnMappings = isMatchFlow ? parseColumnMappings(body?.column_mappings) : {};
@@ -363,6 +437,7 @@ export default async function legacyImport(context, req) {
     }
 
     const content = {};
+    let serviceContext = serviceContextValue;
 
     if (isMatchFlow) {
       Object.entries(columnMappings).forEach(([column, target]) => {
@@ -398,11 +473,20 @@ export default async function legacyImport(context, req) {
       });
     }
 
+    if (serviceStrategy === 'column') {
+      const rowServiceResult = coerceServiceValue(row[serviceContextColumn]);
+      if (!rowServiceResult.valid) {
+        return respond(context, 400, { message: 'invalid_service_context', row: index + 1 });
+      }
+      serviceContext = rowServiceResult.value;
+    }
+
     records.push({
       student_id: studentId,
       date: normalizedDate,
       content: Object.keys(content).length ? content : null,
       is_legacy: true,
+      service_context: serviceContext,
       metadata: { source: 'legacy_import' },
     });
   }
