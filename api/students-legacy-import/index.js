@@ -1,0 +1,362 @@
+/* eslint-env node */
+import { Buffer } from 'node:buffer';
+import { resolveBearerAuthorization } from '../_shared/http.js';
+import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
+import {
+  ensureMembership,
+  isAdminRole,
+  normalizeString,
+  readEnv,
+  respond,
+  resolveOrgId,
+  resolveTenantClient,
+  UUID_PATTERN,
+} from '../_shared/org-bff.js';
+import { parseJsonBodyWithLimit } from '../_shared/validation.js';
+
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+
+function parsePermissions(raw) {
+  if (!raw) {
+    return {};
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw;
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function extractCsvText(body) {
+  const csvText = normalizeString(body?.csv_text);
+  if (csvText) {
+    return csvText;
+  }
+
+  const base64Value = normalizeString(body?.file_base64);
+  if (!base64Value) {
+    return '';
+  }
+
+  let payload = base64Value;
+  if (payload.startsWith('data:')) {
+    const commaIndex = payload.indexOf(',');
+    if (commaIndex !== -1) {
+      payload = payload.slice(commaIndex + 1);
+    }
+  }
+
+  try {
+    return Buffer.from(payload, 'base64').toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
+function splitCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '"') {
+      const nextChar = line[index + 1];
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  result.push(current.trim());
+
+  return result.map((part) => part.replace(/^"|"$/g, ''));
+}
+
+function parseCsv(text) {
+  const normalized = typeof text === 'string' ? text : '';
+  const lines = normalized
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line);
+
+  if (!lines.length) {
+    return { columns: [], rows: [] };
+  }
+
+  const columns = splitCsvLine(lines[0]).filter((column) => column);
+  const rows = lines.slice(1).map((line) => splitCsvLine(line));
+
+  const mappedRows = rows
+    .map((values) => {
+      const entry = {};
+      columns.forEach((column, index) => {
+        entry[column] = values[index] ?? '';
+      });
+      const hasContent = Object.values(entry).some((value) => normalizeString(value));
+      return hasContent ? entry : null;
+    })
+    .filter((entry) => entry !== null);
+
+  return { columns, rows: mappedRows };
+}
+
+function normalizeDate(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const parsed = new Date(String(value).trim());
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toISOString().slice(0, 10);
+}
+
+function parseColumnMappings(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(raw).map(([key, value]) => [normalizeString(key), normalizeString(value)]),
+  );
+}
+
+export default async function legacyImport(context, req) {
+  const env = readEnv(context);
+  const adminConfig = readSupabaseAdminConfig(env);
+
+  if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
+    context.log?.error?.('legacy-import missing Supabase admin credentials');
+    return respond(context, 500, { message: 'server_misconfigured' });
+  }
+
+  const authorization = resolveBearerAuthorization(req);
+  if (!authorization?.token) {
+    context.log?.warn?.('legacy-import missing bearer token');
+    return respond(context, 401, { message: 'missing bearer' });
+  }
+
+  const supabase = createSupabaseAdminClient(adminConfig);
+
+  let authResult;
+  try {
+    authResult = await supabase.auth.getUser(authorization.token);
+  } catch (error) {
+    context.log?.error?.('legacy-import failed to validate token', { message: error?.message });
+    return respond(context, 401, { message: 'invalid or expired token' });
+  }
+
+  if (authResult.error || !authResult.data?.user?.id) {
+    return respond(context, 401, { message: 'invalid or expired token' });
+  }
+
+  const body = parseJsonBodyWithLimit(req, MAX_BODY_BYTES, { mode: 'observe', context, endpoint: 'legacy-import' }) || {};
+  const orgId = resolveOrgId(req, body);
+  const studentId = normalizeString(req.params?.id || body?.student_id);
+
+  if (!orgId) {
+    return respond(context, 400, { message: 'invalid org id' });
+  }
+
+  if (!studentId || !UUID_PATTERN.test(studentId)) {
+    return respond(context, 400, { message: 'invalid student id' });
+  }
+
+  let role;
+  const userId = authResult.data.user.id;
+  try {
+    role = await ensureMembership(supabase, orgId, userId);
+  } catch (membershipError) {
+    context.log?.error?.('legacy-import failed to verify membership', {
+      message: membershipError?.message,
+      orgId,
+      userId,
+    });
+    return respond(context, 500, { message: 'failed_to_verify_membership' });
+  }
+
+  if (!role || !isAdminRole(role)) {
+    return respond(context, 403, { message: 'forbidden' });
+  }
+
+  const { data: orgSettings, error: settingsError } = await supabase
+    .from('org_settings')
+    .select('permissions')
+    .eq('org_id', orgId)
+    .maybeSingle();
+
+  if (settingsError) {
+    context.log?.error?.('legacy-import failed to load org settings', { message: settingsError.message });
+    return respond(context, 500, { message: 'failed_to_load_settings' });
+  }
+
+  const permissions = parsePermissions(orgSettings?.permissions);
+  const canReupload = permissions.can_reupload_legacy_reports === true;
+
+  const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
+  if (tenantError) {
+    return respond(context, tenantError.status, tenantError.body);
+  }
+
+  const { data: studentRecord, error: studentError } = await tenantClient
+    .from('Students')
+    .select('id')
+    .eq('id', studentId)
+    .maybeSingle();
+
+  if (studentError) {
+    context.log?.error?.('legacy-import failed to load student', { message: studentError.message });
+    return respond(context, 500, { message: 'failed_to_load_student' });
+  }
+
+  if (!studentRecord) {
+    return respond(context, 404, { message: 'student_not_found' });
+  }
+
+  const { count: legacyCount, error: legacyCheckError } = await tenantClient
+    .from('SessionRecords')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', studentId)
+    .eq('is_legacy', true);
+
+  if (legacyCheckError) {
+    context.log?.error?.('legacy-import failed to check existing legacy records', { message: legacyCheckError.message });
+    return respond(context, 500, { message: 'failed_to_check_legacy_records' });
+  }
+
+  if (!canReupload && legacyCount && legacyCount > 0) {
+    return respond(context, 409, { message: 'legacy_import_already_exists' });
+  }
+
+  const structureChoice = normalizeString(body?.structure_choice);
+  const isMatchFlow = structureChoice === 'match' || structureChoice === 'yes' || structureChoice === 'structured';
+  const isCustomFlow = structureChoice === 'custom' || structureChoice === 'no' || structureChoice === 'unstructured';
+
+  if (!isMatchFlow && !isCustomFlow) {
+    return respond(context, 400, { message: 'invalid_structure_choice' });
+  }
+
+  const sessionDateColumn = normalizeString(body?.session_date_column);
+  if (!sessionDateColumn) {
+    return respond(context, 400, { message: 'missing_session_date_column' });
+  }
+
+  const csvText = extractCsvText(body);
+  if (!csvText) {
+    return respond(context, 400, { message: 'missing_csv' });
+  }
+
+  const parsedCsv = parseCsv(csvText);
+  if (!parsedCsv.columns.length || !parsedCsv.rows.length) {
+    return respond(context, 400, { message: 'empty_csv' });
+  }
+
+  if (!parsedCsv.columns.includes(sessionDateColumn)) {
+    return respond(context, 400, { message: 'session_date_column_not_found' });
+  }
+
+  const columnMappings = isMatchFlow ? parseColumnMappings(body?.column_mappings) : {};
+  const customLabels = isCustomFlow ? parseColumnMappings(body?.custom_labels) : {};
+
+  const records = [];
+  for (let index = 0; index < parsedCsv.rows.length; index += 1) {
+    const row = parsedCsv.rows[index];
+    const dateValue = row[sessionDateColumn];
+    const normalizedDate = normalizeDate(dateValue);
+
+    if (!normalizedDate) {
+      return respond(context, 400, { message: 'invalid_session_date', row: index + 1 });
+    }
+
+    const content = {};
+
+    if (isMatchFlow) {
+      Object.entries(columnMappings).forEach(([column, target]) => {
+        if (!target || column === sessionDateColumn) {
+          return;
+        }
+        const value = row[column];
+        if (value === undefined || value === null) {
+          return;
+        }
+        const normalizedValue = normalizeString(value);
+        if (!normalizedValue) {
+          return;
+        }
+        content[target] = normalizedValue;
+      });
+    }
+
+    if (isCustomFlow) {
+      Object.entries(customLabels).forEach(([column, label]) => {
+        if (!label || column === sessionDateColumn) {
+          return;
+        }
+        const value = row[column];
+        if (value === undefined || value === null) {
+          return;
+        }
+        const normalizedValue = normalizeString(value);
+        if (!normalizedValue) {
+          return;
+        }
+        content[label] = normalizedValue;
+      });
+    }
+
+    records.push({
+      student_id: studentId,
+      date: normalizedDate,
+      content: Object.keys(content).length ? content : null,
+      is_legacy: true,
+      metadata: { source: 'legacy_import' },
+    });
+  }
+
+  if (!records.length) {
+    return respond(context, 400, { message: 'no_rows_to_import' });
+  }
+
+  const replaced = legacyCount || 0;
+
+  const { error: deleteError } = await tenantClient
+    .from('SessionRecords')
+    .delete()
+    .eq('student_id', studentId)
+    .eq('is_legacy', true);
+
+  if (deleteError) {
+    context.log?.error?.('legacy-import failed to delete existing legacy rows', { message: deleteError.message });
+    return respond(context, 500, { message: 'failed_to_clear_legacy_records' });
+  }
+
+  const { error: insertError } = await tenantClient.from('SessionRecords').insert(records);
+
+  if (insertError) {
+    context.log?.error?.('legacy-import failed to insert legacy rows', { message: insertError.message });
+    return respond(context, 500, { message: 'failed_to_insert_legacy_records' });
+  }
+
+  return respond(context, 201, { imported: records.length, replaced, can_reupload: canReupload });
+}

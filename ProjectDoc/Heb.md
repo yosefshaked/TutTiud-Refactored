@@ -86,6 +86,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - **רישום הרשאות:** טבלת השליטה כוללת כעת `can_reupload_legacy_reports` (ברירת מחדל `false`) כדי לשלוט ביכולת לבצע העלאות חוזרות של נתוני עבר.
 - **ממשק ייבוא דוחות היסטוריים (פרטי תלמיד):** משתמשי Admin/Owner רואים כפתור "ייבוא דוחות היסטוריים" בדף התלמיד. הכפתור מנוטרל אם כבר בוצע ייבוא Legacy אלא אם הופעלה ההרשאה `can_reupload_legacy_reports`. המודל פותח באזהרת גיבוי, שואל האם מבנה ה-CSV תואם את טופס השאלון הנוכחי, ומציג ממשק מיפוי מתאים (תפריטי שאלות מול `session_form_config` או שמות מותאמים) עם בחירת עמודת תאריך חובה ואזהרת החלפה בעת העלאה חוזרת.
+- **צד שרת לייבוא Legacy (`POST /api/students/{id}/legacy-import`):** נקודה למנהלים/בעלי ארגון בלבד שבודקת את `can_reupload_legacy_reports` לפני שמאפשרת החלפה. כשמתאפשר ייבוא המערכת מוחקת רשומות `is_legacy` קיימות לתלמיד, קוראת את ה-CSV שנשלח (גוף JSON עם `csv_text`, `structure_choice`, `session_date_column` ו-`column_mappings` או `custom_labels`) ומכניסה רשומות `SessionRecords` חדשות עם `is_legacy=true`.
 
 > **אמצעי הגנה על הסכימה:** ‎`/api/settings` מריץ כעת את `tuttiud.setup_assistant_diagnostics()` בכל פעם ש-Supabase מדווח על טבלאות חסרות או הרשאות חסרות. פערים בסכימה או במדיניות מוחזרים כ-HTTP ‎424 עם ‎`settings_schema_incomplete` / `settings_schema_unverified` וכוללים את שורות הדיאגנוסטיקה כדי שהאדמין יריץ מחדש את הסקריפט לפני ניסיון נוסף.
 

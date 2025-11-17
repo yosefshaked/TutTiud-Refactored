@@ -405,9 +405,45 @@ export default function StudentDetailPage() {
     setIsLegacyModalOpen(false);
   };
 
-  const handleLegacySubmit = async () => {
-    toast.info('ממשק הייבוא יחובר ל-API לאחר השלמת פיתוח צד השרת.');
-    setIsLegacyModalOpen(false);
+  const readFileAsText = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve(String(reader.result || ''));
+      };
+      reader.onerror = () => {
+        reject(new Error('טעינת הקובץ נכשלה.'));
+      };
+      reader.readAsText(file);
+    });
+  }, []);
+
+  const handleLegacySubmit = async ({ file, structureChoice, sessionDateColumn, columnMappings, customLabels }) => {
+    if (!file || !activeOrgId || !studentId) {
+      throw new Error('חסרים פרטי ייבוא נדרשים.');
+    }
+
+    const csvText = await readFileAsText(file);
+
+    const body = {
+      org_id: activeOrgId,
+      structure_choice: structureChoice,
+      session_date_column: sessionDateColumn,
+      column_mappings: columnMappings,
+      custom_labels: customLabels,
+      csv_text: csvText,
+    };
+
+    try {
+      await authenticatedFetch(`students/${studentId}/legacy-import`, { method: 'POST', body, session });
+      toast.success('הייבוא הושלם בהצלחה.');
+      setIsLegacyModalOpen(false);
+      await loadSessions();
+    } catch (error) {
+      const message = error?.message || 'ייבוא הדוח נכשל. נסו שוב.';
+      toast.error(message);
+      throw error;
+    }
   };
 
   const handleOpenEdit = () => {
