@@ -468,7 +468,7 @@ export default function StudentDetailPage() {
     sessionsLoadError;
 
   const legacyImportReason = !canReuploadLegacy && hasLegacyImport
-    ? 'ייבוא דוחות היסטוריים מתאפשר פעם אחת בלבד. ייבוא חוזר הוא תכונת פרימיום וניתן להפעיל אותה בהרשאת can_reupload_legacy_reports בארגון.'
+    ? 'ייבוא דוחות היסטוריים מתאפשר פעם אחת בלבד. בכדי לאפשר ייבוא חוזר יש לשדרג את המנוי.'
     : '';
 
   const handleOpenLegacyModal = () => {
