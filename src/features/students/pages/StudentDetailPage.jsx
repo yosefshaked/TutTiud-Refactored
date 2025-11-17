@@ -414,6 +414,11 @@ export default function StudentDetailPage() {
     });
   }, [openSessionModal, studentId, loadSessions, student?.is_active]);
 
+  const isStudentLoading = studentState === REQUEST_STATE.loading;
+  const studentLoadError = studentState === REQUEST_STATE.error;
+  const isSessionsLoading = sessionState === REQUEST_STATE.loading;
+  const sessionsLoadError = sessionState === REQUEST_STATE.error;
+
   const backDestination = isAdminRole(membershipRole) ? '/admin/students' : '/my-students';
   const canEdit = isAdminRole(membershipRole);
   const canManageLegacyImport = canEdit;
@@ -593,10 +598,6 @@ export default function StudentDetailPage() {
     );
   }
 
-  const isStudentLoading = studentState === REQUEST_STATE.loading;
-  const studentLoadError = studentState === REQUEST_STATE.error;
-  const isSessionsLoading = sessionState === REQUEST_STATE.loading;
-  const sessionsLoadError = sessionState === REQUEST_STATE.error;
   const noSessions = !isSessionsLoading && !sessionsLoadError && sessions.length === 0;
 
   const toggleOne = (key) => setExpandedById((prev) => ({ ...prev, [key]: !prev[key] }));
