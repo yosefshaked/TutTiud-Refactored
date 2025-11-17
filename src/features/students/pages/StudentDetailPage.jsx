@@ -485,7 +485,15 @@ export default function StudentDetailPage() {
       setIsLegacyModalOpen(false);
       await loadSessions();
     } catch (error) {
-      const message = error?.message || 'ייבוא הדוח נכשל. נסו שוב.';
+      const rowDetail = error?.data?.row ? ` (שורה ${error.data.row})` : '';
+      const apiMessage = error?.data?.message || error?.message;
+      const friendlyDateHint =
+        'ודאו שתאריך המפגש כתוב כ-YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY או כמספר תאריך של Excel.';
+
+      const message = apiMessage === 'invalid_session_date'
+        ? `תאריך מפגש לא תקין${rowDetail}. ${friendlyDateHint}`
+        : apiMessage || 'ייבוא הדוח נכשל. נסו שוב.';
+
       toast.error(message);
       throw error;
     }

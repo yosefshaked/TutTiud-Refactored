@@ -122,15 +122,88 @@ function parseCsv(text) {
   return { columns, rows: mappedRows };
 }
 
+function buildIsoDate(year, month, day) {
+  const normalizedYear = Number(year);
+  const normalizedMonth = Number(month);
+  const normalizedDay = Number(day);
+
+  if (
+    !Number.isInteger(normalizedYear)
+    || !Number.isInteger(normalizedMonth)
+    || !Number.isInteger(normalizedDay)
+  ) {
+    return null;
+  }
+
+  if (normalizedMonth < 1 || normalizedMonth > 12 || normalizedDay < 1 || normalizedDay > 31) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(normalizedYear, normalizedMonth - 1, normalizedDay));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (
+    date.getUTCFullYear() !== normalizedYear
+    || date.getUTCMonth() + 1 !== normalizedMonth
+    || date.getUTCDate() !== normalizedDay
+  ) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function parseExcelSerial(value) {
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+
+  const excelEpoch = Date.UTC(1899, 11, 30);
+  const millis = excelEpoch + numeric * 24 * 60 * 60 * 1000;
+  const date = new Date(millis);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
 function normalizeDate(value) {
   if (value === null || value === undefined) {
     return null;
   }
-  const parsed = new Date(String(value).trim());
-  if (Number.isNaN(parsed.getTime())) {
+
+  const trimmed = String(value).trim();
+  if (!trimmed) {
     return null;
   }
-  return parsed.toISOString().slice(0, 10);
+
+  const excelSerialMatch = /^-?\d+(?:\.\d+)?$/.test(trimmed) ? parseExcelSerial(trimmed) : null;
+  if (excelSerialMatch) {
+    return excelSerialMatch;
+  }
+
+  const isoLikeMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s|T|$)/);
+  if (isoLikeMatch) {
+    return buildIsoDate(isoLikeMatch[1], isoLikeMatch[2], isoLikeMatch[3]);
+  }
+
+  const dmyMatch = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})(?:\s|$)/);
+  if (dmyMatch) {
+    const year = dmyMatch[3].length === 2 ? `20${dmyMatch[3]}` : dmyMatch[3];
+    return buildIsoDate(year, dmyMatch[2], dmyMatch[1]);
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return null;
 }
 
 function parseColumnMappings(raw) {
