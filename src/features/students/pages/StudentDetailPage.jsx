@@ -770,16 +770,18 @@ export default function StudentDetailPage() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      className="self-start text-sm"
-                      size="sm"
-                      variant="outline"
-                      disabled
-                    >
-                      <FileUp className="h-4 w-4" />
-                      <span className="ml-1">ייבוא דוחות היסטוריים</span>
-                    </Button>
+                    <span className="inline-flex" tabIndex={0}>
+                      <Button
+                        type="button"
+                        className="self-start text-sm"
+                        size="sm"
+                        variant="outline"
+                        disabled
+                      >
+                        <FileUp className="h-4 w-4" />
+                        <span className="ml-1">ייבוא דוחות היסטוריים</span>
+                      </Button>
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs text-right">
                     <p className="text-sm leading-relaxed">{legacyImportReason}</p>

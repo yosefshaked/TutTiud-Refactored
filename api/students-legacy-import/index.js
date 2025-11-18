@@ -432,13 +432,20 @@ export default async function legacyImport(context, req) {
   const columnMappings = isMatchFlow ? parseColumnMappings(body?.column_mappings) : {};
   const customLabels = isCustomFlow ? parseColumnMappings(body?.custom_labels) : {};
 
-  const { metadata } = await buildSessionMetadata({
+  const metadataResult = await buildSessionMetadata({
     tenantClient,
     userId,
     role,
     source: 'legacy_import',
     logger: context.log,
   });
+
+  let metadata = metadataResult.metadata;
+
+  if (!isMatchFlow && metadata && Object.prototype.hasOwnProperty.call(metadata, 'form_version')) {
+    const { form_version: _formVersion, ...rest } = metadata;
+    metadata = Object.keys(rest).length ? rest : null;
+  }
 
   const records = [];
   for (let index = 0; index < parsedCsv.rows.length; index += 1) {
