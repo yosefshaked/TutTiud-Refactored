@@ -371,23 +371,18 @@ export default function LegacyImportModal({
         <div className="legacy-import-warning-row">
           <ShieldAlert className="h-5 w-5" aria-hidden="true" />
           <div className="legacy-import-warning-text">
-            <AlertTitle className="rtl-embed-text">חשוב: בצעו גיבוי לפני ייבוא נתוני עבר</AlertTitle>
-            <AlertDescription className="space-y-2 text-sm rtl-embed-text">
+            <AlertTitle className="rtl-embed-text text-right">חשוב: בצעו גיבוי לפני ייבוא נתוני עבר</AlertTitle>
+            <AlertDescription className="space-y-2 text-sm rtl-embed-text text-right">
               <p>
                 ייבוא דוחות היסטוריים ישנה לצמיתות את נתוני הארגון. מומלץ לבצע גיבוי מלא לפני ההעלאה כדי שתוכלו לשחזר במידת הצורך.
               </p>
-              <p className="text-xs text-red-800 rtl-embed-text">
+              <p className="text-xs text-red-800 rtl-embed-text text-right">
                 אם כבר ביצעתם גיבוי, אפשר להמשיך. לחצו על{' '}
                 <button type="button" className="legacy-import-warning-link" onClick={handleNavigateToBackup}>
                   מעבר להגדרות גיבוי
                 </button>{' '}
                 לביצוע גיבוי לפני ההעלאה.
               </p>
-              <div className="legacy-import-warning-actions">
-                <Button type="button" onClick={handleNextFromWarning}>
-                  המשך
-                </Button>
-              </div>
             </AlertDescription>
           </div>
         </div>
@@ -400,8 +395,8 @@ export default function LegacyImportModal({
       {hasLegacyImport ? (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800 rtl-embed-text">
           <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
-          <AlertTitle className="rtl-embed-text">נמצאו דוחות Legacy קיימים לתלמיד זה</AlertTitle>
-          <AlertDescription className="text-sm rtl-embed-text">
+          <AlertTitle className="rtl-embed-text text-right">נמצאו דוחות Legacy קיימים לתלמיד זה</AlertTitle>
+          <AlertDescription className="text-sm rtl-embed-text text-right">
             ייבוא חדש ימחק את הדוחות ההיסטוריים הקיימים ויחליף אותם בנתונים החדשים אם ההרשאה מאפשרת זאת.
           </AlertDescription>
         </Alert>
@@ -411,7 +406,7 @@ export default function LegacyImportModal({
 
   const renderStructureChoice = () => (
     <div className="space-y-4">
-      <div className="space-y-2 rtl-embed-text">
+      <div className="space-y-2 rtl-embed-text text-right">
         <h3 className="text-base font-semibold text-foreground">האם מבנה ה-CSV תואם את טופס המפגש הנוכחי?</h3>
         <p className="text-sm text-neutral-600">
           בחרו האם לעדכן לפי שאלות הטופס הקיים או להזין שמות מותאמים לשדות מהעבר.
@@ -424,7 +419,7 @@ export default function LegacyImportModal({
           className="legacy-import-row-reverse justify-between text-right rtl-embed-text"
           onClick={() => handleSelectStructure('match')}
         >
-          <div className="flex flex-1 flex-col items-end text-right rtl-embed-text">
+          <div className="flex flex-1 flex-col items-start text-right rtl-embed-text">
             <span className="font-semibold">כן, המבנה תואם</span>
             <span className="text-xs text-neutral-600">אמצו את שאלות הטופס הקיים לבחירת שדות</span>
           </div>
@@ -436,7 +431,7 @@ export default function LegacyImportModal({
           className="legacy-import-row-reverse justify-between text-right rtl-embed-text"
           onClick={() => handleSelectStructure('custom')}
         >
-          <div className="flex flex-1 flex-col items-end text-right rtl-embed-text">
+          <div className="flex flex-1 flex-col items-start text-right rtl-embed-text">
             <span className="font-semibold">לא, מבנה שונה</span>
             <span className="text-xs text-neutral-600">כתבו שמות שאלות מותאמים לעמודות הקיימות</span>
           </div>
@@ -457,9 +452,9 @@ export default function LegacyImportModal({
   );
 
   const renderCsvUpload = () => (
-    <div className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4">
-      <div className="space-y-1 rtl-embed-text">
-        <Label htmlFor="legacy-csv-upload" className="text-sm font-semibold text-foreground rtl-embed-text">
+      <div className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4">
+      <div className="space-y-1 rtl-embed-text text-right">
+        <Label htmlFor="legacy-csv-upload" className="text-sm font-semibold text-foreground rtl-embed-text text-right">
           העלאת קובץ CSV
         </Label>
         <p className="text-xs text-neutral-600 text-right">בחרו את קובץ ה-CSV עם כותרות העמודות שברצונכם לייבא.</p>
@@ -481,15 +476,15 @@ export default function LegacyImportModal({
               className="rtl-embed-text text-right"
             />
           </div>
-          <p id="legacy-csv-helper" className="text-xs text-neutral-600 rtl-embed-text text-left">
+          <p id="legacy-csv-helper" className="text-xs text-neutral-600 rtl-embed-text text-right">
             ודאו שהשורה הראשונה מכילה כותרות. המערכת תציג אותן למיפוי שאלות.
           </p>
         </>
       )}
       {uploadError ? (
         <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
-          <AlertTitle className="text-sm font-semibold rtl-embed-text">שגיאת העלאה</AlertTitle>
-          <AlertDescription className="text-sm rtl-embed-text">{uploadError}</AlertDescription>
+          <AlertTitle className="text-sm font-semibold rtl-embed-text text-right">שגיאת העלאה</AlertTitle>
+          <AlertDescription className="text-sm rtl-embed-text text-right">{uploadError}</AlertDescription>
         </Alert>
       ) : null}
       {hasColumns ? (
@@ -509,7 +504,7 @@ export default function LegacyImportModal({
 
   const renderSessionDatePicker = () => (
     <div className="space-y-2">
-      <Label className="text-sm font-semibold text-foreground rtl-embed-text" htmlFor="session-date-column">
+      <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="session-date-column">
         עמודת תאריך המפגש
       </Label>
       <Select value={sessionDateColumn} onValueChange={setSessionDateColumn}>
@@ -531,7 +526,7 @@ export default function LegacyImportModal({
   );
 
   const renderServiceSelection = () => (
-    <div className="space-y-3 rounded-md bg-neutral-50 p-4">
+      <div className="space-y-3 rounded-md bg-neutral-50 p-4">
       <div className="legacy-import-row-reverse flex-wrap items-start justify-between gap-3">
         <div className="space-y-1 rtl-embed-text text-right">
           <h4 className="text-sm font-semibold text-foreground">שיוך שירות למפגשים</h4>
@@ -557,8 +552,8 @@ export default function LegacyImportModal({
       </div>
       {servicesError ? (
         <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
-          <AlertTitle className="text-sm font-semibold rtl-embed-text">שגיאת טעינת שירותים</AlertTitle>
-          <AlertDescription className="text-sm rtl-embed-text">{servicesError}</AlertDescription>
+          <AlertTitle className="text-sm font-semibold rtl-embed-text text-right">שגיאת טעינת שירותים</AlertTitle>
+          <AlertDescription className="text-sm rtl-embed-text text-right">{servicesError}</AlertDescription>
         </Alert>
       ) : null}
       <div className="grid gap-2 sm:grid-cols-2">
@@ -568,7 +563,7 @@ export default function LegacyImportModal({
           className="legacy-import-row-reverse justify-between"
           onClick={() => setServiceMode('fixed')}
         >
-          <div className="flex flex-col items-end text-right rtl-embed-text">
+          <div className="flex flex-col items-start text-right rtl-embed-text">
             <span className="font-semibold">שירות אחיד לכל השורות</span>
             <span className="text-xs text-neutral-600">בחרו שירות אחד או הקלידו שם שירות מותאם</span>
           </div>
@@ -581,7 +576,7 @@ export default function LegacyImportModal({
           disabled={!hasColumns}
           onClick={() => setServiceMode('column')}
         >
-          <div className="flex flex-col items-end text-right rtl-embed-text">
+          <div className="flex flex-col items-start text-right rtl-embed-text">
             <span className="font-semibold">שירות לפי עמודה בקובץ</span>
             <span className="text-xs text-neutral-600">בחרו עמודת שירות מתוך הכותרות שהועלו</span>
           </div>
@@ -593,7 +588,7 @@ export default function LegacyImportModal({
         <div className="space-y-3 rounded-md border border-neutral-200 bg-white p-3">
           {serviceOptions.length ? (
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-foreground rtl-embed-text" htmlFor="fixed-service-select">
+                <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="fixed-service-select">
                 בחירת שירות מהרשימה
               </Label>
               <Select value={selectedService} onValueChange={setSelectedService}>
@@ -615,7 +610,7 @@ export default function LegacyImportModal({
             <p className="text-xs text-neutral-700 rtl-embed-text">לא נמצאו שירותים שמורים בארגון. ניתן להקליד שירות מותאם ידנית.</p>
           )}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold text-foreground rtl-embed-text" htmlFor="custom-service-input">
+            <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="custom-service-input">
               או הקלידו שם שירות מותאם
             </Label>
             <Input
@@ -630,7 +625,7 @@ export default function LegacyImportModal({
         </div>
       ) : (
         <div className="space-y-2 rounded-md border border-neutral-200 bg-white p-3">
-          <Label className="text-sm font-semibold text-foreground rtl-embed-text" htmlFor="service-column-select">
+          <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="service-column-select">
             עמודת שירות מתוך הקובץ
           </Label>
           <Select
@@ -819,8 +814,8 @@ export default function LegacyImportModal({
       {hasLegacyImport ? (
         <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
           <ShieldAlert className="h-5 w-5" aria-hidden="true" />
-          <AlertTitle className="text-sm font-semibold rtl-embed-text">אזהרת העלאה חוזרת</AlertTitle>
-          <AlertDescription className="text-sm space-y-1 rtl-embed-text">
+          <AlertTitle className="text-sm font-semibold rtl-embed-text text-right">אזהרת העלאה חוזרת</AlertTitle>
+          <AlertDescription className="text-sm space-y-1 rtl-embed-text text-right">
             <p>פעולה זו תמחק את כל הדוחות ההיסטוריים שנאספו בעבר לתלמיד זה ותשמור רק את הייבוא החדש.</p>
             <p>הפעולה בלתי הפיכה. האם להמשיך?</p>
           </AlertDescription>
@@ -828,8 +823,8 @@ export default function LegacyImportModal({
       ) : null}
       {submitError ? (
         <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
-          <AlertTitle className="text-sm font-semibold rtl-embed-text">הייבוא נכשל</AlertTitle>
-          <AlertDescription className="text-sm rtl-embed-text">{submitError}</AlertDescription>
+          <AlertTitle className="text-sm font-semibold rtl-embed-text text-right">הייבוא נכשל</AlertTitle>
+          <AlertDescription className="text-sm rtl-embed-text text-right">{submitError}</AlertDescription>
         </Alert>
       ) : null}
       <div className="legacy-import-nav-row">
