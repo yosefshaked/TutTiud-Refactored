@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { FileSpreadsheet, ShieldAlert, Upload, ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
+import './LegacyImportModal.css';
 
 const STEPS = Object.freeze({
   warning: 'warning',
@@ -283,21 +284,25 @@ export default function LegacyImportModal({
   const renderWarningStep = () => (
     <div className="space-y-4">
       <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
-        <ShieldAlert className="h-5 w-5" aria-hidden="true" />
-        <AlertTitle>חשוב: בצעו גיבוי לפני ייבוא נתוני עבר</AlertTitle>
-        <AlertDescription className="space-y-2 text-sm">
-          <p>
-            ייבוא דוחות היסטוריים ישנה לצמיתות את נתוני הארגון. מומלץ לבצע גיבוי מלא לפני ההעלאה כדי שתוכלו לשחזר במידת הצורך.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" type="button" onClick={handleNavigateToBackup}>
-              מעבר להגדרות גיבוי
-            </Button>
-            <Button type="button" onClick={handleNextFromWarning}>
-              המשך ללא גיבוי
-            </Button>
+        <div className="legacy-import-warning-row">
+          <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+          <div className="legacy-import-warning-text">
+            <AlertTitle className="rtl-embed-text">חשוב: בצעו גיבוי לפני ייבוא נתוני עבר</AlertTitle>
+            <AlertDescription className="space-y-2 text-sm rtl-embed-text">
+              <p>
+                ייבוא דוחות היסטוריים ישנה לצמיתות את נתוני הארגון. מומלץ לבצע גיבוי מלא לפני ההעלאה כדי שתוכלו לשחזר במידת הצורך.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" type="button" onClick={handleNavigateToBackup}>
+                  מעבר להגדרות גיבוי
+                </Button>
+                <Button type="button" onClick={handleNextFromWarning}>
+                  המשך ללא גיבוי
+                </Button>
+              </div>
+            </AlertDescription>
           </div>
-        </AlertDescription>
+        </div>
       </Alert>
       {hasLegacyImport ? (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800">
