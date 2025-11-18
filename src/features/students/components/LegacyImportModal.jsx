@@ -383,6 +383,11 @@ export default function LegacyImportModal({
                 </button>{' '}
                 לביצוע גיבוי לפני ההעלאה.
               </p>
+              <div className="legacy-import-warning-actions">
+                <Button type="button" onClick={handleNextFromWarning}>
+                  המשך
+                </Button>
+              </div>
             </AlertDescription>
           </div>
         </div>
@@ -419,7 +424,7 @@ export default function LegacyImportModal({
           className="legacy-import-row-reverse justify-between text-right rtl-embed-text"
           onClick={() => handleSelectStructure('match')}
         >
-          <div className="flex flex-1 flex-col items-start text-right rtl-embed-text">
+          <div className="flex flex-1 flex-col items-end text-right rtl-embed-text">
             <span className="font-semibold">כן, המבנה תואם</span>
             <span className="text-xs text-neutral-600">אמצו את שאלות הטופס הקיים לבחירת שדות</span>
           </div>
@@ -431,7 +436,7 @@ export default function LegacyImportModal({
           className="legacy-import-row-reverse justify-between text-right rtl-embed-text"
           onClick={() => handleSelectStructure('custom')}
         >
-          <div className="flex flex-1 flex-col items-start text-right rtl-embed-text">
+          <div className="flex flex-1 flex-col items-end text-right rtl-embed-text">
             <span className="font-semibold">לא, מבנה שונה</span>
             <span className="text-xs text-neutral-600">כתבו שמות שאלות מותאמים לעמודות הקיימות</span>
           </div>
@@ -563,7 +568,7 @@ export default function LegacyImportModal({
           className="legacy-import-row-reverse justify-between"
           onClick={() => setServiceMode('fixed')}
         >
-          <div className="flex flex-col items-start text-right rtl-embed-text">
+          <div className="flex flex-col items-end text-right rtl-embed-text">
             <span className="font-semibold">שירות אחיד לכל השורות</span>
             <span className="text-xs text-neutral-600">בחרו שירות אחד או הקלידו שם שירות מותאם</span>
           </div>
@@ -576,7 +581,7 @@ export default function LegacyImportModal({
           disabled={!hasColumns}
           onClick={() => setServiceMode('column')}
         >
-          <div className="flex flex-col items-start text-right rtl-embed-text">
+          <div className="flex flex-col items-end text-right rtl-embed-text">
             <span className="font-semibold">שירות לפי עמודה בקובץ</span>
             <span className="text-xs text-neutral-600">בחרו עמודת שירות מתוך הכותרות שהועלו</span>
           </div>
