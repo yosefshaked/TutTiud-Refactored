@@ -16,3 +16,10 @@
   direction: rtl;
   unicode-bidi: embed;
 }
+
+.legacy-import-warning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
