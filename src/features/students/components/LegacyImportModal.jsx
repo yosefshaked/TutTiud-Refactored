@@ -392,6 +392,11 @@ export default function LegacyImportModal({
           </div>
         </div>
       </Alert>
+      <div className="legacy-import-warning-actions">
+        <Button type="button" onClick={handleNextFromWarning}>
+          המשך
+        </Button>
+      </div>
       {hasLegacyImport ? (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800 rtl-embed-text">
           <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
