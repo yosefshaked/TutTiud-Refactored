@@ -17,6 +17,7 @@ import {
   Loader2,
   ListChecks,
   FilePenLine,
+  Table,
 } from 'lucide-react';
 import './LegacyImportModal.css';
 
@@ -26,6 +27,10 @@ const STEPS = Object.freeze({
   mapping: 'mapping',
   confirm: 'confirm',
 });
+
+// Sentinel for "skip this column" in the match-mapping flow. We can't use an empty string
+// as a Select item value because Radix Select reserves empty string for clearing selection.
+const SKIP_VALUE = '__skip__';
 
 function parseCsvColumns(text) {
   const lines = text.split(/\r?\n/).filter((line) => line.trim());
@@ -117,12 +122,22 @@ export default function LegacyImportModal({
     return entries;
   }, [csvColumns, customLabels, excludedColumns]);
 
+  const effectiveColumnMappings = useMemo(() => {
+    const out = {};
+    for (const [col, val] of Object.entries(columnMappings)) {
+      if (val && val !== SKIP_VALUE) {
+        out[col] = val;
+      }
+    }
+    return out;
+  }, [columnMappings]);
+
   const hasMappings = useMemo(() => {
     if (isMatchFlow) {
-      return Object.values(columnMappings).some((value) => Boolean(value));
+      return Object.keys(effectiveColumnMappings).length > 0;
     }
     return Object.keys(effectiveCustomLabels).length > 0;
-  }, [isMatchFlow, columnMappings, effectiveCustomLabels]);
+  }, [isMatchFlow, effectiveColumnMappings, effectiveCustomLabels]);
 
   const serviceSelectionValid = useMemo(() => {
     if (!hasColumns) {
@@ -350,7 +365,7 @@ export default function LegacyImportModal({
         file: selectedFile,
         structureChoice,
         sessionDateColumn,
-        columnMappings: isMatchFlow ? columnMappings : {},
+        columnMappings: isMatchFlow ? effectiveColumnMappings : {},
         customLabels: isMatchFlow ? {} : effectiveCustomLabels,
         serviceMode,
         serviceValue: effectiveServiceValue,
@@ -454,7 +469,7 @@ export default function LegacyImportModal({
   const renderCsvUpload = () => (
       <div className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4">
       <div className="space-y-1 rtl-embed-text text-right">
-        <Label htmlFor="legacy-csv-upload" className="text-sm font-semibold text-foreground rtl-embed-text text-right">
+        <Label htmlFor="legacy-csv-upload" className="block text-right text-sm font-semibold text-foreground rtl-embed-text">
           העלאת קובץ CSV
         </Label>
         <p className="text-xs text-neutral-600 text-right">בחרו את קובץ ה-CSV עם כותרות העמודות שברצונכם לייבא.</p>
@@ -504,7 +519,7 @@ export default function LegacyImportModal({
 
   const renderSessionDatePicker = () => (
     <div className="space-y-2">
-      <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="session-date-column">
+      <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="session-date-column">
         עמודת תאריך המפגש
       </Label>
       <Select value={sessionDateColumn} onValueChange={setSessionDateColumn}>
@@ -567,7 +582,7 @@ export default function LegacyImportModal({
             <span className="font-semibold">שירות אחיד לכל השורות</span>
             <span className="text-xs text-neutral-600">בחרו שירות אחד או הקלידו שם שירות מותאם</span>
           </div>
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
           type="button"
@@ -580,7 +595,7 @@ export default function LegacyImportModal({
             <span className="font-semibold">שירות לפי עמודה בקובץ</span>
             <span className="text-xs text-neutral-600">בחרו עמודת שירות מתוך הכותרות שהועלו</span>
           </div>
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          <Table className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
 
@@ -588,7 +603,7 @@ export default function LegacyImportModal({
         <div className="space-y-3 rounded-md border border-neutral-200 bg-white p-3">
           {serviceOptions.length ? (
             <div className="space-y-2">
-                <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="fixed-service-select">
+                <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="fixed-service-select">
                 בחירת שירות מהרשימה
               </Label>
               <Select value={selectedService} onValueChange={setSelectedService}>
@@ -610,7 +625,7 @@ export default function LegacyImportModal({
             <p className="text-xs text-neutral-700 rtl-embed-text">לא נמצאו שירותים שמורים בארגון. ניתן להקליד שירות מותאם ידנית.</p>
           )}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="custom-service-input">
+            <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="custom-service-input">
               או הקלידו שם שירות מותאם
             </Label>
             <Input
@@ -625,7 +640,7 @@ export default function LegacyImportModal({
         </div>
       ) : (
         <div className="space-y-2 rounded-md border border-neutral-200 bg-white p-3">
-          <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor="service-column-select">
+          <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="service-column-select">
             עמודת שירות מתוך הקובץ
           </Label>
           <Select
@@ -661,7 +676,7 @@ export default function LegacyImportModal({
       <div className="space-y-3">
         {csvColumns.map((column) => (
           <div key={column} className="space-y-1 rounded-md border border-neutral-200 p-3">
-            <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor={`map-${column}`}>
+            <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor={`map-${column}`}>
               {column}
             </Label>
             <Select
@@ -672,7 +687,7 @@ export default function LegacyImportModal({
                 <SelectValue placeholder="בחרו שאלה או דלגו" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">דלגו על עמודה זו</SelectItem>
+                <SelectItem value={SKIP_VALUE}>דלגו על עמודה זו</SelectItem>
                 {questionOptions.map((question) => (
                   <SelectItem key={question.key} value={question.key}>
                     {question.label}
@@ -701,7 +716,7 @@ export default function LegacyImportModal({
             <div key={column} className="space-y-2 rounded-md border border-neutral-200 p-3">
               <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center sm:justify-between">
                 <div className="flex-1 space-y-1">
-                  <Label className="text-sm font-semibold text-foreground rtl-embed-text text-right" htmlFor={`custom-${column}`}>
+                  <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor={`custom-${column}`}>
                     {column}
                   </Label>
                   <Input
@@ -793,8 +808,8 @@ export default function LegacyImportModal({
           <p className="font-semibold">שדות מיובאים</p>
           {isMatchFlow ? (
             <ul className="list-disc space-y-1 pr-5 text-neutral-700 rtl-embed-text text-right">
-              {Object.entries(columnMappings)
-                .filter(([, value]) => value)
+              {Object.entries(effectiveColumnMappings)
+                .filter(([, value]) => value && value !== SKIP_VALUE)
                 .map(([column, value]) => {
                   const match = questionOptions.find((option) => option.key === value);
                   return (
