@@ -674,29 +674,54 @@ export default function LegacyImportModal({
         </p>
       </div>
       <div className="space-y-3">
-        {csvColumns.map((column) => (
-          <div key={column} className="space-y-1 rounded-md border border-neutral-200 p-3">
-            <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor={`map-${column}`}>
-              {column}
-            </Label>
-            <Select
-              value={columnMappings[column] || ''}
-              onValueChange={(value) => handleMappingChange(column, value)}
-            >
-              <SelectTrigger id={`map-${column}`} className="rtl-embed-text text-right">
-                <SelectValue placeholder="בחרו שאלה או דלגו" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={SKIP_VALUE}>דלגו על עמודה זו</SelectItem>
-                {questionOptions.map((question) => (
-                  <SelectItem key={question.key} value={question.key}>
-                    {question.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ))}
+        {csvColumns.map((column) => {
+          const isDateColumn = sessionDateColumn === column;
+          const isExcluded = Boolean(excludedColumns[column]);
+
+          return (
+            <div key={column} className="space-y-2 rounded-md border border-neutral-200 p-3">
+              <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center sm:justify-between">
+                <div className="flex-1 space-y-1">
+                  <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor={`map-${column}`}>
+                    {column}
+                  </Label>
+                  <Select
+                    value={columnMappings[column] || ''}
+                    onValueChange={(value) => handleMappingChange(column, value)}
+                    disabled={isExcluded}
+                  >
+                    <SelectTrigger id={`map-${column}`} className="rtl-embed-text text-right">
+                      <SelectValue placeholder="בחרו שאלה או דלגו" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SKIP_VALUE}>דלגו על עמודה זו</SelectItem>
+                      {questionOptions.map((question) => (
+                        <SelectItem key={question.key} value={question.key}>
+                          {question.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-neutral-600 rtl-embed-text text-right">
+                    {isDateColumn
+                      ? 'עמודת התאריך מוסתרת כברירת מחדל. בטלו את הסימון כדי להציג אותה גם ברשימת השדות.'
+                      : 'בחרו שאלה מהטופס או דלגו על עמודה זו.'}
+                  </p>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm rtl-embed-text">
+                  <input
+                    type="checkbox"
+                    checked={isExcluded}
+                    onChange={() => toggleColumnInclusion(column)}
+                    className="h-4 w-4 accent-[hsl(var(--primary))]"
+                    aria-label={isExcluded ? 'כלול את העמודה' : 'אל תכללו את העמודה'}
+                  />
+                  <span className="text-right">אל תכללו</span>
+                </label>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
