@@ -389,12 +389,12 @@ export default function LegacyImportModal({
             <AlertTitle className="rtl-embed-text text-right">חשוב: בצעו גיבוי לפני ייבוא נתוני עבר</AlertTitle>
             <AlertDescription className="space-y-2 text-sm rtl-embed-text text-right">
               <p>
-                ייבוא דוחות היסטוריים ישנה לצמיתות את נתוני הארגון. מומלץ לבצע גיבוי מלא לפני ההעלאה כדי שתוכלו לשחזר במידת הצורך.
+                ייבוא דוחות היסטוריים עלול לפגוע בדוחות קיימים. מומלץ לבצע גיבוי מלא לפני ההעלאה כדי שתוכלו לשחזר במידת הצורך.
               </p>
               <p className="text-xs text-red-800 rtl-embed-text text-right">
                 אם כבר ביצעתם גיבוי, אפשר להמשיך. לחצו על{' '}
                 <button type="button" className="legacy-import-warning-link" onClick={handleNavigateToBackup}>
-                  מעבר להגדרות גיבוי
+                  מעבר להגדרות
                 </button>{' '}
                 לביצוע גיבוי לפני ההעלאה.
               </p>
