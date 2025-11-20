@@ -84,7 +84,6 @@ export default function LegacyImportModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [isSelectOpen, setIsSelectOpen] = useState(false);
 
   const questionOptions = useMemo(() => buildQuestionOptions(questions), [questions]);
   const serviceOptions = useMemo(() => {
@@ -187,7 +186,6 @@ export default function LegacyImportModal({
       setIsSubmitting(false);
       setSubmitError('');
       setSelectedFile(null);
-      setIsSelectOpen(false);
     }
   }, [open]);
 
@@ -525,9 +523,9 @@ export default function LegacyImportModal({
         עמודת תאריך המפגש
       </Label>
       <Select
+        modal={true}
         value={sessionDateColumn}
         onValueChange={setSessionDateColumn}
-        onOpenChange={setIsSelectOpen}
       >
         <SelectTrigger id="session-date-column" className="rtl-embed-text text-right">
           <SelectValue placeholder="בחרו את העמודה שמייצגת את תאריך המפגש" />
@@ -613,9 +611,9 @@ export default function LegacyImportModal({
                 בחירת שירות מהרשימה
               </Label>
               <Select
+                modal={true}
                 value={selectedService}
                 onValueChange={setSelectedService}
-                onOpenChange={setIsSelectOpen}
               >
                 <SelectTrigger id="fixed-service-select" className="rtl-embed-text text-right">
                   <SelectValue placeholder="בחרו שירות שיוחל על כל השורות" />
@@ -654,10 +652,10 @@ export default function LegacyImportModal({
             עמודת שירות מתוך הקובץ
           </Label>
           <Select
+            modal={true}
             value={serviceColumn}
             onValueChange={setServiceColumn}
             disabled={!hasColumns}
-            onOpenChange={setIsSelectOpen}
           >
             <SelectTrigger id="service-column-select" className="rtl-embed-text text-right">
               <SelectValue placeholder="בחרו את העמודה שמייצגת את השירות" />
@@ -697,10 +695,10 @@ export default function LegacyImportModal({
                     {column}
                   </Label>
                   <Select
+                    modal={true}
                     value={columnMappings[column] || ''}
                     onValueChange={(value) => handleMappingChange(column, value)}
                     disabled={isExcluded}
-                    onOpenChange={setIsSelectOpen}
                   >
                     <SelectTrigger id={`map-${column}`} className="rtl-embed-text text-right">
                       <SelectValue placeholder="בחרו שאלה או דלגו" />
@@ -929,18 +927,9 @@ export default function LegacyImportModal({
     }
   };
 
-  const handleDialogInteractOutside = (event) => {
-    if (isSelectOpen) {
-      event.preventDefault();
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent
-        className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
-        onInteractOutside={handleDialogInteractOutside}
-      >
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-foreground rtl-embed-text">{title}</DialogTitle>
           {studentName ? (
