@@ -927,9 +927,30 @@ export default function LegacyImportModal({
     }
   };
 
+  const logDialogOutsideEvent = (label, event) => {
+    console.log(`Dialog: ${label} fired`, event?.target);
+  };
+
+  const handleDialogPointerDownOutside = (event) => {
+    logDialogOutsideEvent('onPointerDownOutside', event);
+  };
+
+  const handleDialogFocusOutside = (event) => {
+    logDialogOutsideEvent('onFocusOutside', event);
+  };
+
+  const handleDialogInteractOutside = (event) => {
+    logDialogOutsideEvent('onInteractOutside', event);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
+        onPointerDownOutside={handleDialogPointerDownOutside}
+        onFocusOutside={handleDialogFocusOutside}
+        onInteractOutside={handleDialogInteractOutside}
+      >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-foreground rtl-embed-text">{title}</DialogTitle>
           {studentName ? (
