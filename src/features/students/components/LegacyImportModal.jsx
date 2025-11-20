@@ -84,8 +84,10 @@ export default function LegacyImportModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  // Ref to avoid stale closure inside Radix Dialog outside handlers.
-  const isSelectOpenRef = useRef(false);
+  
+  // Track if ANY Select is currently open to prevent Dialog from closing prematurely on mobile.
+  // Use a ref to avoid stale closures + a counter to handle multiple Selects open simultaneously.
+  const openSelectCountRef = useRef(0);
 
   const questionOptions = useMemo(() => buildQuestionOptions(questions), [questions]);
   const serviceOptions = useMemo(() => {
@@ -188,7 +190,7 @@ export default function LegacyImportModal({
       setIsSubmitting(false);
       setSubmitError('');
       setSelectedFile(null);
-      isSelectOpenRef.current = false;
+      openSelectCountRef.current = 0;
     }
   }, [open]);
 
@@ -334,8 +336,13 @@ export default function LegacyImportModal({
     setStep(STEPS.mapping);
   };
 
-  const handleSelectOpenChange = (nextOpen) => {
-    isSelectOpenRef.current = nextOpen;
+  // Handler to track Select open/close state using a counter (supports multiple Selects)
+  const handleSelectOpenChange = (isOpen) => {
+    openSelectCountRef.current += isOpen ? 1 : -1;
+    // Ensure it doesn't go negative
+    if (openSelectCountRef.current < 0) {
+      openSelectCountRef.current = 0;
+    }
   };
 
   const handleBackToChoice = () => {
@@ -938,36 +945,18 @@ export default function LegacyImportModal({
     }
   };
 
-  const logDialogOutsideEvent = (label, event) => {
-    console.log(`Dialog: ${label} fired`, event?.target);
-  };
-
-  const handleDialogPointerDownOutside = (event) => {
-    // Prevent dialog from closing if a nested Select is currently open.
-    if (isSelectOpenRef.current) {
-      event.preventDefault();
-      return;
-    }
-    console.log('Dialog: onPointerDownOutside fired', {
-      target: event?.target,
-      isSelectOpen: isSelectOpenRef.current,
-    });
-  };
-
-  const handleDialogFocusOutside = (event) => {
-    logDialogOutsideEvent('onFocusOutside', event);
-  };
-
+  // Prevent Dialog from closing if any Select is currently open.
+  // This handler fires BEFORE the Select's onOpenChange(false), so we check the ref.
   const handleDialogInteractOutside = (event) => {
-    logDialogOutsideEvent('onInteractOutside', event);
+    if (openSelectCountRef.current > 0) {
+      event.preventDefault();
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent
+      <DialogContent 
         className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
-        onPointerDownOutside={handleDialogPointerDownOutside}
-        onFocusOutside={handleDialogFocusOutside}
         onInteractOutside={handleDialogInteractOutside}
       >
         <DialogHeader>
