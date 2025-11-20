@@ -84,6 +84,7 @@ export default function LegacyImportModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isSelectOpen, setIsSelectOpen] = useState(false);
 
   const questionOptions = useMemo(() => buildQuestionOptions(questions), [questions]);
   const serviceOptions = useMemo(() => {
@@ -186,6 +187,7 @@ export default function LegacyImportModal({
       setIsSubmitting(false);
       setSubmitError('');
       setSelectedFile(null);
+      setIsSelectOpen(false);
     }
   }, [open]);
 
@@ -329,6 +331,10 @@ export default function LegacyImportModal({
   const handleSelectStructure = (choice) => {
     setStructureChoice(choice);
     setStep(STEPS.mapping);
+  };
+
+  const handleSelectOpenChange = (nextOpen) => {
+    setIsSelectOpen(nextOpen);
   };
 
   const handleBackToChoice = () => {
