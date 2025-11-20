@@ -532,6 +532,7 @@ export default function LegacyImportModal({
         modal={true}
         value={sessionDateColumn}
         onValueChange={setSessionDateColumn}
+        onOpenChange={handleSelectOpenChange}
       >
         <SelectTrigger id="session-date-column" className="rtl-embed-text text-right">
           <SelectValue placeholder="בחרו את העמודה שמייצגת את תאריך המפגש" />
@@ -620,6 +621,7 @@ export default function LegacyImportModal({
                 modal={true}
                 value={selectedService}
                 onValueChange={setSelectedService}
+                onOpenChange={handleSelectOpenChange}
               >
                 <SelectTrigger id="fixed-service-select" className="rtl-embed-text text-right">
                   <SelectValue placeholder="בחרו שירות שיוחל על כל השורות" />
@@ -657,12 +659,13 @@ export default function LegacyImportModal({
           <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="service-column-select">
             עמודת שירות מתוך הקובץ
           </Label>
-          <Select
-            modal={true}
-            value={serviceColumn}
-            onValueChange={setServiceColumn}
-            disabled={!hasColumns}
-          >
+        <Select
+          modal={true}
+          value={serviceColumn}
+          onValueChange={setServiceColumn}
+          onOpenChange={handleSelectOpenChange}
+          disabled={!hasColumns}
+        >
             <SelectTrigger id="service-column-select" className="rtl-embed-text text-right">
               <SelectValue placeholder="בחרו את העמודה שמייצגת את השירות" />
             </SelectTrigger>
@@ -704,6 +707,7 @@ export default function LegacyImportModal({
                     modal={true}
                     value={columnMappings[column] || ''}
                     onValueChange={(value) => handleMappingChange(column, value)}
+                    onOpenChange={handleSelectOpenChange}
                     disabled={isExcluded}
                   >
                     <SelectTrigger id={`map-${column}`} className="rtl-embed-text text-right">
@@ -938,7 +942,10 @@ export default function LegacyImportModal({
   };
 
   const handleDialogPointerDownOutside = (event) => {
-    logDialogOutsideEvent('onPointerDownOutside', event);
+    console.log('Dialog: onPointerDownOutside fired', {
+      target: event?.target,
+      isSelectOpen,
+    });
   };
 
   const handleDialogFocusOutside = (event) => {
