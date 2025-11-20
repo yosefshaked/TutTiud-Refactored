@@ -89,6 +89,7 @@ export default function LegacyImportModal({
   // Use a ref to avoid stale closures + a counter to handle multiple Selects open simultaneously.
   const openSelectCountRef = useRef(0);
   const closeTimeoutRef = useRef(null);
+  const isClosingSelectRef = useRef(false); // Flag to track if we're closing a Select
 
   const questionOptions = useMemo(() => buildQuestionOptions(questions), [questions]);
   const serviceOptions = useMemo(() => {
@@ -192,6 +193,7 @@ export default function LegacyImportModal({
       setSubmitError('');
       setSelectedFile(null);
       openSelectCountRef.current = 0;
+      isClosingSelectRef.current = false;
       if (closeTimeoutRef.current) {
         clearTimeout(closeTimeoutRef.current);
         closeTimeoutRef.current = null;
@@ -344,12 +346,24 @@ export default function LegacyImportModal({
   // Handler to track Select open/close state using a counter (supports multiple Selects)
   const handleSelectOpenChange = (isOpen) => {
     console.log('Select onOpenChange:', { isOpen, currentCount: openSelectCountRef.current });
-    openSelectCountRef.current += isOpen ? 1 : -1;
-    // Ensure it doesn't go negative
-    if (openSelectCountRef.current < 0) {
-      openSelectCountRef.current = 0;
+    
+    if (!isOpen && openSelectCountRef.current > 0) {
+      // Select is closing. Set flag BEFORE decrementing so Dialog knows we're in a close transition.
+      isClosingSelectRef.current = true;
+      
+      // Decrement after a small delay to give Dialog's onInteractOutside time to check the flag
+      setTimeout(() => {
+        openSelectCountRef.current -= 1;
+        if (openSelectCountRef.current < 0) {
+          openSelectCountRef.current = 0;
+        }
+        console.log('Select count after delayed decrement:', openSelectCountRef.current);
+        isClosingSelectRef.current = false;
+      }, 100);
+    } else if (isOpen) {
+      openSelectCountRef.current += 1;
+      console.log('Select count after increment:', openSelectCountRef.current);
     }
-    console.log('Select count after update:', openSelectCountRef.current);
   };
 
   const handleBackToChoice = () => {
@@ -970,8 +984,13 @@ export default function LegacyImportModal({
   // Prevent Dialog from closing if any Select is currently open.
   // This handler fires BEFORE the Select's onOpenChange(false), so we check the ref.
   const handleDialogInteractOutside = (event) => {
-    console.log('Dialog onInteractOutside:', { openSelectCount: openSelectCountRef.current });
-    if (openSelectCountRef.current > 0) {
+    console.log('Dialog onInteractOutside:', { 
+      openSelectCount: openSelectCountRef.current,
+      isClosingSelect: isClosingSelectRef.current 
+    });
+    // Prevent close if Select is open OR if we're in the process of closing a Select
+    if (openSelectCountRef.current > 0 || isClosingSelectRef.current) {
+      console.log('Prevented Dialog interaction - Select is open or closing');
       event.preventDefault();
     }
   };
