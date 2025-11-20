@@ -88,6 +88,7 @@ export default function LegacyImportModal({
   // Track if ANY Select is currently open to prevent Dialog from closing prematurely on mobile.
   // Use a ref to avoid stale closures + a counter to handle multiple Selects open simultaneously.
   const openSelectCountRef = useRef(0);
+  const closeTimeoutRef = useRef(null);
 
   const questionOptions = useMemo(() => buildQuestionOptions(questions), [questions]);
   const serviceOptions = useMemo(() => {
@@ -191,6 +192,10 @@ export default function LegacyImportModal({
       setSubmitError('');
       setSelectedFile(null);
       openSelectCountRef.current = 0;
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
     }
   }, [open]);
 
@@ -338,11 +343,13 @@ export default function LegacyImportModal({
 
   // Handler to track Select open/close state using a counter (supports multiple Selects)
   const handleSelectOpenChange = (isOpen) => {
+    console.log('Select onOpenChange:', { isOpen, currentCount: openSelectCountRef.current });
     openSelectCountRef.current += isOpen ? 1 : -1;
     // Ensure it doesn't go negative
     if (openSelectCountRef.current < 0) {
       openSelectCountRef.current = 0;
     }
+    console.log('Select count after update:', openSelectCountRef.current);
   };
 
   const handleBackToChoice = () => {
@@ -940,14 +947,30 @@ export default function LegacyImportModal({
   })();
 
   const handleDialogChange = (nextOpen) => {
-    if (!nextOpen && onClose) {
-      onClose();
+    console.log('Dialog onOpenChange:', { nextOpen, openSelectCount: openSelectCountRef.current });
+    
+    if (!nextOpen) {
+      // Dialog is trying to close. On mobile, this might fire BEFORE Select's onOpenChange(false).
+      // Add a small delay to let Select update the ref first.
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+      
+      closeTimeoutRef.current = setTimeout(() => {
+        console.log('Dialog close timeout fired, openSelectCount:', openSelectCountRef.current);
+        if (openSelectCountRef.current === 0 && onClose) {
+          onClose();
+        } else {
+          console.log('Prevented Dialog close - Select is still open');
+        }
+      }, 50); // 50ms delay to let Select close event process
     }
   };
 
   // Prevent Dialog from closing if any Select is currently open.
   // This handler fires BEFORE the Select's onOpenChange(false), so we check the ref.
   const handleDialogInteractOutside = (event) => {
+    console.log('Dialog onInteractOutside:', { openSelectCount: openSelectCountRef.current });
     if (openSelectCountRef.current > 0) {
       event.preventDefault();
     }
