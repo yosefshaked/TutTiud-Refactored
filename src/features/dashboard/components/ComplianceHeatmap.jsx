@@ -57,6 +57,15 @@ export function ComplianceHeatmap({ orgId }) {
   )
   const [detailQuickDoc, setDetailQuickDoc] = useState(null)
 
+  useEffect(() => {
+    const now = new Date()
+    const actualWeekStart = startOfWeek(now, { locale: he, weekStartsOn: 0 })
+    setCurrentWeekStart(prev =>
+      prev?.getTime?.() === actualWeekStart.getTime() ? prev : actualWeekStart
+    )
+    setMobileSelectedDate(format(now, 'yyyy-MM-dd'))
+  }, [])
+
   const detailDateLabel = useMemo(() => {
     return formatFullHebrewDate(detailedDayData?.date || detailRequestDate)
   }, [detailedDayData, detailRequestDate])

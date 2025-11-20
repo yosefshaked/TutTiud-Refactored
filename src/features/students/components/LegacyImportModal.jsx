@@ -530,7 +530,6 @@ export default function LegacyImportModal({
       </Label>
       <Select
         modal={true}
-        onOpenChange={handleSelectOpenChange}
         value={sessionDateColumn}
         onValueChange={setSessionDateColumn}
       >
@@ -619,7 +618,6 @@ export default function LegacyImportModal({
               </Label>
               <Select
                 modal={true}
-                onOpenChange={handleSelectOpenChange}
                 value={selectedService}
                 onValueChange={setSelectedService}
               >
@@ -661,7 +659,6 @@ export default function LegacyImportModal({
           </Label>
           <Select
             modal={true}
-            onOpenChange={handleSelectOpenChange}
             value={serviceColumn}
             onValueChange={setServiceColumn}
             disabled={!hasColumns}
@@ -705,7 +702,6 @@ export default function LegacyImportModal({
                   </Label>
                   <Select
                     modal={true}
-                    onOpenChange={handleSelectOpenChange}
                     value={columnMappings[column] || ''}
                     onValueChange={(value) => handleMappingChange(column, value)}
                     disabled={isExcluded}
@@ -937,10 +933,20 @@ export default function LegacyImportModal({
     }
   };
 
+  const logDialogOutsideEvent = (label, event) => {
+    console.log(`Dialog: ${label} fired`, event?.target);
+  };
+
   const handleDialogPointerDownOutside = (event) => {
-    if (isSelectOpen) {
-      event.preventDefault();
-    }
+    logDialogOutsideEvent('onPointerDownOutside', event);
+  };
+
+  const handleDialogFocusOutside = (event) => {
+    logDialogOutsideEvent('onFocusOutside', event);
+  };
+
+  const handleDialogInteractOutside = (event) => {
+    logDialogOutsideEvent('onInteractOutside', event);
   };
 
   return (
@@ -948,6 +954,8 @@ export default function LegacyImportModal({
       <DialogContent
         className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
         onPointerDownOutside={handleDialogPointerDownOutside}
+        onFocusOutside={handleDialogFocusOutside}
+        onInteractOutside={handleDialogInteractOutside}
       >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-foreground rtl-embed-text">{title}</DialogTitle>
