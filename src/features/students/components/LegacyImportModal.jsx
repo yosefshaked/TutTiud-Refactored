@@ -522,7 +522,11 @@ export default function LegacyImportModal({
       <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="session-date-column">
         עמודת תאריך המפגש
       </Label>
-      <Select value={sessionDateColumn} onValueChange={setSessionDateColumn}>
+      <Select
+        modal={true}
+        value={sessionDateColumn}
+        onValueChange={setSessionDateColumn}
+      >
         <SelectTrigger id="session-date-column" className="rtl-embed-text text-right">
           <SelectValue placeholder="בחרו את העמודה שמייצגת את תאריך המפגש" />
         </SelectTrigger>
@@ -606,7 +610,11 @@ export default function LegacyImportModal({
                 <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="fixed-service-select">
                 בחירת שירות מהרשימה
               </Label>
-              <Select value={selectedService} onValueChange={setSelectedService}>
+              <Select
+                modal={true}
+                value={selectedService}
+                onValueChange={setSelectedService}
+              >
                 <SelectTrigger id="fixed-service-select" className="rtl-embed-text text-right">
                   <SelectValue placeholder="בחרו שירות שיוחל על כל השורות" />
                 </SelectTrigger>
@@ -644,6 +652,7 @@ export default function LegacyImportModal({
             עמודת שירות מתוך הקובץ
           </Label>
           <Select
+            modal={true}
             value={serviceColumn}
             onValueChange={setServiceColumn}
             disabled={!hasColumns}
@@ -686,6 +695,7 @@ export default function LegacyImportModal({
                     {column}
                   </Label>
                   <Select
+                    modal={true}
                     value={columnMappings[column] || ''}
                     onValueChange={(value) => handleMappingChange(column, value)}
                     disabled={isExcluded}
@@ -917,9 +927,30 @@ export default function LegacyImportModal({
     }
   };
 
+  const logDialogOutsideEvent = (label, event) => {
+    console.log(`Dialog: ${label} fired`, event?.target);
+  };
+
+  const handleDialogPointerDownOutside = (event) => {
+    logDialogOutsideEvent('onPointerDownOutside', event);
+  };
+
+  const handleDialogFocusOutside = (event) => {
+    logDialogOutsideEvent('onFocusOutside', event);
+  };
+
+  const handleDialogInteractOutside = (event) => {
+    logDialogOutsideEvent('onInteractOutside', event);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
+        onPointerDownOutside={handleDialogPointerDownOutside}
+        onFocusOutside={handleDialogFocusOutside}
+        onInteractOutside={handleDialogInteractOutside}
+      >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-foreground rtl-embed-text">{title}</DialogTitle>
           {studentName ? (
