@@ -22,11 +22,14 @@ import {
 import './LegacyImportModal.css';
 
 const STEPS = Object.freeze({
-  warning: 'warning',
-  choice: 'choice',
+  welcome: 'welcome',
+  upload: 'upload',
   mapping: 'mapping',
+  preview: 'preview',
   confirm: 'confirm',
 });
+
+const STEP_SEQUENCE = [STEPS.welcome, STEPS.upload, STEPS.mapping, STEPS.preview, STEPS.confirm];
 
 // Sentinel for "skip this column" in the match-mapping flow. We can't use an empty string
 // as a Select item value because Radix Select reserves empty string for clearing selection.
@@ -44,6 +47,27 @@ function parseCsvColumns(text) {
     .filter((part) => part);
 }
 
+function parseCsvRows(text, columns, limit = 3) {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length <= 1 || !columns.length) {
+    return [];
+  }
+  const rows = [];
+  for (let i = 1; i < lines.length && rows.length < limit; i += 1) {
+    const raw = lines[i].split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((part) => part.trim().replace(/^"|"$/g, ''));
+    const row = {};
+    columns.forEach((column, index) => {
+      row[column] = raw[index] ?? '';
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+function normalize(str) {
+  return (str || '').toString().trim().toLowerCase();
+}
+
 function buildQuestionOptions(questions) {
   if (!Array.isArray(questions)) {
     return [];
@@ -59,7 +83,6 @@ export default function LegacyImportModal({
   onClose,
   studentName,
   questions,
-  canReupload,
   hasLegacyImport,
   services = [],
   servicesLoading = false,
@@ -68,10 +91,11 @@ export default function LegacyImportModal({
   onSubmit,
 }) {
   const navigate = useNavigate();
-  const [step, setStep] = useState(STEPS.warning);
+  const [step, setStep] = useState(STEPS.welcome);
   const [structureChoice, setStructureChoice] = useState(null); // 'match' | 'custom'
   const [fileName, setFileName] = useState('');
   const [csvColumns, setCsvColumns] = useState([]);
+  const [csvText, setCsvText] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [sessionDateColumn, setSessionDateColumn] = useState('');
   const [columnMappings, setColumnMappings] = useState({});
@@ -84,7 +108,7 @@ export default function LegacyImportModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  
+
   // Track if ANY Select is currently open to prevent Dialog from closing prematurely on mobile.
   // Use a ref to avoid stale closures + a counter to handle multiple Selects open simultaneously.
   const openSelectCountRef = useRef(0);
@@ -131,12 +155,12 @@ export default function LegacyImportModal({
   const effectiveColumnMappings = useMemo(() => {
     const out = {};
     for (const [col, val] of Object.entries(columnMappings)) {
-      if (val && val !== SKIP_VALUE) {
+      if (val && val !== SKIP_VALUE && !excludedColumns[col]) {
         out[col] = val;
       }
     }
     return out;
-  }, [columnMappings]);
+  }, [columnMappings, excludedColumns]);
 
   const hasMappings = useMemo(() => {
     if (isMatchFlow) {
@@ -174,12 +198,40 @@ export default function LegacyImportModal({
 
   const canAdvanceFromMapping = hasColumns && hasDateSelection && hasMappings && serviceSelectionValid;
 
+  const previewRows = useMemo(() => parseCsvRows(csvText, csvColumns, 3), [csvText, csvColumns]);
+
+  const mappedPreviewRows = useMemo(() => {
+    if (!previewRows.length) {
+      return [];
+    }
+
+    if (isMatchFlow) {
+      return previewRows.map((row) => {
+        const mapped = {};
+        Object.entries(effectiveColumnMappings).forEach(([column, value]) => {
+          const match = questionOptions.find((option) => option.key === value);
+          mapped[match?.label || value] = row[column];
+        });
+        return mapped;
+      });
+    }
+
+    return previewRows.map((row) => {
+      const mapped = {};
+      Object.entries(effectiveCustomLabels).forEach(([column, value]) => {
+        mapped[value] = row[column];
+      });
+      return mapped;
+    });
+  }, [previewRows, isMatchFlow, effectiveColumnMappings, effectiveCustomLabels, questionOptions]);
+
   useEffect(() => {
     if (!open) {
-      setStep(STEPS.warning);
+      setStep(STEPS.welcome);
       setStructureChoice(null);
       setFileName('');
       setCsvColumns([]);
+      setCsvText('');
       setUploadError('');
       setSessionDateColumn('');
       setColumnMappings({});
@@ -264,6 +316,28 @@ export default function LegacyImportModal({
     }
   }, [sessionDateColumn]);
 
+  useEffect(() => {
+    if (!isMatchFlow || !hasColumns || !questionOptions.length) {
+      return;
+    }
+
+    setColumnMappings((prev) => {
+      const next = { ...prev };
+      csvColumns.forEach((column) => {
+        if (excludedColumns[column] || next[column]) {
+          return;
+        }
+        const found = questionOptions.find(
+          (option) => normalize(option.label) === normalize(column) || normalize(option.key) === normalize(column),
+        );
+        if (found) {
+          next[column] = found.key;
+        }
+      });
+      return next;
+    });
+  }, [isMatchFlow, hasColumns, questionOptions, csvColumns, excludedColumns]);
+
   const handleNavigateToBackup = () => {
     navigate('/settings#backup');
     if (onClose) {
@@ -275,6 +349,7 @@ export default function LegacyImportModal({
     const file = event?.target?.files?.[0];
     setUploadError('');
     setCsvColumns([]);
+    setCsvText('');
     setSelectedFile(null);
     setFileName('');
     setSessionDateColumn('');
@@ -304,6 +379,7 @@ export default function LegacyImportModal({
         return;
       }
       setCsvColumns(columns);
+      setCsvText(String(text));
       setSelectedFile(file);
       setFileName(file.name);
     };
@@ -334,13 +410,8 @@ export default function LegacyImportModal({
     }));
   };
 
-  const handleNextFromWarning = () => {
-    setStep(STEPS.choice);
-  };
-
   const handleSelectStructure = (choice) => {
     setStructureChoice(choice);
-    setStep(STEPS.mapping);
   };
 
   // Handler to track Select open/close state using a counter (supports multiple Selects)
@@ -359,27 +430,11 @@ export default function LegacyImportModal({
     }
   };
 
-  const handleBackToChoice = () => {
-    setSelectedFile(null);
-    setFileName('');
-    setCsvColumns([]);
-    setUploadError('');
-    setSessionDateColumn('');
-    setColumnMappings({});
-    setCustomLabels({});
-    setExcludedColumns({});
-    setServiceMode('fixed');
-    setSelectedService('');
-    setCustomService('');
-    setServiceColumn('');
-    setStep(STEPS.choice);
-  };
-
   const handleProceedToConfirm = () => {
     if (!canAdvanceFromMapping) {
       return;
     }
-    setStep(STEPS.confirm);
+    setStep(STEPS.preview);
   };
 
   const handleSubmit = async () => {
@@ -414,27 +469,15 @@ export default function LegacyImportModal({
         <div className="legacy-import-warning-row">
           <ShieldAlert className="h-5 w-5" aria-hidden="true" />
           <div className="legacy-import-warning-text">
-            <AlertTitle className="rtl-embed-text text-right">חשוב: בצעו גיבוי לפני ייבוא נתוני עבר</AlertTitle>
+            <AlertTitle className="rtl-embed-text text-right">ייבוא דוחות היסטוריים</AlertTitle>
             <AlertDescription className="space-y-2 text-sm rtl-embed-text text-right">
               <p>
-                ייבוא דוחות היסטוריים עלול לפגוע בדוחות קיימים. מומלץ לבצע גיבוי מלא לפני ההעלאה כדי שתוכלו לשחזר במידת הצורך.
-              </p>
-              <p className="text-xs text-red-800 rtl-embed-text text-right">
-                אם כבר ביצעתם גיבוי, אפשר להמשיך. לחצו על{' '}
-                <button type="button" className="legacy-import-warning-link" onClick={handleNavigateToBackup}>
-                  מעבר להגדרות
-                </button>{' '}
-                לביצוע גיבוי לפני ההעלאה.
+                <strong>חשוב:</strong> לפני ייבוא נתונים, מומלץ לבצע <strong>גיבוי</strong> מלא של נתוני הארגון כדי שתוכלו לשחזר במידת הצורך.
               </p>
             </AlertDescription>
           </div>
         </div>
       </Alert>
-      <div className="legacy-import-warning-actions">
-        <Button type="button" onClick={handleNextFromWarning}>
-          המשך
-        </Button>
-      </div>
       {hasLegacyImport ? (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800 rtl-embed-text">
           <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
@@ -444,58 +487,14 @@ export default function LegacyImportModal({
           </AlertDescription>
         </Alert>
       ) : null}
-    </div>
-  );
-
-  const renderStructureChoice = () => (
-    <div className="space-y-4">
-      <div className="space-y-2 rtl-embed-text text-right">
-        <h3 className="text-base font-semibold text-foreground">האם מבנה ה-CSV תואם את טופס המפגש הנוכחי?</h3>
-        <p className="text-sm text-neutral-600">
-          בחרו האם לעדכן לפי שאלות הטופס הקיים או להזין שמות מותאמים לשדות מהעבר.
-        </p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="legacy-import-row-reverse justify-between text-right rtl-embed-text"
-          onClick={() => handleSelectStructure('match')}
-        >
-          <div className="flex flex-1 flex-col items-start text-right rtl-embed-text">
-            <span className="font-semibold">כן, המבנה תואם</span>
-            <span className="text-xs text-neutral-600">אמצו את שאלות הטופס הקיים לבחירת שדות</span>
-          </div>
-          <ListChecks className="h-4 w-4" aria-hidden="true" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="legacy-import-row-reverse justify-between text-right rtl-embed-text"
-          onClick={() => handleSelectStructure('custom')}
-        >
-          <div className="flex flex-1 flex-col items-start text-right rtl-embed-text">
-            <span className="font-semibold">לא, מבנה שונה</span>
-            <span className="text-xs text-neutral-600">כתבו שמות שאלות מותאמים לעמודות הקיימות</span>
-          </div>
-          <FilePenLine className="h-4 w-4" aria-hidden="true" />
-        </Button>
-      </div>
-      <div className="legacy-import-nav-row">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setStep(STEPS.warning)}
-          className="legacy-import-row-reverse gap-2 text-sm rtl-embed-text"
-        >
-          <ArrowRight className="h-4 w-4" aria-hidden="true" /> חזרה לאזהרת הגיבוי
-        </Button>
-      </div>
+      <p className="text-xs text-neutral-700 rtl-embed-text text-right">
+        צריך לבצע גיבוי? <button type="button" className="legacy-import-warning-link" onClick={handleNavigateToBackup}>עברו להגדרות</button> לפני שממשיכים.
+      </p>
     </div>
   );
 
   const renderCsvUpload = () => (
-      <div className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4">
+    <div className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4">
       <div className="space-y-1 rtl-embed-text text-right">
         <Label htmlFor="legacy-csv-upload" className="block text-right text-sm font-semibold text-foreground rtl-embed-text">
           העלאת קובץ CSV
@@ -545,6 +544,51 @@ export default function LegacyImportModal({
     </div>
   );
 
+  const renderStructureChoice = () => (
+    <div className="space-y-4">
+      <div className="space-y-2 rtl-embed-text text-right">
+        <h3 className="text-base font-semibold text-foreground">האם מבנה ה-CSV תואם את טופס המפגש הנוכחי?</h3>
+        <p className="text-sm text-neutral-600">
+          בחרו האם לעדכן לפי שאלות הטופס הקיים או להזין שמות מותאמים לשדות מהעבר.
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button
+          type="button"
+          variant={structureChoice === 'match' ? 'secondary' : 'outline'}
+          className="legacy-import-row-reverse justify-between text-right"
+          onClick={() => handleSelectStructure('match')}
+        >
+          <div className="flex flex-col items-start rtl-embed-text text-right">
+            <span className="font-semibold">כן, המבנה תואם</span>
+            <span className="text-xs text-neutral-600">בחר באפשרות זו אם לקובץ ה-CSV יש את אותן עמודות כמו בטופס התיעוד הנוכחי. המערכת תנסה למפות אותן אוטומטית.</span>
+          </div>
+          <ListChecks className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant={structureChoice === 'custom' ? 'secondary' : 'outline'}
+          className="legacy-import-row-reverse justify-between text-right"
+          onClick={() => handleSelectStructure('custom')}
+        >
+          <div className="flex flex-col items-start rtl-embed-text text-right">
+            <span className="font-semibold">לא, מבנה שונה</span>
+            <span className="text-xs text-neutral-600">בחר באפשרות זו כדי למפות באופן ידני את עמודות הקובץ לשדות המערכת.</span>
+          </div>
+          <FilePenLine className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderUploadStep = () => (
+    <div className="space-y-6">
+      {renderCsvUpload()}
+      <Separator />
+      {renderStructureChoice()}
+    </div>
+  );
+
   const renderSessionDatePicker = () => (
     <div className="space-y-2">
       <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="session-date-column">
@@ -574,7 +618,7 @@ export default function LegacyImportModal({
   );
 
   const renderServiceSelection = () => (
-      <div className="space-y-3 rounded-md bg-neutral-50 p-4">
+    <div className="space-y-3 rounded-md bg-neutral-50 p-4">
       <div className="legacy-import-row-reverse flex-wrap items-start justify-between gap-3">
         <div className="space-y-1 rtl-embed-text text-right">
           <h4 className="text-sm font-semibold text-foreground">שיוך שירות למפגשים</h4>
@@ -636,7 +680,7 @@ export default function LegacyImportModal({
         <div className="space-y-3 rounded-md border border-neutral-200 bg-white p-3">
           {serviceOptions.length ? (
             <div className="space-y-2">
-                <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="fixed-service-select">
+              <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="fixed-service-select">
                 בחירת שירות מהרשימה
               </Label>
               <Select
@@ -681,13 +725,13 @@ export default function LegacyImportModal({
           <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="service-column-select">
             עמודת שירות מתוך הקובץ
           </Label>
-        <Select
-          modal={true}
-          value={serviceColumn}
-          onValueChange={setServiceColumn}
-          onOpenChange={handleSelectOpenChange}
-          disabled={!hasColumns}
-        >
+          <Select
+            modal={true}
+            value={serviceColumn}
+            onValueChange={setServiceColumn}
+            onOpenChange={handleSelectOpenChange}
+            disabled={!hasColumns}
+          >
             <SelectTrigger id="service-column-select" className="rtl-embed-text text-right">
               <SelectValue placeholder="בחרו את העמודה שמייצגת את השירות" />
             </SelectTrigger>
@@ -708,7 +752,7 @@ export default function LegacyImportModal({
   const renderMatchMapping = () => (
     <div className="space-y-3">
       <div className="space-y-1 rtl-embed-text text-right">
-        <h4 className="text-sm font-semibold text-foreground">מיפוי לשאלות קיימות</h4>
+        <h4 className="text-sm font-semibold text-foreground">מיפוי שדות חובה</h4>
         <p className="text-xs text-neutral-600">
           התאימו כל עמודה לשאלה בטופס המפגש. ניתן להשאיר עמודה ללא מיפוי כדי לדלג עליה.
         </p>
@@ -737,29 +781,30 @@ export default function LegacyImportModal({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={SKIP_VALUE}>דלגו על עמודה זו</SelectItem>
-                      {questionOptions.map((question) => (
-                        <SelectItem key={question.key} value={question.key}>
-                          {question.label}
+                      {questionOptions.map((option) => (
+                        <SelectItem key={option.key} value={option.key}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <p className="text-[11px] text-neutral-600 rtl-embed-text text-right">
-                    {isDateColumn
-                      ? 'עמודת התאריך מוסתרת כברירת מחדל. בטלו את הסימון כדי להציג אותה גם ברשימת השדות.'
-                      : 'בחרו שאלה מהטופס או דלגו על עמודה זו.'}
+                    {!isExcluded ? 'בחרו "דלגו" כדי להחריג עמודה זו.' : 'עמודה זו מוחרגת ולא תיכלל בייבוא.'}
                   </p>
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 text-sm rtl-embed-text">
-                  <input
-                    type="checkbox"
-                    checked={isExcluded}
-                    onChange={() => toggleColumnInclusion(column)}
-                    className="h-4 w-4 accent-[hsl(var(--primary))]"
-                    aria-label={isExcluded ? 'כלול את העמודה' : 'אל תכללו את העמודה'}
-                  />
-                  <span className="text-right">אל תכללו</span>
-                </label>
+                <div className="flex flex-col items-end gap-2 sm:items-center sm:gap-3">
+                  <Button
+                    type="button"
+                    variant={isExcluded ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => toggleColumnInclusion(column)}
+                  >
+                    {isExcluded ? 'הכלל' : 'החרג'}
+                  </Button>
+                  {isDateColumn ? (
+                    <span className="text-[11px] text-neutral-700 rtl-embed-text text-right">עמודת תאריך</span>
+                  ) : null}
+                </div>
               </div>
             </div>
           );
@@ -771,45 +816,44 @@ export default function LegacyImportModal({
   const renderCustomMapping = () => (
     <div className="space-y-3">
       <div className="space-y-1 rtl-embed-text text-right">
-        <h4 className="text-sm font-semibold text-foreground">מיפוי עם שמות מותאמים</h4>
-        <p className="text-xs text-neutral-600">כתבו שם שדה מותאם לכל עמודה שתרצו לכלול בייבוא. השארת השדה ריק תשמור את שם העמודה המקורי.</p>
+        <h4 className="text-sm font-semibold text-foreground">מיפוי שדות חובה</h4>
+        <p className="text-xs text-neutral-600">תנו שם לכל עמודה כפי שהיא צריכה להופיע במערכת.</p>
       </div>
       <div className="space-y-3">
         {csvColumns.map((column) => {
-          const isDateColumn = sessionDateColumn === column;
           const isExcluded = Boolean(excludedColumns[column]);
-
+          const isDateColumn = sessionDateColumn === column;
           return (
             <div key={column} className="space-y-2 rounded-md border border-neutral-200 p-3">
               <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center sm:justify-between">
                 <div className="flex-1 space-y-1">
-                  <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor={`custom-${column}`}>
+                  <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor={`label-${column}`}>
                     {column}
                   </Label>
                   <Input
-                    id={`custom-${column}`}
+                    id={`label-${column}`}
                     value={customLabels[column] || ''}
                     onChange={(event) => handleCustomLabelChange(column, event.target.value)}
-                    placeholder="שם שדה מותאם או השתמשו בשם המקורי"
-                    className="rtl-embed-text text-right"
                     disabled={isExcluded}
+                    className="rtl-embed-text"
                   />
                   <p className="text-[11px] text-neutral-600 rtl-embed-text text-right">
-                    {isDateColumn
-                      ? 'עמודת התאריך מוסתרת כברירת מחדל. בטלו את הסימון כדי להציג אותה גם ברשימת השדות.'
-                      : 'השאירו את השדה ריק כדי להשתמש בשם העמודה המקורי.'}
+                    {!isExcluded ? 'ניתן להשאיר את השם המקורי או להקליד שם מותאם.' : 'עמודה זו מוחרגת ולא תיכלל בייבוא.'}
                   </p>
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 text-sm rtl-embed-text">
-                  <input
-                    type="checkbox"
-                    checked={isExcluded}
-                    onChange={() => toggleColumnInclusion(column)}
-                    className="h-4 w-4 accent-[hsl(var(--primary))]"
-                    aria-label={isExcluded ? 'כלול את העמודה' : 'אל תכללו את העמודה'}
-                  />
-                  <span className="text-right">אל תכללו</span>
-                </label>
+                <div className="flex flex-col items-end gap-2 sm:items-center sm:gap-3">
+                  <Button
+                    type="button"
+                    variant={isExcluded ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => toggleColumnInclusion(column)}
+                  >
+                    {isExcluded ? 'הכלל' : 'החרג'}
+                  </Button>
+                  {isDateColumn ? (
+                    <span className="text-[11px] text-neutral-700 rtl-embed-text text-right">עמודת תאריך</span>
+                  ) : null}
+                </div>
               </div>
             </div>
           );
@@ -820,59 +864,88 @@ export default function LegacyImportModal({
 
   const renderMappingStep = () => (
     <div className="space-y-5">
-      {renderCsvUpload()}
-      {hasColumns ? (
-        <div className="space-y-4">
+      <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
+        <p className="text-sm font-semibold text-foreground">שלב 2: מיפוי שדות</p>
+        <p className="text-sm text-neutral-700">אנא בדוק את המיפוי וודא שכל עמודה מהקובץ משויכת לשדה הנכון במערכת.</p>
+      </div>
+      <div className="space-y-4 rounded-md border border-neutral-200 p-4">
+        <div className="space-y-1 rtl-embed-text text-right">
+          <h4 className="text-sm font-semibold text-foreground">מיפוי שדות חובה</h4>
+          <p className="text-xs text-neutral-600">בחרו את עמודת תאריך המפגש והגדירו שיוך שירות.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           {renderSessionDatePicker()}
           {renderServiceSelection()}
-          <Separator />
-          {isMatchFlow ? renderMatchMapping() : renderCustomMapping()}
         </div>
-      ) : null}
-      <div className="legacy-import-nav-row">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleBackToChoice}
-          className="legacy-import-row-reverse gap-2 text-sm rtl-embed-text"
-        >
-          <ArrowRight className="h-4 w-4" aria-hidden="true" /> חזרה לבחירת מבנה
-        </Button>
-        <Button
-          type="button"
-          onClick={handleProceedToConfirm}
-          disabled={!canAdvanceFromMapping}
-          className="legacy-import-row-reverse gap-2 rtl-embed-text"
-        >
-          המשך לאישור
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        </Button>
       </div>
+      <div className="space-y-4">
+        <div className="space-y-1 rtl-embed-text text-right">
+          <h4 className="text-sm font-semibold text-foreground">מיפוי שאלות המפגש</h4>
+          <p className="text-xs text-neutral-600">התאימו כל עמודה לשדה נכון בטופס או הגדירו שם מותאם.</p>
+        </div>
+        {isMatchFlow ? renderMatchMapping() : renderCustomMapping()}
+      </div>
+    </div>
+  );
+
+  const renderPreviewStep = () => (
+    <div className="space-y-4">
+      <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
+        <p className="text-sm font-semibold text-foreground">שלב 3: תצוגה מקדימה ואימות</p>
+        <p className="text-sm text-neutral-700">
+          כך המערכת מפרשת את הנתונים שלך. אנא ודא שהשורות הראשונות מעובדות כהלכה לפני שתמשיך.
+        </p>
+      </div>
+      {!mappedPreviewRows.length ? (
+        <p className="text-sm text-neutral-700 rtl-embed-text text-right">לא נמצאו שורות תצוגה מקדימה. ודאו שקובץ ה-CSV כולל נתונים מעבר לשורת הכותרות.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border border-neutral-200">
+          <table className="min-w-full divide-y divide-neutral-200 text-right rtl-embed-text">
+            <thead className="bg-neutral-50 text-xs font-semibold text-neutral-700">
+              <tr>
+                {Object.keys(mappedPreviewRows[0]).map((header) => (
+                  <th key={header} scope="col" className="px-4 py-2 text-right">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 text-sm">
+              {mappedPreviewRows.map((row, index) => (
+                <tr key={`preview-${index}`} className="bg-white">
+                  {Object.keys(row).map((header) => (
+                    <td key={`${header}-${index}`} className="px-4 py-2 text-neutral-800">
+                      {row[header] || '—'}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 
   const renderConfirmStep = () => (
     <div className="space-y-4">
-      <div className="space-y-1 rtl-embed-text text-right">
-        <h3 className="text-base font-semibold text-foreground">אישור סופי</h3>
-        <p className="text-sm text-neutral-700">
-          פעולה זו קבועה ואינה ניתנת לביטול עבור תלמיד זה.
-          {!canReupload ? ' לא תוכלו להעלות שוב ללא הפעלה של הרשאת העלאה חוזרת.' : ''}
-        </p>
+      <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
+        <p className="text-sm font-semibold text-foreground">שלב 4: סיכום ואישור ייבוא</p>
+        <p className="text-sm text-neutral-700">בדקו את הסיכום לפני אישור הייבוא.</p>
       </div>
-      <div className="space-y-3 rounded-md bg-neutral-50 p-4">
-        <div className="flex items-center gap-2 text-sm text-neutral-800 rtl-embed-text text-right">
-          <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
-          <span>קובץ: {fileName}</span>
+      <div className="space-y-3 rounded-md border border-neutral-200 p-4">
+        <div className="space-y-1 rtl-embed-text text-right">
+          <h4 className="text-sm font-semibold text-foreground">פרטי קובץ</h4>
+          <p className="text-sm text-neutral-700">שם הקובץ: {fileName || 'לא נבחר קובץ'}</p>
         </div>
-        <div className="text-sm text-neutral-800 rtl-embed-text text-right">תאריך מפגש מתוך: {sessionDateColumn}</div>
-        <div className="text-sm text-neutral-800 rtl-embed-text text-right">
-          {serviceMode === 'column'
-            ? `שירות לפי עמודה: ${serviceColumn}`
-            : `שירות לכל המפגשים: ${effectiveServiceValue ? effectiveServiceValue : 'ללא שירות מוגדר'}`}
+        <Separator />
+        <div className="space-y-1 rtl-embed-text text-right">
+          <h4 className="text-sm font-semibold text-foreground">תצורת מיפוי</h4>
+          <p className="text-sm text-neutral-700">בחירת מבנה: {structureChoice === 'match' ? 'התאמת שדות קיימים' : 'שמות מותאמים אישית'}</p>
         </div>
-        <div className="space-y-2 text-sm text-neutral-800 rtl-embed-text text-right">
-          <p className="font-semibold">שדות מיובאים</p>
+        <Separator />
+        <div className="space-y-2 rtl-embed-text text-right">
+          <h4 className="text-sm font-semibold text-foreground">מיפויים שנקבעו</h4>
           {isMatchFlow ? (
             <ul className="list-disc space-y-1 pr-5 text-neutral-700 rtl-embed-text text-right">
               {Object.entries(effectiveColumnMappings)
@@ -909,49 +982,131 @@ export default function LegacyImportModal({
           <AlertDescription className="text-sm rtl-embed-text text-right">{submitError}</AlertDescription>
         </Alert>
       ) : null}
-      <div className="legacy-import-nav-row">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setStep(STEPS.mapping)}
-          className="legacy-import-row-reverse gap-2 text-sm rtl-embed-text"
-        >
-          <ArrowRight className="h-4 w-4" aria-hidden="true" /> חזרה למיפוי
-        </Button>
-        <Button
-          type="button"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="legacy-import-row-reverse gap-2 rtl-embed-text"
-        >
-          {isSubmitting ? (
-            <>
-              <Upload className="h-4 w-4 animate-spin" aria-hidden="true" />
-              מייבא...
-            </>
-          ) : (
-            <>
-              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              אישור וייבוא
-            </>
-          )}
-        </Button>
-      </div>
     </div>
   );
 
   const title = (() => {
-    if (step === STEPS.warning) {
+    if (step === STEPS.welcome) {
       return 'ייבוא דוחות היסטוריים';
     }
-    if (step === STEPS.choice) {
-      return 'בחירת מבנה הקובץ';
+    if (step === STEPS.upload) {
+      return 'שלב 1: העלאת קובץ ובחירת מבנה';
     }
     if (step === STEPS.mapping) {
-      return 'מיפוי עמודות CSV';
+      return 'שלב 2: מיפוי שדות';
     }
-    return 'אישור ייבוא';
+    if (step === STEPS.preview) {
+      return 'שלב 3: תצוגה מקדימה ואימות';
+    }
+    return 'שלב 4: סיכום ואישור ייבוא';
   })();
+
+  const canProceedFromUpload = hasColumns && Boolean(structureChoice);
+
+  const currentStepIndex = STEP_SEQUENCE.indexOf(step);
+  const canGoBack = currentStepIndex > 0;
+
+  const handleBack = () => {
+    if (!canGoBack) {
+      return;
+    }
+    const previousStep = STEP_SEQUENCE[currentStepIndex - 1];
+    setStep(previousStep);
+  };
+
+  const handleNext = () => {
+    if (step === STEPS.welcome) {
+      setStep(STEPS.upload);
+      return;
+    }
+
+    if (step === STEPS.upload && canProceedFromUpload) {
+      setStep(STEPS.mapping);
+      return;
+    }
+
+    if (step === STEPS.mapping) {
+      handleProceedToConfirm();
+      return;
+    }
+
+    if (step === STEPS.preview) {
+      setStep(STEPS.confirm);
+      return;
+    }
+
+    if (step === STEPS.confirm) {
+      handleSubmit();
+    }
+  };
+
+  const nextDisabled = (() => {
+    if (step === STEPS.upload) {
+      return !canProceedFromUpload;
+    }
+    if (step === STEPS.mapping) {
+      return !canAdvanceFromMapping;
+    }
+    if (step === STEPS.confirm) {
+      return isSubmitting;
+    }
+    return false;
+  })();
+
+  const nextLabel = (() => {
+    if (step === STEPS.preview) {
+      return 'המשך';
+    }
+    if (step === STEPS.confirm) {
+      return isSubmitting ? 'מייבא...' : 'אישור וייבוא';
+    }
+    return 'הבא';
+  })();
+
+  const footer = (
+    <div className="legacy-import-footer">
+      {canGoBack ? (
+        <Button type="button" variant="ghost" onClick={handleBack} className="legacy-import-row-reverse gap-2 rtl-embed-text">
+          <ArrowRight className="h-4 w-4" aria-hidden="true" /> חזור
+        </Button>
+      ) : (
+        <span />
+      )}
+      <div className="flex items-center gap-2">
+        {step === STEPS.confirm ? (
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="legacy-import-row-reverse gap-2 rtl-embed-text"
+          >
+            {isSubmitting ? (
+              <>
+                <Upload className="h-4 w-4 animate-spin" aria-hidden="true" />
+                מייבא...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                אישור וייבוא
+              </>
+            )}
+          </Button>
+        ) : null}
+        {step !== STEPS.confirm ? (
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={nextDisabled}
+            className="legacy-import-row-reverse gap-2 rtl-embed-text"
+          >
+            {step === STEPS.mapping ? <ArrowLeft className="h-4 w-4" aria-hidden="true" /> : null}
+            {nextLabel}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
 
   const handleDialogChange = (nextOpen) => {
     if (!nextOpen) {
@@ -960,7 +1115,7 @@ export default function LegacyImportModal({
       if (closeTimeoutRef.current) {
         clearTimeout(closeTimeoutRef.current);
       }
-      
+
       closeTimeoutRef.current = setTimeout(() => {
         if (openSelectCountRef.current === 0 && onClose) {
           onClose();
@@ -978,9 +1133,10 @@ export default function LegacyImportModal({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent 
+      <DialogContent
         className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
         onInteractOutside={handleDialogInteractOutside}
+        footer={footer}
       >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-foreground rtl-embed-text">{title}</DialogTitle>
@@ -989,9 +1145,10 @@ export default function LegacyImportModal({
           ) : null}
         </DialogHeader>
         <div className="space-y-4">
-          {step === STEPS.warning ? renderWarningStep() : null}
-          {step === STEPS.choice ? renderStructureChoice() : null}
+          {step === STEPS.welcome ? renderWarningStep() : null}
+          {step === STEPS.upload ? renderUploadStep() : null}
           {step === STEPS.mapping ? renderMappingStep() : null}
+          {step === STEPS.preview ? renderPreviewStep() : null}
           {step === STEPS.confirm ? renderConfirmStep() : null}
         </div>
       </DialogContent>
