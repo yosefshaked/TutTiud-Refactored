@@ -18,6 +18,71 @@ A living checklist of patterns that frequently trip up automated coders in this 
 - When dropdowns are inside a Dialog, the overlay must allow scroll: set `data-scroll-lock-ignore` and ensure the viewport/list has `overflow-y-auto`.
 - Do not wrap editable `<Input>` inside `PopoverTrigger` — it breaks typing. Trigger only with the chevron/button.
 
+## Mobile-only: Dialog closes when Select dropdown dismissed ⚠️ CRITICAL
+**The Problem:** On real mobile devices (not desktop emulators), tapping outside a nested `<Select>` dropdown to close it also closes the parent `<Dialog>` modal. This does NOT happen on desktop.
+
+**Root Cause:** Mobile touch event timing. The sequence is:
+1. User taps outside Select
+2. **Select's `onOpenChange(false)` fires FIRST**
+3. **Dialog's `onInteractOutside` fires SECOND** (too late to check if Select was open)
+
+**The Solution: Delayed Decrement Pattern**
+Always use this pattern when a Dialog contains any Select components:
+
+```javascript
+// In the Modal component (e.g., NewSessionModal.jsx):
+const openSelectCountRef = useRef(0);
+const isClosingSelectRef = useRef(false);
+
+// Handler to track Select open/close (pass to all Select components via props)
+const handleSelectOpenChange = useCallback((isOpen) => {
+  if (!isOpen && openSelectCountRef.current > 0) {
+    // Select is closing - set flag BEFORE decrementing
+    isClosingSelectRef.current = true;
+    
+    // Delay decrement by 100ms to give Dialog's event handler time to check the flag
+    setTimeout(() => {
+      openSelectCountRef.current -= 1;
+      if (openSelectCountRef.current < 0) openSelectCountRef.current = 0;
+      isClosingSelectRef.current = false;
+    }, 100);
+  } else if (isOpen) {
+    openSelectCountRef.current += 1;
+  }
+}, []);
+
+// Dialog outside interaction handler
+const handleDialogInteractOutside = useCallback((event) => {
+  // Block close if Select is open OR in the process of closing
+  if (openSelectCountRef.current > 0 || isClosingSelectRef.current) {
+    event.preventDefault();
+  }
+}, []);
+
+// Apply to DialogContent
+<DialogContent onInteractOutside={handleDialogInteractOutside}>
+
+// Pass to all Select components (directly or via form props)
+<Select onOpenChange={handleSelectOpenChange}>
+// OR for SelectField wrapper:
+<SelectField onOpenChange={handleSelectOpenChange}>
+```
+
+**Files Already Fixed:**
+- `LegacyImportModal.jsx` ✅
+- `NewSessionModal.jsx` + `NewSessionForm.jsx` ✅
+- `EditStudentModal.jsx` + `EditStudentForm.jsx` ✅
+- `StudentManagementPage.jsx` + `AddStudentForm.jsx` ✅
+- `SelectField.jsx` (wrapper component) ✅
+
+**Why This Works:**
+- The `isClosingSelectRef.current = true` flag is set **immediately** when Select starts closing
+- When `onInteractOutside` fires microseconds later, it sees the flag and blocks the Dialog close
+- The counter is decremented 100ms later (after all events have settled)
+- Supports multiple Selects open simultaneously via counter pattern
+
+**Testing:** Always test on a real mobile device. Desktop Chrome DevTools mobile emulation does NOT reproduce this bug.
+
 ## CSV/Forms specifics
 - Labels: use `rtl-embed-text text-right`.
 - Helper lines: prefer `text-right` for Hebrew.

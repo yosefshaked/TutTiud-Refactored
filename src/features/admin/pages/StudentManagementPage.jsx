@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,10 @@ export default function StudentManagementPage() {
   const [instructorFilterId, setInstructorFilterId] = useState('');
   const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE); // Default sort by schedule
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
+
+  // Mobile fix: prevent Dialog close when Select is open/closing
+  const openSelectCountRef = useRef(0);
+  const isClosingSelectRef = useRef(false);
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -245,6 +249,29 @@ export default function StudentManagementPage() {
       setCreateError('');
     }
   };
+
+  // Mobile fix: Track Select open/close state to prevent Dialog from closing
+  const handleSelectOpenChange = useCallback((isOpen) => {
+    if (!isOpen && openSelectCountRef.current > 0) {
+      isClosingSelectRef.current = true;
+      setTimeout(() => {
+        openSelectCountRef.current -= 1;
+        if (openSelectCountRef.current < 0) {
+          openSelectCountRef.current = 0;
+        }
+        isClosingSelectRef.current = false;
+      }, 100);
+    } else if (isOpen) {
+      openSelectCountRef.current += 1;
+    }
+  }, []);
+
+  // Mobile fix: Prevent Dialog close if Select is open or closing
+  const handleDialogInteractOutside = useCallback((event) => {
+    if (openSelectCountRef.current > 0 || isClosingSelectRef.current) {
+      event.preventDefault();
+    }
+  }, []);
 
   const handleCreateStudent = async ({
     name,
@@ -693,7 +720,8 @@ export default function StudentManagementPage() {
 
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) handleCloseAddDialog(); }}>
         <DialogContent 
-          className="sm:max-w-xl" 
+          className="sm:max-w-xl"
+          onInteractOutside={handleDialogInteractOutside}
           footer={
             <AddStudentFormFooter
               onSubmit={() => document.getElementById('add-student-form')?.requestSubmit()}
@@ -711,6 +739,7 @@ export default function StudentManagementPage() {
             isSubmitting={isCreatingStudent}
             error={createError}
             renderFooterOutside={true}
+            onSelectOpenChange={handleSelectOpenChange}
           />
         </DialogContent>
       </Dialog>

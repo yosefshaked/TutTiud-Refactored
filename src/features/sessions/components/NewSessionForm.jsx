@@ -35,6 +35,7 @@ export default function NewSessionForm({
   renderFooterOutside = false, // New prop to control footer rendering
   onSelectedStudentChange, // Callback to notify parent of selection changes
   onFormValidityChange, // Callback to inform parent when form validity changes
+  onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
@@ -294,6 +295,7 @@ export default function NewSessionForm({
                 <Select
                   value={studentScope}
                   onValueChange={(v) => onScopeChange?.(v)}
+                  onOpenChange={onSelectOpenChange}
                   disabled={isSubmitting}
                 >
                   <SelectTrigger>

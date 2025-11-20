@@ -345,24 +345,17 @@ export default function LegacyImportModal({
 
   // Handler to track Select open/close state using a counter (supports multiple Selects)
   const handleSelectOpenChange = (isOpen) => {
-    console.log('Select onOpenChange:', { isOpen, currentCount: openSelectCountRef.current });
-    
     if (!isOpen && openSelectCountRef.current > 0) {
-      // Select is closing. Set flag BEFORE decrementing so Dialog knows we're in a close transition.
       isClosingSelectRef.current = true;
-      
-      // Decrement after a small delay to give Dialog's onInteractOutside time to check the flag
       setTimeout(() => {
         openSelectCountRef.current -= 1;
         if (openSelectCountRef.current < 0) {
           openSelectCountRef.current = 0;
         }
-        console.log('Select count after delayed decrement:', openSelectCountRef.current);
         isClosingSelectRef.current = false;
       }, 100);
     } else if (isOpen) {
       openSelectCountRef.current += 1;
-      console.log('Select count after increment:', openSelectCountRef.current);
     }
   };
 
@@ -961,8 +954,6 @@ export default function LegacyImportModal({
   })();
 
   const handleDialogChange = (nextOpen) => {
-    console.log('Dialog onOpenChange:', { nextOpen, openSelectCount: openSelectCountRef.current });
-    
     if (!nextOpen) {
       // Dialog is trying to close. On mobile, this might fire BEFORE Select's onOpenChange(false).
       // Add a small delay to let Select update the ref first.
@@ -971,26 +962,16 @@ export default function LegacyImportModal({
       }
       
       closeTimeoutRef.current = setTimeout(() => {
-        console.log('Dialog close timeout fired, openSelectCount:', openSelectCountRef.current);
         if (openSelectCountRef.current === 0 && onClose) {
           onClose();
-        } else {
-          console.log('Prevented Dialog close - Select is still open');
         }
       }, 50); // 50ms delay to let Select close event process
     }
   };
 
   // Prevent Dialog from closing if any Select is currently open.
-  // This handler fires BEFORE the Select's onOpenChange(false), so we check the ref.
   const handleDialogInteractOutside = (event) => {
-    console.log('Dialog onInteractOutside:', { 
-      openSelectCount: openSelectCountRef.current,
-      isClosingSelect: isClosingSelectRef.current 
-    });
-    // Prevent close if Select is open OR if we're in the process of closing a Select
     if (openSelectCountRef.current > 0 || isClosingSelectRef.current) {
-      console.log('Prevented Dialog interaction - Select is open or closing');
       event.preventDefault();
     }
   };
