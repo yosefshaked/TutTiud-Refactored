@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -84,7 +84,8 @@ export default function LegacyImportModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [isSelectOpen, setIsSelectOpen] = useState(false);
+  // Ref to avoid stale closure inside Radix Dialog outside handlers.
+  const isSelectOpenRef = useRef(false);
 
   const questionOptions = useMemo(() => buildQuestionOptions(questions), [questions]);
   const serviceOptions = useMemo(() => {
@@ -187,7 +188,7 @@ export default function LegacyImportModal({
       setIsSubmitting(false);
       setSubmitError('');
       setSelectedFile(null);
-      setIsSelectOpen(false);
+      isSelectOpenRef.current = false;
     }
   }, [open]);
 
@@ -334,7 +335,7 @@ export default function LegacyImportModal({
   };
 
   const handleSelectOpenChange = (nextOpen) => {
-    setIsSelectOpen(nextOpen);
+    isSelectOpenRef.current = nextOpen;
   };
 
   const handleBackToChoice = () => {
@@ -942,9 +943,14 @@ export default function LegacyImportModal({
   };
 
   const handleDialogPointerDownOutside = (event) => {
+    // Prevent dialog from closing if a nested Select is currently open.
+    if (isSelectOpenRef.current) {
+      event.preventDefault();
+      return;
+    }
     console.log('Dialog: onPointerDownOutside fired', {
       target: event?.target,
-      isSelectOpen,
+      isSelectOpen: isSelectOpenRef.current,
     });
   };
 
