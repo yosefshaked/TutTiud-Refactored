@@ -917,9 +917,27 @@ export default function LegacyImportModal({
     }
   };
 
+  const handleDialogInteractOutside = (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    if (
+      target.closest('[data-radix-select-content]') ||
+      target.closest('[data-radix-select-viewport]') ||
+      target.closest('[data-radix-select-item]')
+    ) {
+      event.preventDefault();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
+        onInteractOutside={handleDialogInteractOutside}
+      >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-foreground rtl-embed-text">{title}</DialogTitle>
           {studentName ? (
