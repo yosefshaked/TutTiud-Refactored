@@ -1008,36 +1008,63 @@ export default function LegacyImportModal({
         {!mappedPreviewRows.length ? (
           <p className="text-sm text-neutral-700 rtl-embed-text text-right">לא נמצאו שורות תצוגה מקדימה. ודאו שקובץ ה-CSV כולל נתונים מעבר לשורת הכותרות.</p>
         ) : (
-          <div className="legacy-import-table-wrapper">
-            <table className="legacy-import-table">
-              <thead>
-                <tr>
-                  {Object.keys(mappedPreviewRows[0]).map((header) => {
-                    const isDateHeader = header.includes('תאריך מפגש');
-                    return (
-                      <th key={header} scope="col" className={isDateHeader ? 'legacy-import-date-col' : undefined}>
-                        {header}
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {mappedPreviewRows.map((row, index) => (
-                  <tr key={`preview-${index}`}>
-                    {Object.keys(row).map((header) => {
+          <>
+            <div className="legacy-import-preview-mobile">
+              {mappedPreviewRows.slice(0, 2).map((row, index) => (
+                <div className="legacy-import-preview-card space-y-2" key={`preview-mobile-${index}`}>
+                  <div className="flex items-center justify-between rtl-embed-text text-right">
+                    <p className="text-sm font-semibold text-foreground">דוגמה {index + 1}</p>
+                    <span className="text-[11px] text-neutral-600">תצוגה ניידת</span>
+                  </div>
+                  <dl className="legacy-import-preview-list rtl-embed-text text-right">
+                    {Object.entries(row).map(([header, value]) => {
                       const isDateHeader = header.includes('תאריך מפגש');
                       return (
-                        <td key={`${header}-${index}`} className={isDateHeader ? 'legacy-import-date-col' : undefined}>
-                          {row[header] || '—'}
-                        </td>
+                        <div className="legacy-import-preview-list-row" key={`${header}-${index}`}>
+                          <dt className="legacy-import-preview-term" aria-label={`${header} label`}>
+                            {header}
+                          </dt>
+                          <dd className={`legacy-import-preview-value${isDateHeader ? ' legacy-import-preview-date' : ''}`}>
+                            {value || '—'}
+                          </dd>
+                        </div>
+                      );
+                    })}
+                  </dl>
+                </div>
+              ))}
+            </div>
+            <div className="legacy-import-table-wrapper legacy-import-preview-desktop">
+              <table className="legacy-import-table">
+                <thead>
+                  <tr>
+                    {Object.keys(mappedPreviewRows[0]).map((header) => {
+                      const isDateHeader = header.includes('תאריך מפגש');
+                      return (
+                        <th key={header} scope="col" className={isDateHeader ? 'legacy-import-date-col' : undefined}>
+                          {header}
+                        </th>
                       );
                     })}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {mappedPreviewRows.map((row, index) => (
+                    <tr key={`preview-${index}`}>
+                      {Object.keys(row).map((header) => {
+                        const isDateHeader = header.includes('תאריך מפגש');
+                        return (
+                          <td key={`${header}-${index}`} className={isDateHeader ? 'legacy-import-date-col' : undefined}>
+                            {row[header] || '—'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
