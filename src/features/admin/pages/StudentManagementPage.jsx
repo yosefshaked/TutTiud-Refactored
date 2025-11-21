@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Loader2, Pencil, Search, X, User, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
@@ -461,16 +462,19 @@ export default function StudentManagementPage() {
         <div className="flex items-center gap-3 self-start">
           <div className="flex items-center gap-2 text-sm">
             <label htmlFor="students-filter-combined" className="text-neutral-600">הצג:</label>
-            <select
-              id="students-filter-combined"
-              className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground w-[clamp(8rem,20vw,12rem)]"
+            <Select
               value={combinedFilterValue}
-              onChange={handleCombinedFilterChange}
+              onValueChange={handleCombinedFilterChange}
             >
-              {combinedFilterOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              <SelectTrigger id="students-filter-combined" className="w-[clamp(8rem,20vw,12rem)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {combinedFilterOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -519,29 +523,35 @@ export default function StudentManagementPage() {
           />
           <div className="flex items-center gap-2 text-sm">
             <label htmlFor="students-status" className="text-neutral-600 whitespace-nowrap">מצב:</label>
-            <select
-              id="students-status"
-              className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+            <Select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onValueChange={(value) => setStatusFilter(value)}
             >
-              <option value="active">תלמידים פעילים</option>
-              <option value="inactive">תלמידים לא פעילים</option>
-              <option value="all">הצג הכל</option>
-            </select>
+              <SelectTrigger id="students-status" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">תלמידים פעילים</SelectItem>
+                <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
+                <SelectItem value="all">הצג הכל</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <label htmlFor="students-sort" className="text-neutral-600 whitespace-nowrap">מיון:</label>
-            <select
-              id="students-sort"
-              className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value={STUDENT_SORT_OPTIONS.SCHEDULE}>יום ושעה</option>
-                <option value={STUDENT_SORT_OPTIONS.NAME}>שם התלמיד</option>
-                <option value={STUDENT_SORT_OPTIONS.INSTRUCTOR}>מדריך</option>
-              </select>
+            <Select
+              value={sortBy}
+              onValueChange={(value) => setSortBy(value)}
+            >
+              <SelectTrigger id="students-sort" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={STUDENT_SORT_OPTIONS.SCHEDULE}>יום ושעה</SelectItem>
+                <SelectItem value={STUDENT_SORT_OPTIONS.NAME}>שם התלמיד</SelectItem>
+                <SelectItem value={STUDENT_SORT_OPTIONS.INSTRUCTOR}>מדריך</SelectItem>
+              </SelectContent>
+            </Select>
             </div>
             {hasActiveFilters && (
               <Button

@@ -326,17 +326,21 @@ export default function NewSessionForm({
                 <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
                   מצב:
                 </Label>
-                <select
-                  id="session-status-filter"
-                  className="min-h-[44px] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-foreground"
+                <Select
                   value={statusFilter}
-                  onChange={(event) => onStatusFilterChange?.(event.target.value)}
+                  onValueChange={(value) => onStatusFilterChange?.(value)}
+                  onOpenChange={onSelectOpenChange}
                   disabled={isSubmitting || !visibilityLoaded}
                 >
-                  <option value="active">תלמידים פעילים</option>
-                  <option value="inactive">תלמידים לא פעילים</option>
-                  <option value="all">הצג הכל</option>
-                </select>
+                  <SelectTrigger id="session-status-filter" className="w-auto min-w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">תלמידים פעילים</SelectItem>
+                    <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
+                    <SelectItem value="all">הצג הכל</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             ) : null}
             {hasActiveFilters ? (
@@ -372,9 +376,7 @@ export default function NewSessionForm({
               const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
               return (
                 <SelectItem key={student.id} value={student.id}>
-                  <span className="block text-right w-full">
-                    {student.name || 'ללא שם'} — {schedule}
-                  </span>
+                  {student.name || 'ללא שם'} — {schedule}
                 </SelectItem>
               );
             })}
@@ -580,23 +582,24 @@ export default function NewSessionForm({
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <select
-                      id={questionId}
-                      className="w-full min-h-[44px] rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    <Select
                       value={answerValue ?? ''}
-                      onChange={(e) => handleAnswerChange(question.key, e)}
+                      onValueChange={(value) => updateAnswer(question.key, value)}
+                      onOpenChange={onSelectOpenChange}
                       disabled={isSubmitting || questionOptions.length === 0}
                       required={required}
                     >
-                      <option value="" disabled>
-                        בחרו אפשרות
-                      </option>
-                      {questionOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger id={questionId} className="w-full">
+                        <SelectValue placeholder="בחרו אפשרות" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {questionOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     {questionOptions.length === 0 ? (
                       <p className="text-xs text-neutral-500">אין אפשרויות זמינות לשאלה זו.</p>
                     ) : null}
