@@ -108,6 +108,7 @@ export default function LegacyImportModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Track if ANY Select is currently open to prevent Dialog from closing prematurely on mobile.
   // Use a ref to avoid stale closures + a counter to handle multiple Selects open simultaneously.
@@ -200,6 +201,63 @@ export default function LegacyImportModal({
 
   const previewRows = useMemo(() => parseCsvRows(csvText, csvColumns, 3), [csvText, csvColumns]);
 
+  const parseSessionDateValue = (value) => {
+    const raw = (value ?? '').toString().trim();
+    if (!raw) {
+      return { original: raw, parsed: '—' };
+    }
+
+    const attemptDate = (date) => {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+        return null;
+      }
+      return date.toLocaleDateString('he-IL');
+    };
+
+    const excelSerial = Number(raw);
+    if (!Number.isNaN(excelSerial) && raw !== '') {
+      const base = new Date(Date.UTC(1899, 11, 30));
+      const parsed = attemptDate(new Date(base.getTime() + excelSerial * 24 * 60 * 60 * 1000));
+      if (parsed) {
+        return { original: raw, parsed };
+      }
+    }
+
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      const [year, month, day] = isoMatch.slice(1).map(Number);
+      const parsed = attemptDate(new Date(Date.UTC(year, month - 1, day)));
+      if (parsed) {
+        return { original: raw, parsed };
+      }
+    }
+
+    const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (slashMatch) {
+      const [day, month, year] = slashMatch.slice(1).map(Number);
+      const parsed = attemptDate(new Date(Date.UTC(year, month - 1, day)));
+      if (parsed) {
+        return { original: raw, parsed };
+      }
+    }
+
+    const dotMatch = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (dotMatch) {
+      const [day, month, year] = dotMatch.slice(1).map(Number);
+      const parsed = attemptDate(new Date(Date.UTC(year, month - 1, day)));
+      if (parsed) {
+        return { original: raw, parsed };
+      }
+    }
+
+    const nativeParsed = attemptDate(new Date(raw));
+    if (nativeParsed) {
+      return { original: raw, parsed: nativeParsed };
+    }
+
+    return { original: raw, parsed: 'תאריך לא זוהה' };
+  };
+
   const mappedPreviewRows = useMemo(() => {
     if (!previewRows.length) {
       return [];
@@ -224,6 +282,22 @@ export default function LegacyImportModal({
       return mapped;
     });
   }, [previewRows, isMatchFlow, effectiveColumnMappings, effectiveCustomLabels, questionOptions]);
+
+  const sessionDatePreview = useMemo(() => {
+    if (!previewRows.length || !sessionDateColumn) {
+      return [];
+    }
+
+    return previewRows.map((row, index) => {
+      const value = row[sessionDateColumn];
+      const parsed = parseSessionDateValue(value);
+      return {
+        index: index + 1,
+        original: parsed.original || '—',
+        parsed: parsed.parsed,
+      };
+    });
+  }, [previewRows, sessionDateColumn]);
 
   useEffect(() => {
     if (!open) {
@@ -350,6 +424,7 @@ export default function LegacyImportModal({
     setUploadError('');
     setCsvColumns([]);
     setCsvText('');
+    setStructureChoice(null);
     setSelectedFile(null);
     setFileName('');
     setSessionDateColumn('');
@@ -387,6 +462,26 @@ export default function LegacyImportModal({
       setUploadError('טעינת הקובץ נכשלה. נסו שנית.');
     };
     reader.readAsText(file);
+  };
+
+  const handleClearFile = () => {
+    setUploadError('');
+    setCsvColumns([]);
+    setCsvText('');
+    setSelectedFile(null);
+    setFileName('');
+    setSessionDateColumn('');
+    setColumnMappings({});
+    setCustomLabels({});
+    setExcludedColumns({});
+    setStructureChoice(null);
+    setServiceMode('fixed');
+    setSelectedService('');
+    setCustomService('');
+    setServiceColumn('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleMappingChange = (column, value) => {
@@ -464,7 +559,7 @@ export default function LegacyImportModal({
   };
 
   const renderWarningStep = () => (
-    <div className="space-y-4">
+    <div className="legacy-import-step space-y-4">
       <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
         <div className="legacy-import-warning-row">
           <ShieldAlert className="h-5 w-5" aria-hidden="true" />
@@ -494,7 +589,7 @@ export default function LegacyImportModal({
   );
 
   const renderCsvUpload = () => (
-    <div className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4">
+    <div className="legacy-import-card space-y-3">
       <div className="space-y-1 rtl-embed-text text-right">
         <Label htmlFor="legacy-csv-upload" className="block text-right text-sm font-semibold text-foreground rtl-embed-text">
           העלאת קובץ CSV
@@ -502,9 +597,14 @@ export default function LegacyImportModal({
         <p className="text-xs text-neutral-600 text-right">בחרו את קובץ ה-CSV עם כותרות העמודות שברצונכם לייבא.</p>
       </div>
       {selectedFile ? (
-        <div className="space-y-2 rounded-md bg-neutral-50 p-3 rtl-embed-text text-right">
-          <p className="text-xs font-semibold text-neutral-800">קובץ שנבחר: {fileName}</p>
-          <p className="text-xs text-neutral-600">לשינוי הקובץ חזרו לשלב בחירת המבנה.</p>
+        <div className="legacy-import-file-row">
+          <div className="space-y-1 rtl-embed-text text-right">
+            <p className="text-xs font-semibold text-neutral-800">קובץ שנבחר: {fileName}</p>
+            <p className="text-xs text-neutral-600">החליפו את הקובץ אם ברצונכם להעלות גרסה אחרת.</p>
+          </div>
+          <Button type="button" variant="ghost" size="sm" className="legacy-import-row-reverse" onClick={handleClearFile}>
+            הסרת קובץ
+          </Button>
         </div>
       ) : (
         <>
@@ -516,6 +616,7 @@ export default function LegacyImportModal({
               onChange={handleFileChange}
               aria-describedby="legacy-csv-helper"
               className="rtl-embed-text text-right"
+              ref={fileInputRef}
             />
           </div>
           <p id="legacy-csv-helper" className="text-xs text-neutral-600 rtl-embed-text text-right">
@@ -534,7 +635,7 @@ export default function LegacyImportModal({
           <p className="text-xs font-semibold text-neutral-700 rtl-embed-text text-right">כותרות שאותרו:</p>
           <div className="legacy-import-tags">
             {csvColumns.map((column) => (
-              <span key={column} className="rounded-full bg-white px-3 py-1 text-xs text-neutral-700 shadow-sm">
+              <span key={column} className="legacy-import-tag">
                 {column}
               </span>
             ))}
@@ -582,7 +683,7 @@ export default function LegacyImportModal({
   );
 
   const renderUploadStep = () => (
-    <div className="space-y-6">
+    <div className="legacy-import-step space-y-6">
       {renderCsvUpload()}
       <Separator />
       {renderStructureChoice()}
@@ -863,7 +964,7 @@ export default function LegacyImportModal({
   );
 
   const renderMappingStep = () => (
-    <div className="space-y-5">
+    <div className="legacy-import-step space-y-5">
       <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
         <p className="text-sm font-semibold text-foreground">שלב 2: מיפוי שדות</p>
         <p className="text-sm text-neutral-700">אנא בדוק את המיפוי וודא שכל עמודה מהקובץ משויכת לשדה הנכון במערכת.</p>
@@ -889,34 +990,60 @@ export default function LegacyImportModal({
   );
 
   const renderPreviewStep = () => (
-    <div className="space-y-4">
+    <div className="legacy-import-step space-y-4">
       <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
         <p className="text-sm font-semibold text-foreground">שלב 3: תצוגה מקדימה ואימות</p>
         <p className="text-sm text-neutral-700">
           כך המערכת מפרשת את הנתונים שלך. אנא ודא שהשורות הראשונות מעובדות כהלכה לפני שתמשיך.
         </p>
       </div>
+      {sessionDatePreview.length ? (
+        <div className="legacy-import-card space-y-3">
+          <div className="space-y-1 rtl-embed-text text-right">
+            <h4 className="text-sm font-semibold text-foreground">תצוגה מקדימה של תאריך המפגש</h4>
+            <p className="text-xs text-neutral-700">כאן ניתן לראות כיצד ערכי עמודת התאריך מתורגמים לתאריך מערכת.</p>
+          </div>
+          <div className="legacy-import-table-wrapper">
+            <table className="legacy-import-table">
+              <thead>
+                <tr>
+                  <th scope="col">שורה</th>
+                  <th scope="col">ערך מקורי</th>
+                  <th scope="col">תאריך מפוענח</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessionDatePreview.map((row) => (
+                  <tr key={`session-date-${row.index}`}>
+                    <td className="text-neutral-700">{row.index}</td>
+                    <td className="font-medium text-neutral-800">{row.original || '—'}</td>
+                    <td className="text-neutral-800">{row.parsed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
       {!mappedPreviewRows.length ? (
         <p className="text-sm text-neutral-700 rtl-embed-text text-right">לא נמצאו שורות תצוגה מקדימה. ודאו שקובץ ה-CSV כולל נתונים מעבר לשורת הכותרות.</p>
       ) : (
-        <div className="overflow-x-auto rounded-md border border-neutral-200">
-          <table className="min-w-full divide-y divide-neutral-200 text-right rtl-embed-text">
-            <thead className="bg-neutral-50 text-xs font-semibold text-neutral-700">
+        <div className="legacy-import-table-wrapper">
+          <table className="legacy-import-table">
+            <thead>
               <tr>
                 {Object.keys(mappedPreviewRows[0]).map((header) => (
-                  <th key={header} scope="col" className="px-4 py-2 text-right">
+                  <th key={header} scope="col">
                     {header}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 text-sm">
+            <tbody>
               {mappedPreviewRows.map((row, index) => (
-                <tr key={`preview-${index}`} className="bg-white">
+                <tr key={`preview-${index}`}>
                   {Object.keys(row).map((header) => (
-                    <td key={`${header}-${index}`} className="px-4 py-2 text-neutral-800">
-                      {row[header] || '—'}
-                    </td>
+                    <td key={`${header}-${index}`}>{row[header] || '—'}</td>
                   ))}
                 </tr>
               ))}
@@ -928,7 +1055,7 @@ export default function LegacyImportModal({
   );
 
   const renderConfirmStep = () => (
-    <div className="space-y-4">
+    <div className="legacy-import-step space-y-4">
       <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
         <p className="text-sm font-semibold text-foreground">שלב 4: סיכום ואישור ייבוא</p>
         <p className="text-sm text-neutral-700">בדקו את הסיכום לפני אישור הייבוא.</p>

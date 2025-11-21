@@ -63,3 +63,72 @@
   justify-content: space-between;
   gap: 0.75rem;
 }
+
+.legacy-import-card {
+  border: 1px solid #e5e7eb;
+  background-color: #fff;
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.legacy-import-file-row {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.legacy-import-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background-color: #fff;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  color: #374151;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  word-break: break-word;
+}
+
+.legacy-import-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.legacy-import-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background-color: #fff;
+}
+
+.legacy-import-table {
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+  direction: rtl;
+  text-align: right;
+  table-layout: fixed;
+}
+
+.legacy-import-table thead {
+  background-color: #f5f5f5;
+  color: #374151;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.legacy-import-table th,
+.legacy-import-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.legacy-import-table tbody tr:nth-child(even) {
+  background-color: #fafafa;
+}
