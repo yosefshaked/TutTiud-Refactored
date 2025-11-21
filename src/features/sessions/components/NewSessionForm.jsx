@@ -35,6 +35,7 @@ export default function NewSessionForm({
   renderFooterOutside = false, // New prop to control footer rendering
   onSelectedStudentChange, // Callback to notify parent of selection changes
   onFormValidityChange, // Callback to inform parent when form validity changes
+  onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
@@ -178,8 +179,7 @@ export default function NewSessionForm({
     }
   }, [selectedStudent, serviceTouched]);
 
-  const handleStudentChange = (event) => {
-    const value = event.target.value;
+  const handleStudentChange = (value) => {
     setSelectedStudentId(value);
     onSelectedStudentChange?.(value); // Notify parent
     setServiceTouched(false);
@@ -275,8 +275,10 @@ export default function NewSessionForm({
       dir="rtl"
     >
       <div className="space-y-sm">
-        <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
-        <div className="mb-2 space-y-2">
+        <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
+        <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>
+        <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+          <p className="text-xs font-medium text-neutral-600 text-right mb-2">🔍 מסנני חיפוש</p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="relative min-w-[200px] flex-1">
               <Input
@@ -294,6 +296,7 @@ export default function NewSessionForm({
                 <Select
                   value={studentScope}
                   onValueChange={(v) => onScopeChange?.(v)}
+                  onOpenChange={onSelectOpenChange}
                   disabled={isSubmitting}
                 >
                   <SelectTrigger>
@@ -325,17 +328,21 @@ export default function NewSessionForm({
                 <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
                   מצב:
                 </Label>
-                <select
-                  id="session-status-filter"
-                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+                <Select
                   value={statusFilter}
-                  onChange={(event) => onStatusFilterChange?.(event.target.value)}
+                  onValueChange={(value) => onStatusFilterChange?.(value)}
+                  onOpenChange={onSelectOpenChange}
                   disabled={isSubmitting || !visibilityLoaded}
                 >
-                  <option value="active">תלמידים פעילים</option>
-                  <option value="inactive">תלמידים לא פעילים</option>
-                  <option value="all">הצג הכל</option>
-                </select>
+                  <SelectTrigger id="session-status-filter" className="w-auto min-w-[160px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">תלמידים פעילים</SelectItem>
+                    <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
+                    <SelectItem value="all">הצג הכל</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             ) : null}
             {hasActiveFilters ? (
@@ -356,26 +363,32 @@ export default function NewSessionForm({
             ) : null}
           </div>
         </div>
-        <select
-          id="session-student"
-          className="w-full rounded-lg border border-border bg-white p-sm text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-          value={selectedStudentId}
-          onChange={handleStudentChange}
-          required
-          disabled={isSubmitting || filteredStudents.length === 0}
-        >
-          <option value="" disabled>
-            בחרו תלמיד מהרשימה
-          </option>
-          {filteredStudents.map((student) => {
-            const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
-            return (
-              <option key={student.id} value={student.id}>
-                {student.name || 'ללא שם'} — {schedule}
-              </option>
-            );
-          })}
-        </select>
+        <div className="pt-2">
+          <Label htmlFor="session-student-select" className="block text-right text-sm font-medium text-primary mb-2">
+            ✓ בחירת תלמיד
+          </Label>
+          <Select
+            value={selectedStudentId}
+            onValueChange={handleStudentChange}
+            onOpenChange={onSelectOpenChange}
+            disabled={isSubmitting || filteredStudents.length === 0}
+            required
+          >
+            <SelectTrigger id="session-student" className="w-full border-2 border-primary/30 bg-white shadow-sm hover:border-primary/50 focus:border-primary">
+              <SelectValue placeholder="בחרו תלמיד מהרשימה" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              {filteredStudents.map((student) => {
+                const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
+                return (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.name || 'ללא שם'} — {schedule}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
         {students.length === 0 ? (
           <p className="text-xs text-neutral-500 text-right">אין תלמידים זמינים לשיוך מפגש חדש.</p>
         ) : filteredStudents.length === 0 ? (
@@ -576,23 +589,24 @@ export default function NewSessionForm({
                       {question.label}
                       {required ? ' *' : ''}
                     </Label>
-                    <select
-                      id={questionId}
-                      className="w-full rounded-lg border border-border bg-white p-sm text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    <Select
                       value={answerValue ?? ''}
-                      onChange={(e) => handleAnswerChange(question.key, e)}
+                      onValueChange={(value) => updateAnswer(question.key, value)}
+                      onOpenChange={onSelectOpenChange}
                       disabled={isSubmitting || questionOptions.length === 0}
                       required={required}
                     >
-                      <option value="" disabled>
-                        בחרו אפשרות
-                      </option>
-                      {questionOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger id={questionId} className="w-full">
+                        <SelectValue placeholder="בחרו אפשרות" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {questionOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     {questionOptions.length === 0 ? (
                       <p className="text-xs text-neutral-500">אין אפשרויות זמינות לשאלה זו.</p>
                     ) : null}

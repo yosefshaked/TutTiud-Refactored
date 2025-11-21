@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil, Download } from 'lucide-react';
+import { Loader2, ArrowRight, ChevronDown, ChevronUp, Pencil, Download, FileUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import EditStudentModal from '@/features/admin/components/EditStudentModal.jsx';
 import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } from '@/features/students/utils/tags.js';
 import { exportStudentPdf, downloadPdfBlob } from '@/api/students-export.js';
+import LegacyImportModal from '@/features/students/components/LegacyImportModal.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -75,36 +76,76 @@ function formatSessionDate(value) {
   return value;
 }
 
-function buildAnswerList(content, questions) {
+function extractQuestionLabelRaw(entry) {
+  if (!entry || typeof entry !== 'object') return '';
+  if (typeof entry.label === 'string' && entry.label.trim()) return entry.label.trim();
+  if (typeof entry.title === 'string' && entry.title.trim()) return entry.title.trim();
+  if (typeof entry.question === 'string' && entry.question.trim()) return entry.question.trim();
+  return '';
+}
+
+function toKey(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const str = String(value);
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9א-ת]+/gi, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function buildAnswerList(content, questions, { isLegacy = false } = {}) {
   const answers = parseSessionContent(content);
   const entries = [];
   const seenKeys = new Set();
 
   if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
-    for (const question of questions) {
-      const key = question.key;
-      const label = question.label;
-      let value = answers[key];
-      if (value === undefined && typeof answers[label] !== 'undefined') {
-        value = answers[label];
+    if (isLegacy) {
+      for (const [rawKey, rawValue] of Object.entries(answers)) {
+        if (rawValue === undefined || rawValue === null || rawValue === '') {
+          continue;
+        }
+        const label = String(rawKey);
+        entries.push({ label, value: String(rawValue) });
       }
-      if (value === undefined || value === null || value === '') {
-        continue;
-      }
-      entries.push({ label, value: String(value) });
-      seenKeys.add(key);
-      seenKeys.add(label);
+      return entries;
     }
 
-    for (const [rawKey, rawValue] of Object.entries(answers)) {
-      if (rawValue === undefined || rawValue === null || rawValue === '') {
+    const questionMap = new Map();
+    for (const question of questions) {
+      const qLabel = extractQuestionLabelRaw(question);
+      const qId = typeof question.id === 'string' ? question.id : '';
+      const qKey = typeof question.key === 'string' ? question.key : '';
+
+      if (qLabel) {
+        questionMap.set(qLabel, qLabel);
+        questionMap.set(toKey(qLabel), qLabel);
+      }
+      if (qId) {
+        questionMap.set(qId, qLabel || qId);
+        questionMap.set(toKey(qId), qLabel || qId);
+      }
+      if (qKey) {
+        questionMap.set(qKey, qLabel || qKey);
+        questionMap.set(toKey(qKey), qLabel || qKey);
+      }
+    }
+
+    for (const [answerKey, answerValue] of Object.entries(answers)) {
+      if (answerValue === undefined || answerValue === null || answerValue === '') {
         continue;
       }
-      const normalizedKey = String(rawKey);
-      if (seenKeys.has(normalizedKey)) {
+      const rawKey = String(answerKey);
+      if (seenKeys.has(rawKey)) {
         continue;
       }
-      entries.push({ label: normalizedKey, value: String(rawValue) });
+
+      const label = questionMap.get(rawKey) || questionMap.get(toKey(rawKey)) || rawKey;
+      entries.push({ label, value: String(answerValue) });
+      seenKeys.add(rawKey);
     }
   } else if (typeof answers === 'string' && answers.trim()) {
     entries.push({ label: 'תוכן המפגש', value: answers.trim() });
@@ -139,6 +180,11 @@ export default function StudentDetailPage() {
   const [tagsError, setTagsError] = useState('');
 
   const [instructors, setInstructors] = useState([]);
+  const [services, setServices] = useState([]);
+  const [servicesState, setServicesState] = useState(REQUEST_STATE.idle);
+  const [servicesError, setServicesError] = useState('');
+
+  const [isLegacyModalOpen, setIsLegacyModalOpen] = useState(false);
 
   // Edit student modal state
   const [studentForEdit, setStudentForEdit] = useState(null);
@@ -289,12 +335,37 @@ export default function StudentDetailPage() {
     }
   }, [canFetch, activeOrgId]);
 
+  const loadServices = useCallback(async () => {
+    if (!canFetch) {
+      return;
+    }
+
+    try {
+      setServicesState(REQUEST_STATE.loading);
+      setServicesError('');
+      const searchParams = new URLSearchParams({ keys: 'available_services' });
+      if (activeOrgId) {
+        searchParams.set('org_id', activeOrgId);
+      }
+      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
+      const settingsValue = payload?.settings?.available_services;
+      setServices(Array.isArray(settingsValue) ? settingsValue : []);
+      setServicesState(REQUEST_STATE.idle);
+    } catch (error) {
+      console.error('Failed to load services', error);
+      setServices([]);
+      setServicesState(REQUEST_STATE.error);
+      setServicesError(error?.message || 'טעינת רשימת השירותים נכשלה.');
+    }
+  }, [canFetch, activeOrgId]);
+
   useEffect(() => {
     if (canFetch) {
       void loadStudent();
       void loadQuestions();
       void loadSessions();
       void loadInstructors();
+      void loadServices();
     } else {
       setStudentState(REQUEST_STATE.idle);
       setStudentError('');
@@ -306,8 +377,11 @@ export default function StudentDetailPage() {
       setSessionError('');
       setSessions([]);
       setInstructors([]);
+      setServices([]);
+      setServicesState(REQUEST_STATE.idle);
+      setServicesError('');
     }
-  }, [canFetch, loadStudent, loadQuestions, loadSessions, loadInstructors]);
+  }, [canFetch, loadStudent, loadQuestions, loadSessions, loadInstructors, loadServices]);
 
   const hasStudentTags = Array.isArray(student?.tags) && student.tags.length > 0;
   const studentIdentifier = student?.id || '';
@@ -371,8 +445,182 @@ export default function StudentDetailPage() {
     });
   }, [openSessionModal, studentId, loadSessions, student?.is_active]);
 
+  const isStudentLoading = studentState === REQUEST_STATE.loading;
+  const studentLoadError = studentState === REQUEST_STATE.error;
+  const isSessionsLoading = sessionState === REQUEST_STATE.loading;
+  const sessionsLoadError = sessionState === REQUEST_STATE.error;
+  const isServicesLoading = servicesState === REQUEST_STATE.loading;
+
   const backDestination = isAdminRole(membershipRole) ? '/admin/students' : '/my-students';
   const canEdit = isAdminRole(membershipRole);
+  const canManageLegacyImport = canEdit;
+  const canReuploadLegacy = permissions?.can_reupload_legacy_reports === true;
+
+  const hasLegacyImport = useMemo(() => {
+    return sessions.some((record) => record?.is_legacy === true);
+  }, [sessions]);
+
+  const legacyImportDisabled =
+    (!canReuploadLegacy && hasLegacyImport) ||
+    studentLoadError ||
+    isStudentLoading ||
+    isSessionsLoading ||
+    sessionsLoadError;
+
+  const legacyImportReason = !canReuploadLegacy && hasLegacyImport
+    ? 'ייבוא דוחות היסטוריים מתאפשר פעם אחת בלבד. בכדי לאפשר ייבוא חוזר יש לשדרג את המנוי.'
+    : '';
+
+  const handleOpenLegacyModal = () => {
+    if (legacyImportDisabled) {
+      return;
+    }
+    setIsLegacyModalOpen(true);
+  };
+
+  const handleCloseLegacyModal = () => {
+    setIsLegacyModalOpen(false);
+  };
+
+  const readFileAsText = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve(String(reader.result || ''));
+      };
+      reader.onerror = () => {
+        reject(new Error('טעינת הקובץ נכשלה.'));
+      };
+      reader.readAsText(file);
+    });
+  }, []);
+
+  const handleLegacySubmit = async ({
+    file,
+    structureChoice,
+    sessionDateColumn,
+    columnMappings,
+    customLabels,
+    serviceMode,
+    serviceValue,
+    serviceColumn,
+  }) => {
+    if (!file || !activeOrgId || !studentId) {
+      throw new Error('חסרים פרטי ייבוא נדרשים.');
+    }
+
+    const csvText = await readFileAsText(file);
+
+    const body = {
+      org_id: activeOrgId,
+      structure_choice: structureChoice,
+      session_date_column: sessionDateColumn,
+      column_mappings: columnMappings,
+      custom_labels: customLabels,
+      service_strategy: serviceMode,
+      service_context_value: serviceValue,
+      service_context_column: serviceColumn,
+      csv_text: csvText,
+    };
+
+    try {
+      await authenticatedFetch(`students/${studentId}/legacy-import`, { method: 'POST', body, session });
+      toast.success('הייבוא הושלם בהצלחה.');
+      setIsLegacyModalOpen(false);
+      await loadSessions();
+    } catch (error) {
+      const friendlyDateHint =
+        'ודאו שתאריך המפגש כתוב כ-YYYY-MM-DD, DD/MM/YYYY, DD.MM.YYYY או כמספר תאריך של Excel.';
+      const apiMessage = error?.data?.message || error?.message;
+      const rowDetail = error?.data?.row ? ` (שורה ${error.data.row})` : '';
+
+      let message = 'ייבוא הדוח נכשל. נסו שוב.';
+
+      switch (apiMessage) {
+        case 'server_misconfigured':
+          message = 'שרת הייבוא לא הוגדר כראוי. נסו שוב או פנו לתמיכה.';
+          break;
+        case 'missing bearer':
+        case 'invalid or expired token':
+          message = 'פג תוקף ההתחברות. התחברו מחדש ונסו שוב.';
+          break;
+        case 'invalid org id':
+          message = 'מזהה הארגון לא תקין. רעננו את הדף ונסו שוב.';
+          break;
+        case 'invalid student id':
+          message = 'מזהה התלמיד לא תקין. חזרו לרשימת התלמידים ונסו שוב.';
+          break;
+        case 'failed_to_verify_membership':
+          message = 'אימות ההרשאות נכשל. ודאו שיש לכם גישה כמתאימים לארגון זה.';
+          break;
+        case 'forbidden':
+          message = 'אין לכם הרשאה לייבא דוחות היסטוריים בארגון זה.';
+          break;
+        case 'failed_to_load_settings':
+          message = 'טעינת הגדרות הארגון נכשלה. נסו לרענן את הדף.';
+          break;
+        case 'failed_to_load_student':
+          message = 'טעינת פרטי התלמיד נכשלה. נסו לרענן את הדף.';
+          break;
+        case 'student_not_found':
+          message = 'התלמיד לא נמצא. חזרו לרשימה ונסו שוב.';
+          break;
+        case 'student_missing_instructor':
+          message = 'לא הוקצה מדריך לתלמיד. עדכנו מדריך משובץ לפני ייבוא הדוחות.';
+          break;
+        case 'failed_to_check_legacy_records':
+          message = 'בדיקת ייבוא היסטורי קודם נכשלה. נסו שוב.';
+          break;
+        case 'legacy_import_already_exists':
+          message = 'בוצע כבר ייבוא דוחות היסטוריים לתלמיד זה. ניתן לאפשר ייבוא חוזר בהרשאת can_reupload_legacy_reports.';
+          break;
+        case 'invalid_structure_choice':
+          message = 'בחרו האם מבנה ה-CSV תואם את השאלון או אם תרצו להזין כותרות מותאמות.';
+          break;
+        case 'missing_session_date_column':
+        case 'session_date_column_not_found':
+          message = 'בחרו עמודת תאריך מפגש מתוך כותרות הקובץ.';
+          break;
+        case 'invalid_session_date':
+          message = `תאריך מפגש לא תקין${rowDetail}. ${friendlyDateHint}`;
+          break;
+        case 'invalid_service_strategy':
+          message = 'בחרו האם ליישם שירות אחד קבוע או למפות שירות מתוך עמודה בקובץ.';
+          break;
+        case 'missing_service_column':
+        case 'service_column_not_found':
+          message = 'בחרו עמודת שירות מתוך כותרות הקובץ.';
+          break;
+        case 'invalid_service_context':
+          message = `ערך שירות לא תקין${rowDetail}. ודאו שהשדה מכיל טקסט קריא או השאירו אותו ריק כדי לשמור ללא שירות.`;
+          break;
+        case 'missing_csv':
+        case 'empty_csv':
+          message = 'קובץ ה-CSV חסר או ריק. העלו קובץ עם כותרות ושורות נתונים.';
+          break;
+        case 'no_rows_to_import':
+          message = 'לא נמצאו שורות לייבוא לאחר המיפוי. ודאו שהעמודות כוללות נתונים.';
+          break;
+        case 'failed_to_clear_legacy_records':
+          message = 'מחיקת הדוחות ההיסטוריים הישנים נכשלה. נסו שוב.';
+          break;
+        case 'failed_to_insert_legacy_records':
+          message = 'שמירת הדוחות ההיסטוריים החדשים נכשלה. נסו שוב.';
+          break;
+        default: {
+          if (apiMessage && apiMessage !== 'Error') {
+            message = `ייבוא הדוח נכשל: ${apiMessage}`;
+          }
+        }
+      }
+
+      toast.error(message);
+      const forwardedError = new Error(message);
+      forwardedError.data = error?.data;
+      forwardedError.status = error?.status;
+      throw forwardedError;
+    }
+  };
 
   const handleOpenEdit = () => {
     if (student && canEdit) {
@@ -481,10 +729,6 @@ export default function StudentDetailPage() {
     );
   }
 
-  const isStudentLoading = studentState === REQUEST_STATE.loading;
-  const studentLoadError = studentState === REQUEST_STATE.error;
-  const isSessionsLoading = sessionState === REQUEST_STATE.loading;
-  const sessionsLoadError = sessionState === REQUEST_STATE.error;
   const noSessions = !isSessionsLoading && !sessionsLoadError && sessions.length === 0;
 
   const toggleOne = (key) => setExpandedById((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -521,67 +765,104 @@ export default function StudentDetailPage() {
           <p className="text-xs text-neutral-600 sm:text-sm">סקירת הפרטים והמפגשים של {student?.name || 'תלמיד ללא שם'}.</p>
         </div>
         <div className="flex gap-2 self-start flex-wrap">
-        {canEdit ? (
-          <>
-            {permissions?.can_export_pdf_reports ? (
+          {canManageLegacyImport ? (
+            legacyImportReason ? (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex" tabIndex={0}>
+                      <Button
+                        type="button"
+                        className="self-start text-sm"
+                        size="sm"
+                        variant="outline"
+                        disabled
+                      >
+                        <FileUp className="h-4 w-4" />
+                        <span className="ml-1">ייבוא דוחות היסטוריים</span>
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-right">
+                    <p className="text-sm leading-relaxed">{legacyImportReason}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
               <Button
                 type="button"
                 className="self-start text-sm"
                 size="sm"
-                onClick={handleExportPdf}
-                disabled={studentLoadError || isStudentLoading || !student || isExporting || questionsState === REQUEST_STATE.loading}
+                variant="outline"
+                onClick={handleOpenLegacyModal}
+                disabled={legacyImportDisabled}
+              >
+                <FileUp className="h-4 w-4" />
+                <span className="ml-1">ייבוא דוחות היסטוריים</span>
+              </Button>
+            )
+          ) : null}
+          {canEdit ? (
+            <>
+              {permissions?.can_export_pdf_reports ? (
+                <Button
+                  type="button"
+                  className="self-start text-sm"
+                  size="sm"
+                  onClick={handleExportPdf}
+                  disabled={studentLoadError || isStudentLoading || !student || isExporting || questionsState === REQUEST_STATE.loading}
+                  variant="outline"
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  <span className="ml-1">{isExporting ? 'מייצא...' : 'ייצוא ל-PDF'}</span>
+                </Button>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        className="self-start text-sm"
+                        size="sm"
+                        disabled
+                        variant="outline"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span className="ml-1">ייצוא ל-PDF (Premium)</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="text-sm">ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <Button
+                type="button"
+                className="self-start text-sm"
+                size="sm"
+                onClick={handleOpenEdit}
+                disabled={studentLoadError || isStudentLoading || !student}
                 variant="outline"
               >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4" />
-                )}
-                <span className="ml-1">{isExporting ? 'מייצא...' : 'ייצוא ל-PDF'}</span>
+                <Pencil className="h-4 w-4" />
+                <span className="ml-1">עריכת תלמיד</span>
               </Button>
-            ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      className="self-start text-sm"
-                      size="sm"
-                      disabled
-                      variant="outline"
-                    >
-                      <Download className="h-4 w-4" />
-                      <span className="ml-1">ייצוא ל-PDF (Premium)</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs">
-                    <p className="text-sm">ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            <Button
-              type="button"
-              className="self-start text-sm"
-              size="sm"
-              onClick={handleOpenEdit}
-              disabled={studentLoadError || isStudentLoading || !student}
-              variant="outline"
-            >
-              <Pencil className="h-4 w-4" />
-              <span className="ml-1">עריכת תלמיד</span>
-            </Button>
-          </>
-        ) : null}
-        <Button
-          type="button"
-          className="self-start text-sm"
-          size="sm"
-          onClick={handleOpenSessionModal}
-          disabled={studentLoadError || isStudentLoading || !student}
-        >
-          תעד מפגש חדש
-        </Button>
+            </>
+          ) : null}
+          <Button
+            type="button"
+            className="self-start text-sm"
+            size="sm"
+            onClick={handleOpenSessionModal}
+            disabled={studentLoadError || isStudentLoading || !student}
+          >
+            תעד מפגש חדש
+          </Button>
         </div>
       </div>
 
@@ -752,7 +1033,9 @@ export default function StudentDetailPage() {
                 }
               }
               
-              const answers = buildAnswerList(record.content, versionedQuestions);
+              const answers = buildAnswerList(record.content, versionedQuestions, {
+                isLegacy: Boolean(record?.is_legacy),
+              });
               const key = record.id || record.date;
               const isOpen = Boolean(expandedById[key]);
               return (
@@ -805,6 +1088,19 @@ export default function StudentDetailPage() {
       onSubmit={handleUpdateStudent}
       isSubmitting={isUpdatingStudent}
       error={updateError}
+    />
+    <LegacyImportModal
+      open={isLegacyModalOpen}
+      onClose={handleCloseLegacyModal}
+      studentName={student?.name}
+      questions={questions}
+      canReupload={canReuploadLegacy}
+      hasLegacyImport={hasLegacyImport}
+      services={services}
+      servicesLoading={isServicesLoading}
+      servicesError={servicesError}
+      onReloadServices={loadServices}
+      onSubmit={handleLegacySubmit}
     />
     </>
   );

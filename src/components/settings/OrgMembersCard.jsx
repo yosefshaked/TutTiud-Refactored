@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertTriangle, Check, Clock, MailPlus, Pencil, RefreshCw, Trash2, UserMinus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
@@ -398,16 +399,13 @@ export default function OrgMembersCard() {
                           ערוך שם
                         </Button>
                       )}
-                      <select
-                        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      <Select
                         value={roleNorm || 'member'}
                         disabled={isOwner || isCurrentUser || isSaving}
-                        onChange={async (e) => {
-                          const nextRole = e.target.value;
+                        onValueChange={async (nextRole) => {
                           const nextLabel = nextRole === 'admin' ? 'מנהל' : 'מדריך';
                           const confirmed = window.confirm(`האם לשנות את התפקיד של ${member.name || member.email || 'המשתמש'} ל"${nextLabel}"?`);
                           if (!confirmed) {
-                            e.target.value = roleNorm || 'member';
                             return;
                           }
                           try {
@@ -416,13 +414,17 @@ export default function OrgMembersCard() {
                           } catch (error) {
                             console.error('Failed to update role', error);
                             toast.error(error?.message || 'עדכון התפקיד נכשל');
-                            e.target.value = roleNorm || 'member';
                           }
                         }}
                       >
-                        <option value="member">מדריך</option>
-                        <option value="admin">מנהל</option>
-                      </select>
+                        <SelectTrigger className="h-auto rounded-md px-2 py-1 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">מדריך</SelectItem>
+                          <SelectItem value="admin">מנהל</SelectItem>
+                        </SelectContent>
+                      </Select>
                       {!isCurrentUser ? (
                         <Button
                           type="button"

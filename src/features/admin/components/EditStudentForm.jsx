@@ -20,7 +20,15 @@ import StudentTagsField from './StudentTagsField.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { createStudentFormState } from '@/features/students/utils/form-state.js';
 
-export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitting = false, error = '', renderFooterOutside = false }) {
+export default function EditStudentForm({ 
+  student, 
+  onSubmit, 
+  onCancel, 
+  isSubmitting = false, 
+  error = '', 
+  renderFooterOutside = false,
+  onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
+}) {
   const [values, setValues] = useState(() => createStudentFormState(student));
   const [touched, setTouched] = useState({});
   const [services, setServices] = useState([]);
@@ -180,6 +188,7 @@ export default function EditStudentForm({ student, onSubmit, onCancel, isSubmitt
             label="מדריך משויך"
             value={values.assignedInstructorId}
             onChange={(value) => handleSelectChange('assignedInstructorId', value)}
+            onOpenChange={onSelectOpenChange}
             options={instructors.map((inst) => ({ value: inst.id, label: inst.name || inst.email || inst.id }))}
             placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'}
             required

@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 1.4.0**
-**Last Updated: 2025-11-18**
+**Version: 1.5.0**
+**Last Updated: 2025-11-21**
 
 > **Developer Conventions:** For folder structure, naming rules, API patterns, and feature organization, refer to [Conventions.md](./Conventions.md).
 
@@ -39,7 +39,7 @@ Key characteristics:
 | :---- | :------ | :---------- |
 | `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` (`instructor_color` stores the permanent palette assignment) |
 | `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
-| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, timestamps, `metadata` |
+| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, `is_legacy` (marks imported historical rows), timestamps, `metadata` |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
 
 Supporting indexes:
@@ -83,6 +83,17 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 
 - **Weekly compliance status timing:** The `/api/weekly-compliance` handler marks undocumented sessions scheduled for the current day as `missing` immediately after midnight UTC. Only future-dated sessions remain `upcoming`, so today's column instantly reflects whether a record exists even before the scheduled time occurs.
 - **Daily compliance status timing:** `/api/daily-compliance` follows the same rule. Undocumented sessions with `isoDate` less than or equal to today's UTC date are flagged as `missing`, keeping the daily timeline aligned with the heatmap and preventing same-day gaps from appearing as `upcoming`.
+- **Permission registry:** Control DB registry now includes `can_reupload_legacy_reports` (default `false`) for gating repeated legacy session imports at the organization level.
+- **Legacy import UI (student detail):** Admin/Owner roles see an "Import Legacy Reports" action on the student detail page. The button is disabled once a legacy upload exists unless the `can_reupload_legacy_reports` permission is enabled. The modal flow enforces a backup warning, asks whether the CSV matches the current questionnaire, and renders the appropriate mapping UI (dropdowns against `session_form_config` or custom label inputs) with a required session-date column plus a re-upload warning when replacing prior legacy data. It also prompts for service context: either pick one service for all rows (or leave it blank) or select a CSV column that supplies the service per row.
+  - UI refinements (2025-11-19): the backup notice keeps the “continue” CTA on the visual left with the backup link above it, navigation arrows now point toward the target step (back → right, continue → left), structure choice buttons use descriptive icons with right-aligned Hebrew labels, the CSV file picker disappears after selection (users return to the structure step to change it) with helper text mirrored for RTL, and column exclusion now uses an explicit “Do not include” checkbox (date columns default to hidden until unchecked).
+  - Mobile dropdown stability (2025-11-20): All Select dropdowns inside the legacy import dialog render with `modal={true}` so taps outside an open list close only the dropdown, not the surrounding Dialog, on real mobile devices.
+  - Wizard polish (2025-11-21): refined spacing and alignment across all steps, added an in-place “Remove file” control to clear or replace the uploaded CSV without closing the dialog, and expanded the preview step with an explicit session-date translation table so admins can confirm how the chosen date column is interpreted.
+  - Wizard layout fixes (2025-11-22): unified white card backgrounds across every step, stacked the session-date selector above service assignment for clearer grouping, added outlined/colored states to selection buttons (including refresh/remove actions) to make the active choice obvious, tightened date column widths in the preview, and improved date parsing to recognize single-digit day/month inputs.
+  - Mobile preview cards (2025-11-24): the preview step now shows two example rows as stacked cards on small screens for easier reading, while keeping the full table on tablets/desktops.
+- **Legacy import backend (`POST /api/students/{id}/legacy-import`):** Admin/Owner-only endpoint that checks `can_reupload_legacy_reports` before allowing replacements. When uploads are permitted it purges prior `is_legacy` rows for the student, then ingests the submitted CSV (expects JSON body with `csv_text`, `structure_choice`, `session_date_column`, and either `column_mappings` or `custom_labels`) and writes new `SessionRecords` rows flagged with `is_legacy=true`. Requests may also include either `service_strategy=fixed` with `service_context_value` or `service_strategy=column` with `service_context_column` to populate `service_context` (blank values remain unset).
+- **Legacy import attribution:** Imported rows mirror standard session metadata. `metadata` records `created_by`, `created_role`, `form_version`, and `source='legacy_import'`, and each row sets `instructor_id` from the student's assigned instructor. Uploads fail with `student_missing_instructor` when no assignment exists.
+- **Legacy display logic:** Session renders now check `is_legacy` for every record. Non-legacy rows resolve question labels from the active `session_form_config` (including versioned lookups), while legacy rows display the raw column keys provided in the import. The shared renderer covers the student profile history, dashboard day detail views, and PDF export.
+- **Legacy date parsing:** The importer normalizes common CSV date inputs to ISO, supporting `YYYY-MM-DD`, `DD/MM/YYYY`, `DD.MM.YYYY`, and Excel serial date numbers before writes.
 
 > **Schema guardrails:** `/api/settings` now inspects `tuttiud.setup_assistant_diagnostics()` whenever Supabase reports missing tables or insufficient permissions. Schema or policy gaps surface as HTTP 424 with `settings_schema_incomplete` / `settings_schema_unverified` and include the failing diagnostic rows so admins can rerun the setup script before retrying.
 
@@ -239,3 +250,10 @@ This tool is essential for validating backups before restore or for compliance c
 - **Settings UI** – `StudentVisibilitySettings.jsx` adds a dedicated card (eye-off icon) to `Settings.jsx`. Admins/owners can review the current value, read the guard copy, and toggle the permission through `upsertSetting` while instructors only see the status if they have manage rights.
 - **API integration** – `/api/my-students` checks the setting server-side and only includes inactive rows when the flag is enabled or the caller holds admin privileges. Query parameters (`status=active|inactive|all`) stay aligned with `/api/students` so both dashboards share a single filtering model.
 - **Frontend consumers** – `MyStudentsPage.jsx`, `NewSessionModal.jsx`, and `NewSessionForm.jsx` load the setting via `fetchSettingsValue` and adjust local filters + UI affordances accordingly. The preference for showing inactive students in admin lists persists per tab via `sessionStorage`.
+
+## 17. Legacy Import Wizard UI polish (2025-12)
+
+- **Better alignment** – The mapping step stacks the full-width session date card above the service assignment card so both use the available width without cramped headers.
+- **Button readability** – Selected structure/service buttons use a purple highlight with an outline that matches the New Session design, and utility actions such as “remove file”/“refresh” now use a clear outlined treatment so they read as buttons.
+- **Preview clarity** – The preview callout keeps a single heading (to avoid duplicate step titles), and the confirmation summary uses RTL-friendly arrows (←) to show column-to-field direction.
+- **Mobile safety margin** – The dialog content now caps its height on small screens and adds safe-area padding so the wizard always floats above the bottom navigation/FAB even after selecting a file.

@@ -101,7 +101,7 @@ function coerceSessionContent(source) {
   return { value: normalized };
 }
 
-function coerceOptionalText(value) {
+export function coerceOptionalText(value) {
   if (value === null || value === undefined) return { value: null, valid: true };
   if (typeof value === 'string') return { value: value.trim() || null, valid: true };
   return { value: null, valid: false };

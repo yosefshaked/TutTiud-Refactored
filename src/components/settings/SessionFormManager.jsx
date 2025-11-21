@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import QuestionTypePreview from './QuestionTypePreview.jsx';
@@ -883,16 +884,19 @@ export default function SessionFormManager({
                             <Label htmlFor={`question-type-${question.id}`} className="text-xs sm:text-sm">סוג השאלה</Label>
                             <QuestionTypePreview questionType={question.type} />
                           </div>
-                          <select
-                            id={`question-type-${question.id}`}
-                            className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 sm:text-sm"
+                          <Select
                             value={question.type}
-                            onChange={(event) => handleQuestionChange(question.id, { type: event.target.value })}
+                            onValueChange={(value) => handleQuestionChange(question.id, { type: value })}
                           >
-                            {QUESTION_TYPE_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </select>
+                            <SelectTrigger id={`question-type-${question.id}`} className="w-full text-xs sm:text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              {QUESTION_TYPE_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         {supportsPlaceholder ? (
                           <div className="space-y-2 sm:col-span-2">

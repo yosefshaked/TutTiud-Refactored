@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
 import { includesDayQuery, describeSchedule } from "@/features/students/utils/schedule.js"
 import { sortStudentsBySchedule } from "@/features/students/utils/sorting.js"
@@ -317,17 +318,20 @@ export default function MyStudentsPage() {
                         <label htmlFor="instructor-status-filter" className="text-neutral-600 whitespace-nowrap">
                           מצב:
                         </label>
-                        <select
-                          id="instructor-status-filter"
-                          className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+                        <Select
                           value={statusFilter}
-                          onChange={(event) => setStatusFilter(event.target.value)}
+                          onValueChange={(value) => setStatusFilter(value)}
                           disabled={!visibilityLoaded}
                         >
-                          <option value="active">תלמידים פעילים</option>
-                          <option value="inactive">תלמידים לא פעילים</option>
-                          <option value="all">הצג הכל</option>
-                        </select>
+                          <SelectTrigger id="instructor-status-filter">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">תלמידים פעילים</SelectItem>
+                            <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
+                            <SelectItem value="all">הצג הכל</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     ) : null}
                     {hasActiveFilters && (

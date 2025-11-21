@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,6 +41,10 @@ export default function NewSessionModal({
   const [canViewInactive, setCanViewInactive] = useState(false);
   const [visibilityLoaded, setVisibilityLoaded] = useState(false);
   const [initialStatusApplied, setInitialStatusApplied] = useState(false);
+
+  // Fix for mobile: prevent Dialog close when Select is open/closing
+  const openSelectCountRef = useRef(0);
+  const isClosingSelectRef = useRef(false);
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
@@ -299,6 +303,29 @@ export default function NewSessionModal({
     loadStudents,
   ]);
 
+  // Mobile fix: Track Select open/close state to prevent Dialog from closing
+  const handleSelectOpenChange = useCallback((isOpen) => {
+    if (!isOpen && openSelectCountRef.current > 0) {
+      isClosingSelectRef.current = true;
+      setTimeout(() => {
+        openSelectCountRef.current -= 1;
+        if (openSelectCountRef.current < 0) {
+          openSelectCountRef.current = 0;
+        }
+        isClosingSelectRef.current = false;
+      }, 100);
+    } else if (isOpen) {
+      openSelectCountRef.current += 1;
+    }
+  }, []);
+
+  // Mobile fix: Prevent Dialog close if Select is open or closing
+  const handleDialogInteractOutside = useCallback((event) => {
+    if (openSelectCountRef.current > 0 || isClosingSelectRef.current) {
+      event.preventDefault();
+    }
+  }, []);
+
   const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
     setSubmitState(REQUEST_STATE.loading);
     setSubmitError('');
@@ -361,7 +388,11 @@ export default function NewSessionModal({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) { onClose?.(); } }}>
-      <DialogContent className="sm:max-w-xl" footer={footer}>
+      <DialogContent 
+        className="sm:max-w-xl" 
+        footer={footer}
+        onInteractOutside={handleDialogInteractOutside}
+      >
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
@@ -402,6 +433,7 @@ export default function NewSessionModal({
             error={submitError || (questionsState === REQUEST_STATE.error ? questionError : '')}
             renderFooterOutside={true}
             onFormValidityChange={setIsFormValid}
+            onSelectOpenChange={handleSelectOpenChange}
           />
         )}
       </DialogContent>

@@ -7,6 +7,7 @@ export default function SelectField({
   label,
   value,
   onChange,
+  onOpenChange, // Mobile fix: track Select open/close state
   options = [],
   placeholder = 'בחר אפשרות',
   required = false,
@@ -20,6 +21,7 @@ export default function SelectField({
       <Select
         value={value}
         onValueChange={onChange}
+        onOpenChange={onOpenChange}
         disabled={disabled}
         required={required}
       >

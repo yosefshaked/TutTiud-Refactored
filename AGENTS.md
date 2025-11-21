@@ -21,6 +21,12 @@
   - Control DB access is now lazy and stateless. The team directory fetch (members + invites) is only enabled while the Settings → Team Members dialog is open. Backend endpoints create a fresh Supabase admin client per request (no global caching) so connections are “woken” on demand and naturally closed after the response. Tenant data client remains unaffected.
 - Use ProjectDoc/Eng.md to understand the overall project.
 - **Refer to [ProjectDoc/Conventions.md](ProjectDoc/Conventions.md)** for folder structure, naming conventions, API patterns, and feature organization. Update it when adding new patterns or changing structure (with approval).
+- SessionRecords now includes `is_legacy boolean NOT NULL DEFAULT false` for marking imported historical session rows. Control DB registry adds `can_reupload_legacy_reports` (default false) to gate repeated legacy imports per organization.
+- Legacy import UI: `StudentDetailPage.jsx` shows an "Import Legacy Reports" button for admin/owner users only. The button disables when a legacy import already exists unless `can_reupload_legacy_reports` is true. The modal (`src/features/students/components/LegacyImportModal.jsx`) walks through backup warning → structure choice → CSV mapping (dropdowns vs. custom labels, session date required) → confirmation with re-upload warning.
+- Legacy import backend: `/api/students/{id}/legacy-import` accepts JSON (`csv_text`, `structure_choice`, `session_date_column`, and either `column_mappings` or `custom_labels`), enforces admin/owner role + `can_reupload_legacy_reports`, deletes prior `is_legacy` rows for the student, and writes new `SessionRecords` with `is_legacy=true`.
+- Legacy importer normalizes session dates from `YYYY-MM-DD`, `DD/MM/YYYY`, `DD.MM.YYYY`, or Excel serial numbers before writing rows. Invalid dates return `invalid_session_date` with the 1-based row index.
+- Legacy import now captures service context: send `service_strategy=fixed` with `service_context_value` to apply one service (or leave blank) to all rows, or `service_strategy=column` with `service_context_column` to read the service per CSV row. Empty values persist as "no service".
+- Legacy import rows include standard session attribution: `metadata` stores `created_by`, `created_role`, `form_version`, and `source='legacy_import'`, and each row writes `instructor_id` from the student's assigned instructor. Uploads fail with `student_missing_instructor` when the student lacks an assignment.
 - OAuth redirects must always include `options.redirectTo` when calling `supabase.auth.signInWithOAuth`. Resolve it from the full `window.location` URL (`origin + pathname + search + hash`) and fall back to `VITE_PUBLIC_APP_URL`, `VITE_APP_BASE_URL`, or `VITE_SITE_URL` when a browser location is unavailable.
 - Password reset flows must call `supabase.auth.resetPasswordForEmail` with a redirect that lands on `/#/update-password`, and the update form must rely on `AuthContext.updatePassword` so Supabase finalizes the session before returning users to the dashboard.
 - Login form submissions must set inline error state whenever Supabase rejects credentials so the page renders the design system's red alert with the failure message.
@@ -164,6 +170,9 @@
 
 ## Documentation
 - When editing files in `ProjectDoc/`, keep `Eng.md` and `Heb.md` in sync and update their version and last-updated fields.
+- See `docs/AI-Coder-Gotchas.md` for a concise checklist of common pitfalls (RTL/Hebrew alignment,
+  dialog footers, Select/Popover inside dialogs, CSV/Forms patterns). Keep it updated when you
+  discover recurring issues so future AI coding passes avoid regressions.
 
 ## Notes
 - Instructors are managed in the tenant `tuttiud."Instructors"` table. Records are not deleted; set `is_active=false` to disable. Clients should hide inactive instructors from selection.
