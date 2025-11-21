@@ -65,15 +65,31 @@
   flex-wrap: wrap;
   position: sticky;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.96);
+  background-color: inherit;
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
   border-top: 1px solid #e5e7eb;
-  box-shadow: 0 -6px 16px rgba(17, 24, 39, 0.05);
 }
 
 .legacy-import-footer button {
   white-space: nowrap;
+}
+
+.legacy-import-utility-button {
+  border-color: #d1d5db !important;
+  background-color: #f8fafc !important;
+  color: #1f2937 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.legacy-import-utility-button:hover {
+  border-color: #7e22ce !important;
+  background-color: #eef2ff !important;
+  color: #4c1d95 !important;
+}
+
+.legacy-import-utility-button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(126, 34, 206, 0.25);
 }
 
 .legacy-import-card {
@@ -81,10 +97,6 @@
   background-color: #fff;
   border-radius: 0.75rem;
   padding: 1rem;
-}
-
-.legacy-import-card-narrow {
-  max-width: 560px;
 }
 
 .legacy-import-file-row {
@@ -105,19 +117,14 @@
 }
 
 .legacy-import-cta-button[data-selected='true'] {
-  border-color: hsl(var(--primary));
-  background-color: rgba(88, 28, 135, 0.08);
-  box-shadow: 0 0 0 1px hsl(var(--primary)) inset, 0 10px 18px rgba(88, 28, 135, 0.08);
+  border-color: #7e22ce;
+  background-color: #f3e8ff;
+  box-shadow: 0 0 0 2px #7e22ce inset, 0 10px 18px rgba(126, 34, 206, 0.12);
+  color: #4c1d95;
 }
 
 .legacy-import-cta-button[data-selected='true'] .legacy-import-cta-icon {
-  color: hsl(var(--primary));
-}
-
-.legacy-import-basic-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1fr);
+  color: #7e22ce;
 }
 
 .legacy-import-tag {

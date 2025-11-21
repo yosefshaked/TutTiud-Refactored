@@ -252,6 +252,6 @@ This tool is essential for validating backups before restore or for compliance c
 
 ## 17. Legacy Import Wizard UI polish (2025-12)
 
-- **Better alignment** – The mapping step now uses paired cards for session date selection and service assignment (`legacy-import-card` with `legacy-import-basic-grid`) so headers are no longer squeezed into the same row as the date picker.
-- **Button readability** – Long Hebrew microcopy inside structure/service choice buttons uses the `legacy-import-cta-button` style to wrap text cleanly without overflow and keeps the sticky footer buttons visible.
-- **Preview clarity** – The preview table now includes both the original and parsed session date columns alongside mapped fields, so users can see date context per row instead of in a detached block. Arrow indicators in the confirmation summary follow RTL (←).
+- **Better alignment** – The mapping step stacks the full-width session date card above the service assignment card so both use the available width without cramped headers.
+- **Button readability** – Selected structure/service buttons use a purple highlight with an outline that matches the New Session design, and utility actions such as “remove file”/“refresh” now use a clear outlined treatment so they read as buttons.
+- **Preview clarity** – The preview callout keeps a single heading (to avoid duplicate step titles), and the confirmation summary uses RTL-friendly arrows (←) to show column-to-field direction.

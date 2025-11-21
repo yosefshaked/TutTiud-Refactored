@@ -603,7 +603,7 @@ export default function LegacyImportModal({
             type="button"
             variant="outline"
             size="sm"
-            className="legacy-import-row-reverse"
+            className="legacy-import-row-reverse legacy-import-utility-button"
             onClick={handleClearFile}
           >
             <XCircle className="h-4 w-4" aria-hidden="true" /> הסרת קובץ
@@ -695,7 +695,7 @@ export default function LegacyImportModal({
   );
 
   const renderSessionDatePicker = () => (
-    <div className="legacy-import-card legacy-import-card-narrow space-y-2">
+    <div className="legacy-import-card space-y-2">
       <div className="space-y-1 rtl-embed-text text-right">
         <Label
           className="block text-right text-sm font-semibold text-foreground rtl-embed-text"
@@ -744,6 +744,7 @@ export default function LegacyImportModal({
               type="button"
               size="sm"
               variant="outline"
+              className="legacy-import-row-reverse legacy-import-utility-button"
               onClick={onReloadServices}
               disabled={servicesLoading}
               title="רענון רשימת השירותים מההגדרות"
@@ -982,7 +983,7 @@ export default function LegacyImportModal({
           <h4 className="text-sm font-semibold text-foreground">עמודת תאריך ושיוך שירות</h4>
           <p className="text-xs text-neutral-600">בחרו את עמודת התאריך ולאחר מכן הגדירו את שיוך השירותים.</p>
         </div>
-        <div className="legacy-import-basic-grid">
+        <div className="space-y-3">
           {renderSessionDatePicker()}
           {renderServiceSelection()}
         </div>
@@ -1001,10 +1002,8 @@ export default function LegacyImportModal({
     <div className="legacy-import-step space-y-4">
       <div className="legacy-import-card space-y-3">
         <div className="space-y-1 rtl-embed-text text-right">
-          <h4 className="text-sm font-semibold text-foreground">תצוגה מקדימה ואימות</h4>
-          <p className="text-xs text-neutral-600">
-            כך המערכת מפרשת את הנתונים שלך. ודאו שהשורות הראשונות מעובדות כהלכה לפני שתמשיכו.
-          </p>
+          <p className="text-sm font-semibold text-foreground">כך המערכת מפרשת את הנתונים שלך.</p>
+          <p className="text-xs text-neutral-600">ודאו שהשורות הראשונות מעובדות כהלכה לפני שתמשיכו.</p>
         </div>
         {!mappedPreviewRows.length ? (
           <p className="text-sm text-neutral-700 rtl-embed-text text-right">לא נמצאו שורות תצוגה מקדימה. ודאו שקובץ ה-CSV כולל נתונים מעבר לשורת הכותרות.</p>
@@ -1066,14 +1065,14 @@ export default function LegacyImportModal({
                 .map(([column, value]) => {
                   const match = questionOptions.find((option) => option.key === value);
                   return (
-                    <li key={column}>{match?.label || value} → {column}</li>
+                    <li key={column}>{column} ← {match?.label || value}</li>
                   );
                 })}
             </ul>
           ) : (
             <ul className="list-disc space-y-1 pr-5 text-neutral-700 rtl-embed-text text-right">
               {Object.entries(effectiveCustomLabels).map(([column, value]) => (
-                <li key={column}>{value} → {column}</li>
+                <li key={column}>{column} ← {value}</li>
               ))}
             </ul>
           )}
