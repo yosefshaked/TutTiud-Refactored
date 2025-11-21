@@ -65,9 +65,11 @@
   flex-wrap: wrap;
   position: sticky;
   bottom: 0;
-  background-color: #fff;
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
+  background-color: rgba(255, 255, 255, 0.96);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -6px 16px rgba(17, 24, 39, 0.05);
 }
 
 .legacy-import-footer button {
@@ -79,6 +81,10 @@
   background-color: #fff;
   border-radius: 0.75rem;
   padding: 1rem;
+}
+
+.legacy-import-card-narrow {
+  max-width: 560px;
 }
 
 .legacy-import-file-row {
@@ -98,16 +104,20 @@
   white-space: normal;
 }
 
+.legacy-import-cta-button[data-selected='true'] {
+  border-color: hsl(var(--primary));
+  background-color: rgba(88, 28, 135, 0.08);
+  box-shadow: 0 0 0 1px hsl(var(--primary)) inset, 0 10px 18px rgba(88, 28, 135, 0.08);
+}
+
+.legacy-import-cta-button[data-selected='true'] .legacy-import-cta-icon {
+  color: hsl(var(--primary));
+}
+
 .legacy-import-basic-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 768px) {
-  .legacy-import-basic-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .legacy-import-tag {
@@ -149,6 +159,11 @@
   color: #374151;
   font-size: 0.8125rem;
   font-weight: 600;
+}
+
+.legacy-import-table .legacy-import-date-col {
+  width: 140px;
+  white-space: nowrap;
 }
 
 .legacy-import-table th,

@@ -18,6 +18,8 @@ import {
   ListChecks,
   FilePenLine,
   Table,
+  XCircle,
+  RotateCcw,
 } from 'lucide-react';
 import './LegacyImportModal.css';
 
@@ -232,7 +234,7 @@ export default function LegacyImportModal({
       }
     }
 
-    const slashMatch = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (slashMatch) {
       const [day, month, year] = slashMatch.slice(1).map(Number);
       const parsed = attemptDate(new Date(Date.UTC(year, month - 1, day)));
@@ -241,7 +243,7 @@ export default function LegacyImportModal({
       }
     }
 
-    const dotMatch = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    const dotMatch = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
     if (dotMatch) {
       const [day, month, year] = dotMatch.slice(1).map(Number);
       const parsed = attemptDate(new Date(Date.UTC(year, month - 1, day)));
@@ -584,7 +586,7 @@ export default function LegacyImportModal({
   );
 
   const renderCsvUpload = () => (
-    <div className="legacy-import-card space-y-3">
+    <div className="space-y-3">
       <div className="space-y-1 rtl-embed-text text-right">
         <Label htmlFor="legacy-csv-upload" className="block text-right text-sm font-semibold text-foreground rtl-embed-text">
           העלאת קובץ CSV
@@ -597,8 +599,14 @@ export default function LegacyImportModal({
             <p className="text-xs font-semibold text-neutral-800">קובץ שנבחר: {fileName}</p>
             <p className="text-xs text-neutral-600">החליפו את הקובץ אם ברצונכם להעלות גרסה אחרת.</p>
           </div>
-          <Button type="button" variant="ghost" size="sm" className="legacy-import-row-reverse" onClick={handleClearFile}>
-            הסרת קובץ
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="legacy-import-row-reverse"
+            onClick={handleClearFile}
+          >
+            <XCircle className="h-4 w-4" aria-hidden="true" /> הסרת קובץ
           </Button>
         </div>
       ) : (
@@ -652,6 +660,7 @@ export default function LegacyImportModal({
         <Button
           type="button"
           variant={structureChoice === 'match' ? 'secondary' : 'outline'}
+          data-selected={structureChoice === 'match'}
           className="legacy-import-row-reverse legacy-import-cta-button text-right"
           onClick={() => handleSelectStructure('match')}
         >
@@ -659,11 +668,12 @@ export default function LegacyImportModal({
             <span className="font-semibold">כן, המבנה תואם</span>
             <span className="text-xs text-neutral-600">בחר באפשרות זו אם לקובץ ה-CSV יש את אותן עמודות כמו בטופס התיעוד הנוכחי. המערכת תנסה למפות אותן אוטומטית.</span>
           </div>
-          <ListChecks className="h-4 w-4" aria-hidden="true" />
+          <ListChecks className="h-4 w-4 legacy-import-cta-icon" aria-hidden="true" />
         </Button>
         <Button
           type="button"
           variant={structureChoice === 'custom' ? 'secondary' : 'outline'}
+          data-selected={structureChoice === 'custom'}
           className="legacy-import-row-reverse legacy-import-cta-button text-right"
           onClick={() => handleSelectStructure('custom')}
         >
@@ -671,22 +681,21 @@ export default function LegacyImportModal({
             <span className="font-semibold">לא, מבנה שונה</span>
             <span className="text-xs text-neutral-600">בחר באפשרות זו כדי למפות באופן ידני את עמודות הקובץ לשדות המערכת.</span>
           </div>
-          <FilePenLine className="h-4 w-4" aria-hidden="true" />
+          <FilePenLine className="h-4 w-4 legacy-import-cta-icon" aria-hidden="true" />
         </Button>
       </div>
     </div>
   );
 
   const renderUploadStep = () => (
-    <div className="legacy-import-step space-y-6">
-      {renderCsvUpload()}
-      <Separator />
-      {renderStructureChoice()}
+    <div className="legacy-import-step space-y-4">
+      <div className="legacy-import-card space-y-6">{renderCsvUpload()}</div>
+      <div className="legacy-import-card space-y-6">{renderStructureChoice()}</div>
     </div>
   );
 
   const renderSessionDatePicker = () => (
-    <div className="legacy-import-card space-y-2">
+    <div className="legacy-import-card legacy-import-card-narrow space-y-2">
       <div className="space-y-1 rtl-embed-text text-right">
         <Label
           className="block text-right text-sm font-semibold text-foreground rtl-embed-text"
@@ -720,7 +729,7 @@ export default function LegacyImportModal({
   );
 
   const renderServiceSelection = () => (
-    <div className="legacy-import-card space-y-3 bg-neutral-50">
+    <div className="legacy-import-card space-y-3">
       <div className="legacy-import-row-reverse flex-wrap items-start justify-between gap-3">
         <div className="space-y-1 rtl-embed-text text-right">
           <h4 className="text-sm font-semibold text-foreground">שיוך שירות למפגשים</h4>
@@ -734,12 +743,12 @@ export default function LegacyImportModal({
             <Button
               type="button"
               size="sm"
-              variant="ghost"
+              variant="outline"
               onClick={onReloadServices}
               disabled={servicesLoading}
               title="רענון רשימת השירותים מההגדרות"
             >
-              רענון
+              <RotateCcw className="h-4 w-4" aria-hidden="true" /> רענון
             </Button>
           ) : null}
         </div>
@@ -754,6 +763,7 @@ export default function LegacyImportModal({
         <Button
           type="button"
           variant={serviceMode === 'fixed' ? 'secondary' : 'outline'}
+          data-selected={serviceMode === 'fixed'}
           className="legacy-import-row-reverse legacy-import-cta-button"
           onClick={() => setServiceMode('fixed')}
         >
@@ -761,11 +771,12 @@ export default function LegacyImportModal({
             <span className="font-semibold">שירות אחיד לכל השורות</span>
             <span className="text-xs text-neutral-600">בחרו שירות אחד או הקלידו שם שירות מותאם</span>
           </div>
-          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          <CheckCircle2 className="h-4 w-4 legacy-import-cta-icon" aria-hidden="true" />
         </Button>
         <Button
           type="button"
           variant={serviceMode === 'column' ? 'secondary' : 'outline'}
+          data-selected={serviceMode === 'column'}
           className="legacy-import-row-reverse legacy-import-cta-button"
           disabled={!hasColumns}
           onClick={() => setServiceMode('column')}
@@ -774,7 +785,7 @@ export default function LegacyImportModal({
             <span className="font-semibold">שירות לפי עמודה בקובץ</span>
             <span className="text-xs text-neutral-600">בחרו עמודת שירות מתוך הכותרות שהועלו</span>
           </div>
-          <Table className="h-4 w-4" aria-hidden="true" />
+          <Table className="h-4 w-4 legacy-import-cta-icon" aria-hidden="true" />
         </Button>
       </div>
 
@@ -965,22 +976,18 @@ export default function LegacyImportModal({
   );
 
   const renderMappingStep = () => (
-    <div className="legacy-import-step space-y-5">
-      <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
-        <p className="text-sm font-semibold text-foreground">שלב 2: מיפוי שדות</p>
-        <p className="text-sm text-neutral-700">אנא בדוק את המיפוי וודא שכל עמודה מהקובץ משויכת לשדה הנכון במערכת.</p>
-      </div>
+    <div className="legacy-import-step space-y-4">
       <div className="legacy-import-card space-y-4">
         <div className="space-y-1 rtl-embed-text text-right">
-          <h4 className="text-sm font-semibold text-foreground">מיפוי שדות חובה</h4>
-          <p className="text-xs text-neutral-600">בחרו את עמודת תאריך המפגש והגדירו שיוך שירות.</p>
+          <h4 className="text-sm font-semibold text-foreground">עמודת תאריך ושיוך שירות</h4>
+          <p className="text-xs text-neutral-600">בחרו את עמודת התאריך ולאחר מכן הגדירו את שיוך השירותים.</p>
         </div>
         <div className="legacy-import-basic-grid">
           {renderSessionDatePicker()}
           {renderServiceSelection()}
         </div>
       </div>
-      <div className="space-y-4">
+      <div className="legacy-import-card space-y-4">
         <div className="space-y-1 rtl-embed-text text-right">
           <h4 className="text-sm font-semibold text-foreground">מיפוי שאלות המפגש</h4>
           <p className="text-xs text-neutral-600">התאימו כל עמודה לשדה נכון בטופס או הגדירו שם מותאם.</p>
@@ -992,49 +999,54 @@ export default function LegacyImportModal({
 
   const renderPreviewStep = () => (
     <div className="legacy-import-step space-y-4">
-      <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
-        <p className="text-sm font-semibold text-foreground">שלב 3: תצוגה מקדימה ואימות</p>
-        <p className="text-sm text-neutral-700">
-          כך המערכת מפרשת את הנתונים שלך. אנא ודא שהשורות הראשונות מעובדות כהלכה לפני שתמשיך. עמודת התאריך מוצגת יחד עם
-          הנתונים הממופים כדי לראות את ההקשר המלא.
-        </p>
-      </div>
-      {!mappedPreviewRows.length ? (
-        <p className="text-sm text-neutral-700 rtl-embed-text text-right">לא נמצאו שורות תצוגה מקדימה. ודאו שקובץ ה-CSV כולל נתונים מעבר לשורת הכותרות.</p>
-      ) : (
-        <div className="legacy-import-table-wrapper">
-          <table className="legacy-import-table">
-            <thead>
-              <tr>
-                {Object.keys(mappedPreviewRows[0]).map((header) => (
-                  <th key={header} scope="col">
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {mappedPreviewRows.map((row, index) => (
-                <tr key={`preview-${index}`}>
-                  {Object.keys(row).map((header) => (
-                    <td key={`${header}-${index}`}>{row[header] || '—'}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="legacy-import-card space-y-3">
+        <div className="space-y-1 rtl-embed-text text-right">
+          <h4 className="text-sm font-semibold text-foreground">תצוגה מקדימה ואימות</h4>
+          <p className="text-xs text-neutral-600">
+            כך המערכת מפרשת את הנתונים שלך. ודאו שהשורות הראשונות מעובדות כהלכה לפני שתמשיכו.
+          </p>
         </div>
-      )}
+        {!mappedPreviewRows.length ? (
+          <p className="text-sm text-neutral-700 rtl-embed-text text-right">לא נמצאו שורות תצוגה מקדימה. ודאו שקובץ ה-CSV כולל נתונים מעבר לשורת הכותרות.</p>
+        ) : (
+          <div className="legacy-import-table-wrapper">
+            <table className="legacy-import-table">
+              <thead>
+                <tr>
+                  {Object.keys(mappedPreviewRows[0]).map((header) => {
+                    const isDateHeader = header.includes('תאריך מפגש');
+                    return (
+                      <th key={header} scope="col" className={isDateHeader ? 'legacy-import-date-col' : undefined}>
+                        {header}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {mappedPreviewRows.map((row, index) => (
+                  <tr key={`preview-${index}`}>
+                    {Object.keys(row).map((header) => {
+                      const isDateHeader = header.includes('תאריך מפגש');
+                      return (
+                        <td key={`${header}-${index}`} className={isDateHeader ? 'legacy-import-date-col' : undefined}>
+                          {row[header] || '—'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 
   const renderConfirmStep = () => (
     <div className="legacy-import-step space-y-4">
-      <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
-        <p className="text-sm font-semibold text-foreground">שלב 4: סיכום ואישור ייבוא</p>
-        <p className="text-sm text-neutral-700">בדקו את הסיכום לפני אישור הייבוא.</p>
-      </div>
-      <div className="space-y-3 rounded-md border border-neutral-200 p-4">
+      <div className="legacy-import-card space-y-3">
         <div className="space-y-1 rtl-embed-text text-right">
           <h4 className="text-sm font-semibold text-foreground">פרטי קובץ</h4>
           <p className="text-sm text-neutral-700">שם הקובץ: {fileName || 'לא נבחר קובץ'}</p>
@@ -1054,14 +1066,14 @@ export default function LegacyImportModal({
                 .map(([column, value]) => {
                   const match = questionOptions.find((option) => option.key === value);
                   return (
-                    <li key={column}>{column} ← {match?.label || value}</li>
+                    <li key={column}>{match?.label || value} → {column}</li>
                   );
                 })}
             </ul>
           ) : (
             <ul className="list-disc space-y-1 pr-5 text-neutral-700 rtl-embed-text text-right">
               {Object.entries(effectiveCustomLabels).map(([column, value]) => (
-                <li key={column}>{column} ← {value}</li>
+                <li key={column}>{value} → {column}</li>
               ))}
             </ul>
           )}
