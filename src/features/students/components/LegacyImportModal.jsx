@@ -575,12 +575,12 @@ export default function LegacyImportModal({
           <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
           <AlertTitle className="rtl-embed-text text-right">נמצאו דוחות Legacy קיימים לתלמיד זה</AlertTitle>
           <AlertDescription className="text-sm rtl-embed-text text-right">
-            ייבוא חדש ימחק את הדוחות ההיסטוריים הקיימים ויחליף אותם בנתונים החדשים אם ההרשאה מאפשרת זאת.
+            ייבוא חדש ימחק את הדוחות ההיסטוריים הקיימים ויחליף אותם בנתונים החדשים.
           </AlertDescription>
         </Alert>
       ) : null}
       <p className="text-xs text-neutral-700 rtl-embed-text text-right">
-        צריך לבצע גיבוי? <button type="button" className="legacy-import-warning-link" onClick={handleNavigateToBackup}>עברו להגדרות</button> לפני שממשיכים.
+        צריכים לבצע גיבוי? <button type="button" className="legacy-import-warning-link" onClick={handleNavigateToBackup}>עברו להגדרות</button> לפני שממשיכים.
       </p>
     </div>
   );
@@ -666,7 +666,7 @@ export default function LegacyImportModal({
         >
           <div className="flex flex-col items-start rtl-embed-text text-right">
             <span className="font-semibold">כן, המבנה תואם</span>
-            <span className="text-xs text-neutral-600">בחר באפשרות זו אם לקובץ ה-CSV יש את אותן עמודות כמו בטופס התיעוד הנוכחי. המערכת תנסה למפות אותן אוטומטית.</span>
+            <span className="text-xs text-neutral-600">בחרו באפשרות זו אם לקובץ ה-CSV יש את אותן עמודות כמו בטופס התיעוד הנוכחי. המערכת תנסה למפות אותן אוטומטית.</span>
           </div>
           <ListChecks className="h-4 w-4 legacy-import-cta-icon" aria-hidden="true" />
         </Button>
@@ -679,7 +679,7 @@ export default function LegacyImportModal({
         >
           <div className="flex flex-col items-start rtl-embed-text text-right">
             <span className="font-semibold">לא, מבנה שונה</span>
-            <span className="text-xs text-neutral-600">בחר באפשרות זו כדי למפות באופן ידני את עמודות הקובץ לשדות המערכת.</span>
+            <span className="text-xs text-neutral-600">בחרו באפשרות זו כדי למפות באופן ידני את עמודות הקובץ לשדות המערכת.</span>
           </div>
           <FilePenLine className="h-4 w-4 legacy-import-cta-icon" aria-hidden="true" />
         </Button>
@@ -1280,7 +1280,7 @@ export default function LegacyImportModal({
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-foreground rtl-embed-text">{title}</DialogTitle>
           {studentName ? (
-            <p className="text-sm text-neutral-600 rtl-embed-text">סטודנט: {studentName}</p>
+            <p className="text-sm text-neutral-600 rtl-embed-text">תלמיד: {studentName}</p>
           ) : null}
         </DialogHeader>
         <div className="space-y-4">
