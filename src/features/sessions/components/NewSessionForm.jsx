@@ -179,8 +179,7 @@ export default function NewSessionForm({
     }
   }, [selectedStudent, serviceTouched]);
 
-  const handleStudentChange = (event) => {
-    const value = event.target.value;
+  const handleStudentChange = (value) => {
     setSelectedStudentId(value);
     onSelectedStudentChange?.(value); // Notify parent
     setServiceTouched(false);
@@ -358,26 +357,29 @@ export default function NewSessionForm({
             ) : null}
           </div>
         </div>
-        <select
-          id="session-student"
-          className="w-full min-h-[44px] rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+        <Select
           value={selectedStudentId}
-          onChange={handleStudentChange}
-          required
+          onValueChange={handleStudentChange}
+          onOpenChange={onSelectOpenChange}
           disabled={isSubmitting || filteredStudents.length === 0}
+          required
         >
-          <option value="" disabled>
-            בחרו תלמיד מהרשימה
-          </option>
-          {filteredStudents.map((student) => {
-            const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
-            return (
-              <option key={student.id} value={student.id}>
-                {student.name || 'ללא שם'} — {schedule}
-              </option>
-            );
-          })}
-        </select>
+          <SelectTrigger id="session-student" className="w-full">
+            <SelectValue placeholder="בחרו תלמיד מהרשימה" />
+          </SelectTrigger>
+          <SelectContent className="max-h-[300px]">
+            {filteredStudents.map((student) => {
+              const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
+              return (
+                <SelectItem key={student.id} value={student.id}>
+                  <span className="block text-right w-full">
+                    {student.name || 'ללא שם'} — {schedule}
+                  </span>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
         {students.length === 0 ? (
           <p className="text-xs text-neutral-500 text-right">אין תלמידים זמינים לשיוך מפגש חדש.</p>
         ) : filteredStudents.length === 0 ? (
