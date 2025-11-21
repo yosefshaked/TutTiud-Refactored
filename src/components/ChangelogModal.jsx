@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.4.0': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.5.0': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,115 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.5.0 - Safari improvements and visual hierarchy */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.5.0')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.5.0'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.5.0'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.5.0
+                    </span>
+                    <time dateTime="2025-11-21" style={{ color: '#64748b', fontSize: '14px' }}>
+                      21 בנובמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.5.0'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  🍎 ייבוא דוחות, שיפורי Apple ועיצוב חדש
+                </h3>
+              </header>
+
+              {expandedVersions['1.5.0'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תוספות:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>ייבוא דוחות קודמים:</strong> כעת ניתן להעלות דוחות היסטוריים דרך קובץ CSV (למנהלים בלבד)
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תמיכה בסאפרי ובמכשירי Apple:</strong> תיבות הבחירה ופעולות קטנות נוספות פועלות כעת בצורה חלקה בדפדפן סאפרי ובמכשירי iOS ו-macOS
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>עיצוב משופר לבחירת תלמיד:</strong> התיבה לבחירת תלמיד בדוח חדש בולטת יותר ונבדלת בבירור מהפילטרים
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תפריטים נפתחים עקביים:</strong> כל התפריטים הנפתחים בכל המערכת עובדים באותו אופן ונראים זהה
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תיקוני באגים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תיקון קריסה בנייד:</strong> החלונות הפנימיים לא קורסים יותר כשלוחצים מחוץ לתפריט נפתח בטלפון
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תיקון מיקוד בתצוגת שבוע בנייד:</strong> המערכת מתמקדת כעת ביום הנוכחי במקום ביום הראשון של השבוע
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.4.0 - Weekly & daily compliance refresh */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
