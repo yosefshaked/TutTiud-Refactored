@@ -275,8 +275,10 @@ export default function NewSessionForm({
       dir="rtl"
     >
       <div className="space-y-sm">
-        <Label htmlFor="session-student" className="block text-right">בחרו תלמיד *</Label>
-        <div className="mb-2 space-y-2">
+        <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
+        <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>
+        <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+          <p className="text-xs font-medium text-neutral-600 text-right mb-2">🔍 מסנני חיפוש</p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="relative min-w-[200px] flex-1">
               <Input
@@ -361,27 +363,32 @@ export default function NewSessionForm({
             ) : null}
           </div>
         </div>
-        <Select
-          value={selectedStudentId}
-          onValueChange={handleStudentChange}
-          onOpenChange={onSelectOpenChange}
-          disabled={isSubmitting || filteredStudents.length === 0}
-          required
-        >
-          <SelectTrigger id="session-student" className="w-full">
-            <SelectValue placeholder="בחרו תלמיד מהרשימה" />
-          </SelectTrigger>
-          <SelectContent className="max-h-[300px]">
-            {filteredStudents.map((student) => {
-              const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
-              return (
-                <SelectItem key={student.id} value={student.id}>
-                  {student.name || 'ללא שם'} — {schedule}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
+        <div className="pt-2">
+          <Label htmlFor="session-student-select" className="block text-right text-sm font-medium text-primary mb-2">
+            ✓ בחירת תלמיד
+          </Label>
+          <Select
+            value={selectedStudentId}
+            onValueChange={handleStudentChange}
+            onOpenChange={onSelectOpenChange}
+            disabled={isSubmitting || filteredStudents.length === 0}
+            required
+          >
+            <SelectTrigger id="session-student" className="w-full border-2 border-primary/30 bg-white shadow-sm hover:border-primary/50 focus:border-primary">
+              <SelectValue placeholder="בחרו תלמיד מהרשימה" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              {filteredStudents.map((student) => {
+                const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time);
+                return (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.name || 'ללא שם'} — {schedule}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
         {students.length === 0 ? (
           <p className="text-xs text-neutral-500 text-right">אין תלמידים זמינים לשיוך מפגש חדש.</p>
         ) : filteredStudents.length === 0 ? (
