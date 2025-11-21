@@ -248,3 +248,9 @@ This tool is essential for validating backups before restore or for compliance c
 - **Settings UI** – `StudentVisibilitySettings.jsx` adds a dedicated card (eye-off icon) to `Settings.jsx`. Admins/owners can review the current value, read the guard copy, and toggle the permission through `upsertSetting` while instructors only see the status if they have manage rights.
 - **API integration** – `/api/my-students` checks the setting server-side and only includes inactive rows when the flag is enabled or the caller holds admin privileges. Query parameters (`status=active|inactive|all`) stay aligned with `/api/students` so both dashboards share a single filtering model.
 - **Frontend consumers** – `MyStudentsPage.jsx`, `NewSessionModal.jsx`, and `NewSessionForm.jsx` load the setting via `fetchSettingsValue` and adjust local filters + UI affordances accordingly. The preference for showing inactive students in admin lists persists per tab via `sessionStorage`.
+
+## 17. Legacy Import Wizard UI polish (2025-12)
+
+- **Better alignment** – The mapping step now uses paired cards for session date selection and service assignment (`legacy-import-card` with `legacy-import-basic-grid`) so headers are no longer squeezed into the same row as the date picker.
+- **Button readability** – Long Hebrew microcopy inside structure/service choice buttons uses the `legacy-import-cta-button` style to wrap text cleanly without overflow and keeps the sticky footer buttons visible.
+- **Preview clarity** – The preview table now includes both the original and parsed session date columns alongside mapped fields, so users can see date context per row instead of in a detached block. Arrow indicators in the confirmation summary follow RTL (←).

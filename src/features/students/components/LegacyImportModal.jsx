@@ -263,9 +263,20 @@ export default function LegacyImportModal({
       return [];
     }
 
+    const buildDateColumns = (row) => {
+      if (!sessionDateColumn) {
+        return {};
+      }
+      const parsed = parseSessionDateValue(row[sessionDateColumn]);
+      return {
+        'תאריך מפגש (מקורי)': parsed.original || '—',
+        'תאריך מפגש (מפוענח)': parsed.parsed,
+      };
+    };
+
     if (isMatchFlow) {
       return previewRows.map((row) => {
-        const mapped = {};
+        const mapped = { ...buildDateColumns(row) };
         Object.entries(effectiveColumnMappings).forEach(([column, value]) => {
           const match = questionOptions.find((option) => option.key === value);
           mapped[match?.label || value] = row[column];
@@ -275,29 +286,13 @@ export default function LegacyImportModal({
     }
 
     return previewRows.map((row) => {
-      const mapped = {};
+      const mapped = { ...buildDateColumns(row) };
       Object.entries(effectiveCustomLabels).forEach(([column, value]) => {
         mapped[value] = row[column];
       });
       return mapped;
     });
-  }, [previewRows, isMatchFlow, effectiveColumnMappings, effectiveCustomLabels, questionOptions]);
-
-  const sessionDatePreview = useMemo(() => {
-    if (!previewRows.length || !sessionDateColumn) {
-      return [];
-    }
-
-    return previewRows.map((row, index) => {
-      const value = row[sessionDateColumn];
-      const parsed = parseSessionDateValue(value);
-      return {
-        index: index + 1,
-        original: parsed.original || '—',
-        parsed: parsed.parsed,
-      };
-    });
-  }, [previewRows, sessionDateColumn]);
+  }, [previewRows, isMatchFlow, effectiveColumnMappings, effectiveCustomLabels, questionOptions, sessionDateColumn]);
 
   useEffect(() => {
     if (!open) {
@@ -657,7 +652,7 @@ export default function LegacyImportModal({
         <Button
           type="button"
           variant={structureChoice === 'match' ? 'secondary' : 'outline'}
-          className="legacy-import-row-reverse justify-between text-right"
+          className="legacy-import-row-reverse legacy-import-cta-button text-right"
           onClick={() => handleSelectStructure('match')}
         >
           <div className="flex flex-col items-start rtl-embed-text text-right">
@@ -669,7 +664,7 @@ export default function LegacyImportModal({
         <Button
           type="button"
           variant={structureChoice === 'custom' ? 'secondary' : 'outline'}
-          className="legacy-import-row-reverse justify-between text-right"
+          className="legacy-import-row-reverse legacy-import-cta-button text-right"
           onClick={() => handleSelectStructure('custom')}
         >
           <div className="flex flex-col items-start rtl-embed-text text-right">
@@ -691,10 +686,16 @@ export default function LegacyImportModal({
   );
 
   const renderSessionDatePicker = () => (
-    <div className="space-y-2">
-      <Label className="block text-right text-sm font-semibold text-foreground rtl-embed-text" htmlFor="session-date-column">
-        עמודת תאריך המפגש
-      </Label>
+    <div className="legacy-import-card space-y-2">
+      <div className="space-y-1 rtl-embed-text text-right">
+        <Label
+          className="block text-right text-sm font-semibold text-foreground rtl-embed-text"
+          htmlFor="session-date-column"
+        >
+          עמודת תאריך המפגש
+        </Label>
+        <p className="text-xs text-neutral-600">בחרו את העמודה שמייצגת את התאריך כדי לראות אותה בתצוגה המקדימה.</p>
+      </div>
       <Select
         modal={true}
         value={sessionDateColumn}
@@ -713,13 +714,13 @@ export default function LegacyImportModal({
         </SelectContent>
       </Select>
       <p className="text-[11px] text-neutral-600 rtl-embed-text text-right">
-        עמודת התאריך תוסתר ברשימת השדות המיובאים כברירת מחדל. ניתן לבחור "הכלל" כדי להציג אותה גם בשדות.
+        עמודת התאריך תוצג בתצוגה המקדימה לצד שאר העמודות ותוסתר מהמיפוי הדו-כיווני כברירת מחדל.
       </p>
     </div>
   );
 
   const renderServiceSelection = () => (
-    <div className="space-y-3 rounded-md bg-neutral-50 p-4">
+    <div className="legacy-import-card space-y-3 bg-neutral-50">
       <div className="legacy-import-row-reverse flex-wrap items-start justify-between gap-3">
         <div className="space-y-1 rtl-embed-text text-right">
           <h4 className="text-sm font-semibold text-foreground">שיוך שירות למפגשים</h4>
@@ -753,7 +754,7 @@ export default function LegacyImportModal({
         <Button
           type="button"
           variant={serviceMode === 'fixed' ? 'secondary' : 'outline'}
-          className="legacy-import-row-reverse justify-between"
+          className="legacy-import-row-reverse legacy-import-cta-button"
           onClick={() => setServiceMode('fixed')}
         >
           <div className="flex flex-col items-start text-right rtl-embed-text">
@@ -765,7 +766,7 @@ export default function LegacyImportModal({
         <Button
           type="button"
           variant={serviceMode === 'column' ? 'secondary' : 'outline'}
-          className="legacy-import-row-reverse justify-between"
+          className="legacy-import-row-reverse legacy-import-cta-button"
           disabled={!hasColumns}
           onClick={() => setServiceMode('column')}
         >
@@ -969,12 +970,12 @@ export default function LegacyImportModal({
         <p className="text-sm font-semibold text-foreground">שלב 2: מיפוי שדות</p>
         <p className="text-sm text-neutral-700">אנא בדוק את המיפוי וודא שכל עמודה מהקובץ משויכת לשדה הנכון במערכת.</p>
       </div>
-      <div className="space-y-4 rounded-md border border-neutral-200 p-4">
+      <div className="legacy-import-card space-y-4">
         <div className="space-y-1 rtl-embed-text text-right">
           <h4 className="text-sm font-semibold text-foreground">מיפוי שדות חובה</h4>
           <p className="text-xs text-neutral-600">בחרו את עמודת תאריך המפגש והגדירו שיוך שירות.</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="legacy-import-basic-grid">
           {renderSessionDatePicker()}
           {renderServiceSelection()}
         </div>
@@ -994,37 +995,10 @@ export default function LegacyImportModal({
       <div className="space-y-2 rounded-md bg-neutral-50 p-4 rtl-embed-text text-right">
         <p className="text-sm font-semibold text-foreground">שלב 3: תצוגה מקדימה ואימות</p>
         <p className="text-sm text-neutral-700">
-          כך המערכת מפרשת את הנתונים שלך. אנא ודא שהשורות הראשונות מעובדות כהלכה לפני שתמשיך.
+          כך המערכת מפרשת את הנתונים שלך. אנא ודא שהשורות הראשונות מעובדות כהלכה לפני שתמשיך. עמודת התאריך מוצגת יחד עם
+          הנתונים הממופים כדי לראות את ההקשר המלא.
         </p>
       </div>
-      {sessionDatePreview.length ? (
-        <div className="legacy-import-card space-y-3">
-          <div className="space-y-1 rtl-embed-text text-right">
-            <h4 className="text-sm font-semibold text-foreground">תצוגה מקדימה של תאריך המפגש</h4>
-            <p className="text-xs text-neutral-700">כאן ניתן לראות כיצד ערכי עמודת התאריך מתורגמים לתאריך מערכת.</p>
-          </div>
-          <div className="legacy-import-table-wrapper">
-            <table className="legacy-import-table">
-              <thead>
-                <tr>
-                  <th scope="col">שורה</th>
-                  <th scope="col">ערך מקורי</th>
-                  <th scope="col">תאריך מפוענח</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessionDatePreview.map((row) => (
-                  <tr key={`session-date-${row.index}`}>
-                    <td className="text-neutral-700">{row.index}</td>
-                    <td className="font-medium text-neutral-800">{row.original || '—'}</td>
-                    <td className="text-neutral-800">{row.parsed}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
       {!mappedPreviewRows.length ? (
         <p className="text-sm text-neutral-700 rtl-embed-text text-right">לא נמצאו שורות תצוגה מקדימה. ודאו שקובץ ה-CSV כולל נתונים מעבר לשורת הכותרות.</p>
       ) : (
@@ -1080,14 +1054,14 @@ export default function LegacyImportModal({
                 .map(([column, value]) => {
                   const match = questionOptions.find((option) => option.key === value);
                   return (
-                    <li key={column}>{column} → {match?.label || value}</li>
+                    <li key={column}>{column} ← {match?.label || value}</li>
                   );
                 })}
             </ul>
           ) : (
             <ul className="list-disc space-y-1 pr-5 text-neutral-700 rtl-embed-text text-right">
               {Object.entries(effectiveCustomLabels).map(([column, value]) => (
-                <li key={column}>{column} → {value}</li>
+                <li key={column}>{column} ← {value}</li>
               ))}
             </ul>
           )}
