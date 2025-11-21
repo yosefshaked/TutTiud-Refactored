@@ -138,7 +138,7 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#1e293b',
                   lineHeight: 1.4
                 }}>
-                  🍎 ייבוא דוחות, שיפורי Apple ועיצוב חדש
+                  🍎 ייבוא דוחות, שיפורי Apple ועיצוב משופר
                 </h3>
               </header>
 
@@ -154,7 +154,7 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#334155'
                 }}>
                   <li style={{ marginBottom: '6px' }}>
-                    <strong>ייבוא דוחות קודמים:</strong> כעת ניתן להעלות דוחות היסטוריים דרך קובץ CSV (למנהלים בלבד)
+                    <strong>ייבוא דוחות קודמים (למנהלים בלבד):</strong> כעת ניתן להעלות דוחות היסטוריים דרך קובץ CSV
                   </li>
                 </ul>
 
@@ -168,7 +168,7 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#334155'
                 }}>
                   <li style={{ marginBottom: '6px' }}>
-                    <strong>תמיכה בסאפרי ובמכשירי Apple:</strong> תיבות הבחירה ופעולות קטנות נוספות פועלות כעת בצורה חלקה בדפדפן סאפרי ובמכשירי iOS ו-macOS
+                    <strong>תמיכה בסאפרי ובמכשירי Apple:</strong> תיבות הבחירה ופעולות קטנות נוספות פועלות כעת בצורה משופרת במכשירי Apple
                   </li>
                   <li style={{ marginBottom: '6px' }}>
                     <strong>עיצוב משופר לבחירת תלמיד:</strong> התיבה לבחירת תלמיד בדוח חדש בולטת יותר ונבדלת בבירור מהפילטרים
@@ -188,7 +188,7 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#334155'
                 }}>
                   <li style={{ marginBottom: '6px' }}>
-                    <strong>תיקון קריסה בנייד:</strong> החלונות הפנימיים לא קורסים יותר כשלוחצים מחוץ לתפריט נפתח בטלפון
+                    <strong>תיקון קריסה בנייד:</strong> החלונות הפנימיים לא קורסים יותר בלחיצה מחוץ לתפריט נפתח בנייד
                   </li>
                   <li style={{ marginBottom: '6px' }}>
                     <strong>תיקון מיקוד בתצוגת שבוע בנייד:</strong> המערכת מתמקדת כעת ביום הנוכחי במקום ביום הראשון של השבוע
