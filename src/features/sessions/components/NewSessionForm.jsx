@@ -329,7 +329,7 @@ export default function NewSessionForm({
                 </Label>
                 <select
                   id="session-status-filter"
-                  className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm text-foreground"
+                  className="min-h-[44px] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-foreground"
                   value={statusFilter}
                   onChange={(event) => onStatusFilterChange?.(event.target.value)}
                   disabled={isSubmitting || !visibilityLoaded}
@@ -360,7 +360,7 @@ export default function NewSessionForm({
         </div>
         <select
           id="session-student"
-          className="w-full rounded-lg border border-border bg-white p-sm text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full min-h-[44px] rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
           value={selectedStudentId}
           onChange={handleStudentChange}
           required
@@ -580,7 +580,7 @@ export default function NewSessionForm({
                     </Label>
                     <select
                       id={questionId}
-                      className="w-full rounded-lg border border-border bg-white p-sm text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      className="w-full min-h-[44px] rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                       value={answerValue ?? ''}
                       onChange={(e) => handleAnswerChange(question.key, e)}
                       disabled={isSubmitting || questionOptions.length === 0}
