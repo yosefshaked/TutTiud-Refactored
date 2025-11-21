@@ -572,11 +572,15 @@ export default function LegacyImportModal({
       </Alert>
       {hasLegacyImport ? (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800 rtl-embed-text">
-          <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
-          <AlertTitle className="rtl-embed-text text-right">נמצאו דוחות Legacy קיימים לתלמיד זה</AlertTitle>
-          <AlertDescription className="text-sm rtl-embed-text text-right">
-            ייבוא חדש ימחק את הדוחות ההיסטוריים הקיימים ויחליף אותם בנתונים החדשים.
-          </AlertDescription>
+          <div className="legacy-import-warning-row">
+            <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
+            <div className="legacy-import-warning-text">
+              <AlertTitle className="rtl-embed-text text-right">נמצאו דוחות Legacy קיימים לתלמיד זה</AlertTitle>
+              <AlertDescription className="text-sm rtl-embed-text text-right">
+                ייבוא חדש ימחק את הדוחות ההיסטוריים הקיימים ויחליף אותם בנתונים החדשים.
+              </AlertDescription>
+            </div>
+          </div>
         </Alert>
       ) : null}
       <p className="text-xs text-neutral-700 rtl-embed-text text-right">
@@ -1107,12 +1111,16 @@ export default function LegacyImportModal({
       </div>
       {hasLegacyImport ? (
         <Alert variant="destructive" className="border-red-200 bg-red-50 text-red-800">
-          <ShieldAlert className="h-5 w-5" aria-hidden="true" />
-          <AlertTitle className="text-sm font-semibold rtl-embed-text text-right">אזהרת העלאה חוזרת</AlertTitle>
-          <AlertDescription className="text-sm space-y-1 rtl-embed-text text-right">
-            <p>פעולה זו תמחק את כל הדוחות ההיסטוריים שנאספו בעבר לתלמיד זה ותשמור רק את הייבוא החדש.</p>
-            <p>הפעולה בלתי הפיכה. האם להמשיך?</p>
-          </AlertDescription>
+          <div className="legacy-import-warning-row">
+            <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+            <div className="legacy-import-warning-text">
+              <AlertTitle className="text-sm font-semibold rtl-embed-text text-right">אזהרת העלאה חוזרת</AlertTitle>
+              <AlertDescription className="text-sm space-y-1 rtl-embed-text text-right">
+                <p>פעולה זו תמחק את כל הדוחות ההיסטוריים שנאספו בעבר לתלמיד זה ותשמור רק את הייבוא החדש.</p>
+                <p>הפעולה בלתי הפיכה. האם להמשיך?</p>
+              </AlertDescription>
+            </div>
+          </div>
         </Alert>
       ) : null}
       {submitError ? (
