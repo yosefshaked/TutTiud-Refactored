@@ -92,6 +92,20 @@
   box-shadow: 0 0 0 3px rgba(126, 34, 206, 0.25);
 }
 
+.legacy-import-dialog-content {
+  max-height: calc(100vh - 120px);
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0));
+  margin-bottom: env(safe-area-inset-bottom, 0);
+}
+
+@media (min-width: 640px) {
+  .legacy-import-dialog-content {
+    max-height: 85vh;
+    padding-bottom: 1.25rem;
+    margin-bottom: 0;
+  }
+}
+
 .legacy-import-card {
   border: 1px solid #e5e7eb;
   background-color: #fff;

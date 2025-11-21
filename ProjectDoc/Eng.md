@@ -255,3 +255,4 @@ This tool is essential for validating backups before restore or for compliance c
 - **Better alignment** – The mapping step stacks the full-width session date card above the service assignment card so both use the available width without cramped headers.
 - **Button readability** – Selected structure/service buttons use a purple highlight with an outline that matches the New Session design, and utility actions such as “remove file”/“refresh” now use a clear outlined treatment so they read as buttons.
 - **Preview clarity** – The preview callout keeps a single heading (to avoid duplicate step titles), and the confirmation summary uses RTL-friendly arrows (←) to show column-to-field direction.
+- **Mobile safety margin** – The dialog content now caps its height on small screens and adds safe-area padding so the wizard always floats above the bottom navigation/FAB even after selecting a file.

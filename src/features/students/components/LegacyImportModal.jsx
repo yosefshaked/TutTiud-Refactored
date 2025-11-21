@@ -1246,7 +1246,7 @@ export default function LegacyImportModal({
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent
-        className="max-h-[85vh] overflow-y-auto sm:max-w-3xl"
+        className="legacy-import-dialog-content overflow-y-auto sm:max-w-3xl"
         onInteractOutside={handleDialogInteractOutside}
         footer={footer}
       >
