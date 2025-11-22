@@ -150,14 +150,14 @@ export default async function (context, req) {
       updated_by: userId,
     };
 
-    // Save to database
+    // Save to database (upsert to handle case where org_settings row doesn't exist yet)
     const { error: updateError } = await supabase
       .from('org_settings')
-      .update({
+      .upsert({
+        org_id: orgId,
         storage_profile: profileToSave,
         updated_at: new Date().toISOString(),
-      })
-      .eq('org_id', orgId);
+      }, { onConflict: 'org_id' });
 
     if (updateError) {
       context.log?.error?.('org-settings/storage failed to save storage_profile', {
