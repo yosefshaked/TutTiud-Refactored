@@ -102,6 +102,13 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     async (file) => {
       if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
 
+      // Validate session has access_token
+      if (!session.access_token) {
+        console.error('Session missing access_token', session);
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return { has_duplicates: false, duplicates: [] };
+      }
+
       try {
         const formData = new FormData();
         formData.append('file', file);
@@ -116,7 +123,10 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         });
 
         if (!response.ok) {
-          console.error('Duplicate check failed');
+          console.error('Duplicate check failed', response.status, response.statusText);
+          if (response.status === 401) {
+            toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+          }
           return { has_duplicates: false, duplicates: [] };
         }
 

@@ -64,7 +64,10 @@ export default async function (context, req) {
 
   const authorization = resolveBearerAuthorization(req);
   if (!authorization?.token) {
-    context.log?.warn?.('student-files-check missing bearer token');
+    context.log?.warn?.('student-files-check missing bearer token', { 
+      hasAuthHeader: !!req.headers?.authorization,
+      authHeader: req.headers?.authorization?.substring(0, 20) + '...',
+    });
     return respond(context, 401, { message: 'missing_bearer' });
   }
 
@@ -80,6 +83,12 @@ export default async function (context, req) {
   }
 
   if (authResult.error || !authResult.data?.user?.id) {
+    context.log?.warn?.('student-files-check token validation failed', {
+      hasError: !!authResult.error,
+      errorMessage: authResult.error?.message,
+      hasUser: !!authResult.data?.user,
+      hasUserId: !!authResult.data?.user?.id,
+    });
     return respond(context, 401, { message: 'invalid_or_expired_token' });
   }
 
