@@ -234,10 +234,11 @@ BEGIN
   FROM public.org_settings
   WHERE org_id = p_org_id;
   
-  -- If null, empty object, or no keys, initialize with defaults
+  -- If null, empty object, or has no keys, initialize with defaults
   IF current_permissions IS NULL OR 
      current_permissions = '{}'::jsonb OR 
-     jsonb_object_keys(current_permissions) IS NULL THEN
+     jsonb_typeof(current_permissions) = 'null' OR
+     (SELECT COUNT(*) FROM jsonb_object_keys(current_permissions)) = 0 THEN
     
     -- Get default permissions
     default_permissions := public.get_default_permissions();
