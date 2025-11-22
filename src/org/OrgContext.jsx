@@ -287,6 +287,7 @@ export function OrgProvider({ children }) {
                 metadata: normalized.metadata ?? null,
                 updatedAt: normalized.updatedAt || normalized.updated_at || null,
                 permissions: normalized.permissions ?? {},
+                storageProfile: normalized.storageProfile ?? null,
               },
             ];
           })
@@ -1059,6 +1060,17 @@ export function OrgProvider({ children }) {
     return connection;
   }, [activeOrgId, orgConnections]);
 
+  // Expose org settings (permissions and storage profile) for the active org
+  const orgSettings = useMemo(() => {
+    if (!activeOrgConnection) {
+      return { permissions: {}, storageProfile: null };
+    }
+    return {
+      permissions: activeOrgConnection.permissions ?? {},
+      storageProfile: activeOrgConnection.storageProfile ?? null,
+    };
+  }, [activeOrgConnection]);
+
   const value = useMemo(
     () => ({
       status,
@@ -1091,6 +1103,7 @@ export function OrgProvider({ children }) {
       configStatus,
       activeOrgConnection,
       tenantClientReady,
+      orgSettings,
     }),
     [
       status,
@@ -1119,6 +1132,7 @@ export function OrgProvider({ children }) {
       activeOrgConfig,
       activeOrgConnection,
       tenantClientReady,
+      orgSettings,
     ],
   );
 

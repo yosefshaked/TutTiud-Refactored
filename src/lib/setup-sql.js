@@ -95,7 +95,8 @@ ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
   ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
   ADD COLUMN IF NOT EXISTS "default_service" text,
-  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true;
+  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS "files" jsonb DEFAULT '[]'::jsonb;
 
 UPDATE tuttiud."Students"
 SET "is_active" = true

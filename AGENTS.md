@@ -120,6 +120,32 @@
 - Logo refresh: Component refetches when `activeOrgId` changes, ensuring correct logo displays after org switch.
 - Logo sizing: Uses `object-contain` with white background padding to ensure logos fit nicely in all display locations (48px container).
 
+### Cross-System Storage Configuration (2025-11)
+- **Storage profile** is a cross-system capability stored in `org_settings.storage_profile` (control DB).
+  - Supports two modes: **BYOS** (Bring Your Own Storage) and **Managed Storage**
+  - System-agnostic design: reusable by TutTiud, Farm Management System, and future systems
+- Control DB schema: run `scripts/control-db-storage-profile-schema.sql` to add `storage_profile` JSONB column
+- **Shared validation module**: `api/cross-platform/storage-config/`
+  - `validateStorageProfile(profile)` - validates complete profile structure
+  - `validateByosCredentials(byosConfig)` - validates S3-compatible provider credentials
+  - `validateManagedConfig(managedConfig)` - validates managed storage namespace
+  - `normalizeStorageProfile(rawProfile)` - normalizes and sanitizes input
+  - No TutTiud-specific logic; pure cross-system validation
+- **API endpoints**:
+  - `/api/user-context` now includes `storage_profile` in organization data (all members can read)
+  - `/api/org-settings/storage` (GET/POST) manages storage profile (admin/owner only for updates)
+- **BYOS configuration**:
+  - Supports S3, Azure, GCS, Cloudflare R2, and generic S3-compatible providers
+  - Required fields: provider, endpoint, bucket, access_key_id, secret_access_key
+  - Optional: region (depends on provider)
+  - Validation checks URL format, non-empty credentials, valid provider names
+- **Managed Storage configuration**:
+  - Required fields: namespace (alphanumeric + hyphens/underscores), active status
+  - Namespace format validated: `[a-z0-9-_]+`
+- **Error handling**: Missing or invalid storage profile returns clear error state; no silent fallbacks
+- **Security**: BYOS credentials should be encrypted before storage (encryption not implemented in this module)
+- See `api/cross-platform/README.md` for architectural principles and usage guidelines
+
 ### PDF Export Feature (2025-11)
 - `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
   - Validates admin/owner role and permission before processing

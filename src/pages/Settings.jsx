@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EnhancedDialogHeader } from '@/components/ui/DialogHeader';
-import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff } from 'lucide-react';
+import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff, HardDrive, FileText } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
@@ -14,88 +15,71 @@ import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
 import TagsManager from '@/components/settings/TagsManager.jsx';
 import StudentVisibilitySettings from '@/components/settings/StudentVisibilitySettings.jsx';
+import StorageSettingsCard from '@/components/settings/StorageSettingsCard.jsx';
+import DocumentRulesManager from '@/components/settings/DocumentRulesManager.jsx';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 
 export default function Settings() {
-  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgId, enableDirectory, disableDirectory } = useOrg();
+  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgId, enableDirectory, disableDirectory, refreshOrganizations } = useOrg();
   const { authClient, user, loading, session } = useSupabase();
   const membershipRole = activeOrg?.membership?.role ?? null;
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage' | 'documents'
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
+  const [storageEnabled, setStorageEnabled] = useState(false);
+  const [refreshingPermissions, setRefreshingPermissions] = useState(false);
 
-  // Fetch backup permissions and initialize if empty
+  // Fetch backup permissions and initialize if empty using the proper RPC function
   useEffect(() => {
     if (!activeOrgId || !authClient) return;
     
     const fetchAndInitializePermissions = async () => {
       try {
-        // First, get current permissions
-        const { data: orgSettings, error: fetchError } = await authClient
-          .from('org_settings')
-          .select('permissions')
-          .eq('org_id', activeOrgId)
-          .single();
+        // Use the initialize_org_permissions RPC function
+        // This function checks if permissions are null/empty and initializes them if needed
+        const { data: permissions, error: initError } = await authClient
+          .rpc('initialize_org_permissions', { p_org_id: activeOrgId });
         
-        if (fetchError) {
-          console.error('Error fetching permissions:', fetchError);
+        if (initError) {
+          console.error('Error initializing permissions:', initError);
           setBackupEnabled(false);
+          setLogoEnabled(false);
+          setStorageEnabled(false);
           return;
         }
         
-        let permissions = orgSettings?.permissions;
+        console.log('Permissions initialized/fetched successfully');
         
-        // Check if permissions is null, empty object, or has no keys
-        const needsInitialization = !permissions || 
-          typeof permissions !== 'object' || 
-          Object.keys(permissions).length === 0;
-        
-        if (needsInitialization) {
-          console.log('Permissions empty/null, initializing with defaults from registry');
-          
-          // Get default permissions from the registry
-          const { data: defaults, error: defaultsError } = await authClient
-            .rpc('get_default_permissions');
-          
-          if (defaultsError) {
-            console.error('Error fetching default permissions:', defaultsError);
-            setBackupEnabled(false);
-            return;
+        // Refresh organizations context to reload updated permissions
+        if (refreshOrganizations) {
+          try {
+            await refreshOrganizations({ keepSelection: true });
+            console.log('Organizations context refreshed after permission initialization');
+          } catch (refreshError) {
+            console.error('Error refreshing organizations context:', refreshError);
           }
-          
-          // Update org_settings with default permissions
-          const { error: updateError } = await authClient
-            .from('org_settings')
-            .update({ permissions: defaults })
-            .eq('org_id', activeOrgId);
-          
-          if (updateError) {
-            console.error('Error initializing permissions:', updateError);
-            setBackupEnabled(false);
-            return;
-          }
-          
-          console.log('Permissions initialized successfully');
-          permissions = defaults;
         }
         
         setBackupEnabled(permissions?.backup_local_enabled === true);
         setLogoEnabled(permissions?.logo_enabled === true);
+        // Storage is enabled if storage_access_level is not false (can be byos_only, managed_only, or all)
+        setStorageEnabled(permissions?.storage_access_level && permissions.storage_access_level !== false);
       } catch (err) {
         console.error('Error in permissions initialization:', err);
         setBackupEnabled(false);
         setLogoEnabled(false);
+        setStorageEnabled(false);
       }
     };
     
     fetchAndInitializePermissions();
-  }, [activeOrgId, authClient]);
+  }, [activeOrgId, authClient, refreshOrganizations]);
 
   useEffect(() => {
     if (activeOrgHasConnection) {
@@ -116,6 +100,81 @@ export default function Settings() {
       if (!activeOrgHasConnection) {
         setupDialogAutoOpenRef.current = true;
       }
+    }
+  };
+
+  // Manual permission refresh handler - adds missing permissions without overwriting existing
+  const handleRefreshPermissions = async () => {
+    if (!activeOrgId || !authClient || refreshingPermissions) return;
+    
+    setRefreshingPermissions(true);
+    try {
+      // Get current permissions
+      const { data: orgSettings, error: fetchError } = await authClient
+        .from('org_settings')
+        .select('permissions')
+        .eq('org_id', activeOrgId)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching current permissions:', fetchError);
+        toast.error('שגיאה בטעינת הרשאות נוכחיות');
+        return;
+      }
+      
+      // Get default permissions from registry
+      const { data: defaults, error: defaultsError } = await authClient
+        .rpc('get_default_permissions');
+      
+      if (defaultsError) {
+        console.error('Error fetching default permissions:', defaultsError);
+        toast.error('שגיאה בטעינת הרשאות ברירת מחדל');
+        return;
+      }
+      
+      // Merge: only add missing permissions, preserve existing values
+      const currentPermissions = orgSettings?.permissions || {};
+      const mergedPermissions = { ...currentPermissions };
+      
+      // Add only missing keys from defaults
+      for (const [key, value] of Object.entries(defaults || {})) {
+        if (!(key in mergedPermissions)) {
+          mergedPermissions[key] = value;
+          console.log(`Adding missing permission: ${key} = ${JSON.stringify(value)}`);
+        }
+      }
+      
+      // Update org_settings with merged permissions
+      const { error: updateError } = await authClient
+        .from('org_settings')
+        .update({ permissions: mergedPermissions })
+        .eq('org_id', activeOrgId);
+      
+      if (updateError) {
+        console.error('Error updating permissions:', updateError);
+        toast.error('שגיאה בעדכון הרשאות');
+        return;
+      }
+      
+      console.log('Permissions merged successfully (missing permissions added, existing preserved)');
+      
+      // Update local state
+      setBackupEnabled(mergedPermissions?.backup_local_enabled === true);
+      setLogoEnabled(mergedPermissions?.logo_enabled === true);
+      setStorageEnabled(mergedPermissions?.storage_access_level && mergedPermissions.storage_access_level !== false);
+      
+      // Refresh organizations context
+      if (refreshOrganizations) {
+        await refreshOrganizations({ keepSelection: true });
+        console.log('Organizations context refreshed after permission merge');
+      }
+      
+      toast.success('ההרשאות עודכנו בהצלחה');
+    } catch (err) {
+      console.error('Error refreshing permissions:', err);
+      toast.error('שגיאה בעדכון הרשאות');
+    } finally {
+      setRefreshingPermissions(false);
     }
   };
 
@@ -156,10 +215,26 @@ export default function Settings() {
 
         <Card className="w-full border-0 bg-white/90 shadow-lg" dir="rtl">
           <CardHeader className="border-b border-slate-200 space-y-xs">
-            <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">מידע לניפוי באגים</CardTitle>
-            <p className="text-xs text-slate-600 sm:text-sm">
-              שימוש בנתונים אלו מאפשר להבין איך האפליקציה מזהה את המשתמש הנוכחי וההרשאות שלו.
-            </p>
+            <div className="flex items-center justify-between">
+              <div className="space-y-xs">
+                <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">מידע לניפוי באגים</CardTitle>
+                <p className="text-xs text-slate-600 sm:text-sm">
+                  שימוש בנתונים אלו מאפשר להבין איך האפליקציה מזהה את המשתמש הנוכחי וההרשאות שלו.
+                </p>
+              </div>
+              {canManageSessionForm && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRefreshPermissions}
+                  disabled={refreshingPermissions || !authClient}
+                  className="gap-2"
+                >
+                  <Sparkles className={`h-4 w-4 ${refreshingPermissions ? 'animate-spin' : ''}`} />
+                  רענן הרשאות
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <dl className="grid gap-sm text-xs text-slate-700 sm:grid-cols-2 sm:gap-md sm:text-sm md:grid-cols-3">
@@ -459,6 +534,71 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Storage Settings Card */}
+          <Card className={`group relative w-full overflow-hidden border-0 shadow-md transition-all duration-200 flex flex-col ${
+            storageEnabled ? 'bg-white/80 hover:shadow-xl hover:scale-[1.02]' : 'bg-slate-50 opacity-75'
+          }`}>
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className={`rounded-lg p-2 transition-colors ${
+                  storageEnabled 
+                    ? 'bg-cyan-100 text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white' 
+                    : 'bg-slate-200 text-slate-400'
+                }`}>
+                  <HardDrive className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className={`text-lg font-bold ${storageEnabled ? 'text-slate-900' : 'text-slate-500'}`}>
+                  הגדרות אחסון
+                </CardTitle>
+              </div>
+              <p className={`text-sm leading-relaxed min-h-[2.5rem] ${storageEnabled ? 'text-slate-600' : 'text-slate-500'}`}>
+                {storageEnabled 
+                  ? 'הגדרת מצב אחסון קבצים - אחסון מנוהל או BYOS (אחסון משלך)'
+                  : 'הגדרות אחסון אינן זמינות. נא לפנות לתמיכה'
+                }
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('storage')} 
+                disabled={!canManageSessionForm || !storageEnabled}
+                variant={(!canManageSessionForm || !storageEnabled) ? 'secondary' : 'default'}
+              >
+                <HardDrive className="h-4 w-4" /> ניהול אחסון
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Document Rules Manager Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-amber-100 p-2 text-amber-600 transition-colors group-hover:bg-amber-600 group-hover:text-white">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  ניהול מסמכים
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
+                הגדרת רשימת מסמכים תקניים ומחויבים עבור תלמידי הארגון
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('documents')} 
+                disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <FileText className="h-4 w-4" /> ניהול מסמכים
+              </Button>
+            </CardContent>
+          </Card>
         </div>
         )}
 
@@ -476,6 +616,8 @@ export default function Settings() {
                 selectedModule === 'logo' ? <Sparkles /> :
                 selectedModule === 'tags' ? <Tag /> :
                 selectedModule === 'studentVisibility' ? <EyeOff /> :
+                selectedModule === 'storage' ? <HardDrive /> :
+                selectedModule === 'documents' ? <FileText /> :
                 null
               }
               title={
@@ -488,6 +630,8 @@ export default function Settings() {
                 selectedModule === 'logo' ? 'לוגו מותאם אישית' :
                 selectedModule === 'tags' ? 'ניהול תגיות' :
                 selectedModule === 'studentVisibility' ? 'תצוגת תלמידים לא פעילים' :
+                selectedModule === 'storage' ? 'הגדרות אחסון' :
+                selectedModule === 'documents' ? 'ניהול מסמכים' :
                 ''
               }
               onClose={() => setSelectedModule(null)}
@@ -546,6 +690,12 @@ export default function Settings() {
                     orgId={activeOrgId}
                     activeOrgHasConnection={activeOrgHasConnection}
                   />
+                )}
+                {selectedModule === 'storage' && (
+                  <StorageSettingsCard session={session} orgId={activeOrgId} />
+                )}
+                {selectedModule === 'documents' && (
+                  <DocumentRulesManager session={session} orgId={activeOrgId} />
                 )}
               </div>
             </div>
