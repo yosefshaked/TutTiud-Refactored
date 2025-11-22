@@ -360,6 +360,11 @@ export default function StudentDetailPage() {
     }
   }, [canFetch, activeOrgId]);
 
+  // Refresh student details (for file uploads)
+  const loadStudentDetails = useCallback(async () => {
+    await loadStudent();
+  }, [loadStudent]);
+
   useEffect(() => {
     if (canFetch) {
       void loadStudent();

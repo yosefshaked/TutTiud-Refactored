@@ -6,8 +6,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { FileText, Plus, Trash2, Pencil, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, Plus, Trash2, Pencil, Loader2, AlertCircle, Tag, X } from 'lucide-react';
 import { fetchSettingsValue, upsertSettings } from '@/features/settings/api/settings.js';
+import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const REQUEST_STATE = {
   idle: 'idle',
@@ -25,21 +33,27 @@ export default function DocumentRulesManager({ session, orgId }) {
   const [definitions, setDefinitions] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', is_mandatory: false, target_tags: [] });
+  
+  const { tagOptions, loadingTags, loadTags } = useStudentTags();
 
   const canAct = Boolean(session && orgId);
 
-  // Load document definitions
+  // Load document definitions and tags
   useEffect(() => {
     if (!canAct) return;
 
-    const loadDefinitions = async () => {
+    const loadData = async () => {
       setLoadState(REQUEST_STATE.loading);
       try {
-        const { value } = await fetchSettingsValue({
-          session,
-          orgId,
-          key: 'document_definitions',
-        });
+        // Load both definitions and tags in parallel
+        const [{ value }, tags] = await Promise.all([
+          fetchSettingsValue({
+            session,
+            orgId,
+            key: 'document_definitions',
+          }),
+          loadTags(),
+        ]);
 
         const parsed = Array.isArray(value) ? value : [];
         setDefinitions(parsed);
@@ -51,8 +65,8 @@ export default function DocumentRulesManager({ session, orgId }) {
       }
     };
 
-    loadDefinitions();
-  }, [canAct, session, orgId]);
+    loadData();
+  }, [canAct, session, orgId, loadTags]);
 
   const handleSave = useCallback(async () => {
     if (!canAct) return;
@@ -121,6 +135,23 @@ export default function DocumentRulesManager({ session, orgId }) {
     setDefinitions((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
+  const handleAddTag = useCallback((tagId) => {
+    if (!tagId || editForm.target_tags.includes(tagId)) return;
+    setEditForm((prev) => ({ ...prev, target_tags: [...prev.target_tags, tagId] }));
+  }, [editForm.target_tags]);
+
+  const handleRemoveTag = useCallback((tagId) => {
+    setEditForm((prev) => ({
+      ...prev,
+      target_tags: prev.target_tags.filter((id) => id !== tagId),
+    }));
+  }, []);
+
+  const getTagName = useCallback((tagId) => {
+    const tag = tagOptions.find((t) => t.value === tagId);
+    return tag?.label || tagId;
+  }, [tagOptions]);
+
   if (loadState === REQUEST_STATE.loading) {
     return (
       <Card dir="rtl">
@@ -175,13 +206,14 @@ export default function DocumentRulesManager({ session, orgId }) {
                   // Edit Mode
                   <div className="space-y-3">
                     <div>
-                      <Label htmlFor={`name-${def.id}`}>שם המסמך</Label>
+                      <Label htmlFor={`name-${def.id}`} className="block text-right">שם המסמך</Label>
                       <Input
                         id={`name-${def.id}`}
                         value={editForm.name}
                         onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
                         placeholder="לדוגמה: אישור רפואי"
                         className="mt-1"
+                        dir="rtl"
                       />
                     </div>
                     <div className="flex items-center gap-2">
@@ -192,6 +224,58 @@ export default function DocumentRulesManager({ session, orgId }) {
                       />
                       <Label htmlFor={`mandatory-${def.id}`}>מסמך חובה</Label>
                     </div>
+                    
+                    {/* Tag Selector */}
+                    <div>
+                      <Label className="block text-right mb-2">תגיות יעד (אופציונלי)</Label>
+                      <p className="text-xs text-slate-500 mb-2 text-right">
+                        אם לא נבחרו תגיות, המסמך יחול על כל התלמידים
+                      </p>
+                      
+                      {/* Selected Tags */}
+                      {editForm.target_tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2" dir="rtl">
+                          {editForm.target_tags.map((tagId) => (
+                            <Badge key={tagId} variant="secondary" className="gap-1">
+                              <Tag className="h-3 w-3" />
+                              {getTagName(tagId)}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTag(tagId)}
+                                className="hover:bg-slate-300 rounded-full p-0.5"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Tag Dropdown */}
+                      <Select onValueChange={handleAddTag} value="">
+                        <SelectTrigger dir="rtl">
+                          <SelectValue placeholder="הוסף תגית..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {loadingTags ? (
+                            <div className="p-2 text-center text-sm text-slate-500">טוען תגיות...</div>
+                          ) : tagOptions.length === 0 ? (
+                            <div className="p-2 text-center text-sm text-slate-500">
+                              לא נמצאו תגיות. צור תגיות בניהול תלמידים.
+                            </div>
+                          ) : (
+                            tagOptions
+                              .filter((tag) => !editForm.target_tags.includes(tag.value))
+                              .map((tag) => (
+                                <SelectItem key={tag.value} value={tag.value}>
+                                  {tag.label}
+                                </SelectItem>
+                              ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
                     <div className="flex gap-2">
                       <Button size="sm" onClick={handleSaveEdit}>
                         שמור
@@ -206,7 +290,7 @@ export default function DocumentRulesManager({ session, orgId }) {
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="font-semibold">{def.name}</div>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex flex-wrap gap-2 mt-1">
                         {def.is_mandatory && (
                           <Badge variant="destructive" className="text-xs">
                             חובה
@@ -215,6 +299,18 @@ export default function DocumentRulesManager({ session, orgId }) {
                         {!def.is_mandatory && (
                           <Badge variant="secondary" className="text-xs">
                             אופציונלי
+                          </Badge>
+                        )}
+                        {def.target_tags && def.target_tags.length > 0 ? (
+                          def.target_tags.map((tagId) => (
+                            <Badge key={tagId} variant="outline" className="text-xs gap-1">
+                              <Tag className="h-3 w-3" />
+                              {getTagName(tagId)}
+                            </Badge>
+                          ))
+                        ) : (
+                          <Badge variant="outline" className="text-xs">
+                            כל התלמידים
                           </Badge>
                         )}
                       </div>
