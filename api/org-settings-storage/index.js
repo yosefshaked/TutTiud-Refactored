@@ -7,8 +7,8 @@
  * GET: Read storage profile (all org members)
  * POST: Update storage profile (admin/owner only)
  */
-import { resolveBearerAuthorization } from '../../_shared/http.js';
-import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../../_shared/supabase-admin.js';
+import { resolveBearerAuthorization } from '../_shared/http.js';
+import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
   ensureMembership,
   isAdminRole,
@@ -16,11 +16,11 @@ import {
   readEnv,
   respond,
   resolveOrgId,
-} from '../../_shared/org-bff.js';
+} from '../_shared/org-bff.js';
 import {
   validateStorageProfile,
   normalizeStorageProfile,
-} from '../../cross-platform/storage-config/index.js';
+} from '../cross-platform/storage-config/index.js';
 
 export default async function (context, req) {
   context.log?.info?.('org-settings/storage: request received', { method: req.method });
