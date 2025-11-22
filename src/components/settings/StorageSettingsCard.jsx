@@ -28,6 +28,26 @@ const REQUEST = {
   error: 'error',
 };
 
+/**
+ * Generate a unique namespace for managed storage
+ * Uses org ID prefix and suffix for better distribution
+ */
+function createStorageNamespace(orgId) {
+  if (!orgId || typeof orgId !== 'string') {
+    throw new Error('Valid organization ID required for namespace generation');
+  }
+  
+  // For short IDs, use the full ID
+  if (orgId.length <= 12) {
+    return `org-${orgId}`;
+  }
+  
+  // For longer IDs, use prefix + suffix for better distribution
+  const prefix = orgId.substring(0, 8);
+  const suffix = orgId.substring(orgId.length - 4);
+  return `org-${prefix}-${suffix}`;
+}
+
 export default function StorageSettingsCard({ session, orgId }) {
   const { orgSettings } = useOrg();
   const [saveState, setSaveState] = useState(REQUEST.idle);
@@ -78,15 +98,8 @@ export default function StorageSettingsCard({ session, orgId }) {
       let payload;
 
       if (selectedMode === STORAGE_MODES.MANAGED) {
-        // For managed mode, we need to generate a namespace
-        // Use a simple hash-like approach for better uniqueness
-        const createNamespace = (id) => {
-          // Take first 8 chars + last 4 chars for better distribution
-          const prefix = id.substring(0, 8);
-          const suffix = id.substring(id.length - 4);
-          return `org-${prefix}-${suffix}`;
-        };
-        const namespace = createNamespace(orgId);
+        // For managed mode, generate a namespace from org ID
+        const namespace = createStorageNamespace(orgId);
         payload = {
           mode: STORAGE_MODES.MANAGED,
           managed: {
