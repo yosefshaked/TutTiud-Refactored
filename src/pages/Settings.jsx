@@ -35,68 +35,34 @@ export default function Settings() {
   const [storageEnabled, setStorageEnabled] = useState(false);
   const [refreshingPermissions, setRefreshingPermissions] = useState(false);
 
-  // Fetch backup permissions and initialize if empty
+  // Fetch backup permissions and initialize if empty using the proper RPC function
   useEffect(() => {
     if (!activeOrgId || !authClient) return;
     
     const fetchAndInitializePermissions = async () => {
       try {
-        // First, get current permissions
-        const { data: orgSettings, error: fetchError } = await authClient
-          .from('org_settings')
-          .select('permissions')
-          .eq('org_id', activeOrgId)
-          .single();
+        // Use the initialize_org_permissions RPC function
+        // This function checks if permissions are null/empty and initializes them if needed
+        const { data: permissions, error: initError } = await authClient
+          .rpc('initialize_org_permissions', { p_org_id: activeOrgId });
         
-        if (fetchError) {
-          console.error('Error fetching permissions:', fetchError);
+        if (initError) {
+          console.error('Error initializing permissions:', initError);
           setBackupEnabled(false);
+          setLogoEnabled(false);
+          setStorageEnabled(false);
           return;
         }
         
-        let permissions = orgSettings?.permissions;
+        console.log('Permissions initialized/fetched successfully');
         
-        // Check if permissions is null, empty object, or has no keys
-        const needsInitialization = !permissions || 
-          typeof permissions !== 'object' || 
-          Object.keys(permissions).length === 0;
-        
-        if (needsInitialization) {
-          console.log('Permissions empty/null, initializing with defaults from registry');
-          
-          // Get default permissions from the registry
-          const { data: defaults, error: defaultsError } = await authClient
-            .rpc('get_default_permissions');
-          
-          if (defaultsError) {
-            console.error('Error fetching default permissions:', defaultsError);
-            setBackupEnabled(false);
-            return;
-          }
-          
-          // Update org_settings with default permissions
-          const { error: updateError } = await authClient
-            .from('org_settings')
-            .update({ permissions: defaults })
-            .eq('org_id', activeOrgId);
-          
-          if (updateError) {
-            console.error('Error initializing permissions:', updateError);
-            setBackupEnabled(false);
-            return;
-          }
-          
-          console.log('Permissions initialized successfully');
-          permissions = defaults;
-          
-          // Refresh organizations context to reload updated permissions
-          if (refreshOrganizations) {
-            try {
-              await refreshOrganizations({ keepSelection: true });
-              console.log('Organizations context refreshed after permission initialization');
-            } catch (refreshError) {
-              console.error('Error refreshing organizations context:', refreshError);
-            }
+        // Refresh organizations context to reload updated permissions
+        if (refreshOrganizations) {
+          try {
+            await refreshOrganizations({ keepSelection: true });
+            console.log('Organizations context refreshed after permission initialization');
+          } catch (refreshError) {
+            console.error('Error refreshing organizations context:', refreshError);
           }
         }
         
@@ -137,13 +103,26 @@ export default function Settings() {
     }
   };
 
-  // Manual permission refresh handler
+  // Manual permission refresh handler - adds missing permissions without overwriting existing
   const handleRefreshPermissions = async () => {
     if (!activeOrgId || !authClient || refreshingPermissions) return;
     
     setRefreshingPermissions(true);
     try {
-      // Get default permissions from the registry
+      // Get current permissions
+      const { data: orgSettings, error: fetchError } = await authClient
+        .from('org_settings')
+        .select('permissions')
+        .eq('org_id', activeOrgId)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching current permissions:', fetchError);
+        toast.error('שגיאה בטעינת הרשאות נוכחיות');
+        return;
+      }
+      
+      // Get default permissions from registry
       const { data: defaults, error: defaultsError } = await authClient
         .rpc('get_default_permissions');
       
@@ -153,10 +132,22 @@ export default function Settings() {
         return;
       }
       
-      // Update org_settings with default permissions (overwrite existing)
+      // Merge: only add missing permissions, preserve existing values
+      const currentPermissions = orgSettings?.permissions || {};
+      const mergedPermissions = { ...currentPermissions };
+      
+      // Add only missing keys from defaults
+      for (const [key, value] of Object.entries(defaults || {})) {
+        if (!(key in mergedPermissions)) {
+          mergedPermissions[key] = value;
+          console.log(`Adding missing permission: ${key} = ${JSON.stringify(value)}`);
+        }
+      }
+      
+      // Update org_settings with merged permissions
       const { error: updateError } = await authClient
         .from('org_settings')
-        .update({ permissions: defaults })
+        .update({ permissions: mergedPermissions })
         .eq('org_id', activeOrgId);
       
       if (updateError) {
@@ -165,17 +156,17 @@ export default function Settings() {
         return;
       }
       
-      console.log('Permissions refreshed successfully');
+      console.log('Permissions merged successfully (missing permissions added, existing preserved)');
       
       // Update local state
-      setBackupEnabled(defaults?.backup_local_enabled === true);
-      setLogoEnabled(defaults?.logo_enabled === true);
-      setStorageEnabled(defaults?.storage_access_level && defaults.storage_access_level !== false);
+      setBackupEnabled(mergedPermissions?.backup_local_enabled === true);
+      setLogoEnabled(mergedPermissions?.logo_enabled === true);
+      setStorageEnabled(mergedPermissions?.storage_access_level && mergedPermissions.storage_access_level !== false);
       
       // Refresh organizations context
       if (refreshOrganizations) {
         await refreshOrganizations({ keepSelection: true });
-        console.log('Organizations context refreshed after manual permission refresh');
+        console.log('Organizations context refreshed after permission merge');
       }
       
       toast.success('ההרשאות עודכנו בהצלחה');
