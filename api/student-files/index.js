@@ -214,43 +214,8 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'storage_not_configured' });
     }
 
-    // Calculate file hash for duplicate detection BEFORE uploading
+    // Calculate file hash for deduplication tracking
     const fileHash = calculateFileHash(filePart.data);
-
-    // Get tenant client to check for duplicates
-    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
-    if (tenantError) {
-      return respond(context, tenantError.status, tenantError.body);
-    }
-
-    // Check for duplicate files across ALL students in the organization
-    const { data: allStudents, error: studentsError } = await tenantClient
-      .from('Students')
-      .select('id, first_name, last_name, files');
-
-    if (studentsError) {
-      context.log?.error?.('Failed to fetch students for duplicate check', { message: studentsError.message });
-      return respond(context, 500, { message: 'failed_to_check_duplicates' });
-    }
-
-    // Find duplicates by hash across all students
-    const duplicates = [];
-    for (const student of allStudents || []) {
-      const studentFiles = Array.isArray(student.files) ? student.files : [];
-      for (const file of studentFiles) {
-        if (file.hash === fileHash) {
-          duplicates.push({
-            file_id: file.id,
-            file_name: file.name,
-            uploaded_at: file.uploaded_at,
-            student_id: student.id,
-            student_name: `${student.first_name} ${student.last_name}`.trim(),
-          });
-        }
-      }
-    }
-
-    const hasDuplicate = duplicates.length > 0;
 
     // Generate file metadata
     const fileId = generateFileId();
@@ -321,6 +286,12 @@ export default async function (context, req) {
       hash: fileHash,
     };
 
+    // Get tenant client for database update
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
+    }
+
     // Fetch current student files to append new file
     const { data: currentStudent, error: fetchError } = await tenantClient
       .from('Students')
@@ -348,21 +319,10 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_update_student' });
     }
 
-    context.log?.info?.('File uploaded successfully', { fileId, studentId, mode: storageProfile.mode, hasDuplicate });
+    context.log?.info?.('File uploaded successfully', { fileId, studentId, mode: storageProfile.mode });
 
     return respond(context, 200, {
       file: fileMetadata,
-      warning: hasDuplicate ? {
-        type: 'duplicate_file',
-        message: 'A file with identical content already exists',
-        duplicates: duplicates.map(d => ({
-          file_id: d.file_id,
-          file_name: d.file_name,
-          uploaded_at: d.uploaded_at,
-          student_id: d.student_id,
-          student_name: d.student_name,
-        })),
-      } : null,
     });
   }
 
