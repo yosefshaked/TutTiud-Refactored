@@ -173,6 +173,16 @@ export default async function (context, req) {
     let driver;
     try {
       if (storageProfile.mode === 'managed') {
+        // Check for required R2 environment variables
+        const hasR2Config = env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_ACCESS_KEY && 
+                           env.SYSTEM_R2_SECRET_KEY && env.SYSTEM_R2_BUCKET_NAME;
+        if (!hasR2Config) {
+          context.log?.error?.('Managed storage R2 environment variables not configured');
+          return respond(context, 500, { 
+            message: 'managed_storage_not_configured',
+            details: 'System administrator needs to configure R2 storage credentials'
+          });
+        }
         driver = getStorageDriver('managed', null, env);
       } else if (storageProfile.mode === 'byos') {
         if (!storageProfile.byos) {
@@ -183,8 +193,15 @@ export default async function (context, req) {
         return respond(context, 400, { message: 'invalid_storage_mode' });
       }
     } catch (driverError) {
-      context.log?.error?.('Failed to create storage driver', { message: driverError?.message });
-      return respond(context, 500, { message: 'storage_driver_error', error: driverError.message });
+      context.log?.error?.('Failed to create storage driver', { 
+        message: driverError?.message,
+        stack: driverError?.stack,
+        mode: storageProfile.mode
+      });
+      return respond(context, 500, { 
+        message: 'storage_driver_error', 
+        details: driverError.message 
+      });
     }
 
     // Upload file

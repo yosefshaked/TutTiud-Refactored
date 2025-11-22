@@ -34,7 +34,15 @@ export default function DocumentRulesManager({ session, orgId }) {
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', is_mandatory: false, target_tags: [] });
   
-  const { tagOptions, loadingTags, loadTags } = useStudentTags();
+  const { tagOptions: rawTagOptions, loadingTags, loadTags } = useStudentTags();
+  
+  // Transform tags from { id, name } to { value, label } for Select component
+  const tagOptions = React.useMemo(() => {
+    return rawTagOptions.map(tag => ({
+      value: tag.id,
+      label: tag.name
+    }));
+  }, [rawTagOptions]);
 
   const canAct = Boolean(session && orgId);
 
@@ -261,7 +269,7 @@ export default function DocumentRulesManager({ session, orgId }) {
                             <div className="p-2 text-center text-sm text-slate-500">טוען תגיות...</div>
                           ) : tagOptions.length === 0 ? (
                             <div className="p-2 text-center text-sm text-slate-500">
-                              לא נמצאו תגיות. צור תגיות בניהול תלמידים.
+                              לא נמצאו תגיות. צור תגיות דרך כרטיס "ניהול תגיות" בהגדרות.
                             </div>
                           ) : (
                             tagOptions

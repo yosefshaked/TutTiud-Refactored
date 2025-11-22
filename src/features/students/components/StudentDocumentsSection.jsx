@@ -49,6 +49,20 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     (def) => def.is_mandatory && !studentFiles.find((f) => f.definition_id === def.id)
   );
 
+  // File upload restrictions
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const ALLOWED_TYPES = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ];
+
   // Load document definitions
   useEffect(() => {
     if (!session || !orgId) return;
@@ -85,6 +99,18 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   const handleFileUpload = useCallback(
     async (file, definitionId = null, customName = null) => {
       if (!session || !orgId || !student?.id) return;
+
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`הקובץ גדול מדי. הגודל המקסימלי הוא 10MB`);
+        return;
+      }
+
+      // Validate file type
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        toast.error(`סוג קובץ לא נתמך. אנא העלה PDF, תמונה, או מסמך Word/Excel`);
+        return;
+      }
 
       setUploadState(REQUEST_STATE.loading);
       if (definitionId) {
@@ -233,11 +259,21 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
             {loadState === REQUEST_STATE.idle && (
               <>
+                {/* Upload Guidelines */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-right" dir="rtl">
+                  <h4 className="font-semibold text-blue-900 mb-2">הנחיות העלאת קבצים</h4>
+                  <ul className="space-y-1 text-blue-800">
+                    <li>• גודל מקסימלי: 10MB</li>
+                    <li>• סוגי קבצים מותרים: PDF, תמונות (JPG, PNG, GIF), Word, Excel</li>
+                    <li>• שמות קבצים בעברית נתמכים</li>
+                  </ul>
+                </div>
+
                 {/* Required Documents */}
                 {definitions.length > 0 && (
                   <div className="space-y-3">
                     <h3 className="font-semibold text-slate-900">מסמכים נדרשים</h3>
-                    <div className="space-y-2">
+                    <div className="space-y-2">{
                       {definitions.map((def) => {
                         const file = getFileForDef(def.id);
                         const isUploading = uploadingDefId === def.id;
