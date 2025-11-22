@@ -5,6 +5,9 @@
  * Handles file upload and deletion for student documents.
  * Integrates with Phase 1 storage configuration (BYOS vs Managed).
  * 
+ * Managed Storage: Uses Cloudflare R2 (configured via environment variables)
+ * BYOS Storage: Supports AWS S3, Azure Blob, Cloudflare R2, and Supabase
+ * 
  * POST /api/student-files - Upload file
  * DELETE /api/student-files - Delete file
  */
@@ -13,13 +16,13 @@ import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
   ensureMembership,
-  isAdminRole,
   parseRequestBody,
   readEnv,
   respond,
   resolveOrgId,
 } from '../_shared/org-bff.js';
 import { createTenantClient } from '../_shared/tenant-client.js';
+import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 import multipart from 'parse-multipart-data';
 
 /**
@@ -51,77 +54,16 @@ function parseMultipartData(req) {
 }
 
 /**
- * Upload file to Managed Storage (Supabase)
+ * Build file path based on storage mode
  */
-async function uploadToManaged(supabase, orgId, studentId, file, filename) {
-  const fileId = generateFileId();
-  const ext = filename.split('.').pop();
-  const safeName = `${fileId}.${ext}`;
-  const path = `${orgId}/${studentId}/${safeName}`;
-
-  const { data, error } = await supabase.storage
-    .from('student-files')
-    .upload(path, file.data, {
-      contentType: file.type,
-      cacheControl: '3600',
-      upsert: false,
-    });
-
-  if (error) {
-    throw new Error(`Failed to upload to managed storage: ${error.message}`);
+function buildFilePath(mode, orgId, studentId, fileId, extension) {
+  if (mode === 'managed') {
+    // Managed storage: namespace isolation with 'managed/' prefix
+    return `managed/${orgId}/${studentId}/${fileId}.${extension}`;
+  } else {
+    // BYOS: simpler path without 'managed/' prefix
+    return `students/${studentId}/${fileId}.${extension}`;
   }
-
-  const { data: urlData } = supabase.storage
-    .from('student-files')
-    .getPublicUrl(path);
-
-  return {
-    id: fileId,
-    path,
-    url: urlData.publicUrl,
-    storage_provider: 'managed',
-  };
-}
-
-/**
- * Upload file to BYOS (External S3-compatible storage)
- * This is a placeholder - actual implementation depends on specific provider
- */
-async function uploadToBYOS(byosConfig, orgId, studentId, file, filename) {
-  const fileId = generateFileId();
-  
-  // TODO: Implement actual S3/Azure/GCS upload based on provider
-  // For now, return a mock structure
-  const path = `${orgId}/${studentId}/${fileId}-${filename}`;
-  
-  return {
-    id: fileId,
-    path,
-    url: `${byosConfig.endpoint}/${byosConfig.bucket}/${path}`,
-    storage_provider: 'byos',
-  };
-}
-
-/**
- * Delete file from Managed Storage
- */
-async function deleteFromManaged(supabase, path) {
-  const { error } = await supabase.storage
-    .from('student-files')
-    .remove([path]);
-
-  if (error) {
-    throw new Error(`Failed to delete from managed storage: ${error.message}`);
-  }
-}
-
-/**
- * Delete file from BYOS
- * This is a placeholder - actual implementation depends on specific provider
- */
-async function deleteFromBYOS(byosConfig, path) {
-  // TODO: Implement actual S3/Azure/GCS deletion based on provider
-  console.log('BYOS delete not yet implemented:', path);
 }
 
 export default async function (context, req) {
@@ -137,7 +79,7 @@ export default async function (context, req) {
   const authorization = resolveBearerAuthorization(req);
   if (!authorization?.token) {
     context.log?.warn?.('student-files missing bearer token');
-    return respond(context, 401, { message: 'missing bearer' });
+    return respond(context, 401, { message: 'missing_bearer' });
   }
 
   const controlClient = createSupabaseAdminClient(adminConfig);
@@ -148,11 +90,11 @@ export default async function (context, req) {
     authResult = await controlClient.auth.getUser(authorization.token);
   } catch (error) {
     context.log?.error?.('student-files failed to validate token', { message: error?.message });
-    return respond(context, 401, { message: 'invalid or expired token' });
+    return respond(context, 401, { message: 'invalid_or_expired_token' });
   }
 
   if (authResult.error || !authResult.data?.user?.id) {
-    return respond(context, 401, { message: 'invalid or expired token' });
+    return respond(context, 401, { message: 'invalid_or_expired_token' });
   }
 
   const userId = authResult.data.user.id;
@@ -221,19 +163,34 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'storage_not_configured' });
     }
 
-    // Upload file based on storage mode
-    let uploadResult;
+    // Generate file metadata
+    const fileId = generateFileId();
+    const extension = filePart.filename.split('.').pop() || 'bin';
+    const filePath = buildFilePath(storageProfile.mode, orgId, studentId, fileId, extension);
+    const contentType = filePart.type || 'application/octet-stream';
+
+    // Get storage driver
+    let driver;
     try {
       if (storageProfile.mode === 'managed') {
-        uploadResult = await uploadToManaged(controlClient, orgId, studentId, filePart, filePart.filename);
+        driver = getStorageDriver('managed', null, env);
       } else if (storageProfile.mode === 'byos') {
         if (!storageProfile.byos) {
           return respond(context, 400, { message: 'byos_config_missing' });
         }
-        uploadResult = await uploadToBYOS(storageProfile.byos, orgId, studentId, filePart, filePart.filename);
+        driver = getStorageDriver('byos', storageProfile.byos, env);
       } else {
         return respond(context, 400, { message: 'invalid_storage_mode' });
       }
+    } catch (driverError) {
+      context.log?.error?.('Failed to create storage driver', { message: driverError?.message });
+      return respond(context, 500, { message: 'storage_driver_error', error: driverError.message });
+    }
+
+    // Upload file
+    let uploadResult;
+    try {
+      uploadResult = await driver.upload(filePath, filePart.data, contentType);
     } catch (uploadError) {
       context.log?.error?.('File upload failed', { message: uploadError?.message });
       return respond(context, 500, { message: 'file_upload_failed', error: uploadError.message });
@@ -241,17 +198,17 @@ export default async function (context, req) {
 
     // Create file metadata
     const fileMetadata = {
-      id: uploadResult.id,
+      id: fileId,
       name: customName || filePart.filename,
       original_name: filePart.filename,
       url: uploadResult.url,
-      path: uploadResult.path,
-      storage_provider: uploadResult.storage_provider,
+      path: filePath,
+      storage_provider: storageProfile.mode,
       uploaded_at: new Date().toISOString(),
       uploaded_by: userId,
       definition_id: definitionId || null,
       size: filePart.data.length,
-      type: filePart.type || 'application/octet-stream',
+      type: contentType,
     };
 
     // Get tenant client and update student files
@@ -283,7 +240,7 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_update_student' });
     }
 
-    context.log?.info?.('File uploaded successfully', { fileId: uploadResult.id, studentId });
+    context.log?.info?.('File uploaded successfully', { fileId, studentId, mode: storageProfile.mode });
 
     return respond(context, 200, {
       file: fileMetadata,
@@ -317,6 +274,23 @@ export default async function (context, req) {
       return respond(context, 403, { message: 'not_a_member' });
     }
 
+    // Get storage profile
+    const { data: orgSettings, error: settingsError } = await controlClient
+      .from('org_settings')
+      .select('storage_profile')
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (settingsError) {
+      context.log?.error?.('Failed to load storage profile', { message: settingsError.message });
+      return respond(context, 500, { message: 'failed_to_load_storage_profile' });
+    }
+
+    const storageProfile = orgSettings?.storage_profile;
+    if (!storageProfile || !storageProfile.mode) {
+      return respond(context, 400, { message: 'storage_not_configured' });
+    }
+
     // Get tenant client
     const tenantClient = await createTenantClient(env, orgId);
     
@@ -339,24 +313,32 @@ export default async function (context, req) {
       return respond(context, 404, { message: 'file_not_found' });
     }
 
-    // Delete physical file
+    // Get storage driver
+    let driver;
     try {
-      if (fileToDelete.storage_provider === 'managed') {
-        await deleteFromManaged(controlClient, fileToDelete.path);
-      } else if (fileToDelete.storage_provider === 'byos') {
-        const { data: orgSettings } = await controlClient
-          .from('org_settings')
-          .select('storage_profile')
-          .eq('org_id', orgId)
-          .single();
-        
-        if (orgSettings?.storage_profile?.byos) {
-          await deleteFromBYOS(orgSettings.storage_profile.byos, fileToDelete.path);
+      if (storageProfile.mode === 'managed') {
+        driver = getStorageDriver('managed', null, env);
+      } else if (storageProfile.mode === 'byos') {
+        if (!storageProfile.byos) {
+          context.log?.warn?.('BYOS config missing, skipping physical deletion');
+        } else {
+          driver = getStorageDriver('byos', storageProfile.byos, env);
         }
       }
-    } catch (deleteError) {
-      context.log?.warn?.('Failed to delete physical file', { message: deleteError?.message });
-      // Continue to remove from database even if physical deletion fails
+    } catch (driverError) {
+      context.log?.warn?.('Failed to create storage driver for deletion', { message: driverError?.message });
+      // Continue to remove from database even if driver creation fails
+    }
+
+    // Delete physical file
+    if (driver && fileToDelete.path) {
+      try {
+        await driver.delete(fileToDelete.path);
+        context.log?.info?.('Physical file deleted', { path: fileToDelete.path });
+      } catch (deleteError) {
+        context.log?.warn?.('Failed to delete physical file', { message: deleteError?.message });
+        // Continue to remove from database even if physical deletion fails
+      }
     }
 
     // Remove from files array
