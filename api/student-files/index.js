@@ -20,16 +20,57 @@ import {
   readEnv,
   respond,
   resolveOrgId,
+  resolveTenantClient,
 } from '../_shared/org-bff.js';
-import { createTenantClient } from '../_shared/tenant-client.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 import multipart from 'parse-multipart-data';
+import crypto from 'crypto';
+
+/**
+ * File upload validation constants
+ */
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/gif',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
 
 /**
  * Generate unique file ID
  */
 function generateFileId() {
   return crypto.randomUUID();
+}
+
+/**
+ * Calculate MD5 hash of file content for duplicate detection
+ */
+function calculateFileHash(buffer) {
+  return crypto.createHash('md5').update(buffer).digest('hex');
+}
+
+/**
+ * Validate file upload
+ */
+function validateFileUpload(fileData, mimeType) {
+  // Check file size
+  if (fileData.length > MAX_FILE_SIZE) {
+    return { valid: false, error: 'file_too_large', details: `Maximum file size is ${MAX_FILE_SIZE / 1024 / 1024}MB` };
+  }
+
+  // Check MIME type
+  if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+    return { valid: false, error: 'invalid_file_type', details: 'File type not allowed. Allowed types: PDF, images (JPG, PNG, GIF), Word, Excel' };
+  }
+
+  return { valid: true };
 }
 
 /**
@@ -129,6 +170,16 @@ export default async function (context, req) {
     const definitionId = defIdPart ? defIdPart.data.toString('utf8').trim() : null;
     const customName = fileNamePart ? fileNamePart.data.toString('utf8').trim() : filePart.filename;
 
+    // Validate file
+    const validation = validateFileUpload(filePart.data, filePart.type);
+    if (!validation.valid) {
+      context.log?.warn?.('File validation failed', { error: validation.error, details: validation.details });
+      return respond(context, 400, { 
+        message: validation.error,
+        details: validation.details 
+      });
+    }
+
     // Verify membership
     let role;
     try {
@@ -163,9 +214,50 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'storage_not_configured' });
     }
 
+    // Calculate file hash for duplicate detection BEFORE uploading
+    const fileHash = calculateFileHash(filePart.data);
+
+    // Get tenant client to check for duplicates
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
+    }
+
+    // Check for duplicate files across ALL students in the organization
+    const { data: allStudents, error: studentsError } = await tenantClient
+      .from('Students')
+      .select('id, first_name, last_name, files');
+
+    if (studentsError) {
+      context.log?.error?.('Failed to fetch students for duplicate check', { message: studentsError.message });
+      return respond(context, 500, { message: 'failed_to_check_duplicates' });
+    }
+
+    // Find duplicates by hash across all students
+    const duplicates = [];
+    for (const student of allStudents || []) {
+      const studentFiles = Array.isArray(student.files) ? student.files : [];
+      for (const file of studentFiles) {
+        if (file.hash === fileHash) {
+          duplicates.push({
+            file_id: file.id,
+            file_name: file.name,
+            uploaded_at: file.uploaded_at,
+            student_id: student.id,
+            student_name: `${student.first_name} ${student.last_name}`.trim(),
+          });
+        }
+      }
+    }
+
+    const hasDuplicate = duplicates.length > 0;
+
     // Generate file metadata
     const fileId = generateFileId();
-    const extension = filePart.filename.split('.').pop() || 'bin';
+    const filenameParts = filePart.filename.split('.');
+    const extension = filenameParts.length > 1 && filenameParts[filenameParts.length - 1] 
+      ? filenameParts[filenameParts.length - 1] 
+      : 'bin';
     const filePath = buildFilePath(storageProfile.mode, orgId, studentId, fileId, extension);
     const contentType = filePart.type || 'application/octet-stream';
 
@@ -226,13 +318,11 @@ export default async function (context, req) {
       definition_id: definitionId || null,
       size: filePart.data.length,
       type: contentType,
+      hash: fileHash,
     };
 
-    // Get tenant client and update student files
-    const tenantClient = await createTenantClient(env, orgId);
-    
-    // Fetch current files array
-    const { data: student, error: fetchError } = await tenantClient
+    // Fetch current student files to append new file
+    const { data: currentStudent, error: fetchError } = await tenantClient
       .from('Students')
       .select('files')
       .eq('id', studentId)
@@ -243,7 +333,8 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_fetch_student' });
     }
 
-    const currentFiles = Array.isArray(student?.files) ? student.files : [];
+    const currentFiles = Array.isArray(currentStudent?.files) ? currentStudent.files : [];
+    
     const updatedFiles = [...currentFiles, fileMetadata];
 
     // Update student record
@@ -257,10 +348,21 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_update_student' });
     }
 
-    context.log?.info?.('File uploaded successfully', { fileId, studentId, mode: storageProfile.mode });
+    context.log?.info?.('File uploaded successfully', { fileId, studentId, mode: storageProfile.mode, hasDuplicate });
 
     return respond(context, 200, {
       file: fileMetadata,
+      warning: hasDuplicate ? {
+        type: 'duplicate_file',
+        message: 'A file with identical content already exists',
+        duplicates: duplicates.map(d => ({
+          file_id: d.file_id,
+          file_name: d.file_name,
+          uploaded_at: d.uploaded_at,
+          student_id: d.student_id,
+          student_name: d.student_name,
+        })),
+      } : null,
     });
   }
 
@@ -309,7 +411,10 @@ export default async function (context, req) {
     }
 
     // Get tenant client
-    const tenantClient = await createTenantClient(env, orgId);
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
+    }
     
     // Fetch current files array
     const { data: student, error: fetchError } = await tenantClient

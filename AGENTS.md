@@ -146,6 +146,27 @@
 - **Security**: BYOS credentials should be encrypted before storage (encryption not implemented in this module)
 - See `api/cross-platform/README.md` for architectural principles and usage guidelines
 
+### File Upload and Document Management (2025-11)
+- `/api/student-files` (POST/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
+  - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
+  - **File metadata**: Each file record includes `{id, name, original_name, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, size, type, hash}`
+  - **Progress tracking**: Frontend uses XMLHttpRequest with upload progress events for real-time feedback
+  - **Background uploads**: Uploads continue in background with toast notifications; users can navigate away while files upload
+  - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures
+- `/api/student-files-check` (POST) performs pre-upload duplicate detection.
+  - Calculates MD5 hash of file content before uploading to storage
+  - Searches for duplicates across ALL students in the organization (not just current student)
+  - Returns list of duplicates with `{file_id, file_name, uploaded_at, student_id, student_name}`
+  - Frontend shows confirmation dialog listing which students have the duplicate file before proceeding
+  - Users can cancel upload or proceed to upload anyway (allows intentional duplicates)
+- Frontend (`StudentDocumentsSection.jsx`):
+  - **Pre-upload duplicate check**: Calls check endpoint before starting upload, shows confirmation with student names
+  - **Visual progress indicator**: Shows progress bar and percentage for each active upload in blue info box at top of section
+  - **Background upload tracking**: State tracks multiple concurrent uploads with `backgroundUploads` array
+  - **Toast notifications**: Loading toast updates with progress percentage, then success/error on completion
+  - **Delete functionality**: Uses native fetch with proper JSON body and authorization headers
+- File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
+
 ### PDF Export Feature (2025-11)
 - `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
   - Validates admin/owner role and permission before processing

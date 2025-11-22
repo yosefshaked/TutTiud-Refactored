@@ -43,6 +43,8 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   const [uploadingDefId, setUploadingDefId] = useState(null);
   const [uploadingAdhoc, setUploadingAdhoc] = useState(false);
   const [adhocName, setAdhocName] = useState('');
+  const [uploadProgress, setUploadProgress] = useState({}); // Track progress per upload
+  const [backgroundUploads, setBackgroundUploads] = useState([]); // Active background uploads
 
   const studentFiles = Array.isArray(student?.files) ? student.files : [];
   const hasMissingMandatory = definitions.some(
@@ -96,6 +98,38 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     loadDefinitions();
   }, [session, orgId, student?.id]);
 
+  const checkForDuplicates = useCallback(
+    async (file) => {
+      if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('org_id', orgId);
+
+        const response = await fetch('/api/student-files-check', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          console.error('Duplicate check failed');
+          return { has_duplicates: false, duplicates: [] };
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Duplicate check error:', error);
+        return { has_duplicates: false, duplicates: [] };
+      }
+    },
+    [session, orgId]
+  );
+
   const handleFileUpload = useCallback(
     async (file, definitionId = null, customName = null) => {
       if (!session || !orgId || !student?.id) return;
@@ -112,14 +146,47 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         return;
       }
 
-      setUploadState(REQUEST_STATE.loading);
+      // Check for duplicates BEFORE uploading
+      const duplicateCheck = await checkForDuplicates(file);
+      if (duplicateCheck.has_duplicates) {
+        const duplicateList = duplicateCheck.duplicates
+          .map(d => `• ${d.file_name} (${d.student_name})`)
+          .join('\n');
+        
+        const confirmMessage = `הקובץ "${file.name}" כבר קיים במערכת:\n\n${duplicateList}\n\nהאם להעלות בכל זאת?`;
+        
+        if (!confirm(confirmMessage)) {
+          toast.info('העלאת הקובץ בוטלה');
+          return;
+        }
+      }
+
+      // Generate upload ID for tracking
+      const uploadId = crypto.randomUUID();
+      const uploadInfo = {
+        id: uploadId,
+        fileName: file.name,
+        definitionId,
+        progress: 0,
+        status: 'uploading',
+      };
+
+      // Add to background uploads
+      setBackgroundUploads(prev => [...prev, uploadInfo]);
+
+      // Show toast with upload starting
+      const toastId = toast.loading(`מעלה: ${file.name}...`, {
+        description: '0%',
+      });
+
+      // Start upload immediately (background)
       if (definitionId) {
         setUploadingDefId(definitionId);
       } else {
         setUploadingAdhoc(true);
       }
 
-      try {
+      return new Promise((resolve) => {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('student_id', student.id);
@@ -131,38 +198,92 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
           formData.append('custom_name', customName);
         }
 
-        const response = await fetch('/api/student-files', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: formData,
+        const xhr = new XMLHttpRequest();
+
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            setBackgroundUploads(prev => 
+              prev.map(u => u.id === uploadId ? { ...u, progress: percentComplete } : u)
+            );
+            toast.loading(`מעלה: ${file.name}...`, {
+              id: toastId,
+              description: `${percentComplete}%`,
+            });
+          }
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Upload failed');
-        }
+        // Handle completion
+        xhr.addEventListener('load', async () => {
+          setUploadingDefId(null);
+          setUploadingAdhoc(false);
+          setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
 
-        toast.success('הקובץ הועלה בהצלחה!');
-        setUploadState(REQUEST_STATE.idle);
-        setUploadingDefId(null);
-        setUploadingAdhoc(false);
-        setAdhocName('');
-        
-        // Refresh student data
-        if (onRefresh) {
-          await onRefresh();
-        }
-      } catch (error) {
-        console.error('File upload failed', error);
-        toast.error(`העלאת הקובץ נכשלה: ${error.message}`);
-        setUploadState(REQUEST_STATE.error);
-        setUploadingDefId(null);
-        setUploadingAdhoc(false);
-      }
+          if (xhr.status === 200) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              
+              toast.success(`הקובץ ${file.name} הועלה בהצלחה!`, {
+                id: toastId,
+              });
+
+              // Refresh student data
+              if (onRefresh) {
+                await onRefresh();
+              }
+              resolve(true);
+            } catch (error) {
+              console.error('Failed to parse response', error);
+              toast.error(`העלאה הושלמה אך התגובה לא תקינה`, { id: toastId });
+              resolve(false);
+            }
+          } else {
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              let errorMsg = 'העלאת הקובץ נכשלה';
+              
+              if (errorData.message === 'file_too_large') {
+                errorMsg = 'הקובץ גדול מדי (מקסימום 10MB)';
+              } else if (errorData.message === 'invalid_file_type') {
+                errorMsg = 'סוג קובץ לא נתמך';
+              } else if (errorData.details) {
+                errorMsg = errorData.details;
+              }
+              
+              toast.error(errorMsg, { id: toastId });
+            } catch {
+              toast.error(`העלאת הקובץ נכשלה (שגיאה ${xhr.status})`, { id: toastId });
+            }
+            resolve(false);
+          }
+        });
+
+        // Handle errors
+        xhr.addEventListener('error', () => {
+          setUploadingDefId(null);
+          setUploadingAdhoc(false);
+          setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+          toast.error(`שגיאת רשת בהעלאת ${file.name}`, { id: toastId });
+          resolve(false);
+        });
+
+        // Handle abort
+        xhr.addEventListener('abort', () => {
+          setUploadingDefId(null);
+          setUploadingAdhoc(false);
+          setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+          toast.info(`העלאת ${file.name} בוטלה`, { id: toastId });
+          resolve(false);
+        });
+
+        // Send request
+        xhr.open('POST', '/api/student-files');
+        xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+        xhr.send(formData);
+      });
     },
-    [session, orgId, student?.id, onRefresh]
+    [session, orgId, student?.id, onRefresh, checkForDuplicates]
   );
 
   const handleFileDelete = useCallback(
@@ -173,14 +294,23 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       setDeleteState(REQUEST_STATE.loading);
 
       try {
-        await authenticatedFetch('student-files', {
+        const response = await fetch('/api/student-files', {
           method: 'DELETE',
-          body: {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             org_id: orgId,
             student_id: student.id,
             file_id: fileId,
-          },
+          }),
         });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Delete failed' }));
+          throw new Error(errorData.message || 'Delete failed');
+        }
 
         toast.success('הקובץ נמחק בהצלחה!');
         setDeleteState(REQUEST_STATE.idle);
@@ -191,7 +321,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         }
       } catch (error) {
         console.error('File delete failed', error);
-        toast.error(`מחיקת הקובץ נכשלה: ${error.message}`);
+        toast.error(`מחיקת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`);
         setDeleteState(REQUEST_STATE.error);
       }
     },
@@ -250,6 +380,30 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
         <CollapsibleContent>
           <CardContent className="space-y-6 pt-4">
+            {/* Background Upload Indicator */}
+            {backgroundUploads.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2" dir="rtl">
+                <div className="flex items-center gap-2 text-sm font-medium text-blue-900">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  מעלה {backgroundUploads.length} קבצים ברקע
+                </div>
+                {backgroundUploads.map(upload => (
+                  <div key={upload.id} className="text-xs text-blue-800">
+                    <div className="flex items-center justify-between mb-1">
+                      <span>{upload.fileName}</span>
+                      <span>{upload.progress}%</span>
+                    </div>
+                    <div className="w-full bg-blue-200 rounded-full h-1.5">
+                      <div 
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${upload.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {loadState === REQUEST_STATE.loading && (
               <div className="text-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-slate-400" />
