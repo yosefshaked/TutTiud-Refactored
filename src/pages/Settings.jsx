@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import { useSupabase } from '@/context/SupabaseContext.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 
 export default function Settings() {
-  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgId, enableDirectory, disableDirectory } = useOrg();
+  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgId, enableDirectory, disableDirectory, refreshOrganizations } = useOrg();
   const { authClient, user, loading, session } = useSupabase();
   const membershipRole = activeOrg?.membership?.role ?? null;
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
@@ -32,6 +33,7 @@ export default function Settings() {
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
   const [storageEnabled, setStorageEnabled] = useState(false);
+  const [refreshingPermissions, setRefreshingPermissions] = useState(false);
 
   // Fetch backup permissions and initialize if empty
   useEffect(() => {
@@ -86,6 +88,16 @@ export default function Settings() {
           
           console.log('Permissions initialized successfully');
           permissions = defaults;
+          
+          // Refresh organizations context to reload updated permissions
+          if (refreshOrganizations) {
+            try {
+              await refreshOrganizations({ keepSelection: true });
+              console.log('Organizations context refreshed after permission initialization');
+            } catch (refreshError) {
+              console.error('Error refreshing organizations context:', refreshError);
+            }
+          }
         }
         
         setBackupEnabled(permissions?.backup_local_enabled === true);
@@ -101,7 +113,7 @@ export default function Settings() {
     };
     
     fetchAndInitializePermissions();
-  }, [activeOrgId, authClient]);
+  }, [activeOrgId, authClient, refreshOrganizations]);
 
   useEffect(() => {
     if (activeOrgHasConnection) {
@@ -122,6 +134,56 @@ export default function Settings() {
       if (!activeOrgHasConnection) {
         setupDialogAutoOpenRef.current = true;
       }
+    }
+  };
+
+  // Manual permission refresh handler
+  const handleRefreshPermissions = async () => {
+    if (!activeOrgId || !authClient || refreshingPermissions) return;
+    
+    setRefreshingPermissions(true);
+    try {
+      // Get default permissions from the registry
+      const { data: defaults, error: defaultsError } = await authClient
+        .rpc('get_default_permissions');
+      
+      if (defaultsError) {
+        console.error('Error fetching default permissions:', defaultsError);
+        toast.error('שגיאה בטעינת הרשאות ברירת מחדל');
+        return;
+      }
+      
+      // Update org_settings with default permissions (overwrite existing)
+      const { error: updateError } = await authClient
+        .from('org_settings')
+        .update({ permissions: defaults })
+        .eq('org_id', activeOrgId);
+      
+      if (updateError) {
+        console.error('Error updating permissions:', updateError);
+        toast.error('שגיאה בעדכון הרשאות');
+        return;
+      }
+      
+      console.log('Permissions refreshed successfully');
+      
+      // Update local state
+      setBackupEnabled(defaults?.backup_local_enabled === true);
+      setLogoEnabled(defaults?.logo_enabled === true);
+      setStorageEnabled(defaults?.storage_access_level && defaults.storage_access_level !== false);
+      
+      // Refresh organizations context
+      if (refreshOrganizations) {
+        await refreshOrganizations({ keepSelection: true });
+        console.log('Organizations context refreshed after manual permission refresh');
+      }
+      
+      toast.success('ההרשאות עודכנו בהצלחה');
+    } catch (err) {
+      console.error('Error refreshing permissions:', err);
+      toast.error('שגיאה בעדכון הרשאות');
+    } finally {
+      setRefreshingPermissions(false);
     }
   };
 
@@ -162,10 +224,26 @@ export default function Settings() {
 
         <Card className="w-full border-0 bg-white/90 shadow-lg" dir="rtl">
           <CardHeader className="border-b border-slate-200 space-y-xs">
-            <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">מידע לניפוי באגים</CardTitle>
-            <p className="text-xs text-slate-600 sm:text-sm">
-              שימוש בנתונים אלו מאפשר להבין איך האפליקציה מזהה את המשתמש הנוכחי וההרשאות שלו.
-            </p>
+            <div className="flex items-center justify-between">
+              <div className="space-y-xs">
+                <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">מידע לניפוי באגים</CardTitle>
+                <p className="text-xs text-slate-600 sm:text-sm">
+                  שימוש בנתונים אלו מאפשר להבין איך האפליקציה מזהה את המשתמש הנוכחי וההרשאות שלו.
+                </p>
+              </div>
+              {canManageSessionForm && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRefreshPermissions}
+                  disabled={refreshingPermissions || !authClient}
+                  className="gap-2"
+                >
+                  <Sparkles className={`h-4 w-4 ${refreshingPermissions ? 'animate-spin' : ''}`} />
+                  רענן הרשאות
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <dl className="grid gap-sm text-xs text-slate-700 sm:grid-cols-2 sm:gap-md sm:text-sm md:grid-cols-3">
