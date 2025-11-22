@@ -123,7 +123,10 @@ export default async function (context, req) {
     // Normalize the profile
     const normalizedProfile = normalizeStorageProfile(rawProfile);
     if (!normalizedProfile) {
-      return respond(context, 400, { message: 'invalid_storage_profile_structure' });
+      return respond(context, 400, { 
+        message: 'invalid_storage_profile_structure',
+        details: 'Storage profile must be an object with valid mode and configuration',
+      });
     }
 
     // Validate the normalized profile

@@ -11,6 +11,7 @@ export {
   validateManagedConfig,
   validateStorageProfile,
   normalizeStorageProfile,
+  BYOS_PROVIDERS,
 } from './validation.js';
 
 /**
@@ -19,15 +20,4 @@ export {
 export const STORAGE_MODES = {
   BYOS: 'byos',
   MANAGED: 'managed',
-};
-
-/**
- * Supported BYOS providers
- */
-export const BYOS_PROVIDERS = {
-  S3: 's3',
-  AZURE: 'azure',
-  GCS: 'gcs',
-  R2: 'r2',
-  GENERIC: 'generic',
 };

@@ -7,6 +7,17 @@
  */
 
 /**
+ * Supported BYOS providers
+ */
+export const BYOS_PROVIDERS = {
+  S3: 's3',
+  AZURE: 'azure',
+  GCS: 'gcs',
+  R2: 'r2',
+  GENERIC: 'generic',
+};
+
+/**
  * Validates BYOS (Bring Your Own Storage) configuration
  * @param {object} byosConfig - BYOS configuration object
  * @returns {{ valid: boolean, errors: string[] }}
@@ -20,7 +31,7 @@ export function validateByosCredentials(byosConfig) {
   }
 
   // Provider validation
-  const validProviders = ['s3', 'azure', 'gcs', 'r2', 'generic'];
+  const validProviders = Object.values(BYOS_PROVIDERS);
   if (!byosConfig.provider || typeof byosConfig.provider !== 'string') {
     errors.push('Provider is required');
   } else if (!validProviders.includes(byosConfig.provider)) {
@@ -34,8 +45,13 @@ export function validateByosCredentials(byosConfig) {
     const trimmedEndpoint = byosConfig.endpoint.trim();
     if (!trimmedEndpoint) {
       errors.push('Endpoint URL cannot be empty');
-    } else if (!trimmedEndpoint.startsWith('https://') && !trimmedEndpoint.startsWith('http://')) {
-      errors.push('Endpoint must be a valid URL starting with http:// or https://');
+    } else if (!trimmedEndpoint.startsWith('https://')) {
+      // Security: Require HTTPS to protect credentials in transit
+      if (trimmedEndpoint.startsWith('http://')) {
+        errors.push('Endpoint must use HTTPS (not HTTP) to protect credentials in transit. Only use HTTP for local development.');
+      } else {
+        errors.push('Endpoint must be a valid HTTPS URL');
+      }
     }
   }
 
@@ -167,16 +183,13 @@ export function normalizeStorageProfile(rawProfile) {
   };
 
   if (normalized.mode === 'byos' && rawProfile.byos) {
-    normalized.byos = {
+    const byos = {
       provider: typeof rawProfile.byos.provider === 'string' 
         ? rawProfile.byos.provider.trim().toLowerCase() 
         : '',
       endpoint: typeof rawProfile.byos.endpoint === 'string' 
         ? rawProfile.byos.endpoint.trim() 
         : '',
-      region: typeof rawProfile.byos.region === 'string' 
-        ? rawProfile.byos.region.trim() 
-        : undefined,
       bucket: typeof rawProfile.byos.bucket === 'string' 
         ? rawProfile.byos.bucket.trim() 
         : '',
@@ -189,10 +202,12 @@ export function normalizeStorageProfile(rawProfile) {
       validated_at: rawProfile.byos.validated_at || null,
     };
 
-    // Remove undefined region if not provided
-    if (normalized.byos.region === undefined) {
-      delete normalized.byos.region;
+    // Only include region if it's a non-empty string
+    if (typeof rawProfile.byos.region === 'string' && rawProfile.byos.region.trim()) {
+      byos.region = rawProfile.byos.region.trim();
     }
+
+    normalized.byos = byos;
   } else if (normalized.mode === 'managed' && rawProfile.managed) {
     normalized.managed = {
       namespace: typeof rawProfile.managed.namespace === 'string' 
