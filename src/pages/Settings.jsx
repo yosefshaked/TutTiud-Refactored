@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EnhancedDialogHeader } from '@/components/ui/DialogHeader';
-import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff } from 'lucide-react';
+import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff, HardDrive } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
@@ -14,6 +14,7 @@ import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
 import TagsManager from '@/components/settings/TagsManager.jsx';
 import StudentVisibilitySettings from '@/components/settings/StudentVisibilitySettings.jsx';
+import StorageSettingsCard from '@/components/settings/StorageSettingsCard.jsx';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -26,9 +27,10 @@ export default function Settings() {
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage'
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
+  const [storageEnabled, setStorageEnabled] = useState(false);
 
   // Fetch backup permissions and initialize if empty
   useEffect(() => {
@@ -87,10 +89,13 @@ export default function Settings() {
         
         setBackupEnabled(permissions?.backup_local_enabled === true);
         setLogoEnabled(permissions?.logo_enabled === true);
+        // Storage is enabled if storage_access_level is not false (can be byos_only, managed_only, or all)
+        setStorageEnabled(permissions?.storage_access_level && permissions.storage_access_level !== false);
       } catch (err) {
         console.error('Error in permissions initialization:', err);
         setBackupEnabled(false);
         setLogoEnabled(false);
+        setStorageEnabled(false);
       }
     };
     
@@ -459,6 +464,43 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Storage Settings Card */}
+          <Card className={`group relative w-full overflow-hidden border-0 shadow-md transition-all duration-200 flex flex-col ${
+            storageEnabled ? 'bg-white/80 hover:shadow-xl hover:scale-[1.02]' : 'bg-slate-50 opacity-75'
+          }`}>
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className={`rounded-lg p-2 transition-colors ${
+                  storageEnabled 
+                    ? 'bg-cyan-100 text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white' 
+                    : 'bg-slate-200 text-slate-400'
+                }`}>
+                  <HardDrive className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className={`text-lg font-bold ${storageEnabled ? 'text-slate-900' : 'text-slate-500'}`}>
+                  הגדרות אחסון
+                </CardTitle>
+              </div>
+              <p className={`text-sm leading-relaxed min-h-[2.5rem] ${storageEnabled ? 'text-slate-600' : 'text-slate-500'}`}>
+                {storageEnabled 
+                  ? 'הגדרת מצב אחסון קבצים - אחסון מנוהל או BYOS (אחסון משלך)'
+                  : 'הגדרות אחסון אינן זמינות. נא לפנות לתמיכה'
+                }
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('storage')} 
+                disabled={!canManageSessionForm || !storageEnabled}
+                variant={(!canManageSessionForm || !storageEnabled) ? 'secondary' : 'default'}
+              >
+                <HardDrive className="h-4 w-4" /> ניהול אחסון
+              </Button>
+            </CardContent>
+          </Card>
         </div>
         )}
 
@@ -476,6 +518,7 @@ export default function Settings() {
                 selectedModule === 'logo' ? <Sparkles /> :
                 selectedModule === 'tags' ? <Tag /> :
                 selectedModule === 'studentVisibility' ? <EyeOff /> :
+                selectedModule === 'storage' ? <HardDrive /> :
                 null
               }
               title={
@@ -488,6 +531,7 @@ export default function Settings() {
                 selectedModule === 'logo' ? 'לוגו מותאם אישית' :
                 selectedModule === 'tags' ? 'ניהול תגיות' :
                 selectedModule === 'studentVisibility' ? 'תצוגת תלמידים לא פעילים' :
+                selectedModule === 'storage' ? 'הגדרות אחסון' :
                 ''
               }
               onClose={() => setSelectedModule(null)}
@@ -546,6 +590,9 @@ export default function Settings() {
                     orgId={activeOrgId}
                     activeOrgHasConnection={activeOrgHasConnection}
                   />
+                )}
+                {selectedModule === 'storage' && (
+                  <StorageSettingsCard session={session} orgId={activeOrgId} />
                 )}
               </div>
             </div>
