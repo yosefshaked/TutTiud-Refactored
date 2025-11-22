@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { FileText, Upload, Download, Trash2, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { authenticatedFetch } from '@/lib/api-client.js';
+import { getAuthClient } from '@/lib/supabase-manager.js';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
@@ -100,16 +100,20 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
   const checkForDuplicates = useCallback(
     async (file) => {
-      if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
-
-      // Validate session has access_token
-      if (!session.access_token) {
-        console.error('Session missing access_token', session);
-        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
-        return { has_duplicates: false, duplicates: [] };
-      }
+      if (!orgId) return { has_duplicates: false, duplicates: [] };
 
       try {
+        // Get fresh session token
+        const authClient = getAuthClient();
+        const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
+
+        if (sessionError || !sessionData?.session?.access_token) {
+          console.error('Failed to get session token', sessionError);
+          toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+          return { has_duplicates: false, duplicates: [] };
+        }
+
+        const token = sessionData.session.access_token;
         const formData = new FormData();
         formData.append('file', file);
         formData.append('org_id', orgId);
@@ -117,7 +121,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         const response = await fetch('/api/student-files-check', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: formData,
         });
@@ -137,12 +141,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         return { has_duplicates: false, duplicates: [] };
       }
     },
-    [session, orgId]
+    [orgId]
   );
 
   const handleFileUpload = useCallback(
     async (file, definitionId = null, customName = null) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!orgId || !student?.id) return;
 
       // Validate file size
       if (file.size > MAX_FILE_SIZE) {
@@ -170,6 +174,18 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
           return;
         }
       }
+
+      // Get fresh session token for upload
+      const authClient = getAuthClient();
+      const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
+
+      if (sessionError || !sessionData?.session?.access_token) {
+        console.error('Failed to get session token', sessionError);
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return;
+      }
+
+      const token = sessionData.session.access_token;
 
       // Generate upload ID for tracking
       const uploadId = crypto.randomUUID();
@@ -289,25 +305,37 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
         // Send request
         xhr.open('POST', '/api/student-files');
-        xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.send(formData);
       });
     },
-    [session, orgId, student?.id, onRefresh, checkForDuplicates]
+    [orgId, student?.id, onRefresh, checkForDuplicates]
   );
 
   const handleFileDelete = useCallback(
     async (fileId) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!orgId || !student?.id) return;
       if (!confirm('האם למחוק קובץ זה? פעולה זו אינה ניתנת לביטול.')) return;
 
       setDeleteState(REQUEST_STATE.loading);
 
       try {
+        // Get fresh session token
+        const authClient = getAuthClient();
+        const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
+
+        if (sessionError || !sessionData?.session?.access_token) {
+          console.error('Failed to get session token', sessionError);
+          toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+          setDeleteState(REQUEST_STATE.idle);
+          return;
+        }
+
+        const token = sessionData.session.access_token;
         const response = await fetch('/api/student-files', {
           method: 'DELETE',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -335,7 +363,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         setDeleteState(REQUEST_STATE.error);
       }
     },
-    [session, orgId, student?.id, onRefresh]
+    [orgId, student?.id, onRefresh]
   );
 
   const handleFileInputChange = useCallback(
