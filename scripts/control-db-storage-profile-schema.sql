@@ -48,6 +48,4 @@ END $$;
 -- Comments for documentation
 -- ============================================================================
 COMMENT ON COLUMN public.org_settings.storage_profile IS 
-  'Cross-system storage configuration (BYOS or Managed Storage). ' ||
-  'Used by TutTiud and future systems for file storage operations. ' ||
-  'Structure: { mode: "byos"|"managed", byos?: {...}, managed?: {...} }';
+  'Cross-system storage configuration (BYOS or Managed Storage). Used by TutTiud and future systems for file storage operations. Structure: { mode: "byos"|"managed", byos?: {...}, managed?: {...} }';
