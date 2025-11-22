@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Lock, HardDrive, Cloud, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Lock, HardDrive, Cloud, Loader2, CheckCircle2 } from 'lucide-react';
 import { saveStorageConfiguration } from '@/features/settings/api/storage.js';
 import { useOrg } from '@/org/OrgContext.jsx';
 
@@ -79,8 +79,14 @@ export default function StorageSettingsCard({ session, orgId }) {
 
       if (selectedMode === STORAGE_MODES.MANAGED) {
         // For managed mode, we need to generate a namespace
-        // For now, we'll use org-{short-id} pattern
-        const namespace = `org-${orgId.substring(0, 8)}`;
+        // Use a simple hash-like approach for better uniqueness
+        const createNamespace = (id) => {
+          // Take first 8 chars + last 4 chars for better distribution
+          const prefix = id.substring(0, 8);
+          const suffix = id.substring(id.length - 4);
+          return `org-${prefix}-${suffix}`;
+        };
+        const namespace = createNamespace(orgId);
         payload = {
           mode: STORAGE_MODES.MANAGED,
           managed: {
@@ -90,11 +96,21 @@ export default function StorageSettingsCard({ session, orgId }) {
         };
       } else if (selectedMode === STORAGE_MODES.BYOS) {
         // Validate BYOS fields
-        if (!endpoint.trim()) {
+        const trimmedEndpoint = endpoint.trim();
+        
+        if (!trimmedEndpoint) {
           toast.error('נדרשת כתובת Endpoint');
           setSaveState(REQUEST.idle);
           return;
         }
+        
+        // HTTPS validation for security
+        if (!trimmedEndpoint.startsWith('https://')) {
+          toast.error('Endpoint חייב להשתמש ב-HTTPS למניעת דליפת מפתחות');
+          setSaveState(REQUEST.idle);
+          return;
+        }
+        
         if (!bucket.trim()) {
           toast.error('נדרש שם Bucket');
           setSaveState(REQUEST.idle);
