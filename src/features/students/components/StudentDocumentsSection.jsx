@@ -273,7 +273,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                 {definitions.length > 0 && (
                   <div className="space-y-3">
                     <h3 className="font-semibold text-slate-900">מסמכים נדרשים</h3>
-                    <div className="space-y-2">{
+                    <div className="space-y-2">
                       {definitions.map((def) => {
                         const file = getFileForDef(def.id);
                         const isUploading = uploadingDefId === def.id;
