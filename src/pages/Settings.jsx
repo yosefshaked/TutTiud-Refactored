@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EnhancedDialogHeader } from '@/components/ui/DialogHeader';
-import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff, HardDrive } from 'lucide-react';
+import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff, HardDrive, FileText } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
@@ -15,6 +15,7 @@ import LogoManager from '@/components/settings/LogoManager.jsx';
 import TagsManager from '@/components/settings/TagsManager.jsx';
 import StudentVisibilitySettings from '@/components/settings/StudentVisibilitySettings.jsx';
 import StorageSettingsCard from '@/components/settings/StorageSettingsCard.jsx';
+import DocumentRulesManager from '@/components/settings/DocumentRulesManager.jsx';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -27,7 +28,7 @@ export default function Settings() {
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage' | 'documents'
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
   const [storageEnabled, setStorageEnabled] = useState(false);
@@ -501,6 +502,34 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Document Rules Manager Card */}
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-amber-100 p-2 text-amber-600 transition-colors group-hover:bg-amber-600 group-hover:text-white">
+                  <FileText className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  ניהול מסמכים
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
+                הגדרת רשימת מסמכים תקניים ומחויבים עבור תלמידי הארגון
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('documents')} 
+                disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <FileText className="h-4 w-4" /> ניהול מסמכים
+              </Button>
+            </CardContent>
+          </Card>
         </div>
         )}
 
@@ -519,6 +548,7 @@ export default function Settings() {
                 selectedModule === 'tags' ? <Tag /> :
                 selectedModule === 'studentVisibility' ? <EyeOff /> :
                 selectedModule === 'storage' ? <HardDrive /> :
+                selectedModule === 'documents' ? <FileText /> :
                 null
               }
               title={
@@ -532,6 +562,7 @@ export default function Settings() {
                 selectedModule === 'tags' ? 'ניהול תגיות' :
                 selectedModule === 'studentVisibility' ? 'תצוגת תלמידים לא פעילים' :
                 selectedModule === 'storage' ? 'הגדרות אחסון' :
+                selectedModule === 'documents' ? 'ניהול מסמכים' :
                 ''
               }
               onClose={() => setSelectedModule(null)}
@@ -593,6 +624,9 @@ export default function Settings() {
                 )}
                 {selectedModule === 'storage' && (
                   <StorageSettingsCard session={session} orgId={activeOrgId} />
+                )}
+                {selectedModule === 'documents' && (
+                  <DocumentRulesManager session={session} orgId={activeOrgId} />
                 )}
               </div>
             </div>
