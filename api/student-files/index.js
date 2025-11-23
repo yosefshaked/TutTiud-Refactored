@@ -321,8 +321,19 @@ export default async function (context, req) {
       .single();
 
     if (fetchError) {
-      context.log?.error?.('Failed to fetch student', { message: fetchError.message });
-      return respond(context, 500, { message: 'failed_to_fetch_student' });
+      context.log?.error?.('Failed to fetch student for file upload', { 
+        message: fetchError.message,
+        code: fetchError.code,
+        details: fetchError.details,
+        hint: fetchError.hint,
+        studentId,
+        orgId,
+      });
+      return respond(context, 500, { 
+        message: 'failed_to_fetch_student',
+        error: fetchError.message,
+        student_id: studentId,
+      });
     }
 
     const currentFiles = Array.isArray(currentStudent?.files) ? currentStudent.files : [];

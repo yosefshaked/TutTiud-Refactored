@@ -125,9 +125,15 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         });
 
         if (!response.ok) {
-          console.error('Duplicate check failed', response.status, response.statusText);
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Duplicate check failed', response.status, response.statusText, errorData);
+          
           if (response.status === 401) {
             toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+          } else if (errorData.message === 'storage_not_configured') {
+            toast.error('אחסון לא מוגדר. נא להגדיר אחסון בהגדרות המערכת');
+          } else if (response.status >= 500) {
+            toast.error(`שגיאת שרת: ${errorData.message || 'שגיאה לא ידועה'}`);
           }
           return { has_duplicates: false, duplicates: [] };
         }
