@@ -229,6 +229,12 @@
 ### Storage Grace Period & File Deletion (2025-11)
 - **Configurable grace period**: `permission_registry.storage_grace_period_days` (default 30) controls how many days users have to download files after storage is disconnected before permanent deletion.
 - **Database schema**: `org_settings.storage_grace_ends_at` (timestamptz) tracks when grace period expires and files should be deleted.
+- **Storage disconnection**: Preserves configuration with `disconnected: true` flag instead of deleting profile.
+  - Allows easy reconnection without reconfiguring credentials
+  - For BYOS: Users can maintain read-only access to their storage if desired
+  - For managed: Triggers grace period in separate endpoint
+  - Audit trail maintained with `disconnected_at`, `disconnected_by` metadata
+- **Reconnection**: `PATCH /api/org-settings/storage` removes disconnected flag and restores full access
 - **Grace period lifecycle**:
   1. **Start grace period**: `/api/storage-start-grace-period` (POST) - Admin/owner triggers grace period
      - Fetches grace period days from `permission_registry`
@@ -258,7 +264,7 @@
 - **Helper function**: `public.log_audit_event()` - Use this from API endpoints to log actions.
 - **Shared utilities**: `api/_shared/audit-log.js` provides `logAuditEvent()` and action type constants (`AUDIT_ACTIONS`, `AUDIT_CATEGORIES`).
 - **Logged actions**:
-  - **Storage**: configured, updated, disconnected, grace_period_started, files_deleted, migrated_to_byos, bulk_download
+  - **Storage**: configured, updated, disconnected, reconnected, grace_period_started, files_deleted, migrated_to_byos, bulk_download
   - **Permissions**: enabled, disabled
   - **Membership**: invited, removed, role_changed
   - **Backup**: created, restored

@@ -7,7 +7,9 @@
       "name": "req",
       "methods": [
         "get",
-        "post"
+        "post",
+        "patch",
+        "delete"
       ],
       "route": "org-settings/storage"
     },

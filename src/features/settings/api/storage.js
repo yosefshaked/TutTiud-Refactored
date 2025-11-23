@@ -61,7 +61,8 @@ export async function saveStorageConfiguration(orgId, payload, { session, signal
 }
 
 /**
- * Disconnects (deletes) storage configuration for an organization
+ * Disconnects storage configuration for an organization
+ * (Marks as disconnected while preserving configuration for easy reconnection)
  * @param {string} orgId - Organization ID
  * @param {object} options - Request options
  * @param {object} options.session - User session
@@ -81,4 +82,29 @@ export async function deleteStorageConfiguration(orgId, { session, signal } = {}
     session,
     signal,
   });
+}
+
+/**
+ * Reconnects previously disconnected storage configuration
+ * @param {string} orgId - Organization ID
+ * @param {object} options - Request options
+ * @param {object} options.session - User session
+ * @param {AbortSignal} options.signal - Abort signal
+ * @returns {Promise<object>} Reconnected storage profile
+ */
+export async function reconnectStorageConfiguration(orgId, { session, signal } = {}) {
+  if (!orgId) {
+    throw new Error('Organization ID is required');
+  }
+
+  const data = await authenticatedFetch('org-settings/storage', {
+    method: 'PATCH',
+    body: {
+      org_id: orgId,
+    },
+    session,
+    signal,
+  });
+
+  return data?.storage_profile || null;
 }

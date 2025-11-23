@@ -98,14 +98,19 @@ export default async function (context, req) {
 
     const storageProfile = orgSettings?.storage_profile || null;
 
+    // Check if disconnected
+    const isDisconnected = storageProfile?.disconnected === true;
+
     context.log?.info?.('org-settings/storage loaded successfully', { 
       orgId,
       hasProfile: Boolean(storageProfile),
       mode: storageProfile?.mode || null,
+      disconnected: isDisconnected,
     });
 
     return respond(context, 200, {
       storage_profile: storageProfile,
+      is_disconnected: isDisconnected,
     }, { 'Cache-Control': 'private, max-age=60' });
   }
 
@@ -144,9 +149,10 @@ export default async function (context, req) {
       });
     }
 
-    // Add metadata
+    // Add metadata and ensure disconnected flag is removed
     const profileToSave = {
       ...normalizedProfile,
+      disconnected: false,
       updated_at: new Date().toISOString(),
       updated_by: userId,
     };
@@ -201,18 +207,39 @@ export default async function (context, req) {
     });
   }
 
-  // DELETE: Admin/Owner only can disconnect (remove) storage configuration
+  // DELETE: Admin/Owner only can disconnect storage configuration
   if (req.method === 'DELETE') {
     if (!isAdminRole(role)) {
       context.log?.warn?.('org-settings/storage non-admin attempted delete', { orgId, userId, role });
       return respond(context, 403, { message: 'admin_or_owner_required' });
     }
 
-    // Remove storage_profile by setting it to null
+    // Fetch current storage profile
+    const { data: orgSettings } = await supabase
+      .from('org_settings')
+      .select('storage_profile')
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    const currentProfile = orgSettings?.storage_profile;
+    if (!currentProfile) {
+      return respond(context, 400, { message: 'storage_not_configured' });
+    }
+
+    // Mark as disconnected while preserving configuration
+    // For BYOS: User can keep read-only access if they want
+    // For managed: Triggers grace period in separate endpoint
+    const disconnectedProfile = {
+      ...currentProfile,
+      disconnected: true,
+      disconnected_at: new Date().toISOString(),
+      disconnected_by: userId,
+    };
+
     const { error: deleteError } = await supabase
       .from('org_settings')
       .update({
-        storage_profile: null,
+        storage_profile: disconnectedProfile,
         updated_at: new Date().toISOString(),
       })
       .eq('org_id', orgId);
@@ -230,6 +257,7 @@ export default async function (context, req) {
     context.log?.info?.('org-settings/storage disconnected successfully', {
       orgId,
       userId,
+      mode: currentProfile.mode,
     });
 
     // Log audit event
@@ -244,7 +272,9 @@ export default async function (context, req) {
         resourceType: 'storage_profile',
         resourceId: orgId,
         details: {
-          previous_mode: orgSettings?.storage_profile?.mode,
+          mode: currentProfile.mode,
+          provider: currentProfile.mode === 'byos' ? currentProfile.byos?.provider : 'managed',
+          can_reconnect: true,
         },
       });
     } catch (auditError) {
@@ -253,6 +283,91 @@ export default async function (context, req) {
 
     return respond(context, 200, {
       message: 'storage_disconnected',
+    });
+  }
+
+  // PATCH: Admin/Owner only can reconnect (remove disconnected flag)
+  if (req.method === 'PATCH') {
+    if (!isAdminRole(role)) {
+      context.log?.warn?.('org-settings/storage non-admin attempted reconnect', { orgId, userId, role });
+      return respond(context, 403, { message: 'admin_or_owner_required' });
+    }
+
+    // Fetch current storage profile
+    const { data: orgSettings } = await supabase
+      .from('org_settings')
+      .select('storage_profile')
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    const currentProfile = orgSettings?.storage_profile;
+    if (!currentProfile) {
+      return respond(context, 400, { message: 'storage_not_configured' });
+    }
+
+    if (!currentProfile.disconnected) {
+      return respond(context, 400, { message: 'storage_already_connected' });
+    }
+
+    // Remove disconnected flags
+    const reconnectedProfile = {
+      ...currentProfile,
+      disconnected: false,
+      reconnected_at: new Date().toISOString(),
+      reconnected_by: userId,
+    };
+
+    // Remove old disconnection metadata
+    delete reconnectedProfile.disconnected_at;
+    delete reconnectedProfile.disconnected_by;
+
+    const { error: updateError } = await supabase
+      .from('org_settings')
+      .update({
+        storage_profile: reconnectedProfile,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('org_id', orgId);
+
+    if (updateError) {
+      context.log?.error?.('org-settings/storage failed to reconnect storage', {
+        message: updateError.message,
+        code: updateError.code,
+        orgId,
+        userId,
+      });
+      return respond(context, 500, { message: 'failed_to_reconnect_storage' });
+    }
+
+    context.log?.info?.('org-settings/storage reconnected successfully', {
+      orgId,
+      userId,
+      mode: currentProfile.mode,
+    });
+
+    // Log audit event
+    try {
+      await logAuditEvent(supabase, {
+        orgId,
+        userId,
+        userEmail: authResult.data.user.email,
+        userRole: role,
+        actionType: AUDIT_ACTIONS.STORAGE_RECONNECTED,
+        actionCategory: AUDIT_CATEGORIES.STORAGE,
+        resourceType: 'storage_profile',
+        resourceId: orgId,
+        details: {
+          mode: currentProfile.mode,
+          provider: currentProfile.mode === 'byos' ? currentProfile.byos?.provider : 'managed',
+        },
+      });
+    } catch (auditError) {
+      context.log?.error?.('Failed to log audit event', { message: auditError.message });
+    }
+
+    return respond(context, 200, {
+      storage_profile: reconnectedProfile,
+      message: 'storage_reconnected',
     });
   }
 

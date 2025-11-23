@@ -75,6 +75,7 @@ export const AUDIT_ACTIONS = {
   STORAGE_CONFIGURED: 'storage.configured',
   STORAGE_UPDATED: 'storage.updated',
   STORAGE_DISCONNECTED: 'storage.disconnected',
+  STORAGE_RECONNECTED: 'storage.reconnected',
   STORAGE_GRACE_STARTED: 'storage.grace_period_started',
   STORAGE_FILES_DELETED: 'storage.files_deleted',
   STORAGE_MIGRATED_BYOS: 'storage.migrated_to_byos',
