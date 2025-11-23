@@ -128,6 +128,14 @@ export default async function (context, req) {
       const hasR2Config = env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_ACCESS_KEY && 
         env.SYSTEM_R2_SECRET_KEY && env.SYSTEM_R2_BUCKET;
       
+      context.log?.info?.('Managed storage config check', {
+        hasEndpoint: !!env.SYSTEM_R2_ENDPOINT,
+        hasAccessKey: !!env.SYSTEM_R2_ACCESS_KEY,
+        hasSecretKey: !!env.SYSTEM_R2_SECRET_KEY,
+        hasBucket: !!env.SYSTEM_R2_BUCKET,
+        endpoint: env.SYSTEM_R2_ENDPOINT?.substring(0, 30) + '...',
+      });
+      
       if (!hasR2Config) {
         throw new Error('Managed storage configured but R2 credentials missing');
       }

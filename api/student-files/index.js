@@ -191,6 +191,14 @@ export default async function (context, req) {
     const definitionId = defIdPart ? defIdPart.data.toString('utf8').trim() : null;
     const customName = fileNamePart ? fileNamePart.data.toString('utf8').trim() : filePart.filename;
 
+    context.log?.info?.('File upload parsed', {
+      filename: filePart.filename,
+      mimeType: filePart.type,
+      fileSize: filePart.data.length,
+      studentId,
+      orgId,
+    });
+
     // Validate file
     const validation = validateFileUpload(filePart.data, filePart.type);
     if (!validation.valid) {
