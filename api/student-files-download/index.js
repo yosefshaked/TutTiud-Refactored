@@ -163,41 +163,65 @@ export default async function (context, req) {
   
   // For files with definition_id, try to get current definition name first
   if (file.definition_id && student?.name) {
-    // Fetch document definitions to get current name (in case definition was renamed)
-    // Note: Settings are in the TENANT DB, not control DB
-    const { data: settingsData } = await tenantClient
-      .from('Settings')
-      .select('settings_value')
-      .eq('settings_key', 'document_definitions')
-      .maybeSingle();
+    try {
+      // Fetch document definitions to get current name (in case definition was renamed)
+      // Note: Settings are in the TENANT DB, not control DB
+      const { data: settingsData, error: settingsError } = await tenantClient
+        .from('Settings')
+        .select('settings_value')
+        .eq('settings_key', 'document_definitions')
+        .maybeSingle();
 
-    context.log?.info?.('Settings query result', {
-      hasData: !!settingsData,
-      hasValue: !!settingsData?.settings_value,
-      isArray: Array.isArray(settingsData?.settings_value),
-    });
-
-    if (settingsData?.settings_value) {
-      const definitions = Array.isArray(settingsData.settings_value) ? settingsData.settings_value : [];
-      const currentDef = definitions.find(d => d.id === file.definition_id);
-      
-      context.log?.info?.('Definition lookup', {
-        totalDefinitions: definitions.length,
-        searchingFor: file.definition_id,
-        found: !!currentDef,
-        foundName: currentDef?.name,
-      });
-      
-      // Use current definition name if exists, otherwise fall back to stored definition_name
-      const defName = currentDef?.name || file.definition_name;
-      if (defName) {
-        displayFilename = `${defName} - ${student.name}`;
-        context.log?.info?.('Using definition-based filename', { 
-          defName,
-          studentName: student.name,
-          result: displayFilename,
+      if (settingsError) {
+        context.log?.error?.('Failed to fetch document definitions', {
+          error: settingsError.message,
+          code: settingsError.code,
         });
       }
+
+      context.log?.info?.('Settings query result', {
+        hasData: !!settingsData,
+        hasValue: !!settingsData?.settings_value,
+        isArray: Array.isArray(settingsData?.settings_value),
+        rawValue: settingsData?.settings_value ? JSON.stringify(settingsData.settings_value).substring(0, 200) : null,
+      });
+
+      if (settingsData?.settings_value) {
+        const definitions = Array.isArray(settingsData.settings_value) ? settingsData.settings_value : [];
+        const currentDef = definitions.find(d => d.id === file.definition_id);
+        
+        context.log?.info?.('Definition lookup', {
+          totalDefinitions: definitions.length,
+          searchingFor: file.definition_id,
+          found: !!currentDef,
+          foundName: currentDef?.name,
+          allDefinitionIds: definitions.map(d => d.id),
+        });
+        
+        // Use current definition name if exists, otherwise fall back to stored definition_name
+        const defName = currentDef?.name || file.definition_name;
+        if (defName) {
+          displayFilename = `${defName} - ${student.name}`;
+          context.log?.info?.('Using definition-based filename', { 
+            defName,
+            studentName: student.name,
+            result: displayFilename,
+          });
+        } else {
+          context.log?.warn?.('Definition name not found', {
+            definitionId: file.definition_id,
+            hadCurrentDef: !!currentDef,
+            hadStoredName: !!file.definition_name,
+          });
+        }
+      } else {
+        context.log?.warn?.('No document_definitions settings found in tenant DB');
+      }
+    } catch (err) {
+      context.log?.error?.('Exception while fetching definitions', {
+        error: err.message,
+        stack: err.stack,
+      });
     }
   }
   
@@ -214,9 +238,20 @@ export default async function (context, req) {
     }
   }
 
+  context.log?.info?.('Final filename for download', { 
+    displayFilename,
+    filePath: file.path,
+  });
+
   // Generate presigned URL (valid for 1 hour)
   try {
     const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename);
+    
+    context.log?.info?.('Generated presigned URL', {
+      filename: displayFilename,
+      urlLength: downloadUrl?.length,
+    });
+    
     return respond(context, 200, { url: downloadUrl });
   } catch (error) {
     context.log?.error?.('Failed to generate download URL', { message: error?.message });
