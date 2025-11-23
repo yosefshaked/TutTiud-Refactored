@@ -193,18 +193,38 @@ export default async function (context, req) {
     const customName = fileNamePart ? fileNamePart.data.toString('utf8').trim() : null;
 
     // Decode filename properly to handle Hebrew and other UTF-8 characters
-    // The multipart parser may give us a mis-encoded string; try to fix it
+    // The multipart parser gives us filePart.filename which may be mis-encoded
     let decodedFilename = filePart.filename;
+    
+    context.log?.info?.('Filename encoding debug', {
+      original: filePart.filename,
+      codePoints: filePart.filename ? Array.from(filePart.filename).map(c => c.charCodeAt(0).toString(16)) : [],
+      length: filePart.filename?.length,
+    });
+
     try {
-      // If the filename looks garbled (contains replacement characters or latin1 artifacts),
-      // try to recover it by converting latin1 bytes back to UTF-8
-      if (decodedFilename && /[\u00C0-\u00FF]{2,}/.test(decodedFilename)) {
-        // Convert string to latin1 bytes, then decode as UTF-8
-        const latin1Bytes = Buffer.from(decodedFilename, 'latin1');
-        decodedFilename = latin1Bytes.toString('utf8');
+      // Hebrew characters sent as UTF-8 bytes but interpreted as latin1/windows-1252
+      // Need to convert: mis-encoded string → latin1 bytes → UTF-8 string
+      // Only attempt if filename contains non-ASCII characters that look mis-encoded
+      if (decodedFilename && /[\u0080-\u00FF]/.test(decodedFilename)) {
+        // Re-encode as latin1 (to get original bytes), then decode as UTF-8
+        const originalBytes = Buffer.from(decodedFilename, 'latin1');
+        const utf8Decoded = originalBytes.toString('utf8');
+        
+        // Only use the decoded version if it doesn't contain replacement characters
+        if (!utf8Decoded.includes('\uFFFD')) {
+          context.log?.info?.('Successfully decoded Hebrew filename', {
+            before: decodedFilename,
+            after: utf8Decoded,
+          });
+          decodedFilename = utf8Decoded;
+        }
       }
     } catch (err) {
-      context.log?.warn?.('Failed to decode filename, using original', { error: err.message });
+      context.log?.warn?.('Failed to decode filename, using original', { 
+        error: err.message,
+        filename: decodedFilename,
+      });
       // Keep original if decoding fails
     }
 
