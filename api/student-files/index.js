@@ -387,21 +387,40 @@ export default async function (context, req) {
 
     if (definitionId) {
       // Fetch document definitions from settings to get the definition name
-      const { data: settingsData, error: settingsError } = await controlClient
+      // Note: Settings are in the TENANT DB, not control DB
+      const { data: settingsData, error: settingsError } = await tenantClient
         .from('Settings')
         .select('settings_value')
-        .eq('org_id', orgId)
         .eq('settings_key', 'document_definitions')
         .maybeSingle();
+
+      context.log?.info?.('Upload: Fetching definition for naming', {
+        hasSettingsData: !!settingsData,
+        hasValue: !!settingsData?.settings_value,
+        definitionId,
+      });
 
       if (!settingsError && settingsData?.settings_value) {
         const definitions = Array.isArray(settingsData.settings_value) ? settingsData.settings_value : [];
         const definition = definitions.find(d => d.id === definitionId);
+        
+        context.log?.info?.('Upload: Definition lookup', {
+          totalDefinitions: definitions.length,
+          foundDefinition: !!definition,
+          definitionName: definition?.name,
+        });
+        
         if (definition?.name) {
           definitionName = definition.name;
           const studentName = currentStudent?.name || 'תלמיד';
           // Build filename: "Definition Name - Student Name"
           displayName = `${definitionName} - ${studentName}`;
+          
+          context.log?.info?.('Upload: Built display name', {
+            definitionName,
+            studentName,
+            displayName,
+          });
         }
       }
     }
