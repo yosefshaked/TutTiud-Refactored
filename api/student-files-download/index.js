@@ -18,11 +18,14 @@ import {
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 
 export default async function (context, req) {
-  if (req.method !== 'GET') {
-    return respond(context, 405, { message: 'method_not_allowed' });
-  }
+  try {
+    context.log('student-files-download: function started');
+    
+    if (req.method !== 'GET') {
+      return respond(context, 405, { message: 'method_not_allowed' });
+    }
 
-  context.log?.info?.('student-files-download: request received');
+    context.log?.info?.('student-files-download: request received');
 
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
@@ -174,5 +177,15 @@ export default async function (context, req) {
   } catch (error) {
     context.log?.error?.('Failed to generate download URL', { message: error?.message });
     return respond(context, 500, { message: 'failed_to_generate_download_url' });
+  }
+  } catch (error) {
+    context.log?.error?.('student-files-download: unhandled error', {
+      message: error?.message,
+      stack: error?.stack,
+    });
+    return respond(context, 500, {
+      message: 'internal_error',
+      error: error?.message,
+    });
   }
 }
