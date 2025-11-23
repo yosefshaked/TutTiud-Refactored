@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Lock, HardDrive, Cloud, Loader2, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
-import { saveStorageConfiguration, deleteStorageConfiguration } from '@/features/settings/api/storage.js';
+import { Lock, HardDrive, Cloud, Loader2, CheckCircle2, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { saveStorageConfiguration, deleteStorageConfiguration, reconnectStorageConfiguration } from '@/features/settings/api/storage.js';
 import { useOrg } from '@/org/OrgContext.jsx';
 
 const STORAGE_MODES = {
@@ -66,6 +66,9 @@ export default function StorageSettingsCard({ session, orgId }) {
 
   // Get storage_access_level permission
   const storageAccessLevel = orgSettings?.permissions?.storage_access_level;
+  
+  // Check if storage is disconnected
+  const isDisconnected = orgSettings?.storageProfile?.disconnected === true;
   
   // Determine access states
   const isLocked = storageAccessLevel === false || !storageAccessLevel;
@@ -202,6 +205,28 @@ export default function StorageSettingsCard({ session, orgId }) {
     } catch (error) {
       console.error('Disconnect storage failed', error);
       toast.error(error?.message || 'ניתוק האחסון נכשל');
+      setDisconnectState(REQUEST.error);
+    }
+  }, [canAct, orgId, session, refreshOrganizations]);
+
+  const handleReconnect = useCallback(async () => {
+    if (!canAct) return;
+
+    setDisconnectState(REQUEST.loading);
+
+    try {
+      await reconnectStorageConfiguration(orgId, { session });
+      
+      // Refresh org context to reload storage profile
+      if (refreshOrganizations) {
+        await refreshOrganizations({ keepSelection: true });
+      }
+
+      toast.success('האחסון חובר מחדש בהצלחה');
+      setDisconnectState(REQUEST.idle);
+    } catch (error) {
+      console.error('Reconnect storage failed', error);
+      toast.error(error?.message || 'חיבור האחסון מחדש נכשל');
       setDisconnectState(REQUEST.error);
     }
   }, [canAct, orgId, session, refreshOrganizations]);
@@ -430,8 +455,8 @@ export default function StorageSettingsCard({ session, orgId }) {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between gap-3 pt-4 border-t">
-          {/* Disconnect button - only show if storage is already configured */}
-          {orgSettings?.storageProfile?.mode && (
+          {/* Disconnect button - only show if storage is configured and NOT disconnected */}
+          {orgSettings?.storageProfile?.mode && !isDisconnected && (
             <Button
               variant="outline"
               onClick={() => setShowDisconnectDialog(true)}
@@ -443,8 +468,21 @@ export default function StorageSettingsCard({ session, orgId }) {
             </Button>
           )}
           
-          {/* Save button - only show if mode is selected */}
-          {selectedMode && (
+          {/* Reconnect button - only show if storage is disconnected */}
+          {isDisconnected && (
+            <Button
+              variant="outline"
+              onClick={handleReconnect}
+              disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading}
+              className="gap-2 text-primary hover:bg-primary/10"
+            >
+              <RefreshCw className="h-4 w-4" />
+              חיבור מחדש
+            </Button>
+          )}
+          
+          {/* Save button - only show if mode is selected and not disconnected */}
+          {selectedMode && !isDisconnected && (
             <Button
               onClick={handleSave}
               disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading || !selectedMode}
