@@ -105,10 +105,10 @@ export default async function (context, req) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
-  // Fetch student to get file metadata
+  // Fetch student to get file metadata and student name
   const { data: student, error: fetchError } = await tenantClient
     .from('Students')
-    .select('files')
+    .select('name, files')
     .eq('id', studentId)
     .single();
 
@@ -149,9 +149,28 @@ export default async function (context, req) {
     return respond(context, 200, { url: file.url });
   }
 
+  // Get display filename
+  let displayFilename = file.name;
+  
+  // For files with definition_name (even if orphaned), use definition_name + student name
+  if (file.definition_name && student?.name) {
+    displayFilename = `${file.definition_name} - ${student.name}`;
+  }
+  
+  // Ensure the display name has the correct file extension
+  if (displayFilename && file.original_name) {
+    const hasExtension = /\.[^.]+$/.test(displayFilename);
+    if (!hasExtension) {
+      const extensionMatch = file.original_name.match(/\.[^.]+$/);
+      if (extensionMatch) {
+        displayFilename = displayFilename + extensionMatch[0];
+      }
+    }
+  }
+
   // Generate presigned URL (valid for 1 hour)
   try {
-    const downloadUrl = await driver.getDownloadUrl(file.path, 3600);
+    const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename);
     return respond(context, 200, { url: downloadUrl });
   } catch (error) {
     context.log?.error?.('Failed to generate download URL', { message: error?.message });

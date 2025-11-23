@@ -96,13 +96,19 @@ export function createS3Driver(config) {
      * 
      * @param {string} path - File path within bucket
      * @param {number} expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
+     * @param {string} filename - Optional filename for Content-Disposition header
      * @returns {Promise<string>} Presigned download URL
      */
-    async getDownloadUrl(path, expiresIn = 3600) {
+    async getDownloadUrl(path, expiresIn = 3600, filename = null) {
+      // Build Content-Disposition header with filename if provided
+      const disposition = filename 
+        ? `attachment; filename="${filename}"`
+        : 'attachment';
+
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: path,
-        ResponseContentDisposition: 'attachment', // Force download instead of preview
+        ResponseContentDisposition: disposition,
       });
 
       const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn });

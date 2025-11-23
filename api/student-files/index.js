@@ -1,4 +1,5 @@
 /* eslint-env node */
+/* global Buffer */
 /**
  * Student Files API
  * 
@@ -321,10 +322,10 @@ export default async function (context, req) {
       return respond(context, tenantError.status, tenantError.body);
     }
 
-    // Fetch current student files to append new file
+    // Fetch current student (name + files) to build proper filename and append new file
     const { data: currentStudent, error: fetchError } = await tenantClient
       .from('Students')
-      .select('files')
+      .select('name, files')
       .eq('id', studentId)
       .single();
 
@@ -344,9 +345,41 @@ export default async function (context, req) {
       });
     }
 
+    // Build proper display name based on definition and student
+    let displayName = customName || filePart.filename;
+    let definitionName = null;
+
+    if (definitionId) {
+      // Fetch document definitions from settings to get the definition name
+      const { data: settingsData, error: settingsError } = await controlClient
+        .from('Settings')
+        .select('settings_value')
+        .eq('org_id', orgId)
+        .eq('settings_key', 'document_definitions')
+        .maybeSingle();
+
+      if (!settingsError && settingsData?.settings_value) {
+        const definitions = Array.isArray(settingsData.settings_value) ? settingsData.settings_value : [];
+        const definition = definitions.find(d => d.id === definitionId);
+        if (definition?.name) {
+          definitionName = definition.name;
+          const studentName = currentStudent?.name || 'תלמיד';
+          // Build filename: "Definition Name - Student Name"
+          displayName = `${definitionName} - ${studentName}`;
+        }
+      }
+    }
+
+    // Build complete file metadata object with all properties
+    const completeFileMetadata = {
+      ...fileMetadata,
+      name: displayName,
+      ...(definitionName && { definition_name: definitionName }),
+    };
+
     const currentFiles = Array.isArray(currentStudent?.files) ? currentStudent.files : [];
     
-    const updatedFiles = [...currentFiles, fileMetadata];
+    const updatedFiles = [...currentFiles, completeFileMetadata];
 
     // Update student record
     const { error: updateError } = await tenantClient

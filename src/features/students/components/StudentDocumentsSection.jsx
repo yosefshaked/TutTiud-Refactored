@@ -429,8 +429,17 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     return studentFiles.find((f) => f.definition_id === defId);
   };
 
-  // Get adhoc files (no definition_id)
-  const adhocFiles = studentFiles.filter((f) => !f.definition_id);
+  // Get adhoc files (no definition_id OR orphaned - definition was deleted)
+  const adhocFiles = studentFiles.filter((f) => {
+    if (!f.definition_id) return true;
+    // Include files whose definition no longer exists (orphaned)
+    return !definitions.find(def => def.id === f.definition_id);
+  });
+
+  // Helper to check if a file is orphaned (definition was deleted)
+  const isOrphanedFile = (file) => {
+    return file.definition_id && !definitions.find(def => def.id === file.definition_id);
+  };
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -600,36 +609,55 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                     <p className="text-sm text-slate-500 py-4 text-center">אין קבצים נוספים</p>
                   ) : (
                     <div className="space-y-2">
-                      {adhocFiles.map((file) => (
-                        <div key={file.id} className="p-4 border border-slate-200 rounded-lg bg-white">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="font-medium mb-1">{file.name}</div>
-                              <div className="text-sm text-slate-600">
-                                <div>הועלה: {formatFileDate(file.uploaded_at)}</div>
-                                <div>{formatFileSize(file.size)}</div>
+                      {adhocFiles.map((file) => {
+                        const isOrphaned = isOrphanedFile(file);
+                        const displayName = isOrphaned && file.definition_name 
+                          ? `${file.definition_name} - ${student?.name || 'תלמיד'}`
+                          : file.name;
+                        
+                        return (
+                          <div key={file.id} className={`p-4 border rounded-lg ${isOrphaned ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200 bg-white'}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium">{displayName}</span>
+                                  {isOrphaned && (
+                                    <Badge variant="outline" className="text-xs text-amber-700 border-amber-400">
+                                      הגדרה ישנה
+                                    </Badge>
+                                  )}
+                                </div>
+                                {isOrphaned && file.original_name && (
+                                  <div className="text-xs text-amber-700 mb-1">
+                                    קובץ מקורי: {file.original_name}
+                                  </div>
+                                )}
+                                <div className="text-sm text-slate-600">
+                                  <div>הועלה: {formatFileDate(file.uploaded_at)}</div>
+                                  <div>{formatFileSize(file.size)}</div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleFileDownload(file.id)}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleFileDelete(file.id)}
+                                  disabled={deleteState === REQUEST_STATE.loading}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleFileDownload(file.id)}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleFileDelete(file.id)}
-                                disabled={deleteState === REQUEST_STATE.loading}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
-                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
