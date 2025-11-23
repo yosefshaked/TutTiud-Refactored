@@ -18,14 +18,17 @@ import {
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 
 export default async function (context, req) {
+  // Log IMMEDIATELY to confirm function is called
+  context.log('===== STUDENT FILES DOWNLOAD FUNCTION INVOKED =====');
+  context.log('Request method:', req.method);
+  context.log('Request query:', JSON.stringify(req.query || {}));
+  
   try {
     context.log('student-files-download: function started');
     
     if (req.method !== 'GET') {
       return respond(context, 405, { message: 'method_not_allowed' });
     }
-
-    context.log?.info?.('student-files-download: request received');
 
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);

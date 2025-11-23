@@ -450,7 +450,7 @@ export default async function (context, req) {
     context.log?.info?.('File uploaded successfully', { fileId, studentId, mode: storageProfile.mode });
 
     return respond(context, 200, {
-      file: fileMetadata,
+      file: completeFileMetadata,
     });
   }
 
