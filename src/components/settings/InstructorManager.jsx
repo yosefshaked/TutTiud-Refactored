@@ -272,9 +272,9 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                             <div>
                               <Label htmlFor={`inst-type-${i.id}`} className="text-xs text-slate-600">סוג מדריך</Label>
                               <Select
-                                value={i.instructor_type || ''}
+                                value={i.instructor_type || '__none__'}
                                 onValueChange={(value) => {
-                                  handleSaveDetails(i, { instructor_type: value || null });
+                                  handleSaveDetails(i, { instructor_type: value === '__none__' ? null : value });
                                 }}
                                 disabled={isSaving}
                               >
@@ -282,7 +282,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                                   <SelectValue placeholder="בחר סוג מדריך..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">ללא סיווג</SelectItem>
+                                  <SelectItem value="__none__">ללא סיווג</SelectItem>
                                   {typeOptions.map((type) => (
                                     <SelectItem key={type.value} value={type.value}>
                                       {type.label}
