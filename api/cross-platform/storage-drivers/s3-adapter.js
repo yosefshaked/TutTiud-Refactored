@@ -101,9 +101,15 @@ export function createS3Driver(config) {
      */
     async getDownloadUrl(path, expiresIn = 3600, filename = null) {
       // Build Content-Disposition header with filename if provided
-      const disposition = filename 
-        ? `attachment; filename="${filename}"`
-        : 'attachment';
+      // Use RFC 5987 encoding for non-ASCII filenames (Hebrew, etc.)
+      let disposition = 'attachment';
+      if (filename) {
+        // ASCII-safe fallback filename
+        const asciiFallback = 'document';
+        // RFC 5987 encoded filename with UTF-8
+        const encodedFilename = encodeURIComponent(filename);
+        disposition = `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFilename}`;
+      }
 
       const command = new GetObjectCommand({
         Bucket: bucket,

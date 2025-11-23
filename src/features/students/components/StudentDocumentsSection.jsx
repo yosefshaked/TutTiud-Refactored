@@ -46,7 +46,21 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   const [backgroundUploads, setBackgroundUploads] = useState([]); // Active background uploads
 
   const studentFiles = Array.isArray(student?.files) ? student.files : [];
-  const hasMissingMandatory = definitions.some(
+  const studentTags = Array.isArray(student?.tags) ? student.tags : [];
+  
+  // Filter definitions to show only those relevant to this student's tags
+  const relevantDefinitions = definitions.filter(def => {
+    // If definition has no target_tags, it applies to all students
+    if (!def.target_tags || def.target_tags.length === 0) return true;
+    
+    // If student has no tags, only show definitions with no target_tags
+    if (studentTags.length === 0) return false;
+    
+    // Show definition if student has at least one matching tag
+    return def.target_tags.some(targetTag => studentTags.includes(targetTag));
+  });
+  
+  const hasMissingMandatory = relevantDefinitions.some(
     (def) => def.is_mandatory && !studentFiles.find((f) => f.definition_id === def.id)
   );
 
@@ -81,13 +95,8 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         setDefinitions(parsed);
         setLoadState(REQUEST_STATE.idle);
         
-        // Auto-open if missing mandatory files
-        const missing = parsed.some(
-          (def) => def.is_mandatory && !studentFiles.find((f) => f.definition_id === def.id)
-        );
-        if (missing) {
-          setIsOpen(true);
-        }
+        // Note: Auto-open logic will run via hasMissingMandatory which uses relevantDefinitions
+        // No need to duplicate filtering here
       } catch (error) {
         console.error('Error loading document definitions:', error);
         setLoadState(REQUEST_STATE.error);
@@ -96,6 +105,13 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
     loadDefinitions();
   }, [session, orgId, student?.id]);
+
+  // Auto-open section if there are missing mandatory files (runs when definitions or tags change)
+  useEffect(() => {
+    if (hasMissingMandatory) {
+      setIsOpen(true);
+    }
+  }, [hasMissingMandatory]);
 
   const checkForDuplicates = useCallback(
     async (file) => {
@@ -510,11 +526,11 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                 </div>
 
                 {/* Required Documents */}
-                {definitions.length > 0 && (
+                {relevantDefinitions.length > 0 && (
                   <div className="space-y-3">
                     <h3 className="font-semibold text-slate-900">מסמכים נדרשים</h3>
                     <div className="space-y-2">
-                      {definitions.map((def) => {
+                      {relevantDefinitions.map((def) => {
                         const file = getFileForDef(def.id);
                         const isUploading = uploadingDefId === def.id;
 
