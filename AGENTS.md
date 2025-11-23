@@ -158,11 +158,17 @@
 - `/api/student-files` (POST/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
   - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
   - **File metadata**: Each file record includes `{id, name, original_name, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **Hebrew filename encoding**: Properly decodes UTF-8 filenames from multipart data by detecting latin1 mis-encoding and converting back to UTF-8
   - **Progress tracking**: Frontend uses XMLHttpRequest with upload progress events for real-time feedback
   - **Background uploads**: Uploads continue in background with toast notifications; users can navigate away while files upload
   - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures
   - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Student Name}" (e.g., "אישור רפואי - יוסי כהן")
   - **Definition name preservation**: Stores `definition_name` in file metadata so orphaned files (deleted definitions) maintain proper display name
+  - **Configuration changes handling**: When admins modify document definitions after files are uploaded:
+    - **Rename definition**: Files automatically show the NEW definition name (fetched dynamically from current definitions); `definition_name` metadata only used as fallback if definition is deleted
+    - **Change target_tags**: Files remain associated with `definition_id`; display uses current definition regardless of tag changes, so file stays in "Required Documents" section with updated tags
+    - **Delete definition**: Files become orphaned, shown in "Additional Files" with amber styling and "הגדרה ישנה" badge using stored `definition_name`
+    - **Implementation**: Frontend and download endpoint both check current definitions first, falling back to stored `definition_name` only for truly deleted definitions
 - `/api/student-files-check` (POST) performs pre-upload duplicate detection.
   - Calculates MD5 hash of file content before uploading to storage
   - Searches for duplicates across ALL students in the organization (not just current student)

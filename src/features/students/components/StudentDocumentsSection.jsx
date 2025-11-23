@@ -60,6 +60,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     return def.target_tags.some(targetTag => studentTags.includes(targetTag));
   });
   
+  // For mandatory check: only check definitions that are both relevant AND have matching files
   const hasMissingMandatory = relevantDefinitions.some(
     (def) => def.is_mandatory && !studentFiles.find((f) => f.definition_id === def.id)
   );
@@ -448,13 +449,20 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   // Get adhoc files (no definition_id OR orphaned - definition was deleted)
   const adhocFiles = studentFiles.filter((f) => {
     if (!f.definition_id) return true;
-    // Include files whose definition no longer exists (orphaned)
+    // Include files whose definition no longer exists in ANY definitions list (truly deleted)
     return !definitions.find(def => def.id === f.definition_id);
   });
 
-  // Helper to check if a file is orphaned (definition was deleted)
+  // Helper to check if a file is orphaned (definition was truly deleted)
   const isOrphanedFile = (file) => {
     return file.definition_id && !definitions.find(def => def.id === file.definition_id);
+  };
+
+  // Get definition name for a file (current name if definition exists, stored name if orphaned)
+  const getDefinitionNameForFile = (file) => {
+    if (!file.definition_id) return null;
+    const currentDef = definitions.find(def => def.id === file.definition_id);
+    return currentDef?.name || file.definition_name || null;
   };
 
   return (
@@ -627,6 +635,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                     <div className="space-y-2">
                       {adhocFiles.map((file) => {
                         const isOrphaned = isOrphanedFile(file);
+                        // For orphaned files, use stored definition_name; otherwise use current file name
                         const displayName = isOrphaned && file.definition_name 
                           ? `${file.definition_name} - ${student?.name || 'תלמיד'}`
                           : file.name;

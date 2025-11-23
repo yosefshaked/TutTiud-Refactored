@@ -190,10 +190,26 @@ export default async function (context, req) {
     const studentId = studentIdPart.data.toString('utf8').trim();
     const orgId = orgIdPart.data.toString('utf8').trim();
     const definitionId = defIdPart ? defIdPart.data.toString('utf8').trim() : null;
-    const customName = fileNamePart ? fileNamePart.data.toString('utf8').trim() : filePart.filename;
+    const customName = fileNamePart ? fileNamePart.data.toString('utf8').trim() : null;
+
+    // Decode filename properly to handle Hebrew and other UTF-8 characters
+    // The multipart parser may give us a mis-encoded string; try to fix it
+    let decodedFilename = filePart.filename;
+    try {
+      // If the filename looks garbled (contains replacement characters or latin1 artifacts),
+      // try to recover it by converting latin1 bytes back to UTF-8
+      if (decodedFilename && /[\u00C0-\u00FF]{2,}/.test(decodedFilename)) {
+        // Convert string to latin1 bytes, then decode as UTF-8
+        const latin1Bytes = Buffer.from(decodedFilename, 'latin1');
+        decodedFilename = latin1Bytes.toString('utf8');
+      }
+    } catch (err) {
+      context.log?.warn?.('Failed to decode filename, using original', { error: err.message });
+      // Keep original if decoding fails
+    }
 
     context.log?.info?.('File upload parsed', {
-      filename: filePart.filename,
+      filename: decodedFilename,
       mimeType: filePart.type,
       fileSize: filePart.data.length,
       studentId,
@@ -303,8 +319,8 @@ export default async function (context, req) {
     // Create file metadata
     const fileMetadata = {
       id: fileId,
-      name: customName || filePart.filename,
-      original_name: filePart.filename,
+      name: customName || decodedFilename,
+      original_name: decodedFilename,
       url: uploadResult.url,
       path: filePath,
       storage_provider: storageProfile.mode,
@@ -346,7 +362,7 @@ export default async function (context, req) {
     }
 
     // Build proper display name based on definition and student
-    let displayName = customName || filePart.filename;
+    let displayName = customName || decodedFilename;
     let definitionName = null;
 
     if (definitionId) {

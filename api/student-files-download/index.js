@@ -152,9 +152,26 @@ export default async function (context, req) {
   // Get display filename
   let displayFilename = file.name;
   
-  // For files with definition_name (even if orphaned), use definition_name + student name
-  if (file.definition_name && student?.name) {
-    displayFilename = `${file.definition_name} - ${student.name}`;
+  // For files with definition_id, try to get current definition name first
+  if (file.definition_id && student?.name) {
+    // Fetch document definitions to get current name (in case definition was renamed)
+    const { data: settingsData } = await controlClient
+      .from('Settings')
+      .select('settings_value')
+      .eq('org_id', orgId)
+      .eq('settings_key', 'document_definitions')
+      .maybeSingle();
+
+    if (settingsData?.settings_value) {
+      const definitions = Array.isArray(settingsData.settings_value) ? settingsData.settings_value : [];
+      const currentDef = definitions.find(d => d.id === file.definition_id);
+      
+      // Use current definition name if exists, otherwise fall back to stored definition_name
+      const defName = currentDef?.name || file.definition_name;
+      if (defName) {
+        displayFilename = `${defName} - ${student.name}`;
+      }
+    }
   }
   
   // Ensure the display name has the correct file extension
