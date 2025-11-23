@@ -35,6 +35,7 @@ export default function Settings() {
   const [logoEnabled, setLogoEnabled] = useState(false);
   const [storageEnabled, setStorageEnabled] = useState(false);
   const [refreshingPermissions, setRefreshingPermissions] = useState(false);
+  const [isInstructor, setIsInstructor] = useState(false);
 
   // Fetch backup permissions and initialize if empty using the proper RPC function
   useEffect(() => {
@@ -81,6 +82,42 @@ export default function Settings() {
     
     fetchAndInitializePermissions();
   }, [activeOrgId, authClient, refreshOrganizations]);
+
+  // Check if current user is an instructor
+  useEffect(() => {
+    if (!user?.id || !session || !tenantClientReady || !activeOrgId) {
+      setIsInstructor(false);
+      return;
+    }
+
+    const checkInstructorStatus = async () => {
+      try {
+        const response = await fetch(`/api/instructors?org_id=${activeOrgId}`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+            'x-supabase-authorization': `Bearer ${session.access_token}`,
+            'x-supabase-auth': `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (response.ok) {
+          const instructors = await response.json();
+          // Check if current user exists in the instructors list
+          const isInstructorRecord = Array.isArray(instructors) && 
+            instructors.some(instructor => instructor.id === user.id);
+          setIsInstructor(isInstructorRecord);
+        } else {
+          setIsInstructor(false);
+        }
+      } catch (error) {
+        console.error('Error checking instructor status:', error);
+        setIsInstructor(false);
+      }
+    };
+
+    checkInstructorStatus();
+  }, [user?.id, session, tenantClientReady, activeOrgId]);
 
   useEffect(() => {
     if (activeOrgHasConnection) {
@@ -602,7 +639,8 @@ export default function Settings() {
           </Card>
 
           {/* Instructor Documents - For instructors to view/upload their own files */}
-          {!canManageSessionForm && activeOrgHasConnection && tenantClientReady && (
+          {/* Instructor Documents Card - visible to any user who is an instructor */}
+          {isInstructor && activeOrgHasConnection && tenantClientReady && (
             <Card dir="rtl">
               <CardHeader>
                 <div className="flex items-center justify-between">
