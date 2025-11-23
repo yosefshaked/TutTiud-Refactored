@@ -15,7 +15,10 @@ import { resolveEncryptionSecret, deriveEncryptionKey } from './org-bff.js';
 /**
  * Encrypt BYOS configuration
  * 
- * @param {Object} byosConfig - BYOS configuration object
+ * IMPORTANT: Uses snake_case field names (access_key_id, secret_access_key)
+ * to match the normalized format from normalizeStorageProfile().
+ * 
+ * @param {Object} byosConfig - BYOS configuration object (normalized format)
  * @param {string} encryptionKey - 32-byte encryption key (Buffer)
  * @returns {Object} Encrypted BYOS configuration
  */
@@ -28,16 +31,16 @@ export function encryptByosConfig(byosConfig, encryptionKey) {
     throw new Error('Invalid encryption key: must be 32 bytes');
   }
 
-  // Extract sensitive fields
-  const { accessKeyId, secretAccessKey, ...publicFields } = byosConfig;
+  // Extract sensitive fields (using snake_case as that's what normalizeStorageProfile returns)
+  const { access_key_id, secret_access_key, ...publicFields } = byosConfig;
 
   // If no sensitive data, return as-is
-  if (!accessKeyId && !secretAccessKey) {
+  if (!access_key_id && !secret_access_key) {
     return byosConfig;
   }
 
   // Encrypt sensitive credentials
-  const sensitiveData = JSON.stringify({ accessKeyId, secretAccessKey });
+  const sensitiveData = JSON.stringify({ access_key_id, secret_access_key });
   const iv = randomBytes(12); // 96 bits for GCM
   const cipher = createCipheriv('aes-256-gcm', encryptionKey, iv);
 
@@ -68,9 +71,12 @@ export function encryptByosConfig(byosConfig, encryptionKey) {
 /**
  * Decrypt BYOS configuration
  * 
+ * IMPORTANT: Returns snake_case field names (access_key_id, secret_access_key)
+ * to match the normalized format expected by storage drivers.
+ * 
  * @param {Object} encryptedConfig - Encrypted BYOS configuration
  * @param {Buffer} encryptionKey - 32-byte encryption key
- * @returns {Object} Decrypted BYOS configuration
+ * @returns {Object} Decrypted BYOS configuration (snake_case fields)
  */
 export function decryptByosConfig(encryptedConfig, encryptionKey) {
   if (!encryptedConfig || typeof encryptedConfig !== 'object') {
@@ -115,11 +121,11 @@ export function decryptByosConfig(encryptedConfig, encryptionKey) {
 
     const sensitiveData = JSON.parse(decrypted.toString('utf8'));
 
-    // Return config with decrypted credentials
+    // Return config with decrypted credentials (snake_case to match normalized format)
     return {
       ...publicFields,
-      accessKeyId: sensitiveData.accessKeyId,
-      secretAccessKey: sensitiveData.secretAccessKey,
+      access_key_id: sensitiveData.access_key_id,
+      secret_access_key: sensitiveData.secret_access_key,
     };
   } catch (error) {
     throw new Error(`Failed to decrypt BYOS credentials: ${error.message}`);
