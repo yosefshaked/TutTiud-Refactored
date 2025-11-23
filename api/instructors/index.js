@@ -88,7 +88,7 @@ export default async function (context, req) {
 
     let builder = tenantClient
       .from('Instructors')
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_type, files')
       .order('name', { ascending: true });
 
     if (!includeInactive) {
@@ -172,7 +172,7 @@ export default async function (context, req) {
     const { data, error } = await tenantClient
       .from('Instructors')
       .upsert(insertPayload, { onConflict: 'id' })
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_type, files')
       .single();
 
     if (error) {
@@ -205,7 +205,7 @@ export default async function (context, req) {
       .from('Instructors')
       .update(updates)
       .eq('id', instructorId)
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_type, files')
       .maybeSingle();
 
     if (error) {
@@ -235,7 +235,7 @@ export default async function (context, req) {
       .from('Instructors')
       .update({ is_active: false })
       .eq('id', instructorId)
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_type, files')
       .maybeSingle();
 
     if (error) {

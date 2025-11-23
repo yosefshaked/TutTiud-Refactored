@@ -197,6 +197,10 @@ export function validateInstructorUpdate(body) {
   if (Object.prototype.hasOwnProperty.call(body, 'is_active')) {
     updates.is_active = Boolean(body.is_active);
   }
+  if (Object.prototype.hasOwnProperty.call(body, 'instructor_type')) {
+    const v = normalizeString(body.instructor_type);
+    updates.instructor_type = v || null;
+  }
 
   return { instructorId, updates };
 }
