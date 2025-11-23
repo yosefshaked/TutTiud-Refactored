@@ -102,6 +102,7 @@ export function createS3Driver(config) {
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: path,
+        ResponseContentDisposition: 'attachment', // Force download instead of preview
       });
 
       const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn });
