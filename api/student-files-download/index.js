@@ -88,7 +88,7 @@ export default async function (context, req) {
   // Get storage profile
   const { data: orgSettings, error: settingsError } = await controlClient
     .from('org_settings')
-    .select('storage_profile')
+    .select('storage_profile, permissions')
     .eq('org_id', orgId)
     .maybeSingle();
 
@@ -100,6 +100,22 @@ export default async function (context, req) {
   const storageProfile = orgSettings?.storage_profile;
   if (!storageProfile || !storageProfile.mode) {
     return respond(context, 400, { message: 'storage_not_configured' });
+  }
+
+  // Handle disconnected storage
+  if (storageProfile.disconnected === true) {
+    // For BYOS: Allow read-only access if user still has access to their storage
+    // For managed: Only allow during grace period (check storage_access_level)
+    if (storageProfile.mode === 'managed') {
+      const accessLevel = orgSettings?.permissions?.storage_access_level;
+      if (accessLevel !== 'read_only_grace') {
+        return respond(context, 403, { 
+          message: 'storage_disconnected',
+          details: 'Storage is disconnected. Downloads are not available.'
+        });
+      }
+    }
+    // BYOS continues - user owns the storage
   }
 
   // Get tenant client to find the file

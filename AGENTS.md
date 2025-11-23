@@ -234,6 +234,10 @@
   - For BYOS: Users can maintain read-only access to their storage if desired
   - For managed: Triggers grace period in separate endpoint
   - Audit trail maintained with `disconnected_at`, `disconnected_by` metadata
+  - **File operations during disconnection**:
+    - Uploads (`POST /api/student-files`): Blocked with 403 error
+    - Downloads (`GET /api/student-files-download`): Allowed for BYOS (user owns storage); for managed, only during grace period when `storage_access_level = 'read_only_grace'`
+    - Bulk download (`POST /api/storage-bulk-download`): Allowed for BYOS anytime; for managed, only during grace period
 - **Reconnection**: `PATCH /api/org-settings/storage` removes disconnected flag and restores full access
 - **Grace period lifecycle**:
   1. **Start grace period**: `/api/storage-start-grace-period` (POST) - Admin/owner triggers grace period

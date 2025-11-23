@@ -90,7 +90,7 @@ export default async function (context, req) {
   // Get storage profile
   const { data: orgSettings, error: settingsError } = await controlClient
     .from('org_settings')
-    .select('storage_profile')
+    .select('storage_profile, permissions')
     .eq('org_id', orgId)
     .maybeSingle();
 
@@ -103,6 +103,18 @@ export default async function (context, req) {
   if (!storageProfile || !storageProfile.mode) {
     return respond(context, 400, { message: 'storage_not_configured' });
   }
+
+  // Handle disconnected storage - allow bulk download during grace period for migration
+  if (storageProfile.disconnected === true && storageProfile.mode === 'managed') {
+    const accessLevel = orgSettings?.permissions?.storage_access_level;
+    if (accessLevel !== 'read_only_grace') {
+      return respond(context, 403, { 
+        message: 'storage_disconnected',
+        details: 'Storage is disconnected and grace period has ended. Files are no longer available.'
+      });
+    }
+  }
+  // BYOS bulk download always allowed (user owns storage)
 
   // Get tenant client to fetch all student files
   const { client: tenantClient, error: tenantError } = await resolveTenantClient(

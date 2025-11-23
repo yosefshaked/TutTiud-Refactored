@@ -280,6 +280,14 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'storage_not_configured' });
     }
 
+    // Block uploads if storage is disconnected
+    if (storageProfile.disconnected === true) {
+      return respond(context, 403, { 
+        message: 'storage_disconnected',
+        details: 'Storage is disconnected. Please reconnect or reconfigure storage to upload files.'
+      });
+    }
+
     // Calculate file hash for deduplication tracking
     const fileHash = calculateFileHash(filePart.data);
 
