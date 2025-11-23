@@ -4,6 +4,22 @@
 - Use 2 spaces for indentation.
 - Prefer ES module syntax.
 
+## Azure Logging and Diagnostics
+- **Finding Azure Function logs**: Navigate to Azure Portal → Application Insights → Investigate → Search.
+  - Set view to "Individual items"
+  - Filter by "Trace Severity level = Error" when looking for error logs
+  - Filter by "Trace Severity level = Information" for general logs
+  - Use time range selector (last 24 hours, custom, etc.) to narrow results
+  - Search specific function names in the search box (e.g., "student-files-download")
+- **Azure Functions logging API**: Use `context.log()`, `context.log.error()`, `context.log.warn()` in function code
+  - Do NOT use `console.log` - it doesn't integrate with Application Insights properly
+  - Do NOT use `@azure/logger` - that's for Azure SDK clients, not application logging
+  - Do NOT use optional chaining on logging (e.g., `context.log?.info?.()`) - use direct method calls
+- **Common logging patterns**:
+  - Log at function entry: `context.log('function-name: started', { params })`
+  - Log errors with context: `context.log.error('operation failed', { error: err.message, details })`
+  - Log important state changes: `context.log('state changed', { before, after })`
+
 ## Workflow
 - For premium features, always check permissions in both frontend (UI) and backend (API) before allowing access.
 - PDF export feature uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment.
