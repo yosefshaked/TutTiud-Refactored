@@ -152,7 +152,7 @@ export default async function (context, req) {
   // Get display filename
   let displayFilename = file.name;
   
-  context.log?.info?.('Download filename construction', {
+  context.log('Download filename construction', {
     hasDefinitionId: !!file.definition_id,
     definitionId: file.definition_id,
     fileName: file.name,
@@ -173,13 +173,13 @@ export default async function (context, req) {
         .maybeSingle();
 
       if (settingsError) {
-        context.log?.error?.('Failed to fetch document definitions', {
+        context.log.error('Failed to fetch document definitions', {
           error: settingsError.message,
           code: settingsError.code,
         });
       }
 
-      context.log?.info?.('Settings query result', {
+      context.log('Settings query result', {
         hasData: !!settingsData,
         hasValue: !!settingsData?.settings_value,
         isArray: Array.isArray(settingsData?.settings_value),
@@ -190,7 +190,7 @@ export default async function (context, req) {
         const definitions = Array.isArray(settingsData.settings_value) ? settingsData.settings_value : [];
         const currentDef = definitions.find(d => d.id === file.definition_id);
         
-        context.log?.info?.('Definition lookup', {
+        context.log('Definition lookup', {
           totalDefinitions: definitions.length,
           searchingFor: file.definition_id,
           found: !!currentDef,
@@ -202,30 +202,30 @@ export default async function (context, req) {
         const defName = currentDef?.name || file.definition_name;
         if (defName) {
           displayFilename = `${defName} - ${student.name}`;
-          context.log?.info?.('Using definition-based filename', { 
+          context.log('Using definition-based filename', { 
             defName,
             studentName: student.name,
             result: displayFilename,
           });
         } else {
-          context.log?.warn?.('Definition name not found', {
+          context.log.warn('Definition name not found', {
             definitionId: file.definition_id,
             hadCurrentDef: !!currentDef,
             hadStoredName: !!file.definition_name,
           });
         }
       } else {
-        context.log?.warn?.('No document_definitions settings found in tenant DB');
+        context.log.warn('No document_definitions settings found in tenant DB');
       }
     } catch (err) {
-      context.log?.error?.('Exception while fetching definitions', {
+      context.log.error('Exception while fetching definitions', {
         error: err.message,
         stack: err.stack,
       });
     }
   }
   
-  context.log?.info?.('Final display filename before extension check', { displayFilename });
+  context.log('Final display filename before extension check', { displayFilename });
   
   // Ensure the display name has the correct file extension
   if (displayFilename && file.original_name) {
@@ -238,7 +238,7 @@ export default async function (context, req) {
     }
   }
 
-  context.log?.info?.('Final filename for download', { 
+  context.log('Final filename for download', { 
     displayFilename,
     filePath: file.path,
   });
@@ -247,7 +247,7 @@ export default async function (context, req) {
   try {
     const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename);
     
-    context.log?.info?.('Generated presigned URL', {
+    context.log('Generated presigned URL', {
       filename: displayFilename,
       urlLength: downloadUrl?.length,
     });
