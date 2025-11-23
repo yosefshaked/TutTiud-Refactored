@@ -18,6 +18,29 @@ function mapOrganizationRecord(record, membership, connection) {
     return null;
   }
 
+  // Strip sensitive credentials from storage profile for non-admin users
+  let storageProfile = connection?.storageProfile ?? null;
+  const userRole = membership?.role || 'member';
+  const isAdmin = userRole === 'admin' || userRole === 'owner';
+  
+  if (storageProfile && !isAdmin && storageProfile.mode === 'byos' && storageProfile.byos) {
+    // Non-admin: Remove sensitive credentials
+    storageProfile = {
+      ...storageProfile,
+      byos: {
+        provider: storageProfile.byos.provider,
+        endpoint: storageProfile.byos.endpoint,
+        bucket: storageProfile.byos.bucket,
+        region: storageProfile.byos.region,
+        validated_at: storageProfile.byos.validated_at,
+        // Credentials intentionally omitted for non-admin users
+      },
+    };
+    // Remove encrypted credentials marker if present
+    delete storageProfile.byos._encrypted;
+    delete storageProfile.byos._credentials;
+  }
+
   return {
     id: record.id,
     name: record.name,
@@ -40,7 +63,7 @@ function mapOrganizationRecord(record, membership, connection) {
     permissions: connection?.permissions ?? {},
     org_settings_metadata: connection?.metadata ?? null,
     org_settings_updated_at: connection?.updatedAt ?? null,
-    storage_profile: connection?.storageProfile ?? null,
+    storage_profile: storageProfile,
   };
 }
 

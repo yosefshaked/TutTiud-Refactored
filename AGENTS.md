@@ -149,22 +149,32 @@
   - Supports two modes: **BYOS** (Bring Your Own Storage) and **Managed Storage**
   - System-agnostic design: reusable by TutTiud, Farm Management System, and future systems
 - **BYOS credentials encryption** (`api/_shared/storage-encryption.js`):
-  - Encrypts `accessKeyId` and `secretAccessKey` before storing in database
+  - Encrypts `access_key_id` and `secret_access_key` before storing in database
   - Uses AES-256-GCM authenticated encryption (same as tenant credentials)
   - Encrypted format: `v1:gcm:iv:authTag:cipherText` (base64-encoded)
-  - Decrypts automatically when loading storage profile
+  - **CRITICAL**: Uses snake_case field names (access_key_id, secret_access_key) to match normalizeStorageProfile() output
+  - Decrypts automatically when loading storage profile (admin/owner only)
   - Uses same encryption key as org credentials (`APP_ORG_CREDENTIALS_ENCRYPTION_KEY`)
   - Public fields (provider, endpoint, bucket, region) stored unencrypted for admin visibility
+- **Security model**:
+  - **Admin/Owner**: GET endpoint decrypts and returns full profile including credentials
+  - **Non-admin members**: GET endpoint strips sensitive fields (access_key_id, secret_access_key, _encrypted, _credentials)
+  - **Rationale**: Only admins need credentials to configure/troubleshoot storage; regular members only need to know storage is configured
+  - Never expose decrypted credentials to non-admin users to prevent storage bucket takeover
 - Control DB schema: run `scripts/control-db-storage-profile-schema.sql` to add `storage_profile` JSONB column
 - **Shared validation module**: `api/cross-platform/storage-config/`
   - `validateStorageProfile(profile)` - validates complete profile structure
   - `validateByosCredentials(byosConfig)` - validates S3-compatible provider credentials
   - `validateManagedConfig(managedConfig)` - validates managed storage namespace
-  - `normalizeStorageProfile(rawProfile)` - normalizes and sanitizes input
+  - `normalizeStorageProfile(rawProfile)` - normalizes and sanitizes input, outputs snake_case credentials
   - No TutTiud-specific logic; pure cross-system validation
 - **API endpoints**:
-  - `/api/user-context` now includes `storage_profile` in organization data (all members can read)
-  - `/api/org-settings/storage` (GET/POST) manages storage profile (admin/owner only for updates)
+  - `/api/user-context` now includes `storage_profile` in organization data (credentials stripped for non-admin)
+  - `/api/org-settings/storage` (GET/POST/DELETE/PATCH) manages storage profile
+    - GET: All members can read (credentials only for admin/owner)
+    - POST: Admin/owner only, encrypts before saving
+    - DELETE: Admin/owner only, marks as disconnected
+    - PATCH: Admin/owner only, reconnects storage
 - **BYOS configuration**:
   - Supports S3, Azure, GCS, Cloudflare R2, and generic S3-compatible providers
   - Required fields: provider, endpoint, bucket, access_key_id, secret_access_key
@@ -174,7 +184,6 @@
   - Required fields: namespace (alphanumeric + hyphens/underscores), active status
   - Namespace format validated: `[a-z0-9-_]+`
 - **Error handling**: Missing or invalid storage profile returns clear error state; no silent fallbacks
-- **Security**: BYOS credentials should be encrypted before storage (encryption not implemented in this module)
 - See `api/cross-platform/README.md` for architectural principles and usage guidelines
 
 ### File Upload and Document Management (2025-11)

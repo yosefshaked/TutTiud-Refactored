@@ -99,21 +99,42 @@ export default async function (context, req) {
 
     const storageProfile = orgSettings?.storage_profile || null;
 
-    // Decrypt BYOS credentials before sending to client
-    const decryptedProfile = storageProfile ? decryptStorageProfile(storageProfile, env) : null;
+    // Decrypt BYOS credentials for admin/owner only
+    let profileToReturn = storageProfile;
+    if (storageProfile && isAdminRole(role)) {
+      profileToReturn = decryptStorageProfile(storageProfile, env);
+    } else if (storageProfile) {
+      // Non-admin: Strip sensitive credentials from BYOS config
+      profileToReturn = { ...storageProfile };
+      if (profileToReturn.mode === 'byos' && profileToReturn.byos) {
+        profileToReturn.byos = {
+          provider: profileToReturn.byos.provider,
+          endpoint: profileToReturn.byos.endpoint,
+          bucket: profileToReturn.byos.bucket,
+          region: profileToReturn.byos.region,
+          validated_at: profileToReturn.byos.validated_at,
+          // Credentials intentionally omitted for non-admin users
+        };
+        // Remove encrypted credentials marker if present
+        delete profileToReturn.byos._encrypted;
+        delete profileToReturn.byos._credentials;
+      }
+    }
 
     // Check if disconnected
-    const isDisconnected = decryptedProfile?.disconnected === true;
+    const isDisconnected = profileToReturn?.disconnected === true;
 
     context.log?.info?.('org-settings/storage loaded successfully', { 
       orgId,
-      hasProfile: Boolean(decryptedProfile),
-      mode: decryptedProfile?.mode || null,
+      hasProfile: Boolean(profileToReturn),
+      mode: profileToReturn?.mode || null,
       disconnected: isDisconnected,
+      role: role,
+      credentialsIncluded: isAdminRole(role),
     });
 
     return respond(context, 200, {
-      storage_profile: decryptedProfile,
+      storage_profile: profileToReturn,
       is_disconnected: isDisconnected,
     }, { 'Cache-Control': 'private, max-age=60' });
   }
