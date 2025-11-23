@@ -133,12 +133,21 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
 
   const handleSaveDetails = async (instructor, partial) => {
     if (!canLoad || !instructor?.id) return;
+    console.log('[InstructorManager] handleSaveDetails called:', {
+      instructorId: instructor.id,
+      instructorName: instructor.name,
+      currentInstructorType: instructor.instructor_type,
+      partialUpdate: partial,
+      fullInstructor: instructor
+    });
     setSaveState(SAVE.saving);
     try {
+      const payload = { org_id: orgId, instructor_id: instructor.id, ...partial };
+      console.log('[InstructorManager] API request payload:', payload);
       await authenticatedFetch('instructors', {
         session,
         method: 'PUT',
-        body: { org_id: orgId, instructor_id: instructor.id, ...partial },
+        body: payload,
       });
       toast.success('פרטי המדריך נשמרו.');
       await loadAll();
@@ -276,9 +285,23 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                                 onValueChange={(value) => {
                                   // Compare BEFORE conversion to detect actual changes
                                   const currentValue = i.instructor_type || '__none__';
+                                  console.log('[InstructorManager] Select onValueChange fired:', {
+                                    selectedValue: value,
+                                    currentValue,
+                                    instructorType: i.instructor_type,
+                                    areEqual: value === currentValue,
+                                    instructorId: i.id
+                                  });
                                   if (value !== currentValue) {
                                     const newType = value === '__none__' ? null : value;
+                                    console.log('[InstructorManager] Calling handleSaveDetails with:', {
+                                      instructorId: i.id,
+                                      newType,
+                                      originalType: i.instructor_type
+                                    });
                                     handleSaveDetails(i, { instructor_type: newType });
+                                  } else {
+                                    console.log('[InstructorManager] Skipping save - values are equal');
                                   }
                                 }}
                                 disabled={isSaving}
