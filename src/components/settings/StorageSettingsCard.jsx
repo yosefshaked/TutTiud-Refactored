@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Lock, HardDrive, Cloud, Loader2, CheckCircle2 } from 'lucide-react';
-import { saveStorageConfiguration } from '@/features/settings/api/storage.js';
+import { Lock, HardDrive, Cloud, Loader2, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
+import { saveStorageConfiguration, deleteStorageConfiguration } from '@/features/settings/api/storage.js';
 import { useOrg } from '@/org/OrgContext.jsx';
 
 const STORAGE_MODES = {
@@ -49,7 +50,7 @@ function createStorageNamespace(orgId) {
 }
 
 export default function StorageSettingsCard({ session, orgId }) {
-  const { orgSettings } = useOrg();
+  const { orgSettings, refreshOrganizations } = useOrg();
   const [saveState, setSaveState] = useState(REQUEST.idle);
   const [selectedMode, setSelectedMode] = useState('');
   const [provider, setProvider] = useState('s3');
@@ -58,6 +59,8 @@ export default function StorageSettingsCard({ session, orgId }) {
   const [bucket, setBucket] = useState('');
   const [accessKeyId, setAccessKeyId] = useState('');
   const [secretAccessKey, setSecretAccessKey] = useState('');
+  const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [disconnectState, setDisconnectState] = useState(REQUEST.idle);
 
   const canAct = Boolean(session && orgId);
 
@@ -170,6 +173,38 @@ export default function StorageSettingsCard({ session, orgId }) {
       setSaveState(REQUEST.error);
     }
   }, [canAct, orgId, session, selectedMode, provider, endpoint, region, bucket, accessKeyId, secretAccessKey]);
+
+  const handleDisconnect = useCallback(async () => {
+    if (!canAct) return;
+
+    setDisconnectState(REQUEST.loading);
+
+    try {
+      await deleteStorageConfiguration(orgId, { session });
+      
+      // Refresh org context to reload storage profile
+      if (refreshOrganizations) {
+        await refreshOrganizations({ keepSelection: true });
+      }
+
+      toast.success('אחסון נותק בהצלחה');
+      setDisconnectState(REQUEST.idle);
+      setShowDisconnectDialog(false);
+      
+      // Reset form state
+      setSelectedMode('');
+      setProvider('s3');
+      setEndpoint('');
+      setRegion('');
+      setBucket('');
+      setAccessKeyId('');
+      setSecretAccessKey('');
+    } catch (error) {
+      console.error('Disconnect storage failed', error);
+      toast.error(error?.message || 'ניתוק האחסון נכשל');
+      setDisconnectState(REQUEST.error);
+    }
+  }, [canAct, orgId, session, refreshOrganizations]);
 
   // Render locked state
   if (isLocked) {
@@ -393,13 +428,27 @@ export default function StorageSettingsCard({ session, orgId }) {
           </div>
         )}
 
-        {/* Save Button */}
-        {selectedMode && (
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
+        {/* Action Buttons */}
+        <div className="flex items-center justify-between gap-3 pt-4 border-t">
+          {/* Disconnect button - only show if storage is already configured */}
+          {orgSettings?.storageProfile?.mode && (
+            <Button
+              variant="outline"
+              onClick={() => setShowDisconnectDialog(true)}
+              disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading}
+              className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              ניתוק אחסון
+            </Button>
+          )}
+          
+          {/* Save button - only show if mode is selected */}
+          {selectedMode && (
             <Button
               onClick={handleSave}
-              disabled={saveState === REQUEST.loading || !selectedMode}
-              className="gap-2"
+              disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading || !selectedMode}
+              className="gap-2 mr-auto"
             >
               {saveState === REQUEST.loading ? (
                 <>
@@ -413,9 +462,58 @@ export default function StorageSettingsCard({ session, orgId }) {
                 </>
               )}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
+
+      {/* Disconnect Confirmation Dialog */}
+      <Dialog open={showDisconnectDialog} onOpenChange={setShowDisconnectDialog}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-right">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              ניתוק אחסון
+            </DialogTitle>
+            <DialogDescription className="text-right">
+              פעולה זו תנתק את הגדרות האחסון. קבצים קיימים יישארו זמינים לתקופה מוגבלת.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-4" dir="rtl">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-900">
+                <strong>שים לב:</strong> לאחר הניתוק, לא תוכל להעלות קבצים חדשים עד שתגדיר אחסון מחדש.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2" dir="rtl">
+            <Button
+              variant="outline"
+              onClick={() => setShowDisconnectDialog(false)}
+              disabled={disconnectState === REQUEST.loading}
+            >
+              ביטול
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDisconnect}
+              disabled={disconnectState === REQUEST.loading}
+              className="gap-2"
+            >
+              {disconnectState === REQUEST.loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  מנתק...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  נתק אחסון
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

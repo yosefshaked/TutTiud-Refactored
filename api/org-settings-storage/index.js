@@ -21,6 +21,7 @@ import {
   validateStorageProfile,
   normalizeStorageProfile,
 } from '../cross-platform/storage-config/index.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 export default async function (context, req) {
   context.log?.info?.('org-settings/storage: request received', { method: req.method });
@@ -175,8 +176,83 @@ export default async function (context, req) {
       mode: profileToSave.mode,
     });
 
+    // Log audit event
+    try {
+      await logAuditEvent(supabase, {
+        orgId,
+        userId,
+        userEmail: authResult.data.user.email,
+        userRole: role,
+        actionType: AUDIT_ACTIONS.STORAGE_CONFIGURED,
+        actionCategory: AUDIT_CATEGORIES.STORAGE,
+        resourceType: 'storage_profile',
+        resourceId: orgId,
+        details: {
+          mode: profileToSave.mode,
+          provider: profileToSave.mode === 'byos' ? profileToSave.byos?.provider : 'managed',
+        },
+      });
+    } catch (auditError) {
+      context.log?.error?.('Failed to log audit event', { message: auditError.message });
+    }
+
     return respond(context, 200, {
       storage_profile: profileToSave,
+    });
+  }
+
+  // DELETE: Admin/Owner only can disconnect (remove) storage configuration
+  if (req.method === 'DELETE') {
+    if (!isAdminRole(role)) {
+      context.log?.warn?.('org-settings/storage non-admin attempted delete', { orgId, userId, role });
+      return respond(context, 403, { message: 'admin_or_owner_required' });
+    }
+
+    // Remove storage_profile by setting it to null
+    const { error: deleteError } = await supabase
+      .from('org_settings')
+      .update({
+        storage_profile: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('org_id', orgId);
+
+    if (deleteError) {
+      context.log?.error?.('org-settings/storage failed to disconnect storage', {
+        message: deleteError.message,
+        code: deleteError.code,
+        orgId,
+        userId,
+      });
+      return respond(context, 500, { message: 'failed_to_disconnect_storage' });
+    }
+
+    context.log?.info?.('org-settings/storage disconnected successfully', {
+      orgId,
+      userId,
+    });
+
+    // Log audit event
+    try {
+      await logAuditEvent(supabase, {
+        orgId,
+        userId,
+        userEmail: authResult.data.user.email,
+        userRole: role,
+        actionType: AUDIT_ACTIONS.STORAGE_DISCONNECTED,
+        actionCategory: AUDIT_CATEGORIES.STORAGE,
+        resourceType: 'storage_profile',
+        resourceId: orgId,
+        details: {
+          previous_mode: orgSettings?.storage_profile?.mode,
+        },
+      });
+    } catch (auditError) {
+      context.log?.error?.('Failed to log audit event', { message: auditError.message });
+    }
+
+    return respond(context, 200, {
+      message: 'storage_disconnected',
     });
   }
 

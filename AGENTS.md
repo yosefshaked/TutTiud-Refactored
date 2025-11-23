@@ -226,6 +226,70 @@
   - Uses toast notifications for success/error feedback
   - API client: `src/api/students-export.js` exports `exportStudentPdf()` and `downloadPdfBlob()`
 
+### Storage Grace Period & File Deletion (2025-11)
+- **Configurable grace period**: `permission_registry.storage_grace_period_days` (default 30) controls how many days users have to download files after storage is disconnected before permanent deletion.
+- **Database schema**: `org_settings.storage_grace_ends_at` (timestamptz) tracks when grace period expires and files should be deleted.
+- **Grace period lifecycle**:
+  1. **Start grace period**: `/api/storage-start-grace-period` (POST) - Admin/owner triggers grace period
+     - Fetches grace period days from `permission_registry`
+     - Calculates `grace_ends_at = current_date + grace_period_days`
+     - Sets `permissions.storage_access_level = 'read_only_grace'`
+     - Updates `org_settings.storage_grace_ends_at`
+  2. **During grace period**: Users can download files but cannot upload new ones
+  3. **Cleanup job**: `/api/storage-cleanup-expired` (POST) - Runs daily to delete expired files
+     - Finds orgs where `storage_grace_ends_at < NOW()`
+     - **Managed storage**: Deletes files from YOUR R2 bucket using `driver.deletePrefix()`
+     - **BYOS**: Skips file deletion (user owns the storage)
+     - Updates `org_settings`: sets `storage_profile = null`, `storage_grace_ends_at = null`, `storage_access_level = false`
+- **Data ownership principles**:
+  - ✅ Delete files from YOUR managed R2 bucket
+  - ❌ Do NOT force-delete from user's tenant database
+  - ℹ️ Leave `Students.files` metadata intact (user owns their DB)
+  - 📧 Send email notifications at grace period start and after deletion
+- **S3 driver enhancement**: `deletePrefix(prefix)` method lists and deletes all objects with given prefix in batches of 1000 (S3 limit).
+- **Permission**: `storage_grace_period_days` in registry allows system-wide control of deletion timeline without code changes.
+- **Deployment**: Run `scripts/control-db-storage-grace-period.sql` to add `storage_grace_ends_at` column and index.
+
+### Audit Logging for Compliance (2025-11)
+- **Audit log table**: `public.audit_log` in control DB tracks all critical admin and system actions for legal compliance and dispute resolution.
+- **Schema**: Includes org_id, user_id, user_email, user_role, action_type, action_category, resource_type, resource_id, details (JSONB), metadata (JSONB), performed_at, expires_at.
+- **Retention**: 7 years by default (configurable via `expires_at`); required for GDPR and legal compliance.
+- **RLS policies**: Users can read audit logs for their own organizations; only service role can insert/modify.
+- **Helper function**: `public.log_audit_event()` - Use this from API endpoints to log actions.
+- **Shared utilities**: `api/_shared/audit-log.js` provides `logAuditEvent()` and action type constants (`AUDIT_ACTIONS`, `AUDIT_CATEGORIES`).
+- **Logged actions**:
+  - **Storage**: configured, updated, disconnected, grace_period_started, files_deleted, migrated_to_byos, bulk_download
+  - **Permissions**: enabled, disabled
+  - **Membership**: invited, removed, role_changed
+  - **Backup**: created, restored
+- **Usage pattern**:
+  ```javascript
+  await logAuditEvent(supabaseClient, {
+    orgId, userId, userEmail, userRole,
+    actionType: AUDIT_ACTIONS.STORAGE_CONFIGURED,
+    actionCategory: AUDIT_CATEGORIES.STORAGE,
+    resourceType: 'storage_profile',
+    resourceId: orgId,
+    details: { mode: 'managed' }
+  });
+  ```
+- **Deployment**: Run `scripts/control-db-audit-log.sql` to create audit_log table and helper function.
+
+### File Migration and Bulk Download (2025-11)
+- **Bulk download**: `/api/storage-bulk-download` (POST) - Creates ZIP archive of all organization files.
+  - Admin/owner only
+  - Fetches all student files from tenant DB
+  - Downloads files from storage using `driver.getFile(path)` method
+  - Packages files into ZIP organized by student folders
+  - Returns as `application/zip` download
+  - Logs audit event with file count, success/failure counts, and ZIP size
+  - Sanitizes filenames to prevent path traversal attacks
+- **Storage drivers**: All drivers (S3, Azure, GCS) implement `getFile(path)` method that returns file data as Buffer.
+  - S3 adapter: Converts readable stream to Buffer using async iteration
+  - Handles large files efficiently with streaming
+- **BYOS migration** (planned): Export all files → User uploads to their S3/R2 → Reconfigure storage profile
+- **Use cases**: Before grace period ends, manual backup, migration from managed to BYOS
+
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
 - Render the summary information in the base `<TableRow>` and immediately follow it with a conditional second `<TableRow>` that holds the drawer content inside a single spanning `<TableCell>` (e.g., `colSpan={totalColumns}`).

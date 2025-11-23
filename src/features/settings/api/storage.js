@@ -59,3 +59,26 @@ export async function saveStorageConfiguration(orgId, payload, { session, signal
 
   return data?.storage_profile || null;
 }
+
+/**
+ * Disconnects (deletes) storage configuration for an organization
+ * @param {string} orgId - Organization ID
+ * @param {object} options - Request options
+ * @param {object} options.session - User session
+ * @param {AbortSignal} options.signal - Abort signal
+ * @returns {Promise<void>}
+ */
+export async function deleteStorageConfiguration(orgId, { session, signal } = {}) {
+  if (!orgId) {
+    throw new Error('Organization ID is required');
+  }
+
+  await authenticatedFetch('org-settings/storage', {
+    method: 'DELETE',
+    body: {
+      org_id: orgId,
+    },
+    session,
+    signal,
+  });
+}

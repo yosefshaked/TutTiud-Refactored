@@ -1,4 +1,5 @@
 /* eslint-env node */
+/* global Buffer */
 /**
  * S3-Compatible Storage Adapter
  * 
@@ -6,7 +7,7 @@
  * Uses AWS SDK v3 for S3 operations.
  */
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 /**
@@ -119,6 +120,73 @@ export function createS3Driver(config) {
 
       const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn });
       return presignedUrl;
+    },
+
+    /**
+     * Get file data as Buffer
+     * 
+     * @param {string} path - File path within bucket
+     * @returns {Promise<Buffer>} File data
+     */
+    async getFile(path) {
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: path,
+      });
+
+      const response = await s3Client.send(command);
+      
+      // Convert stream to buffer
+      const chunks = [];
+      for await (const chunk of response.Body) {
+        chunks.push(chunk);
+      }
+      
+      return Buffer.concat(chunks);
+    },
+
+    /**
+     * Delete all files with a given prefix (for bulk cleanup)
+     * 
+     * @param {string} prefix - Path prefix to delete (e.g., "managed/org-id/")
+     * @returns {Promise<number>} Number of files deleted
+     */
+    async deletePrefix(prefix) {
+      let deletedCount = 0;
+      let continuationToken = null;
+
+      do {
+        // List objects with prefix
+        const listCommand = new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        });
+
+        const listResponse = await s3Client.send(listCommand);
+
+        if (!listResponse.Contents || listResponse.Contents.length === 0) {
+          break;
+        }
+
+        // Delete in batches of up to 1000 (S3 limit)
+        const objectsToDelete = listResponse.Contents.map(obj => ({ Key: obj.Key }));
+
+        const deleteCommand = new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: {
+            Objects: objectsToDelete,
+            Quiet: true,
+          },
+        });
+
+        await s3Client.send(deleteCommand);
+        deletedCount += objectsToDelete.length;
+
+        continuationToken = listResponse.NextContinuationToken;
+      } while (continuationToken);
+
+      return deletedCount;
     },
 
     /**

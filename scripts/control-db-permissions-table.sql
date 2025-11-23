@@ -191,6 +191,17 @@ INSERT INTO public.permission_registry (
     'false'::jsonb,
     'features',
     true
+  ),
+  -- Storage grace period before deletion (in days)
+  (
+    'storage_grace_period_days',
+    'Storage Grace Period (Days)',
+    'תקופת חסד לאחסון (ימים)',
+    'Number of days users have to download files after storage is disconnected before permanent deletion',
+    'מספר הימים שיש למשתמשים להוריד קבצים לאחר ניתוק האחסון לפני מחיקה סופית',
+    '30'::jsonb,
+    'storage',
+    false
   )
 ON CONFLICT (permission_key) DO UPDATE SET
   display_name_en = EXCLUDED.display_name_en,
