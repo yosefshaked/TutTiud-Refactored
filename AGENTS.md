@@ -11,6 +11,14 @@
 - Run `npm run build` to ensure the project builds.
 - No test script is configured; note this in your testing summary.
 - Run `npm run check:schema` before adding new persistence logic; if it reports missing columns, add a checklist note to the PR instead of coding around the gap.
+- **API Authentication Headers**: All frontend API calls to backend endpoints MUST include Supabase-specific authentication headers in addition to the standard `Authorization` header:
+  - `Authorization: Bearer ${token}`
+  - `X-Supabase-Authorization: Bearer ${token}`
+  - `x-supabase-authorization: Bearer ${token}`
+  - `x-supabase-auth: Bearer ${token}`
+  - The backend expects these headers for authentication. Missing them will result in 401 Unauthorized errors even with a valid token.
+  - See `src/lib/api-client.js`, `src/org/OrgContext.jsx`, or `src/api/students-export.js` for reference implementations.
+  - When using `fetch()` or `XMLHttpRequest`, always include all four headers.
 - Instructor color assignments live in `api/_shared/instructor-colors.js`. Use `ensureInstructorColors()` before returning instructor records or aggregations so every row keeps a unique `metadata.instructor_color` (solid or gradient).
 - `/api/weekly-compliance` powers the dashboard widget with aggregated schedules, legend entries, and dynamic hour ranges. Frontend work should consume its payload instead of duplicating aggregation logic.
 - Weekly compliance status logic: `/api/weekly-compliance` marks undocumented sessions scheduled for the current day as `missing`; only future days are returned as `upcoming`.
