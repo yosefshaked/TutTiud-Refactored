@@ -42,9 +42,21 @@ function parseMultipartData(req) {
   }
 
   const boundary = boundaryMatch[1];
-  const bodyBuffer = req.rawBody || Buffer.from(req.body);
+  
+  // In Azure Static Web Apps / Azure Functions v4:
+  // - req.body is a string (not Buffer) for binary data
+  // - We need to convert it to Buffer with 'binary' encoding to preserve byte values
+  let bodyBuffer;
+  if (Buffer.isBuffer(req.body)) {
+    bodyBuffer = req.body;
+  } else if (typeof req.body === 'string') {
+    // Azure SWA sends binary data as a latin1/binary string
+    bodyBuffer = Buffer.from(req.body, 'binary');
+  } else {
+    throw new Error(`Unexpected body type: ${typeof req.body}`);
+  }
+  
   const parts = multipart.parse(bodyBuffer, boundary);
-
   return parts;
 }
 
@@ -97,10 +109,23 @@ export default async function (context, req) {
   // Parse multipart data
   let parts;
   try {
+    context.log?.info?.('Attempting to parse multipart data', {
+      contentType: req.headers['content-type'],
+      bodyType: typeof req.body,
+      isBuffer: Buffer.isBuffer(req.body),
+      bodyLength: req.body?.length || 0,
+    });
     parts = parseMultipartData(req);
+    context.log?.info?.('Multipart parsing successful', { partsCount: parts?.length || 0 });
   } catch (error) {
-    context.log?.error?.('Failed to parse multipart data', { message: error?.message });
-    return respond(context, 400, { message: 'invalid_multipart_data' });
+    context.log?.error?.('Failed to parse multipart data', { 
+      message: error?.message,
+      stack: error?.stack,
+      contentType: req.headers['content-type'],
+      bodyType: typeof req.body,
+      isBuffer: Buffer.isBuffer(req.body),
+    });
+    return respond(context, 400, { message: 'invalid_multipart_data', error: error?.message });
   }
 
   // Extract fields

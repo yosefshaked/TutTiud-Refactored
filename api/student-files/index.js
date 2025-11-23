@@ -88,9 +88,21 @@ function parseMultipartData(req) {
   }
 
   const boundary = boundaryMatch[1];
-  const bodyBuffer = req.rawBody || Buffer.from(req.body);
+  
+  // In Azure Static Web Apps / Azure Functions v4:
+  // - req.body is a string (not Buffer) for binary data
+  // - We need to convert it to Buffer with 'binary' encoding to preserve byte values
+  let bodyBuffer;
+  if (Buffer.isBuffer(req.body)) {
+    bodyBuffer = req.body;
+  } else if (typeof req.body === 'string') {
+    // Azure SWA sends binary data as a latin1/binary string
+    bodyBuffer = Buffer.from(req.body, 'binary');
+  } else {
+    throw new Error(`Unexpected body type: ${typeof req.body}`);
+  }
+  
   const parts = multipart.parse(bodyBuffer, boundary);
-
   return parts;
 }
 
