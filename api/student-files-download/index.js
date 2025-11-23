@@ -128,31 +128,10 @@ export default async function (context, req) {
   let driver;
   try {
     if (storageProfile.mode === 'managed') {
-      const hasR2Config = env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_ACCESS_KEY && 
-        env.SYSTEM_R2_SECRET_KEY && env.SYSTEM_R2_BUCKET_NAME;
-      
-      context.log?.info?.('Managed storage config check', {
-        hasEndpoint: !!env.SYSTEM_R2_ENDPOINT,
-        hasAccessKey: !!env.SYSTEM_R2_ACCESS_KEY,
-        hasSecretKey: !!env.SYSTEM_R2_SECRET_KEY,
-        hasBucket: !!env.SYSTEM_R2_BUCKET_NAME,
-        endpoint: env.SYSTEM_R2_ENDPOINT?.substring(0, 30) + '...',
-      });
-      
-      if (!hasR2Config) {
-        throw new Error('Managed storage configured but R2 credentials missing');
-      }
-
-      driver = getStorageDriver('s3', {
-        endpoint: env.SYSTEM_R2_ENDPOINT,
-        region: 'auto',
-        bucket: env.SYSTEM_R2_BUCKET_NAME,
-        accessKeyId: env.SYSTEM_R2_ACCESS_KEY,
-        secretAccessKey: env.SYSTEM_R2_SECRET_KEY,
-      });
+      driver = getStorageDriver('managed', {}, env);
     } else if (storageProfile.mode === 'byos') {
       const byosConfig = storageProfile.byos_config;
-      driver = getStorageDriver(byosConfig.provider, byosConfig);
+      driver = getStorageDriver('byos', byosConfig, env);
     } else {
       throw new Error(`Unknown storage mode: ${storageProfile.mode}`);
     }
