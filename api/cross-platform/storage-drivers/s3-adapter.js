@@ -6,7 +6,8 @@
  * Uses AWS SDK v3 for S3 operations.
  */
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 /**
  * Create S3 storage driver
@@ -88,6 +89,23 @@ export function createS3Driver(config) {
       });
 
       await s3Client.send(command);
+    },
+
+    /**
+     * Get presigned download URL
+     * 
+     * @param {string} path - File path within bucket
+     * @param {number} expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
+     * @returns {Promise<string>} Presigned download URL
+     */
+    async getDownloadUrl(path, expiresIn = 3600) {
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: path,
+      });
+
+      const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+      return presignedUrl;
     },
 
     /**

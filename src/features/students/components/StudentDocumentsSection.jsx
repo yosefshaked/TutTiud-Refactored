@@ -366,6 +366,45 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     [session, orgId, student?.id, onRefresh]
   );
 
+  const handleFileDownload = useCallback(
+    async (fileId) => {
+      if (!session || !orgId || !student?.id) return;
+
+      const token = session.access_token;
+      if (!token) {
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return;
+      }
+
+      try {
+        // Get presigned download URL
+        const response = await fetch(
+          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Supabase-Authorization': `Bearer ${token}`,
+              'x-supabase-authorization': `Bearer ${token}`,
+              'x-supabase-auth': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to get download URL');
+        }
+
+        const { url } = await response.json();
+        window.open(url, '_blank');
+      } catch (error) {
+        console.error('File download failed', error);
+        toast.error(`הורדת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`);
+      }
+    },
+    [session, orgId, student?.id]
+  );
+
   const handleFileInputChange = useCallback(
     (event, definitionId = null) => {
       const file = event.target.files?.[0];
@@ -503,7 +542,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => window.open(file.url, '_blank')}
+                                      onClick={() => handleFileDownload(file.id)}
                                     >
                                       <Download className="h-4 w-4" />
                                     </Button>
@@ -575,7 +614,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => window.open(file.url, '_blank')}
+                                onClick={() => handleFileDownload(file.id)}
                               >
                                 <Download className="h-4 w-4" />
                               </Button>
