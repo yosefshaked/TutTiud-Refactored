@@ -274,7 +274,12 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                               <Select
                                 value={i.instructor_type || '__none__'}
                                 onValueChange={(value) => {
-                                  handleSaveDetails(i, { instructor_type: value === '__none__' ? null : value });
+                                  // Compare BEFORE conversion to detect actual changes
+                                  const currentValue = i.instructor_type || '__none__';
+                                  if (value !== currentValue) {
+                                    const newType = value === '__none__' ? null : value;
+                                    handleSaveDetails(i, { instructor_type: newType });
+                                  }
                                 }}
                                 disabled={isSaving}
                               >
