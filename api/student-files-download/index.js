@@ -152,27 +152,56 @@ export default async function (context, req) {
   // Get display filename
   let displayFilename = file.name;
   
+  context.log?.info?.('Download filename construction', {
+    hasDefinitionId: !!file.definition_id,
+    definitionId: file.definition_id,
+    fileName: file.name,
+    originalName: file.original_name,
+    definitionName: file.definition_name,
+    studentName: student?.name,
+  });
+  
   // For files with definition_id, try to get current definition name first
   if (file.definition_id && student?.name) {
     // Fetch document definitions to get current name (in case definition was renamed)
-    const { data: settingsData } = await controlClient
+    // Note: Settings are in the TENANT DB, not control DB
+    const { data: settingsData } = await tenantClient
       .from('Settings')
       .select('settings_value')
-      .eq('org_id', orgId)
       .eq('settings_key', 'document_definitions')
       .maybeSingle();
+
+    context.log?.info?.('Settings query result', {
+      hasData: !!settingsData,
+      hasValue: !!settingsData?.settings_value,
+      isArray: Array.isArray(settingsData?.settings_value),
+    });
 
     if (settingsData?.settings_value) {
       const definitions = Array.isArray(settingsData.settings_value) ? settingsData.settings_value : [];
       const currentDef = definitions.find(d => d.id === file.definition_id);
       
+      context.log?.info?.('Definition lookup', {
+        totalDefinitions: definitions.length,
+        searchingFor: file.definition_id,
+        found: !!currentDef,
+        foundName: currentDef?.name,
+      });
+      
       // Use current definition name if exists, otherwise fall back to stored definition_name
       const defName = currentDef?.name || file.definition_name;
       if (defName) {
         displayFilename = `${defName} - ${student.name}`;
+        context.log?.info?.('Using definition-based filename', { 
+          defName,
+          studentName: student.name,
+          result: displayFilename,
+        });
       }
     }
   }
+  
+  context.log?.info?.('Final display filename before extension check', { displayFilename });
   
   // Ensure the display name has the correct file extension
   if (displayFilename && file.original_name) {
