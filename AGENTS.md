@@ -510,6 +510,50 @@
   - Tag deletion is permanent; confirmation dialog warns users that operation cannot be undone
   - Full RTL support with proper Hebrew text alignment and flex-row-reverse layouts
 
+### Instructor Types and Document Management (2025-11)
+- **Instructor Types**: Similar to student tags, instructors can be categorized by type (e.g., "Therapist", "Volunteer", "Staff")
+  - Tenant type definitions live in `tuttiud."Settings"` row keyed `instructor_types` (JSONB array of `{ id, name }`)
+  - Database schema: `Instructors.instructor_type` (text) and `Instructors.files` (jsonb) columns added in setup script
+  - Frontend hook: `useInstructorTypes()` (`src/features/instructors/hooks/useInstructorTypes.js`) provides load/create/update/delete operations
+  - Management UI: **Unified `TagsManager.jsx`** in Settings manages both student tags and instructor types via mode toggle
+    - Card renamed to "ניהול תגיות וסיווגים" (Manage Tags and Classifications)
+    - Toggle buttons switch between student tags and instructor types modes
+    - Single component handles CRUD for both entity types with mode-aware UI labels
+  - Instructor editing: `InstructorManager.jsx` includes type selector dropdown in expanded edit form
+- **Dual-Mode Document Definitions**:
+  - `DocumentRulesManager.jsx` now supports both students and instructors via target type selector
+  - Settings keys: `document_definitions` (students) and `instructor_document_definitions` (instructors)
+  - Student documents can be filtered by `target_tags` (student tags)
+  - Instructor documents can be filtered by `target_instructor_types` (instructor types)
+  - If no tags/types specified, document applies to all students/instructors
+  - UI shows appropriate badges and icons (Tag for students, Briefcase for instructors)
+- **File Upload for Instructors**:
+  - Backend endpoints: `/api/instructor-files` (POST/DELETE) and `/api/instructor-files-download` (GET)
+  - Storage path: `instructors/{org_id}/{instructor_id}/{file_id}.{ext}`
+  - **Admin UI**: `InstructorDocumentsSection` component integrated into `InstructorManager` via tabs (Details/Documents)
+  - **Instructor Self-Service**: `MyInstructorDocuments` component in Settings page modal
+    - Modal trigger: "המסמכים שלי" card appears for instructor role (non-admin users)
+    - Modal features: Upload required/additional documents, view/download own files, background progress tracking
+    - No delete capability: Instructors cannot delete files to preserve important documentation
+  - Document validation: Filters by `instructor_type` matching `target_instructor_types` in definitions
+  - Upload features: Background progress tracking, duplicate detection (MD5 hash), Hebrew filename support
+  - File management: Upload, download (presigned URLs), delete (admin-only)
+  - Orphaned files: Files from deleted definitions display with amber badge "הגדרה ישנה"
+  - Storage integration: Works with both managed R2 and BYOS storage profiles
+  - **Permission model** (enforced in backend):
+    - Admin/Owner: Can manage files for all instructors (via `InstructorManager`)
+      - Full CRUD: Upload, download, delete any instructor's files
+    - Instructor (non-admin): Can only upload/download their own files
+      - Upload: ✅ Own files only
+      - Download: ✅ Own files only
+      - Delete: ❌ Blocked (admin-only for data integrity)
+    - `GET /api/instructors`: Non-admin users can only fetch their own instructor record (`builder.eq('id', userId)`)
+    - `POST /api/instructor-files`: Validates `instructorId !== user.id` for non-admins, blocks cross-instructor uploads
+    - `DELETE /api/instructor-files`: Blocked for all non-admin users regardless of file ownership
+    - `GET /api/instructor-files-download`: Validates `instructorId !== userId` for non-admins, blocks cross-instructor downloads
+  - **Data isolation**: Instructors cannot see other instructors' files, names, or technical information; only admins have roster visibility
+  - **Rationale for admin-only deletion**: Files (medical certificates, credentials, etc.) are critical documentation that should only be removed with administrative approval to prevent accidental or unauthorized deletion
+
 ### Session Form Question Types (2025-10)
 - Session form questions are managed via `SessionFormManager.jsx` (Settings page) and rendered in `NewSessionForm.jsx`.
 - Question type definitions in `QUESTION_TYPE_OPTIONS`:

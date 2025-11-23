@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EnhancedDialogHeader } from '@/components/ui/DialogHeader';
-import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff, HardDrive, FileText } from 'lucide-react';
+import { PlugZap, Sparkles, Users, ListChecks, ClipboardList, ShieldCheck, Tag, EyeOff, HardDrive, FileText, Briefcase } from 'lucide-react';
 import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
@@ -17,6 +17,7 @@ import TagsManager from '@/components/settings/TagsManager.jsx';
 import StudentVisibilitySettings from '@/components/settings/StudentVisibilitySettings.jsx';
 import StorageSettingsCard from '@/components/settings/StorageSettingsCard.jsx';
 import DocumentRulesManager from '@/components/settings/DocumentRulesManager.jsx';
+import MyInstructorDocuments from '@/components/settings/MyInstructorDocuments.jsx';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -507,7 +508,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Tags Manager Card */}
+          {/* Tags and Types Manager Card */}
           <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
             <CardHeader className="space-y-2 pb-3 flex-1">
               <div className="flex items-start gap-2">
@@ -515,11 +516,11 @@ export default function Settings() {
                   <Tag className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <CardTitle className="text-lg font-bold text-slate-900">
-                  ניהול תגיות
+                  ניהול תגיות וסיווגים
                 </CardTitle>
               </div>
               <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
-                יצירה, עריכה ומחיקה של תגיות לסיווג ותיוג תלמידים
+                ניהול תגיות לתלמידים וסיווגים למדריכים
               </p>
             </CardHeader>
             <CardContent className="pt-0 mt-auto">
@@ -530,7 +531,7 @@ export default function Settings() {
                 disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
                 variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
               >
-                <Tag className="h-4 w-4" /> ניהול תגיות
+                <Tag className="h-4 w-4" /> ניהול תגיות וסיווגים
               </Button>
             </CardContent>
           </Card>
@@ -599,6 +600,40 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Instructor Documents - For instructors to view/upload their own files */}
+          {!canManageSessionForm && activeOrgHasConnection && tenantClientReady && (
+            <Card dir="rtl">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-blue-100 p-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <CardTitle>המסמכים שלי</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        צפייה והעלאת מסמכים אישיים
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  הצג והעלה מסמכים נדרשים ומסמכים נוספים.
+                </p>
+                <Button
+                  onClick={() => setSelectedModule('myDocuments')}
+                  disabled={!activeOrgHasConnection || !tenantClientReady}
+                  variant={(!activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+                >
+                  <FileText className="ml-2 h-4 w-4" />
+                  ניהול המסמכים שלי
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
         )}
 
@@ -618,6 +653,7 @@ export default function Settings() {
                 selectedModule === 'studentVisibility' ? <EyeOff /> :
                 selectedModule === 'storage' ? <HardDrive /> :
                 selectedModule === 'documents' ? <FileText /> :
+                selectedModule === 'myDocuments' ? <FileText /> :
                 null
               }
               title={
@@ -628,10 +664,11 @@ export default function Settings() {
                 selectedModule === 'instructors' ? 'ניהול מדריכים' :
                 selectedModule === 'backup' ? 'גיבוי ושחזור' :
                 selectedModule === 'logo' ? 'לוגו מותאם אישית' :
-                selectedModule === 'tags' ? 'ניהול תגיות' :
+                selectedModule === 'tags' ? 'ניהול תגיות וסיווגים' :
                 selectedModule === 'studentVisibility' ? 'תצוגת תלמידים לא פעילים' :
                 selectedModule === 'storage' ? 'הגדרות אחסון' :
                 selectedModule === 'documents' ? 'ניהול מסמכים' :
+                selectedModule === 'myDocuments' ? 'המסמכים שלי' :
                 ''
               }
               onClose={() => setSelectedModule(null)}
@@ -696,6 +733,9 @@ export default function Settings() {
                 )}
                 {selectedModule === 'documents' && (
                   <DocumentRulesManager session={session} orgId={activeOrgId} />
+                )}
+                {selectedModule === 'myDocuments' && (
+                  <MyInstructorDocuments session={session} orgId={activeOrgId} userId={user?.id} />
                 )}
               </div>
             </div>

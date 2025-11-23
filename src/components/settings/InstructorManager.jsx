@@ -3,9 +3,19 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronUp, Loader2, UserPlus, UserX, Save } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChevronDown, ChevronUp, Loader2, UserPlus, UserX, Save, FileText, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
+import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
+import InstructorDocumentsSection from '@/components/settings/InstructorDocumentsSection.jsx';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 const SAVE = { idle: 'idle', saving: 'saving', error: 'error' };
@@ -21,6 +31,8 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
   const [expanded, setExpanded] = useState({});
   const toggleExpanded = (id) => setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
 
+  const { typeOptions, loadTypes } = useInstructorTypes();
+
   const instructorMap = useMemo(() => new Map(instructors.map((i) => [i.id, i])), [instructors]);
 
   const loadAll = useCallback(async () => {
@@ -33,8 +45,14 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
     setLoadError('');
     try {
       const params = new URLSearchParams({ org_id: orgId });
-      const dir = await authenticatedFetch(`directory?${params.toString()}`, { session });
-      const roster = await authenticatedFetch(`instructors?${params.toString()}&include_inactive=true`, { session });
+      const [dir, roster] = await Promise.all([
+        authenticatedFetch(`directory?${params.toString()}`, { session }),
+        authenticatedFetch(`instructors?${params.toString()}&include_inactive=true`, { session }),
+      ]);
+      
+      // Load instructor types
+      await loadTypes();
+      
       setMembers(Array.isArray(dir?.members) ? dir.members : []);
       setInstructors(Array.isArray(roster) ? roster : []);
       setLoadState(REQUEST.idle);
@@ -45,7 +63,7 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
       setMembers([]);
       setInstructors([]);
     }
-  }, [canLoad, orgId, session]);
+  }, [canLoad, orgId, session, loadTypes]);
 
   useEffect(() => {
     loadAll();
@@ -203,57 +221,103 @@ export default function InstructorManager({ session, orgId, activeOrgHasConnecti
                         </div>
                       </div>
                       <div id={`inst-editor-${i.id}`} hidden={!expanded[i.id]} className="mt-2 space-y-2">
-                        <div className="flex flex-wrap items-start gap-2">
-                          <div className="w-full sm:min-w-[260px] sm:flex-1">
-                            <Label htmlFor={`inst-name-${i.id}`} className="text-xs text-slate-600">שם</Label>
-                            <Input
-                              id={`inst-name-${i.id}`}
-                              placeholder="שם המדריך"
-                              className="h-10"
-                              defaultValue={i.name || ''}
-                              onBlur={(e) => {
-                                const val = e.target.value.trim();
-                                if (val !== (i.name || '')) {
-                                  handleSaveDetails(i, { name: val || null });
-                                }
-                              }}
-                              disabled={isSaving}
+                        <Tabs defaultValue="details" className="w-full" dir="rtl">
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="details" className="gap-2">
+                              <User className="h-4 w-4" />
+                              פרטים
+                            </TabsTrigger>
+                            <TabsTrigger value="documents" className="gap-2">
+                              <FileText className="h-4 w-4" />
+                              מסמכים
+                            </TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="details" className="mt-4 space-y-2">
+                            <div className="flex flex-wrap items-start gap-2">
+                              <div className="w-full sm:min-w-[260px] sm:flex-1">
+                                <Label htmlFor={`inst-name-${i.id}`} className="text-xs text-slate-600">שם</Label>
+                                <Input
+                                  id={`inst-name-${i.id}`}
+                                  placeholder="שם המדריך"
+                                  className="h-10"
+                                  defaultValue={i.name || ''}
+                                  onBlur={(e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (i.name || '')) {
+                                      handleSaveDetails(i, { name: val || null });
+                                    }
+                                  }}
+                                  disabled={isSaving}
+                                />
+                                <div className="mt-1 text-xs text-slate-500">{i.email || '—'}</div>
+                              </div>
+                              <div>
+                                <Label htmlFor={`inst-phone-${i.id}`} className="text-xs text-slate-600">טלפון</Label>
+                                <Input
+                                  id={`inst-phone-${i.id}`}
+                                  placeholder="טלפון"
+                                  className="h-10 w-32 sm:w-40"
+                                  defaultValue={i.phone || ''}
+                                  onBlur={(e) => {
+                                    const val = e.target.value.trim();
+                                    if (val !== (i.phone || '')) {
+                                      handleSaveDetails(i, { phone: val || null });
+                                    }
+                                  }}
+                                  disabled={isSaving}
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <Label htmlFor={`inst-type-${i.id}`} className="text-xs text-slate-600">סוג מדריך</Label>
+                              <Select
+                                value={i.instructor_type || ''}
+                                onValueChange={(value) => {
+                                  handleSaveDetails(i, { instructor_type: value || null });
+                                }}
+                                disabled={isSaving}
+                              >
+                                <SelectTrigger id={`inst-type-${i.id}`} className="h-10 mt-1" dir="rtl">
+                                  <SelectValue placeholder="בחר סוג מדריך..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">ללא סיווג</SelectItem>
+                                  {typeOptions.map((type) => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      {type.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor={`inst-notes-${i.id}`} className="text-xs text-slate-600">הערות</Label>
+                              <textarea
+                                id={`inst-notes-${i.id}`}
+                                className="mt-1 w-full resize-y rounded-md border p-2 text-sm"
+                                rows={2}
+                                defaultValue={i.notes || ''}
+                                onBlur={(e) => {
+                                  const val = e.target.value.trim();
+                                  if (val !== (i.notes || '')) {
+                                    handleSaveDetails(i, { notes: val || null });
+                                  }
+                                }}
+                                disabled={isSaving}
+                              />
+                            </div>
+                          </TabsContent>
+
+                          <TabsContent value="documents" className="mt-4">
+                            <InstructorDocumentsSection
+                              instructor={i}
+                              session={session}
+                              orgId={orgId}
+                              onRefresh={loadAll}
                             />
-                            <div className="mt-1 text-xs text-slate-500">{i.email || '—'}</div>
-                          </div>
-                          <div>
-                            <Label htmlFor={`inst-phone-${i.id}`} className="text-xs text-slate-600">טלפון</Label>
-                            <Input
-                              id={`inst-phone-${i.id}`}
-                              placeholder="טלפון"
-                              className="h-10 w-32 sm:w-40"
-                              defaultValue={i.phone || ''}
-                              onBlur={(e) => {
-                                const val = e.target.value.trim();
-                                if (val !== (i.phone || '')) {
-                                  handleSaveDetails(i, { phone: val || null });
-                                }
-                              }}
-                              disabled={isSaving}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor={`inst-notes-${i.id}`} className="text-xs text-slate-600">הערות</Label>
-                          <textarea
-                            id={`inst-notes-${i.id}`}
-                            className="mt-1 w-full resize-y rounded-md border p-2 text-sm"
-                            rows={2}
-                            defaultValue={i.notes || ''}
-                            onBlur={(e) => {
-                              const val = e.target.value.trim();
-                              if (val !== (i.notes || '')) {
-                                handleSaveDetails(i, { notes: val || null });
-                              }
-                            }}
-                            disabled={isSaving}
-                          />
-                        </div>
+                          </TabsContent>
+                        </Tabs>
                       </div>
                     </div>
                   ))}

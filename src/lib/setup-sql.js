@@ -17,6 +17,11 @@ ALTER TABLE tuttiud."Instructors"
   ALTER COLUMN "id" DROP DEFAULT;
 ALTER TABLE tuttiud."Instructors"
   DROP CONSTRAINT IF EXISTS "Instructors_id_fkey";
+
+-- Ensure instructor_type and files columns exist (idempotent)
+ALTER TABLE tuttiud."Instructors"
+  ADD COLUMN IF NOT EXISTS "instructor_type" text,
+  ADD COLUMN IF NOT EXISTS "files" jsonb;
 CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" text NOT NULL,

@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { FileText, Plus, Trash2, Pencil, Loader2, AlertCircle, Tag, X } from 'lucide-react';
+import { FileText, Plus, Trash2, Pencil, Loader2, AlertCircle, Tag, X, Users, Briefcase } from 'lucide-react';
 import { fetchSettingsValue, upsertSettings } from '@/features/settings/api/settings.js';
 import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
+import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
 import {
   Select,
   SelectContent,
@@ -30,11 +31,13 @@ function generateId() {
 export default function DocumentRulesManager({ session, orgId }) {
   const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
   const [saveState, setSaveState] = useState(REQUEST_STATE.idle);
+  const [targetType, setTargetType] = useState('students'); // 'students' or 'instructors'
   const [definitions, setDefinitions] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', is_mandatory: false, target_tags: [] });
+  const [editForm, setEditForm] = useState({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [] });
   
   const { tagOptions: rawTagOptions, loadingTags, loadTags } = useStudentTags();
+  const { typeOptions: rawTypeOptions, loadingTypes, loadTypes } = useInstructorTypes();
   
   // Transform tags from { id, name } to { value, label } for Select component
   const tagOptions = React.useMemo(() => {
@@ -44,24 +47,37 @@ export default function DocumentRulesManager({ session, orgId }) {
     }));
   }, [rawTagOptions]);
 
+  // Instructor type options (already in correct format from hook)
+  const typeOptions = rawTypeOptions;
+
   const canAct = Boolean(session && orgId);
 
-  // Load document definitions and tags
+  // Determine which settings key to use based on target type
+  const settingsKey = targetType === 'students' ? 'document_definitions' : 'instructor_document_definitions';
+
+  // Load document definitions and tags/types
   useEffect(() => {
     if (!canAct) return;
 
     const loadData = async () => {
       setLoadState(REQUEST_STATE.loading);
       try {
-        // Load both definitions and tags in parallel
-        const [{ value }, tags] = await Promise.all([
+        // Load definitions and appropriate metadata (tags or types)
+        const promises = [
           fetchSettingsValue({
             session,
             orgId,
-            key: 'document_definitions',
+            key: settingsKey,
           }),
-          loadTags(),
-        ]);
+        ];
+
+        if (targetType === 'students') {
+          promises.push(loadTags());
+        } else {
+          promises.push(loadTypes());
+        }
+
+        const [{ value }] = await Promise.all(promises);
 
         const parsed = Array.isArray(value) ? value : [];
         setDefinitions(parsed);
@@ -74,7 +90,7 @@ export default function DocumentRulesManager({ session, orgId }) {
     };
 
     loadData();
-  }, [canAct, session, orgId, loadTags]);
+  }, [canAct, session, orgId, settingsKey, targetType, loadTags, loadTypes]);
 
   const handleSave = useCallback(async () => {
     if (!canAct) return;
@@ -86,7 +102,7 @@ export default function DocumentRulesManager({ session, orgId }) {
         session,
         orgId,
         settings: {
-          document_definitions: definitions,
+          [settingsKey]: definitions,
         },
       });
 
@@ -97,23 +113,34 @@ export default function DocumentRulesManager({ session, orgId }) {
       toast.error(error?.message || 'שמירת הגדרות המסמכים נכשלה');
       setSaveState(REQUEST_STATE.error);
     }
-  }, [canAct, session, orgId, definitions]);
+  }, [canAct, session, orgId, definitions, settingsKey]);
 
   const handleAdd = useCallback(() => {
     const newDef = {
       id: generateId(),
       name: 'מסמך חדש',
       is_mandatory: false,
-      target_tags: [],
+      target_tags: targetType === 'students' ? [] : undefined,
+      target_instructor_types: targetType === 'instructors' ? [] : undefined,
     };
     setDefinitions((prev) => [...prev, newDef]);
     setEditingId(newDef.id);
-    setEditForm({ name: newDef.name, is_mandatory: newDef.is_mandatory, target_tags: newDef.target_tags });
-  }, []);
+    setEditForm({
+      name: newDef.name,
+      is_mandatory: newDef.is_mandatory,
+      target_tags: newDef.target_tags || [],
+      target_instructor_types: newDef.target_instructor_types || [],
+    });
+  }, [targetType]);
 
   const handleEdit = useCallback((def) => {
     setEditingId(def.id);
-    setEditForm({ name: def.name, is_mandatory: def.is_mandatory, target_tags: def.target_tags });
+    setEditForm({
+      name: def.name,
+      is_mandatory: def.is_mandatory,
+      target_tags: def.target_tags || [],
+      target_instructor_types: def.target_instructor_types || [],
+    });
   }, []);
 
   const handleSaveEdit = useCallback(() => {
@@ -125,17 +152,23 @@ export default function DocumentRulesManager({ session, orgId }) {
     setDefinitions((prev) =>
       prev.map((d) =>
         d.id === editingId
-          ? { ...d, name: editForm.name.trim(), is_mandatory: editForm.is_mandatory, target_tags: editForm.target_tags }
+          ? {
+              ...d,
+              name: editForm.name.trim(),
+              is_mandatory: editForm.is_mandatory,
+              target_tags: targetType === 'students' ? editForm.target_tags : undefined,
+              target_instructor_types: targetType === 'instructors' ? editForm.target_instructor_types : undefined,
+            }
           : d
       )
     );
     setEditingId(null);
-    setEditForm({ name: '', is_mandatory: false, target_tags: [] });
-  }, [editingId, editForm]);
+    setEditForm({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [] });
+  }, [editingId, editForm, targetType]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingId(null);
-    setEditForm({ name: '', is_mandatory: false, target_tags: [] });
+    setEditForm({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [] });
   }, []);
 
   const handleDelete = useCallback((id) => {
@@ -155,10 +188,27 @@ export default function DocumentRulesManager({ session, orgId }) {
     }));
   }, []);
 
+  const handleAddType = useCallback((typeId) => {
+    if (!typeId || editForm.target_instructor_types.includes(typeId)) return;
+    setEditForm((prev) => ({ ...prev, target_instructor_types: [...prev.target_instructor_types, typeId] }));
+  }, [editForm.target_instructor_types]);
+
+  const handleRemoveType = useCallback((typeId) => {
+    setEditForm((prev) => ({
+      ...prev,
+      target_instructor_types: prev.target_instructor_types.filter((id) => id !== typeId),
+    }));
+  }, []);
+
   const getTagName = useCallback((tagId) => {
     const tag = tagOptions.find((t) => t.value === tagId);
     return tag?.label || tagId;
   }, [tagOptions]);
+
+  const getTypeName = useCallback((typeId) => {
+    const type = typeOptions.find((t) => t.value === typeId);
+    return type?.label || typeId;
+  }, [typeOptions]);
 
   if (loadState === REQUEST_STATE.loading) {
     return (
@@ -190,10 +240,40 @@ export default function DocumentRulesManager({ session, orgId }) {
           הגדרות מסמכים נדרשים
         </CardTitle>
         <p className="text-sm text-slate-600 mt-2">
-          הגדרת רשימת מסמכים תקניים ומחויבים עבור תלמידי הארגון
+          הגדרת רשימת מסמכים תקניים ומחויבים עבור תלמידים או מדריכים בארגון
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Target Type Selector */}
+        <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+          <Button
+            variant={targetType === 'students' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setTargetType('students');
+              setDefinitions([]);
+              setEditingId(null);
+            }}
+            className="flex-1 gap-2"
+          >
+            <Users className="h-4 w-4" />
+            תלמידים
+          </Button>
+          <Button
+            variant={targetType === 'instructors' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setTargetType('instructors');
+              setDefinitions([]);
+              setEditingId(null);
+            }}
+            className="flex-1 gap-2"
+          >
+            <Briefcase className="h-4 w-4" />
+            מדריכים
+          </Button>
+        </div>
+        
         {/* Definitions List */}
         {definitions.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
@@ -233,56 +313,108 @@ export default function DocumentRulesManager({ session, orgId }) {
                       <Label htmlFor={`mandatory-${def.id}`}>מסמך חובה</Label>
                     </div>
                     
-                    {/* Tag Selector */}
-                    <div>
-                      <Label className="block text-right mb-2">תגיות יעד (אופציונלי)</Label>
-                      <p className="text-xs text-slate-500 mb-2 text-right">
-                        אם לא נבחרו תגיות, המסמך יחול על כל התלמידים
-                      </p>
-                      
-                      {/* Selected Tags */}
-                      {editForm.target_tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2" dir="rtl">
-                          {editForm.target_tags.map((tagId) => (
-                            <Badge key={tagId} variant="secondary" className="gap-1">
-                              <Tag className="h-3 w-3" />
-                              {getTagName(tagId)}
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveTag(tagId)}
-                                className="hover:bg-slate-300 rounded-full p-0.5"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Tag Dropdown */}
-                      <Select onValueChange={handleAddTag} value="">
-                        <SelectTrigger dir="rtl">
-                          <SelectValue placeholder="הוסף תגית..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {loadingTags ? (
-                            <div className="p-2 text-center text-sm text-slate-500">טוען תגיות...</div>
-                          ) : tagOptions.length === 0 ? (
-                            <div className="p-2 text-center text-sm text-slate-500">
-                              לא נמצאו תגיות. צור תגיות דרך כרטיס "ניהול תגיות" בהגדרות.
-                            </div>
-                          ) : (
-                            tagOptions
-                              .filter((tag) => !editForm.target_tags.includes(tag.value))
-                              .map((tag) => (
-                                <SelectItem key={tag.value} value={tag.value}>
-                                  {tag.label}
-                                </SelectItem>
-                              ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {/* Tag/Type Selector - Conditional based on target type */}
+                    {targetType === 'students' ? (
+                      <div>
+                        <Label className="block text-right mb-2">תגיות יעד (אופציונלי)</Label>
+                        <p className="text-xs text-slate-500 mb-2 text-right">
+                          אם לא נבחרו תגיות, המסמך יחול על כל התלמידים
+                        </p>
+                        
+                        {/* Selected Tags */}
+                        {editForm.target_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2" dir="rtl">
+                            {editForm.target_tags.map((tagId) => (
+                              <Badge key={tagId} variant="secondary" className="gap-1">
+                                <Tag className="h-3 w-3" />
+                                {getTagName(tagId)}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveTag(tagId)}
+                                  className="hover:bg-slate-300 rounded-full p-0.5"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Tag Dropdown */}
+                        <Select onValueChange={handleAddTag} value="">
+                          <SelectTrigger dir="rtl">
+                            <SelectValue placeholder="הוסף תגית..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {loadingTags ? (
+                              <div className="p-2 text-center text-sm text-slate-500">טוען תגיות...</div>
+                            ) : tagOptions.length === 0 ? (
+                              <div className="p-2 text-center text-sm text-slate-500">
+                                לא נמצאו תגיות. צור תגיות דרך כרטיס "ניהול תגיות" בהגדרות.
+                              </div>
+                            ) : (
+                              tagOptions
+                                .filter((tag) => !editForm.target_tags.includes(tag.value))
+                                .map((tag) => (
+                                  <SelectItem key={tag.value} value={tag.value}>
+                                    {tag.label}
+                                  </SelectItem>
+                                ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label className="block text-right mb-2">סוגי מדריכים יעד (אופציונלי)</Label>
+                        <p className="text-xs text-slate-500 mb-2 text-right">
+                          אם לא נבחרו סוגים, המסמך יחול על כל המדריכים
+                        </p>
+                        
+                        {/* Selected Types */}
+                        {editForm.target_instructor_types.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2" dir="rtl">
+                            {editForm.target_instructor_types.map((typeId) => (
+                              <Badge key={typeId} variant="secondary" className="gap-1">
+                                <Briefcase className="h-3 w-3" />
+                                {getTypeName(typeId)}
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveType(typeId)}
+                                  className="hover:bg-slate-300 rounded-full p-0.5"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Type Dropdown */}
+                        <Select onValueChange={handleAddType} value="">
+                          <SelectTrigger dir="rtl">
+                            <SelectValue placeholder="הוסף סוג מדריך..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {loadingTypes ? (
+                              <div className="p-2 text-center text-sm text-slate-500">טוען סוגים...</div>
+                            ) : typeOptions.length === 0 ? (
+                              <div className="p-2 text-center text-sm text-slate-500">
+                                לא נמצאו סוגי מדריכים. צור סוגים דרך כרטיס "ניהול סוגי מדריכים" בהגדרות.
+                              </div>
+                            ) : (
+                              typeOptions
+                                .filter((type) => !editForm.target_instructor_types.includes(type.value))
+                                .map((type) => (
+                                  <SelectItem key={type.value} value={type.value}>
+                                    {type.label}
+                                  </SelectItem>
+                                ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     
                     <div className="flex gap-2">
                       <Button size="sm" onClick={handleSaveEdit}>
@@ -309,17 +441,34 @@ export default function DocumentRulesManager({ session, orgId }) {
                             אופציונלי
                           </Badge>
                         )}
-                        {def.target_tags && def.target_tags.length > 0 ? (
-                          def.target_tags.map((tagId) => (
-                            <Badge key={tagId} variant="outline" className="text-xs gap-1">
-                              <Tag className="h-3 w-3" />
-                              {getTagName(tagId)}
+                        
+                        {/* Show tags for students, types for instructors */}
+                        {targetType === 'students' ? (
+                          def.target_tags && def.target_tags.length > 0 ? (
+                            def.target_tags.map((tagId) => (
+                              <Badge key={tagId} variant="outline" className="text-xs gap-1">
+                                <Tag className="h-3 w-3" />
+                                {getTagName(tagId)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              כל התלמידים
                             </Badge>
-                          ))
+                          )
                         ) : (
-                          <Badge variant="outline" className="text-xs">
-                            כל התלמידים
-                          </Badge>
+                          def.target_instructor_types && def.target_instructor_types.length > 0 ? (
+                            def.target_instructor_types.map((typeId) => (
+                              <Badge key={typeId} variant="outline" className="text-xs gap-1">
+                                <Briefcase className="h-3 w-3" />
+                                {getTypeName(typeId)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              כל המדריכים
+                            </Badge>
+                          )
                         )}
                       </div>
                     </div>
