@@ -16,6 +16,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
+import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 
 export default async function (context, req) {
   // Log IMMEDIATELY to confirm function is called
@@ -102,11 +103,14 @@ export default async function (context, req) {
     return respond(context, 400, { message: 'storage_not_configured' });
   }
 
+  // Decrypt BYOS credentials if present
+  const decryptedProfile = decryptStorageProfile(storageProfile, env);
+
   // Handle disconnected storage
-  if (storageProfile.disconnected === true) {
+  if (decryptedProfile.disconnected === true) {
     // For BYOS: Allow read-only access if user still has access to their storage
     // For managed: Only allow during grace period (check storage_access_level)
-    if (storageProfile.mode === 'managed') {
+    if (decryptedProfile.mode === 'managed') {
       const accessLevel = orgSettings?.permissions?.storage_access_level;
       if (accessLevel !== 'read_only_grace') {
         return respond(context, 403, { 
@@ -146,13 +150,12 @@ export default async function (context, req) {
   // Get storage driver
   let driver;
   try {
-    if (storageProfile.mode === 'managed') {
+    if (decryptedProfile.mode === 'managed') {
       driver = getStorageDriver('managed', {}, env);
-    } else if (storageProfile.mode === 'byos') {
-      const byosConfig = storageProfile.byos_config;
-      driver = getStorageDriver('byos', byosConfig, env);
+    } else if (decryptedProfile.mode === 'byos') {
+      driver = getStorageDriver('byos', decryptedProfile.byos, env);
     } else {
-      throw new Error(`Unknown storage mode: ${storageProfile.mode}`);
+      throw new Error(`Unknown storage mode: ${decryptedProfile.mode}`);
     }
   } catch (driverError) {
     context.log?.error?.('Failed to create storage driver', { message: driverError?.message });

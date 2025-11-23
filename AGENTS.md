@@ -148,6 +148,13 @@
 - **Storage profile** is a cross-system capability stored in `org_settings.storage_profile` (control DB).
   - Supports two modes: **BYOS** (Bring Your Own Storage) and **Managed Storage**
   - System-agnostic design: reusable by TutTiud, Farm Management System, and future systems
+- **BYOS credentials encryption** (`api/_shared/storage-encryption.js`):
+  - Encrypts `accessKeyId` and `secretAccessKey` before storing in database
+  - Uses AES-256-GCM authenticated encryption (same as tenant credentials)
+  - Encrypted format: `v1:gcm:iv:authTag:cipherText` (base64-encoded)
+  - Decrypts automatically when loading storage profile
+  - Uses same encryption key as org credentials (`APP_ORG_CREDENTIALS_ENCRYPTION_KEY`)
+  - Public fields (provider, endpoint, bucket, region) stored unencrypted for admin visibility
 - Control DB schema: run `scripts/control-db-storage-profile-schema.sql` to add `storage_profile` JSONB column
 - **Shared validation module**: `api/cross-platform/storage-config/`
   - `validateStorageProfile(profile)` - validates complete profile structure

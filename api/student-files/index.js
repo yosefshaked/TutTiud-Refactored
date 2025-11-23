@@ -24,6 +24,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
+import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 import multipart from 'parse-multipart-data';
 import crypto from 'crypto';
 
@@ -280,8 +281,11 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'storage_not_configured' });
     }
 
+    // Decrypt BYOS credentials if present
+    const decryptedProfile = decryptStorageProfile(storageProfile, env);
+
     // Block uploads if storage is disconnected
-    if (storageProfile.disconnected === true) {
+    if (decryptedProfile.disconnected === true) {
       return respond(context, 403, { 
         message: 'storage_disconnected',
         details: 'Storage is disconnected. Please reconnect or reconfigure storage to upload files.'
@@ -297,13 +301,13 @@ export default async function (context, req) {
     const extension = filenameParts.length > 1 && filenameParts[filenameParts.length - 1] 
       ? filenameParts[filenameParts.length - 1] 
       : 'bin';
-    const filePath = buildFilePath(storageProfile.mode, orgId, studentId, fileId, extension);
+    const filePath = buildFilePath(decryptedProfile.mode, orgId, studentId, fileId, extension);
     const contentType = filePart.type || 'application/octet-stream';
 
     // Get storage driver
     let driver;
     try {
-      if (storageProfile.mode === 'managed') {
+      if (decryptedProfile.mode === 'managed') {
         // Check for required R2 environment variables
         const hasR2Config = env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_ACCESS_KEY && 
                            env.SYSTEM_R2_SECRET_KEY && env.SYSTEM_R2_BUCKET_NAME;
@@ -315,11 +319,11 @@ export default async function (context, req) {
           });
         }
         driver = getStorageDriver('managed', null, env);
-      } else if (storageProfile.mode === 'byos') {
-        if (!storageProfile.byos) {
+      } else if (decryptedProfile.mode === 'byos') {
+        if (!decryptedProfile.byos) {
           return respond(context, 400, { message: 'byos_config_missing' });
         }
-        driver = getStorageDriver('byos', storageProfile.byos, env);
+        driver = getStorageDriver('byos', decryptedProfile.byos, env);
       } else {
         return respond(context, 400, { message: 'invalid_storage_mode' });
       }

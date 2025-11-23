@@ -22,6 +22,7 @@ import {
   normalizeStorageProfile,
 } from '../cross-platform/storage-config/index.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
+import { encryptStorageProfile, decryptStorageProfile } from '../_shared/storage-encryption.js';
 
 export default async function (context, req) {
   context.log?.info?.('org-settings/storage: request received', { method: req.method });
@@ -98,18 +99,21 @@ export default async function (context, req) {
 
     const storageProfile = orgSettings?.storage_profile || null;
 
+    // Decrypt BYOS credentials before sending to client
+    const decryptedProfile = storageProfile ? decryptStorageProfile(storageProfile, env) : null;
+
     // Check if disconnected
-    const isDisconnected = storageProfile?.disconnected === true;
+    const isDisconnected = decryptedProfile?.disconnected === true;
 
     context.log?.info?.('org-settings/storage loaded successfully', { 
       orgId,
-      hasProfile: Boolean(storageProfile),
-      mode: storageProfile?.mode || null,
+      hasProfile: Boolean(decryptedProfile),
+      mode: decryptedProfile?.mode || null,
       disconnected: isDisconnected,
     });
 
     return respond(context, 200, {
-      storage_profile: storageProfile,
+      storage_profile: decryptedProfile,
       is_disconnected: isDisconnected,
     }, { 'Cache-Control': 'private, max-age=60' });
   }
@@ -157,11 +161,14 @@ export default async function (context, req) {
       updated_by: userId,
     };
 
+    // Encrypt BYOS credentials before saving to database
+    const encryptedProfile = encryptStorageProfile(profileToSave, env);
+
     // Update the existing org_settings row (row must exist if user can access the app)
     const { error: updateError } = await supabase
       .from('org_settings')
       .update({
-        storage_profile: profileToSave,
+        storage_profile: encryptedProfile,
         updated_at: new Date().toISOString(),
       })
       .eq('org_id', orgId);
