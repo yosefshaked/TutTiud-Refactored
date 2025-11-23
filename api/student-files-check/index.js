@@ -171,11 +171,20 @@ export default async function (context, req) {
   // Check for duplicate files across ALL students
   const { data: allStudents, error: studentsError } = await tenantClient
     .from('Students')
-    .select('id, first_name, last_name, files');
+    .select('id, name, files');
 
   if (studentsError) {
-    context.log?.error?.('Failed to fetch students for duplicate check', { message: studentsError.message });
-    return respond(context, 500, { message: 'failed_to_check_duplicates' });
+    context.log?.error?.('Failed to fetch students for duplicate check', { 
+      message: studentsError.message,
+      code: studentsError.code,
+      details: studentsError.details,
+      hint: studentsError.hint,
+      orgId,
+    });
+    return respond(context, 500, { 
+      message: 'failed_to_check_duplicates',
+      error: studentsError.message,
+    });
   }
 
   // Find duplicates by hash
@@ -189,7 +198,7 @@ export default async function (context, req) {
           file_name: file.name,
           uploaded_at: file.uploaded_at,
           student_id: student.id,
-          student_name: `${student.first_name} ${student.last_name}`.trim(),
+          student_name: student.name,
         });
       }
     }
