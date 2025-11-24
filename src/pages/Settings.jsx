@@ -83,7 +83,7 @@ export default function Settings() {
     fetchAndInitializePermissions();
   }, [activeOrgId, authClient, refreshOrganizations]);
 
-  // Check if current user is an instructor
+  // Check if current user is an instructor (with caching)
   useEffect(() => {
     if (!user?.id || !session || !tenantClientReady || !activeOrgId) {
       console.log('[Settings] Instructor check skipped:', {
@@ -97,6 +97,24 @@ export default function Settings() {
     }
 
     const checkInstructorStatus = async () => {
+      const cacheKey = `instructor_status_${activeOrgId}_${user.id}`;
+      
+      // Check cache first (valid for 5 minutes)
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const { isInstructor: cachedValue, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+          if (age < 5 * 60 * 1000) { // 5 minutes
+            console.log('[Settings] Using cached instructor status:', cachedValue);
+            setIsInstructor(cachedValue);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[Settings] Cache read error:', e);
+      }
+
       try {
         console.log('[Settings] Checking instructor status for user:', user.id);
         const response = await fetch(`/api/instructors?org_id=${activeOrgId}`, {
@@ -120,6 +138,16 @@ export default function Settings() {
             instructors.some(instructor => instructor.id === user.id);
           console.log('[Settings] Is instructor:', isInstructorRecord);
           setIsInstructor(isInstructorRecord);
+          
+          // Cache the result
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+              isInstructor: isInstructorRecord,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            console.warn('[Settings] Cache write error:', e);
+          }
         } else {
           console.log('[Settings] Instructors API failed:', response.status, response.statusText);
           setIsInstructor(false);

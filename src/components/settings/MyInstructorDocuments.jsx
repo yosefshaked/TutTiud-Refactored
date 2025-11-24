@@ -61,24 +61,21 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
         
         // Load instructor record (filtered to current user by backend)
         console.log('[MyInstructorDocuments] Loading instructor data for userId:', userId);
-        const instructorsResponse = await authenticatedFetch(
-          `instructors?org_id=${orgId}`,
+        const instructors = await authenticatedFetch(
+          'instructors',
           {
             session,
             method: 'GET',
+            query: { org_id: orgId }
           }
         );
-        console.log('[MyInstructorDocuments] Instructors response status:', instructorsResponse.status);
+        console.log('[MyInstructorDocuments] Instructors loaded:', instructors);
 
-        if (!instructorsResponse.ok) {
-          throw new Error('Failed to load instructor data');
-        }
-
-        const instructors = await instructorsResponse.json();
         const myInstructor = Array.isArray(instructors) && instructors.length > 0 ? instructors[0] : null;
         
         if (!myInstructor) {
           toast.error('לא נמצא רשומת מדריך עבור המשתמש');
+          setLoading(false);
           return;
         }
 
@@ -111,19 +108,15 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
     if (!session || !orgId) return;
 
     try {
-      const response = await authenticatedFetch(
-        `instructors?org_id=${orgId}`,
+      const instructors = await authenticatedFetch(
+        'instructors',
         {
           session,
           method: 'GET',
+          query: { org_id: orgId }
         }
       );
 
-      if (!response.ok) {
-        throw new Error('Failed to reload instructor data');
-      }
-
-      const instructors = await response.json();
       const myInstructor = Array.isArray(instructors) && instructors.length > 0 ? instructors[0] : null;
       
       if (myInstructor) {
