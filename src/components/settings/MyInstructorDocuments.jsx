@@ -381,22 +381,22 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
               const isMissing = files.length === 0;
               
               return (
-                <div key={definition.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-medium">{definition.label}</h3>
-                        {definition.is_mandatory && (
-                          <Badge variant="destructive" className="text-xs">
-                            חובה
-                          </Badge>
-                        )}
-                        {isMissing && definition.is_mandatory && (
-                          <Badge variant="outline" className="text-xs border-amber-600 text-amber-700">
-                            חסר
-                          </Badge>
-                        )}
-                        {!isMissing && (
+                  <div key={definition.id} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-medium">{definition.name}</h3>
+                          {definition.is_mandatory && (
+                            <Badge variant="destructive" className="text-xs">
+                              חובה
+                            </Badge>
+                          )}
+                          {isMissing && definition.is_mandatory && (
+                            <Badge variant="outline" className="text-xs border-amber-600 text-amber-700">
+                              חסר
+                            </Badge>
+                          )}
+                          {!isMissing && (
                           <Badge variant="outline" className="text-xs border-green-600 text-green-700">
                             <CheckCircle2 className="h-3 w-3 ml-1" />
                             הועלה
@@ -418,7 +418,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
                           input.onchange = (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              handleFileUpload(file, definition.id, definition.label);
+                              handleFileUpload(file, definition.id, definition.name);
                             }
                           };
                           input.click();
