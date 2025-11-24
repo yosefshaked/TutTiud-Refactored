@@ -289,24 +289,18 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
         file_id: fileId,
       });
 
-      const response = await authenticatedFetch(
+      const data = await authenticatedFetch(
         `instructor-files-download?${params.toString()}`,
         {
           session,
           method: 'GET',
         }
       );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData?.details || errorData?.message || 'Failed to generate download URL';
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
       
-      if (data.url) {
+      if (data?.url) {
         window.open(data.url, '_blank');
+      } else {
+        throw new Error('No download URL in response');
       }
     } catch (error) {
       console.error('Download error:', error);
