@@ -20,12 +20,12 @@ import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 
 export default async function (context, req) {
-  context.log('===== INSTRUCTOR FILES DOWNLOAD FUNCTION INVOKED =====');
-  context.log('Request method:', req.method);
-  context.log('Request query:', JSON.stringify(req.query || {}));
+  context.log?.info?.('📥 [INSTRUCTOR-DOWNLOAD] Request received', { 
+    method: req.method,
+    query: req.query 
+  });
   
   try {
-    context.log('instructor-files-download: function started');
     
     if (req.method !== 'GET') {
       return respond(context, 405, { message: 'method_not_allowed' });
@@ -90,8 +90,19 @@ export default async function (context, req) {
 
   // Permission check: Non-admin users can only download their own files
   if (!isAdmin && instructorId !== userId) {
+    context.log?.warn?.('🚫 [INSTRUCTOR-DOWNLOAD] Permission denied', {
+      userId,
+      instructorId,
+      isAdmin
+    });
     return respond(context, 403, { message: 'forbidden', details: 'You can only access your own files' });
   }
+
+  context.log?.info?.('✅ [INSTRUCTOR-DOWNLOAD] Permission check passed', {
+    userId,
+    instructorId,
+    isAdmin
+  });
 
   // Get storage profile
   const { data: orgSettings, error: settingsError } = await controlClient
@@ -136,6 +147,8 @@ export default async function (context, req) {
   }
 
   // Fetch instructor to get file metadata and instructor name
+  context.log?.info?.('🔍 [INSTRUCTOR-DOWNLOAD] Fetching instructor', { instructorId });
+  
   const { data: instructor, error: fetchError } = await tenantClient
     .from('Instructors')
     .select('name, files')
@@ -143,7 +156,10 @@ export default async function (context, req) {
     .single();
 
   if (fetchError) {
-    context.log?.error?.('Failed to fetch instructor', { message: fetchError.message });
+    context.log?.error?.('❌ [INSTRUCTOR-DOWNLOAD] Failed to fetch instructor', { 
+      message: fetchError.message,
+      instructorId 
+    });
     return respond(context, 500, { message: 'failed_to_fetch_instructor' });
   }
 
@@ -151,8 +167,19 @@ export default async function (context, req) {
   const file = files.find(f => f.id === fileId);
 
   if (!file) {
+    context.log?.warn?.('❌ [INSTRUCTOR-DOWNLOAD] File not found', { 
+      fileId,
+      instructorId,
+      totalFiles: files.length 
+    });
     return respond(context, 404, { message: 'file_not_found' });
   }
+
+  context.log?.info?.('📄 [INSTRUCTOR-DOWNLOAD] File found', {
+    fileId,
+    fileName: file.name,
+    filePath: file.path
+  });
 
   // Get storage driver
   let driver;
@@ -263,16 +290,24 @@ export default async function (context, req) {
 
   // Generate presigned URL (valid for 1 hour)
   try {
+    context.log?.info?.('🔗 [INSTRUCTOR-DOWNLOAD] Generating presigned URL', {
+      path: file.path,
+      filename: displayFilename
+    });
+    
     const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename);
     
-    context.log('Generated presigned URL', {
+    context.log?.info?.('✅ [INSTRUCTOR-DOWNLOAD] Download URL generated successfully', {
       filename: displayFilename,
       urlLength: downloadUrl?.length,
     });
     
     return respond(context, 200, { url: downloadUrl });
   } catch (error) {
-    context.log?.error?.('Failed to generate download URL', { message: error?.message });
+    context.log?.error?.('❌ [INSTRUCTOR-DOWNLOAD] Failed to generate download URL', { 
+      message: error?.message,
+      path: file.path
+    });
     return respond(context, 500, { message: 'failed_to_generate_download_url' });
   }
   } catch (error) {

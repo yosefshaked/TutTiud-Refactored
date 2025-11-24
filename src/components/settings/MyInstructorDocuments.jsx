@@ -290,7 +290,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       });
 
       const response = await authenticatedFetch(
-        `/api/instructor-files-download?${params.toString()}`,
+        `instructor-files-download?${params.toString()}`,
         {
           session,
           method: 'GET',
