@@ -142,11 +142,16 @@ async function handleUpload(req, context) {
   let tenantClient = null;
 
   try {
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Upload started');
+    
     // Parse auth and resolve org
     const bearer = resolveBearerAuthorization(req);
     if (!bearer) {
+      context.log?.error?.('❌ [INSTRUCTOR-FILES] Missing authorization header');
       return respond(context, 401, { error: 'missing_authorization' });
     }
+
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Bearer token found');
 
     const controlDbUrl = readEnv('APP_CONTROL_DB_URL');
     const controlDbServiceRoleKey = readEnv('APP_CONTROL_DB_SERVICE_ROLE_KEY');
@@ -154,24 +159,34 @@ async function handleUpload(req, context) {
       readSupabaseAdminConfig(controlDbUrl, controlDbServiceRoleKey)
     );
 
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Control client created');
+
     // Verify session
     const { data: { user }, error: authError } = await controlClient.auth.getUser(bearer);
     if (authError || !user) {
+      context.log?.error?.('❌ [INSTRUCTOR-FILES] Auth failed:', authError?.message);
       return respond(context, 401, { error: 'invalid_token' });
     }
 
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] User authenticated:', user.id);
+
     const orgId = resolveOrgId(req);
     if (!orgId) {
+      context.log?.error?.('❌ [INSTRUCTOR-FILES] Missing org_id');
       return respond(context, 400, { error: 'missing_org_id' });
     }
+
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Org ID:', orgId);
 
     // Ensure user is a member
     const role = await ensureMembership(controlClient, orgId, user.id);
     if (!role) {
+      context.log?.error?.('❌ [INSTRUCTOR-FILES] User not a member of org');
       return respond(context, 403, { error: 'not_org_member' });
     }
 
     const isAdmin = isAdminRole(role);
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] User role:', role, 'isAdmin:', isAdmin);
 
     // Get storage profile
     const { data: orgSettings, error: settingsError } = await controlClient
@@ -181,13 +196,16 @@ async function handleUpload(req, context) {
       .single();
 
     if (settingsError || !orgSettings?.storage_profile) {
+      context.log?.error?.('❌ [INSTRUCTOR-FILES] Storage not configured:', settingsError?.message);
       return respond(context, 424, { error: 'storage_not_configured' });
     }
 
     const storageProfile = orgSettings.storage_profile;
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Storage profile loaded. Mode:', storageProfile.mode);
 
     // Check if storage is disconnected
     if (storageProfile.disconnected === true) {
+      context.log?.error?.('❌ [INSTRUCTOR-FILES] Storage is disconnected');
       return respond(context, 403, { error: 'storage_disconnected', message: 'Storage is disconnected. Please reconnect storage to upload files.' });
     }
 
@@ -196,6 +214,7 @@ async function handleUpload(req, context) {
     if (storageProfile.mode === 'byos' && storageProfile.byos) {
       const decrypted = decryptStorageProfile(storageProfile);
       resolvedProfile = { ...storageProfile, byos: decrypted.byos };
+      context.log?.info?.('🔵 [INSTRUCTOR-FILES] BYOS credentials decrypted');
     }
 
     // Get environment variables for managed storage
@@ -206,8 +225,11 @@ async function handleUpload(req, context) {
       SYSTEM_R2_BUCKET_NAME: process.env.SYSTEM_R2_BUCKET_NAME,
     };
 
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Environment variables loaded. Has R2 config:', !!(env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_BUCKET_NAME));
+
     // Parse multipart data
     const parts = parseMultipartData(req);
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Multipart data parsed. Parts count:', parts.length);
 
     // Extract fields
     const filePart = parts.find(p => p.name === 'file');
@@ -299,9 +321,13 @@ async function handleUpload(req, context) {
       hash: fileHash,
     };
 
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] File metadata created:', fileMetadata);
+
     // Update instructor record with new file
     const currentFiles = Array.isArray(instructor.files) ? instructor.files : [];
     const updatedFiles = [...currentFiles, fileMetadata];
+
+    context.log?.info?.('🔵 [INSTRUCTOR-FILES] Updating instructor record. Old file count:', currentFiles.length, 'New count:', updatedFiles.length);
 
     const { error: updateError } = await tenantClient
       .from('Instructors')
@@ -309,15 +335,19 @@ async function handleUpload(req, context) {
       .eq('id', instructorId);
 
     if (updateError) {
-      context.log.error('Failed to update instructor files:', updateError);
+      context.log?.error?.('❌ [INSTRUCTOR-FILES] Failed to update instructor files:', updateError.message, updateError);
       // Try to delete uploaded file from storage
       try {
-        await driver.deleteFile(storagePath);
+        context.log?.info?.('🔵 [INSTRUCTOR-FILES] Attempting cleanup of uploaded file...');
+        await driver.delete(storagePath);
+        context.log?.info?.('✅ [INSTRUCTOR-FILES] Cleanup successful');
       } catch (cleanupError) {
-        context.log.error('Failed to cleanup uploaded file:', cleanupError);
+        context.log?.error?.('❌ [INSTRUCTOR-FILES] Failed to cleanup uploaded file:', cleanupError.message);
       }
-      return respond(context, 500, { error: 'database_update_failed' });
+      return respond(context, 500, { error: 'database_update_failed', details: updateError.message });
     }
+
+    context.log?.info?.('✅ [INSTRUCTOR-FILES] Upload complete! File ID:', fileId);
 
     return respond(context, 200, {
       success: true,
@@ -325,7 +355,7 @@ async function handleUpload(req, context) {
     });
 
   } catch (error) {
-    context.log.error('Instructor file upload error:', error);
+    context.log?.error?.('❌ [INSTRUCTOR-FILES] Unexpected error:', error.message, error.stack);
     return respond(context, 500, { error: 'internal_error', details: error.message });
   }
 }
@@ -447,7 +477,7 @@ async function handleDelete(req, context) {
     }
 
     try {
-      await driver.deleteFile(fileToDelete.path);
+      await driver.delete(fileToDelete.path);
     } catch (storageError) {
       context.log.error('Failed to delete file from storage:', storageError);
       // Continue with database update even if storage delete fails
