@@ -86,12 +86,19 @@ export default function Settings() {
   // Check if current user is an instructor
   useEffect(() => {
     if (!user?.id || !session || !tenantClientReady || !activeOrgId) {
+      console.log('[Settings] Instructor check skipped:', {
+        userId: user?.id,
+        hasSession: !!session,
+        tenantClientReady,
+        activeOrgId
+      });
       setIsInstructor(false);
       return;
     }
 
     const checkInstructorStatus = async () => {
       try {
+        console.log('[Settings] Checking instructor status for user:', user.id);
         const response = await fetch(`/api/instructors?org_id=${activeOrgId}`, {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -103,15 +110,22 @@ export default function Settings() {
 
         if (response.ok) {
           const instructors = await response.json();
+          console.log('[Settings] Instructors response:', {
+            instructors,
+            currentUserId: user.id,
+            instructorIds: instructors.map(i => i.id)
+          });
           // Check if current user exists in the instructors list
           const isInstructorRecord = Array.isArray(instructors) && 
             instructors.some(instructor => instructor.id === user.id);
+          console.log('[Settings] Is instructor:', isInstructorRecord);
           setIsInstructor(isInstructorRecord);
         } else {
+          console.log('[Settings] Instructors API failed:', response.status, response.statusText);
           setIsInstructor(false);
         }
       } catch (error) {
-        console.error('Error checking instructor status:', error);
+        console.error('[Settings] Error checking instructor status:', error);
         setIsInstructor(false);
       }
     };
@@ -287,6 +301,20 @@ export default function Settings() {
               <div className="space-y-1">
                 <dt className="font-medium text-slate-500">תפקיד מזוהה</dt>
                 <dd className="text-slate-900">{membershipRole ? membershipRole : '—'}</dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="font-medium text-slate-500">מדריך במערכת</dt>
+                <dd className="text-slate-900">
+                  {isInstructor ? (
+                    <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-200">
+                      כן
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="bg-slate-100 text-slate-600">
+                      לא
+                    </Badge>
+                  )}
+                </dd>
               </div>
             </dl>
           </CardContent>
@@ -637,42 +665,44 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+        </div>
+        )}
 
-          {/* Instructor Documents - For instructors to view/upload their own files */}
-          {/* Instructor Documents Card - visible to any user who is an instructor */}
-          {isInstructor && activeOrgHasConnection && tenantClientReady && (
-            <Card dir="rtl">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-blue-100 p-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle>המסמכים שלי</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        צפייה והעלאת מסמכים אישיים
-                      </p>
-                    </div>
+        {/* Instructor Documents Card - visible to any user who is an instructor (outside admin-only section) */}
+        {isInstructor && activeOrgHasConnection && tenantClientReady && (
+          <Card dir="rtl" className="w-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-blue-100 p-2">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle>המסמכים שלי</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      צפייה והעלאת מסמכים אישיים
+                    </p>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  הצג והעלה מסמכים נדרשים ומסמכים נוספים.
-                </p>
-                <Button
-                  onClick={() => setSelectedModule('myDocuments')}
-                  disabled={!activeOrgHasConnection || !tenantClientReady}
-                  variant={(!activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
-                >
-                  <FileText className="ml-2 h-4 w-4" />
-                  ניהול המסמכים שלי
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                הצג והעלה מסמכים נדרשים ומסמכים נוספים.
+              </p>
+              <Button
+                onClick={() => {
+                  console.log('[Settings] Opening myDocuments modal');
+                  setSelectedModule('myDocuments');
+                }}
+                disabled={!activeOrgHasConnection || !tenantClientReady}
+                variant={(!activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <FileText className="ml-2 h-4 w-4" />
+                ניהול המסמכים שלי
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Floating dialog for the selected module */}
