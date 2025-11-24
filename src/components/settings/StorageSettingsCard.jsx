@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Lock, HardDrive, Cloud, Loader2, CheckCircle2, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
-import { saveStorageConfiguration, deleteStorageConfiguration, reconnectStorageConfiguration } from '@/features/settings/api/storage.js';
+import { Lock, HardDrive, Cloud, Loader2, CheckCircle2, Trash2, AlertTriangle, RefreshCw, Zap } from 'lucide-react';
+import { saveStorageConfiguration, deleteStorageConfiguration, reconnectStorageConfiguration, testStorageConnection } from '@/features/settings/api/storage.js';
 import { useOrg } from '@/org/OrgContext.jsx';
 
 const STORAGE_MODES = {
@@ -19,6 +19,7 @@ const PROVIDERS = [
   { value: 's3', label: 'Amazon S3' },
   { value: 'r2', label: 'Cloudflare R2' },
   { value: 'azure', label: 'Azure Blob Storage' },
+  { value: 'supabase', label: 'Supabase Storage' },
   { value: 'gcs', label: 'Google Cloud Storage' },
   { value: 'generic', label: 'S3-Compatible (Generic)' },
 ];
@@ -61,6 +62,7 @@ export default function StorageSettingsCard({ session, orgId }) {
   const [secretAccessKey, setSecretAccessKey] = useState('');
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [disconnectState, setDisconnectState] = useState(REQUEST.idle);
+  const [testState, setTestState] = useState(REQUEST.idle);
 
   const canAct = Boolean(session && orgId);
 
@@ -230,6 +232,94 @@ export default function StorageSettingsCard({ session, orgId }) {
       setDisconnectState(REQUEST.error);
     }
   }, [canAct, orgId, session, refreshOrganizations]);
+
+  const handleTestConnection = useCallback(async () => {
+    if (!canAct) return;
+
+    if (!selectedMode) {
+      toast.error('יש לבחור מצב אחסון');
+      return;
+    }
+
+    setTestState(REQUEST.loading);
+
+    try {
+      let payload;
+
+      if (selectedMode === STORAGE_MODES.MANAGED) {
+        const namespace = createStorageNamespace(orgId);
+        payload = {
+          mode: STORAGE_MODES.MANAGED,
+          managed: {
+            namespace,
+            active: true,
+          },
+        };
+      } else if (selectedMode === STORAGE_MODES.BYOS) {
+        // Validate BYOS fields before testing
+        const trimmedEndpoint = endpoint.trim();
+        
+        if (!trimmedEndpoint) {
+          toast.error('נדרשת כתובת Endpoint');
+          setTestState(REQUEST.idle);
+          return;
+        }
+        
+        if (!trimmedEndpoint.startsWith('https://')) {
+          toast.error('Endpoint חייב להשתמש ב-HTTPS');
+          setTestState(REQUEST.idle);
+          return;
+        }
+        
+        if (!bucket.trim()) {
+          toast.error('נדרש שם Bucket');
+          setTestState(REQUEST.idle);
+          return;
+        }
+        if (!accessKeyId.trim()) {
+          toast.error('נדרש Access Key ID');
+          setTestState(REQUEST.idle);
+          return;
+        }
+        if (!secretAccessKey.trim()) {
+          toast.error('נדרש Secret Access Key');
+          setTestState(REQUEST.idle);
+          return;
+        }
+
+        payload = {
+          mode: STORAGE_MODES.BYOS,
+          byos: {
+            provider,
+            endpoint: endpoint.trim(),
+            bucket: bucket.trim(),
+            access_key_id: accessKeyId.trim(),
+            secret_access_key: secretAccessKey.trim(),
+          },
+        };
+
+        if (region.trim()) {
+          payload.byos.region = region.trim();
+        }
+      }
+
+      const result = await testStorageConnection(payload, { session });
+
+      if (result?.success) {
+        toast.success('✅ החיבור נבדק בהצלחה! ההגדרות תקינות.');
+      } else {
+        toast.error('הבדיקה נכשלה');
+      }
+      
+      setTestState(REQUEST.idle);
+    } catch (error) {
+      console.error('Test connection failed', error);
+      const errorMessage = error?.message || 'בדיקת החיבור נכשלה';
+      toast.error(errorMessage);
+      setTestState(REQUEST.error);
+    }
+  }, [canAct, orgId, session, selectedMode, provider, endpoint, region, bucket, accessKeyId, secretAccessKey]);
+
 
   // Render locked state
   if (isLocked) {
@@ -455,38 +545,62 @@ export default function StorageSettingsCard({ session, orgId }) {
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between gap-3 pt-4 border-t">
-          {/* Disconnect button - only show if storage is configured and NOT disconnected */}
-          {orgSettings?.storageProfile?.mode && !isDisconnected && (
-            <Button
-              variant="outline"
-              onClick={() => setShowDisconnectDialog(true)}
-              disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading}
-              className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-              ניתוק אחסון
-            </Button>
-          )}
-          
-          {/* Reconnect button - only show if storage is disconnected */}
-          {isDisconnected && (
-            <Button
-              variant="outline"
-              onClick={handleReconnect}
-              disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading}
-              className="gap-2 text-primary hover:bg-primary/10"
-            >
-              <RefreshCw className="h-4 w-4" />
-              חיבור מחדש
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Disconnect button - only show if storage is configured and NOT disconnected */}
+            {orgSettings?.storageProfile?.mode && !isDisconnected && (
+              <Button
+                variant="outline"
+                onClick={() => setShowDisconnectDialog(true)}
+                disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading || testState === REQUEST.loading}
+                className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                ניתוק אחסון
+              </Button>
+            )}
+            
+            {/* Reconnect button - only show if storage is disconnected */}
+            {isDisconnected && (
+              <Button
+                variant="outline"
+                onClick={handleReconnect}
+                disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading || testState === REQUEST.loading}
+                className="gap-2 text-primary hover:bg-primary/10"
+              >
+                <RefreshCw className="h-4 w-4" />
+                חיבור מחדש
+              </Button>
+            )}
+
+            {/* Test Connection button - only show if mode is selected and not disconnected */}
+            {selectedMode && !isDisconnected && (
+              <Button
+                variant="outline"
+                onClick={handleTestConnection}
+                disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading || testState === REQUEST.loading}
+                className="gap-2"
+              >
+                {testState === REQUEST.loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    בודק...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4" />
+                    בדיקת חיבור
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
           
           {/* Save button - only show if mode is selected and not disconnected */}
           {selectedMode && !isDisconnected && (
             <Button
               onClick={handleSave}
-              disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading || !selectedMode}
-              className="gap-2 mr-auto"
+              disabled={saveState === REQUEST.loading || disconnectState === REQUEST.loading || testState === REQUEST.loading || !selectedMode}
+              className="gap-2"
             >
               {saveState === REQUEST.loading ? (
                 <>

@@ -65,6 +65,11 @@ export default defineConfig([
   },
   {
     files: ['api/**/*.{js,jsx,mjs}', 'scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
     rules: {
       'no-restricted-imports': 'off',
     },

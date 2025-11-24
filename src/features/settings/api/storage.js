@@ -108,3 +108,28 @@ export async function reconnectStorageConfiguration(orgId, { session, signal } =
 
   return data?.storage_profile || null;
 }
+
+/**
+ * Tests storage connection by attempting to upload and delete a test file
+ * @param {object} storageProfile - Storage profile configuration to test
+ * @param {object} options - Request options
+ * @param {object} options.session - User session
+ * @param {AbortSignal} options.signal - Abort signal
+ * @returns {Promise<object>} Test result with success status
+ */
+export async function testStorageConnection(storageProfile, { session, signal } = {}) {
+  if (!storageProfile || typeof storageProfile !== 'object') {
+    throw new Error('Valid storage profile is required');
+  }
+
+  const data = await authenticatedFetch('storage-test-connection', {
+    method: 'POST',
+    body: {
+      storage_profile: storageProfile,
+    },
+    session,
+    signal,
+  });
+
+  return data;
+}
