@@ -507,3 +507,20 @@ async function handleDelete(req, context) {
   }
 }
 
+/**
+ * Main Azure Function entry point
+ */
+module.exports = async function (context, req) {
+  console.log('🔵 [INSTRUCTOR-FILES] Function invoked', { method: req.method, url: req.url });
+  
+  if (req.method === 'POST') {
+    console.log('🔵 [INSTRUCTOR-FILES] Routing to handleUpload');
+    return await handleUpload(context, req);
+  } else if (req.method === 'DELETE') {
+    console.log('🔵 [INSTRUCTOR-FILES] Routing to handleDelete');
+    return await handleDelete(context, req);
+  } else {
+    console.log('❌ [INSTRUCTOR-FILES] Method not allowed:', req.method);
+    return respond(context, 405, { error: 'method_not_allowed' });
+  }
+};
