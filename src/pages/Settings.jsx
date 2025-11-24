@@ -670,27 +670,29 @@ export default function Settings() {
 
         {/* Instructor Documents Card - visible to any user who is an instructor (outside admin-only section) */}
         {isInstructor && activeOrgHasConnection && tenantClientReady && (
-          <Card dir="rtl" className="w-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-blue-100 p-2">
-                    <FileText className="h-5 w-5 text-blue-600" />
+          <Card dir="rtl" className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02]">
+            <CardHeader className="space-y-2 pb-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-blue-100 p-2 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                    <FileText className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
-                    <CardTitle>המסמכים שלי</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <CardTitle className="text-lg font-bold text-slate-900">המסמכים שלי</CardTitle>
+                    <p className="text-sm text-slate-600 mt-1">
                       צפייה והעלאת מסמכים אישיים
                     </p>
                   </div>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
+            <CardContent className="space-y-3">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 הצג והעלה מסמכים נדרשים ומסמכים נוספים.
               </p>
               <Button
+                size="sm"
+                className="w-full gap-2"
                 onClick={() => {
                   console.log('[Settings] Opening myDocuments modal');
                   setSelectedModule('myDocuments');
@@ -698,7 +700,7 @@ export default function Settings() {
                 disabled={!activeOrgHasConnection || !tenantClientReady}
                 variant={(!activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
               >
-                <FileText className="ml-2 h-4 w-4" />
+                <FileText className="h-4 w-4" />
                 ניהול המסמכים שלי
               </Button>
             </CardContent>

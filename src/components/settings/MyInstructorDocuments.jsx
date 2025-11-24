@@ -60,13 +60,15 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
         setLoading(true);
         
         // Load instructor record (filtered to current user by backend)
+        console.log('[MyInstructorDocuments] Loading instructor data for userId:', userId);
         const instructorsResponse = await authenticatedFetch(
-          `/api/instructors?org_id=${orgId}`,
+          `instructors?org_id=${orgId}`,
           {
             session,
             method: 'GET',
           }
         );
+        console.log('[MyInstructorDocuments] Instructors response status:', instructorsResponse.status);
 
         if (!instructorsResponse.ok) {
           throw new Error('Failed to load instructor data');
@@ -81,19 +83,22 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
         }
 
         setInstructor(myInstructor);
+        console.log('[MyInstructorDocuments] Loaded instructor:', myInstructor);
 
         // Load document definitions
+        console.log('[MyInstructorDocuments] Loading document definitions');
         const { value } = await fetchSettingsValue({
           session,
           orgId,
           key: 'instructor_document_definitions',
         });
+        console.log('[MyInstructorDocuments] Document definitions loaded:', value);
 
         const parsed = Array.isArray(value) ? value : [];
         setDefinitions(parsed);
       } catch (error) {
-        console.error('Failed to load data:', error);
-        toast.error('טעינת נתונים נכשלה');
+        console.error('[MyInstructorDocuments] Failed to load data:', error);
+        toast.error(`טעינת נתונים נכשלה: ${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -107,7 +112,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
 
     try {
       const response = await authenticatedFetch(
-        `/api/instructors?org_id=${orgId}`,
+        `instructors?org_id=${orgId}`,
         {
           session,
           method: 'GET',
