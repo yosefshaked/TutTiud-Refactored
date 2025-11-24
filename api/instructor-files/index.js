@@ -123,15 +123,15 @@ function decodeFilename(filename) {
 /**
  * Main request handler
  */
-export default async function handler(req, context) {
-  context.log('🚀 Test log from instructor-files!');
+export default async function (context, req) {
+  context.log?.info?.('🚀 Test log from instructor-files!');
 
   const { method } = req;
 
   if (method === 'POST') {
-    return await handleUpload(req, context);
+    return await handleUpload(context, req);
   } else if (method === 'DELETE') {
-    return await handleDelete(req, context);
+    return await handleDelete(context, req);
   } else {
     return respond(context, 405, { error: 'method_not_allowed' });
   }
@@ -140,12 +140,12 @@ export default async function handler(req, context) {
 /**
  * POST /api/instructor-files - Upload file
  */
-async function handleUpload(req, context) {
+async function handleUpload(context, req) {
   let tenantClient = null;
 
   try {
     console.log('\n\n🚀🚀🚀 [INSTRUCTOR-FILES] ===== UPLOAD STARTED ===== 🚀🚀🚀\n');
-    context.log('🚀🚀🚀 INSTRUCTOR FILE UPLOAD STARTED 🚀🚀🚀');
+    context.log?.info?.('🚀🚀🚀 INSTRUCTOR FILE UPLOAD STARTED 🚀🚀🚀');
     console.log('🔵 [INSTRUCTOR-FILES] Upload started');
     
     // Parse auth and resolve org
@@ -173,7 +173,7 @@ async function handleUpload(req, context) {
     }
 
     console.log('🔵 [INSTRUCTOR-FILES] User authenticated:', user.id);
-    context.log(`✅ User authenticated: ${user.id}`);
+    context.log?.info?.(`✅ User authenticated: ${user.id}`);
 
     const orgId = resolveOrgId(req);
     if (!orgId) {
@@ -261,7 +261,7 @@ async function handleUpload(req, context) {
     const mimeType = filePart.type || 'application/octet-stream';
 
     console.log('🔵 [INSTRUCTOR-FILES] File parsed:', { originalName, mimeType, size: fileData.length });
-    context.log(`📄 File parsed: ${originalName} (${mimeType}, ${fileData.length} bytes)`);
+    context.log?.info?.(`📄 File parsed: ${originalName} (${mimeType}, ${fileData.length} bytes)`);
 
     // Validate file
     const validation = validateFileUpload(fileData, mimeType);
@@ -300,19 +300,19 @@ async function handleUpload(req, context) {
     }
 
     console.log('🔵 [INSTRUCTOR-FILES] Uploading to storage...', { path: storagePath, size: fileData.length });
-    context.log(`📤 Uploading file to storage: ${storagePath}`);
+    context.log?.info?.(`📤 Uploading file to storage: ${storagePath}`);
 
     // Upload to storage
     await driver.upload(storagePath, fileData, mimeType);
 
     console.log('✅ [INSTRUCTOR-FILES] File uploaded to storage');
-    context.log('✅ File uploaded to storage successfully');
+    context.log?.info?.('✅ File uploaded to storage successfully');
 
     // Get download URL for immediate access
     const url = await driver.getDownloadUrl(storagePath, 3600, originalName); // 1 hour expiry
 
     console.log('✅ [INSTRUCTOR-FILES] Download URL generated');
-    context.log('✅ Download URL generated');
+    context.log?.info?.('✅ Download URL generated');
 
     // Build file metadata
     const fileMetadata = {
@@ -361,7 +361,7 @@ async function handleUpload(req, context) {
 
     console.log('✅ [INSTRUCTOR-FILES] Upload complete! File ID:', fileId);
     console.log('\n\n✅✅✅ [INSTRUCTOR-FILES] ===== UPLOAD SUCCESS ===== ✅✅✅\n');
-    context.log('✅✅✅ INSTRUCTOR FILE UPLOAD SUCCESS ✅✅✅');
+    context.log?.info?.('✅✅✅ INSTRUCTOR FILE UPLOAD SUCCESS ✅✅✅');
 
     return respond(context, 200, {
       success: true,
@@ -370,7 +370,7 @@ async function handleUpload(req, context) {
 
   } catch (error) {
     console.error('❌ [INSTRUCTOR-FILES] Unexpected error:', error.message, error.stack);
-    context.log.error('❌ INSTRUCTOR FILE UPLOAD ERROR:', error.message);
+    context.log?.error?.('❌ INSTRUCTOR FILE UPLOAD ERROR:', error.message);
     return respond(context, 500, { error: 'internal_error', details: error.message });
   }
 }
@@ -383,7 +383,7 @@ async function handleDelete(context, req) {
 
   try {
     console.log('\n\n🗑️🗑️🗑️ [INSTRUCTOR-FILES] ===== DELETE STARTED ===== 🗑️🗑️🗑️\n');
-    context.log('🗑️🗑️🗑️ INSTRUCTOR FILE DELETE STARTED 🗑️🗑️🗑️');
+    context.log?.info?.('🗑️🗑️🗑️ INSTRUCTOR FILE DELETE STARTED 🗑️🗑️🗑️');
     
     // Parse auth and resolve org
     const bearer = resolveBearerAuthorization(req);
@@ -497,7 +497,7 @@ async function handleDelete(context, req) {
     try {
       await driver.delete(fileToDelete.path);
     } catch (storageError) {
-      context.log.error('Failed to delete file from storage:', storageError);
+      context.log?.error?.('Failed to delete file from storage:', storageError);
       // Continue with database update even if storage delete fails
     }
 
@@ -510,7 +510,7 @@ async function handleDelete(context, req) {
       .eq('id', instructor_id);
 
     if (updateError) {
-      context.log.error('Failed to update instructor files:', updateError);
+      context.log?.error?.('Failed to update instructor files:', updateError);
       return respond(context, 500, { error: 'database_update_failed' });
     }
 
@@ -520,7 +520,7 @@ async function handleDelete(context, req) {
     });
 
   } catch (error) {
-    context.log.error('Instructor file delete error:', error);
+    context.log?.error?.('Instructor file delete error:', error);
     return respond(context, 500, { error: 'internal_error', details: error.message });
   }
 }
