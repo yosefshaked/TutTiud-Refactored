@@ -132,7 +132,7 @@ export default async function handler(req, context) {
   } else if (method === 'DELETE') {
     return await handleDelete(req, context);
   } else {
-    return respond({ status: 405, body: { error: 'method_not_allowed' } });
+    return respond(context, 405, { error: 'method_not_allowed' });
   }
 }
 
@@ -146,7 +146,7 @@ async function handleUpload(req, context) {
     // Parse auth and resolve org
     const bearer = resolveBearerAuthorization(req);
     if (!bearer) {
-      return respond({ status: 401, body: { error: 'missing_authorization' } });
+      return respond(context, 401, { error: 'missing_authorization' });
     }
 
     const controlDbUrl = readEnv('APP_CONTROL_DB_URL');
@@ -158,18 +158,18 @@ async function handleUpload(req, context) {
     // Verify session
     const { data: { user }, error: authError } = await controlClient.auth.getUser(bearer);
     if (authError || !user) {
-      return respond({ status: 401, body: { error: 'invalid_token' } });
+      return respond(context, 401, { error: 'invalid_token' });
     }
 
     const orgId = resolveOrgId(req);
     if (!orgId) {
-      return respond({ status: 400, body: { error: 'missing_org_id' } });
+      return respond(context, 400, { error: 'missing_org_id' });
     }
 
     // Ensure user is a member
     const role = await ensureMembership(controlClient, orgId, user.id);
     if (!role) {
-      return respond({ status: 403, body: { error: 'not_org_member' } });
+      return respond(context, 403, { error: 'not_org_member' });
     }
 
     const isAdmin = isAdminRole(role);
@@ -182,14 +182,14 @@ async function handleUpload(req, context) {
       .single();
 
     if (settingsError || !orgSettings?.storage_profile) {
-      return respond({ status: 424, body: { error: 'storage_not_configured' } });
+      return respond(context, 424, { error: 'storage_not_configured' });
     }
 
     const storageProfile = orgSettings.storage_profile;
 
     // Check if storage is disconnected
     if (storageProfile.disconnected === true) {
-      return respond({ status: 403, body: { error: 'storage_disconnected', message: 'Storage is disconnected. Please reconnect storage to upload files.' } });
+      return respond(context, 403, { error: 'storage_disconnected', message: 'Storage is disconnected. Please reconnect storage to upload files.' });
     }
 
     // Decrypt BYOS credentials if needed
@@ -209,7 +209,7 @@ async function handleUpload(req, context) {
     const definitionNamePart = parts.find(p => p.name === 'definition_name');
 
     if (!filePart || !instructorIdPart) {
-      return respond({ status: 400, body: { error: 'missing_required_fields', details: 'file and instructor_id are required' } });
+      return respond(context, 400, { error: 'missing_required_fields', details: 'file and instructor_id are required' });
     }
 
     const instructorId = instructorIdPart.data.toString('utf8');
@@ -218,7 +218,7 @@ async function handleUpload(req, context) {
 
     // Permission check: Non-admin users can only upload to their own instructor record
     if (!isAdmin && instructorId !== user.id) {
-      return respond({ status: 403, body: { error: 'forbidden', message: 'You can only upload files to your own instructor record' } });
+      return respond(context, 403, { error: 'forbidden', message: 'You can only upload files to your own instructor record' });
     }
 
     const fileData = filePart.data;
@@ -228,13 +228,13 @@ async function handleUpload(req, context) {
 
     // Permission check: Non-admin users can only upload to their own instructor record
     if (!isAdmin && instructorId !== user.id) {
-      return respond({ status: 403, body: { error: 'forbidden', message: 'You can only upload files to your own instructor record' } });
+      return respond(context, 403, { error: 'forbidden', message: 'You can only upload files to your own instructor record' });
     }
 
     // Validate file
     const validation = validateFileUpload(fileData, mimeType);
     if (!validation.valid) {
-      return respond({ status: 400, body: { error: validation.error, details: validation.details } });
+      return respond(context, 400, { error: validation.error, details: validation.details });
     }
 
     // Get tenant client
@@ -248,7 +248,7 @@ async function handleUpload(req, context) {
       .single();
 
     if (instructorError || !instructor) {
-      return respond({ status: 404, body: { error: 'instructor_not_found' } });
+      return respond(context, 404, { error: 'instructor_not_found' });
     }
 
     // Generate file metadata
@@ -302,7 +302,7 @@ async function handleUpload(req, context) {
       } catch (cleanupError) {
         context.log.error('Failed to cleanup uploaded file:', cleanupError);
       }
-      return respond({ status: 500, body: { error: 'database_update_failed' } });
+      return respond(context, 500, { error: 'database_update_failed' });
     }
 
     return respond({
@@ -332,7 +332,7 @@ async function handleDelete(req, context) {
     // Parse auth and resolve org
     const bearer = resolveBearerAuthorization(req);
     if (!bearer) {
-      return respond({ status: 401, body: { error: 'missing_authorization' } });
+      return respond(context, 401, { error: 'missing_authorization' });
     }
 
     const controlDbUrl = readEnv('APP_CONTROL_DB_URL');
@@ -344,18 +344,18 @@ async function handleDelete(req, context) {
     // Verify session
     const { data: { user }, error: authError } = await controlClient.auth.getUser(bearer);
     if (authError || !user) {
-      return respond({ status: 401, body: { error: 'invalid_token' } });
+      return respond(context, 401, { error: 'invalid_token' });
     }
 
     const orgId = resolveOrgId(req);
     if (!orgId) {
-      return respond({ status: 400, body: { error: 'missing_org_id' } });
+      return respond(context, 400, { error: 'missing_org_id' });
     }
 
     // Ensure user is a member
     const role = await ensureMembership(controlClient, orgId, user.id);
     if (!role) {
-      return respond({ status: 403, body: { error: 'not_org_member' } });
+      return respond(context, 403, { error: 'not_org_member' });
     }
 
     const isAdmin = isAdminRole(role);
@@ -365,18 +365,18 @@ async function handleDelete(req, context) {
     const { instructor_id, file_id } = body;
 
     if (!instructor_id || !file_id) {
-      return respond({ status: 400, body: { error: 'missing_required_fields', details: 'instructor_id and file_id are required' } });
+      return respond(context, 400, { error: 'missing_required_fields', details: 'instructor_id and file_id are required' });
     }
 
     // Permission check: Non-admin users can only delete their own files
     if (!isAdmin && instructor_id !== user.id) {
-      return respond({ status: 403, body: { error: 'forbidden', message: 'You can only delete your own files' } });
+      return respond(context, 403, { error: 'forbidden', message: 'You can only delete your own files' });
     }
 
     // CRITICAL: File deletion is restricted to admins only for data integrity
     // Even if user is deleting their own file, only admins can perform deletions
     if (!isAdmin) {
-      return respond({ status: 403, body: { error: 'forbidden', message: 'File deletion is restricted to administrators only' } });
+      return respond(context, 403, { error: 'forbidden', message: 'File deletion is restricted to administrators only' });
     }
 
     // Get storage profile
@@ -387,7 +387,7 @@ async function handleDelete(req, context) {
       .single();
 
     if (settingsError || !orgSettings?.storage_profile) {
-      return respond({ status: 424, body: { error: 'storage_not_configured' } });
+      return respond(context, 424, { error: 'storage_not_configured' });
     }
 
     const storageProfile = orgSettings.storage_profile;
@@ -410,14 +410,14 @@ async function handleDelete(req, context) {
       .single();
 
     if (instructorError || !instructor) {
-      return respond({ status: 404, body: { error: 'instructor_not_found' } });
+      return respond(context, 404, { error: 'instructor_not_found' });
     }
 
     const currentFiles = Array.isArray(instructor.files) ? instructor.files : [];
     const fileToDelete = currentFiles.find(f => f.id === file_id);
 
     if (!fileToDelete) {
-      return respond({ status: 404, body: { error: 'file_not_found' } });
+      return respond(context, 404, { error: 'file_not_found' });
     }
 
     // Delete from storage
@@ -439,7 +439,7 @@ async function handleDelete(req, context) {
 
     if (updateError) {
       context.log.error('Failed to update instructor files:', updateError);
-      return respond({ status: 500, body: { error: 'database_update_failed' } });
+      return respond(context, 500, { error: 'database_update_failed' });
     }
 
     return respond({
@@ -458,3 +458,4 @@ async function handleDelete(req, context) {
     });
   }
 }
+

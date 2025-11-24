@@ -15,13 +15,5 @@
   },
   "platform": {
     "api_location": "api"
-  },
-  "api": {
-    "cors": {
-      "allowedOrigins": [
-        "https://tuttiud.thepcrunners.com",
-        "https://lemon-wave-0e6c61303.westeurope.1.azurestaticapps.net"
-      ]
-    }
   }
 }
