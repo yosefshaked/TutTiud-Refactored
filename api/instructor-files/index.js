@@ -1,5 +1,4 @@
 /* eslint-env node */
-/* global Buffer */
 /**
  * Instructor Files API
  * 
@@ -199,6 +198,14 @@ async function handleUpload(req, context) {
       resolvedProfile = { ...storageProfile, byos: decrypted.byos };
     }
 
+    // Get environment variables for managed storage
+    const env = {
+      SYSTEM_R2_ENDPOINT: process.env.SYSTEM_R2_ENDPOINT,
+      SYSTEM_R2_ACCESS_KEY: process.env.SYSTEM_R2_ACCESS_KEY,
+      SYSTEM_R2_SECRET_KEY: process.env.SYSTEM_R2_SECRET_KEY,
+      SYSTEM_R2_BUCKET_NAME: process.env.SYSTEM_R2_BUCKET_NAME,
+    };
+
     // Parse multipart data
     const parts = parseMultipartData(req);
 
@@ -258,7 +265,14 @@ async function handleUpload(req, context) {
     const storagePath = `instructors/${orgId}/${instructorId}/${fileId}.${fileExtension}`;
 
     // Initialize storage driver
-    const driver = getStorageDriver(resolvedProfile);
+    let driver;
+    if (resolvedProfile.mode === 'managed') {
+      driver = getStorageDriver('managed', null, env);
+    } else if (resolvedProfile.mode === 'byos') {
+      driver = getStorageDriver('byos', resolvedProfile.byos, env);
+    } else {
+      return respond(context, 500, { error: 'invalid_storage_mode' });
+    }
 
     // Upload to storage
     await driver.putFile(storagePath, fileData, mimeType);
@@ -305,20 +319,14 @@ async function handleUpload(req, context) {
       return respond(context, 500, { error: 'database_update_failed' });
     }
 
-    return respond({
-      status: 200,
-      body: {
-        success: true,
-        file: fileMetadata,
-      },
+    return respond(context, 200, {
+      success: true,
+      file: fileMetadata,
     });
 
   } catch (error) {
     context.log.error('Instructor file upload error:', error);
-    return respond({
-      status: 500,
-      body: { error: 'internal_error', details: error.message },
-    });
+    return respond(context, 500, { error: 'internal_error', details: error.message });
   }
 }
 
@@ -399,6 +407,14 @@ async function handleDelete(req, context) {
       resolvedProfile = { ...storageProfile, byos: decrypted.byos };
     }
 
+    // Get environment variables for managed storage
+    const env = {
+      SYSTEM_R2_ENDPOINT: process.env.SYSTEM_R2_ENDPOINT,
+      SYSTEM_R2_ACCESS_KEY: process.env.SYSTEM_R2_ACCESS_KEY,
+      SYSTEM_R2_SECRET_KEY: process.env.SYSTEM_R2_SECRET_KEY,
+      SYSTEM_R2_BUCKET_NAME: process.env.SYSTEM_R2_BUCKET_NAME,
+    };
+
     // Get tenant client
     tenantClient = await resolveTenantClient(controlClient, orgId);
 
@@ -421,7 +437,15 @@ async function handleDelete(req, context) {
     }
 
     // Delete from storage
-    const driver = getStorageDriver(resolvedProfile);
+    let driver;
+    if (resolvedProfile.mode === 'managed') {
+      driver = getStorageDriver('managed', null, env);
+    } else if (resolvedProfile.mode === 'byos') {
+      driver = getStorageDriver('byos', resolvedProfile.byos, env);
+    } else {
+      return respond(context, 500, { error: 'invalid_storage_mode' });
+    }
+
     try {
       await driver.deleteFile(fileToDelete.path);
     } catch (storageError) {
@@ -442,20 +466,14 @@ async function handleDelete(req, context) {
       return respond(context, 500, { error: 'database_update_failed' });
     }
 
-    return respond({
-      status: 200,
-      body: {
-        success: true,
-        deleted_file_id: file_id,
-      },
+    return respond(context, 200, {
+      success: true,
+      deleted_file_id: file_id,
     });
 
   } catch (error) {
     context.log.error('Instructor file delete error:', error);
-    return respond({
-      status: 500,
-      body: { error: 'internal_error', details: error.message },
-    });
+    return respond(context, 500, { error: 'internal_error', details: error.message });
   }
 }
 
