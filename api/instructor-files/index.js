@@ -124,6 +124,8 @@ function decodeFilename(filename) {
  * Main request handler
  */
 export default async function handler(req, context) {
+  context.log('🚀 Test log from instructor-files!');
+
   const { method } = req;
 
   if (method === 'POST') {
@@ -142,6 +144,8 @@ async function handleUpload(req, context) {
   let tenantClient = null;
 
   try {
+    console.log('\n\n🚀🚀🚀 [INSTRUCTOR-FILES] ===== UPLOAD STARTED ===== 🚀🚀🚀\n');
+    context.log('🚀🚀🚀 INSTRUCTOR FILE UPLOAD STARTED 🚀🚀🚀');
     console.log('🔵 [INSTRUCTOR-FILES] Upload started');
     
     // Parse auth and resolve org
@@ -169,6 +173,7 @@ async function handleUpload(req, context) {
     }
 
     console.log('🔵 [INSTRUCTOR-FILES] User authenticated:', user.id);
+    context.log(`✅ User authenticated: ${user.id}`);
 
     const orgId = resolveOrgId(req);
     if (!orgId) {
@@ -256,6 +261,7 @@ async function handleUpload(req, context) {
     const mimeType = filePart.type || 'application/octet-stream';
 
     console.log('🔵 [INSTRUCTOR-FILES] File parsed:', { originalName, mimeType, size: fileData.length });
+    context.log(`📄 File parsed: ${originalName} (${mimeType}, ${fileData.length} bytes)`);
 
     // Validate file
     const validation = validateFileUpload(fileData, mimeType);
@@ -293,11 +299,20 @@ async function handleUpload(req, context) {
       return respond(context, 500, { error: 'invalid_storage_mode' });
     }
 
-    // Upload to storage
-    await driver.putFile(storagePath, fileData, mimeType);
+    console.log('🔵 [INSTRUCTOR-FILES] Uploading to storage...', { path: storagePath, size: fileData.length });
+    context.log(`📤 Uploading file to storage: ${storagePath}`);
 
-    // Get presigned URL for immediate access
-    const url = await driver.getPresignedUrl(storagePath, 3600); // 1 hour expiry
+    // Upload to storage
+    await driver.upload(storagePath, fileData, mimeType);
+
+    console.log('✅ [INSTRUCTOR-FILES] File uploaded to storage');
+    context.log('✅ File uploaded to storage successfully');
+
+    // Get download URL for immediate access
+    const url = await driver.getDownloadUrl(storagePath, 3600, originalName); // 1 hour expiry
+
+    console.log('✅ [INSTRUCTOR-FILES] Download URL generated');
+    context.log('✅ Download URL generated');
 
     // Build file metadata
     const fileMetadata = {
@@ -355,6 +370,7 @@ async function handleUpload(req, context) {
 
   } catch (error) {
     console.error('❌ [INSTRUCTOR-FILES] Unexpected error:', error.message, error.stack);
+    context.log.error('❌ INSTRUCTOR FILE UPLOAD ERROR:', error.message);
     return respond(context, 500, { error: 'internal_error', details: error.message });
   }
 }
@@ -508,21 +524,3 @@ async function handleDelete(context, req) {
     return respond(context, 500, { error: 'internal_error', details: error.message });
   }
 }
-
-/**
- * Main Azure Function entry point
- */
-module.exports = async function (context, req) {
-  console.log('🔵 [INSTRUCTOR-FILES] Function invoked', { method: req.method, url: req.url });
-  
-  if (req.method === 'POST') {
-    console.log('🔵 [INSTRUCTOR-FILES] Routing to handleUpload');
-    return await handleUpload(context, req);
-  } else if (req.method === 'DELETE') {
-    console.log('🔵 [INSTRUCTOR-FILES] Routing to handleDelete');
-    return await handleDelete(context, req);
-  } else {
-    console.log('❌ [INSTRUCTOR-FILES] Method not allowed:', req.method);
-    return respond(context, 405, { error: 'method_not_allowed' });
-  }
-};
