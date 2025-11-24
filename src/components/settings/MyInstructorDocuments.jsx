@@ -254,7 +254,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       }
     });
 
-    const uploadUrl = '/api/instructor-files';
+    const uploadUrl = `/api/instructor-files?org_id=${orgId}`;
     console.log('🔵 [UPLOAD] Opening XHR', { method: 'POST', url: uploadUrl });
     xhr.open('POST', uploadUrl);
     

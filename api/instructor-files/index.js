@@ -1,4 +1,5 @@
 /* eslint-env node */
+/* global Buffer */
 /**
  * Instructor Files API
  * 
@@ -89,346 +90,368 @@ function parseMultipartData(req) {
 
   const boundary = boundaryMatch[1];
   
+  // In Azure Static Web Apps / Azure Functions v4:
+  // - req.body is a string (not Buffer) for binary data
+  // - We need to convert it to Buffer with 'binary' encoding to preserve byte values
   let bodyBuffer;
   if (Buffer.isBuffer(req.body)) {
     bodyBuffer = req.body;
   } else if (typeof req.body === 'string') {
+    // Azure SWA sends binary data as a latin1/binary string
     bodyBuffer = Buffer.from(req.body, 'binary');
   } else {
-    throw new Error('Unexpected request body type');
+    throw new Error(`Unexpected body type: ${typeof req.body}`);
   }
-
+  
   const parts = multipart.parse(bodyBuffer, boundary);
   return parts;
 }
 
-/**
- * Decode UTF-8 filenames that may have been mis-encoded as latin1
- */
-function decodeFilename(filename) {
-  try {
-    // Try to detect if filename was mis-encoded (contains non-ASCII that looks like mojibake)
-    const hasHighBytes = /[\x80-\xFF]/.test(filename);
-    if (hasHighBytes) {
-      // Convert back to bytes and decode as UTF-8
-      const bytes = Buffer.from(filename, 'latin1');
-      return bytes.toString('utf8');
-    }
-    return filename;
-  } catch {
-    return filename;
-  }
-}
-
-/**
- * Main request handler
- */
 export default async function (context, req) {
-  context.log?.info?.('🚀 Test log from instructor-files!');
+  context.log?.info?.('instructor-files: request received', { method: req.method });
 
-  const { method } = req;
-
-  if (method === 'POST') {
-    return await handleUpload(context, req);
-  } else if (method === 'DELETE') {
-    return await handleDelete(context, req);
-  } else {
-    return respond(context, 405, { error: 'method_not_allowed' });
+  const env = readEnv(context);
+  const adminConfig = readSupabaseAdminConfig(env);
+  if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
+    context.log?.error?.('instructor-files missing Supabase admin credentials');
+    return respond(context, 500, { message: 'server_misconfigured' });
   }
-}
 
-/**
- * POST /api/instructor-files - Upload file
- */
-async function handleUpload(context, req) {
-  let tenantClient = null;
+  const authorization = resolveBearerAuthorization(req);
+  if (!authorization?.token) {
+    context.log?.warn?.('instructor-files missing bearer token', {
+      hasAuthHeader: !!req.headers?.authorization,
+      authHeader: req.headers?.authorization?.substring(0, 20) + '...',
+    });
+    return respond(context, 401, { message: 'missing_bearer' });
+  }
 
+  const controlClient = createSupabaseAdminClient(adminConfig);
+
+  // Validate token
+  let authResult;
   try {
-    console.log('\n\n🚀🚀🚀 [INSTRUCTOR-FILES] ===== UPLOAD STARTED ===== 🚀🚀🚀\n');
-    context.log?.info?.('🚀🚀🚀 INSTRUCTOR FILE UPLOAD STARTED 🚀🚀🚀');
-    console.log('🔵 [INSTRUCTOR-FILES] Upload started');
+    authResult = await controlClient.auth.getUser(authorization.token);
+  } catch (error) {
+    context.log?.error?.('instructor-files failed to validate token', { message: error?.message });
+    return respond(context, 401, { message: 'invalid_or_expired_token' });
+  }
+
+  if (authResult.error || !authResult.data?.user?.id) {
+    context.log?.warn?.('instructor-files token validation failed', {
+      hasError: !!authResult.error,
+      errorMessage: authResult.error?.message,
+      hasUser: !!authResult.data?.user,
+      hasUserId: !!authResult.data?.user?.id,
+    });
+    return respond(context, 401, { message: 'invalid_or_expired_token' });
+  }
+
+  const userId = authResult.data.user.id;
+
+  // POST: Upload file
+  if (req.method === 'POST') {
+    let parts;
+    try {
+      parts = parseMultipartData(req);
+    } catch (error) {
+      context.log?.error?.('Failed to parse multipart data', { message: error?.message });
+      return respond(context, 400, { message: 'invalid_multipart_data' });
+    }
+
+    // Extract fields from multipart data
+    const filePart = parts.find(p => p.filename);
+    const instructorIdPart = parts.find(p => p.name === 'instructor_id');
+    const orgIdPart = parts.find(p => p.name === 'org_id');
+    const defIdPart = parts.find(p => p.name === 'definition_id');
+    const defNamePart = parts.find(p => p.name === 'definition_name');
+
+    if (!filePart) {
+      return respond(context, 400, { message: 'no_file_provided' });
+    }
+
+    if (!instructorIdPart || !orgIdPart) {
+      return respond(context, 400, { message: 'missing_instructor_id_or_org_id' });
+    }
+
+    const instructorId = instructorIdPart.data.toString('utf8').trim();
+    const orgId = orgIdPart.data.toString('utf8').trim();
+    const definitionId = defIdPart ? defIdPart.data.toString('utf8').trim() : null;
+    const definitionName = defNamePart ? defNamePart.data.toString('utf8').trim() : null;
+
+    // Decode filename properly to handle Hebrew and other UTF-8 characters
+    let decodedFilename = filePart.filename;
     
-    // Parse auth and resolve org
-    const bearer = resolveBearerAuthorization(req);
-    if (!bearer) {
-      console.error('❌ [INSTRUCTOR-FILES] Missing authorization header');
-      return respond(context, 401, { error: 'missing_authorization' });
+    context.log?.info?.('Filename encoding debug', {
+      original: filePart.filename,
+      codePoints: filePart.filename ? Array.from(filePart.filename).map(c => c.charCodeAt(0).toString(16)) : [],
+      length: filePart.filename?.length,
+    });
+
+    try {
+      // Hebrew characters sent as UTF-8 bytes but interpreted as latin1/windows-1252
+      if (decodedFilename && /[\u0080-\u00FF]/.test(decodedFilename)) {
+        const originalBytes = Buffer.from(decodedFilename, 'latin1');
+        const utf8Decoded = originalBytes.toString('utf8');
+        
+        if (!utf8Decoded.includes('\uFFFD')) {
+          context.log?.info?.('Successfully decoded Hebrew filename', {
+            before: decodedFilename,
+            after: utf8Decoded,
+          });
+          decodedFilename = utf8Decoded;
+        }
+      }
+    } catch (err) {
+      context.log?.warn?.('Failed to decode filename, using original', { 
+        error: err.message,
+        filename: decodedFilename,
+      });
     }
 
-    console.log('🔵 [INSTRUCTOR-FILES] Bearer token found');
+    context.log?.info?.('File upload parsed', {
+      filename: decodedFilename,
+      mimeType: filePart.type,
+      fileSize: filePart.data.length,
+      instructorId,
+      orgId,
+    });
 
-    const env = readEnv(context);
-    const adminConfig = readSupabaseAdminConfig(env);
-    const controlClient = createSupabaseAdminClient(adminConfig);
-
-    console.log('🔵 [INSTRUCTOR-FILES] Control client created');
-
-    // Verify session
-    const { data: { user }, error: authError } = await controlClient.auth.getUser(bearer);
-    if (authError || !user) {
-      console.error('❌ [INSTRUCTOR-FILES] Auth failed:', authError?.message);
-      return respond(context, 401, { error: 'invalid_token' });
+    // Validate file
+    const validation = validateFileUpload(filePart.data, filePart.type);
+    if (!validation.valid) {
+      context.log?.warn?.('File validation failed', { error: validation.error, details: validation.details });
+      return respond(context, 400, { 
+        message: validation.error,
+        details: validation.details 
+      });
     }
 
-    console.log('🔵 [INSTRUCTOR-FILES] User authenticated:', user.id);
-    context.log?.info?.(`✅ User authenticated: ${user.id}`);
-
-    const orgId = resolveOrgId(req);
-    if (!orgId) {
-      console.error('❌ [INSTRUCTOR-FILES] Missing org_id');
-      return respond(context, 400, { error: 'missing_org_id' });
+    // Verify membership
+    let role;
+    try {
+      role = await ensureMembership(controlClient, orgId, userId);
+    } catch (membershipError) {
+      context.log?.error?.('instructor-files failed to verify membership', {
+        message: membershipError?.message,
+        orgId,
+        userId,
+      });
+      return respond(context, 500, { message: 'failed_to_verify_membership' });
     }
 
-    console.log('🔵 [INSTRUCTOR-FILES] Org ID:', orgId);
-
-    // Ensure user is a member
-    const role = await ensureMembership(controlClient, orgId, user.id);
     if (!role) {
-      console.error('❌ [INSTRUCTOR-FILES] User not a member of org');
-      return respond(context, 403, { error: 'not_org_member' });
+      return respond(context, 403, { message: 'not_a_member' });
     }
 
     const isAdmin = isAdminRole(role);
-    console.log('🔵 [INSTRUCTOR-FILES] User role:', role, 'isAdmin:', isAdmin);
 
-    // Get storage profile
+    // Permission check: Non-admin users can only upload to their own instructor record
+    if (!isAdmin && instructorId !== userId) {
+      return respond(context, 403, { 
+        message: 'forbidden',
+        details: 'You can only upload files to your own instructor record'
+      });
+    }
+
+    // Get storage profile from org_settings
     const { data: orgSettings, error: settingsError } = await controlClient
       .from('org_settings')
       .select('storage_profile')
       .eq('org_id', orgId)
-      .single();
+      .maybeSingle();
 
-    if (settingsError || !orgSettings?.storage_profile) {
-      console.error('❌ [INSTRUCTOR-FILES] Storage not configured:', settingsError?.message);
-      return respond(context, 424, { error: 'storage_not_configured' });
+    if (settingsError) {
+      context.log?.error?.('Failed to load storage profile', { message: settingsError.message });
+      return respond(context, 500, { message: 'failed_to_load_storage_profile' });
     }
 
-    const storageProfile = orgSettings.storage_profile;
-    console.log('🔵 [INSTRUCTOR-FILES] Storage profile loaded. Mode:', storageProfile.mode);
-
-    // Check if storage is disconnected
-    if (storageProfile.disconnected === true) {
-      console.error('❌ [INSTRUCTOR-FILES] Storage is disconnected');
-      return respond(context, 403, { error: 'storage_disconnected', message: 'Storage is disconnected. Please reconnect storage to upload files.' });
+    const storageProfile = orgSettings?.storage_profile;
+    if (!storageProfile || !storageProfile.mode) {
+      return respond(context, 400, { message: 'storage_not_configured' });
     }
 
-    // Decrypt BYOS credentials if needed
-    let resolvedProfile = storageProfile;
-    if (storageProfile.mode === 'byos' && storageProfile.byos) {
-      const decrypted = decryptStorageProfile(storageProfile);
-      resolvedProfile = { ...storageProfile, byos: decrypted.byos };
-      console.log('🔵 [INSTRUCTOR-FILES] BYOS credentials decrypted');
+    // Decrypt BYOS credentials if present
+    const decryptedProfile = decryptStorageProfile(storageProfile, env);
+
+    // Block uploads if storage is disconnected
+    if (decryptedProfile.disconnected === true) {
+      return respond(context, 403, { 
+        message: 'storage_disconnected',
+        details: 'Storage is disconnected. Please reconnect or reconfigure storage to upload files.'
+      });
     }
 
-    // Get environment variables for managed storage
-    const r2Env = {
-      SYSTEM_R2_ENDPOINT: process.env.SYSTEM_R2_ENDPOINT,
-      SYSTEM_R2_ACCESS_KEY: process.env.SYSTEM_R2_ACCESS_KEY,
-      SYSTEM_R2_SECRET_KEY: process.env.SYSTEM_R2_SECRET_KEY,
-      SYSTEM_R2_BUCKET_NAME: process.env.SYSTEM_R2_BUCKET_NAME,
-    };
-
-    console.log('🔵 [INSTRUCTOR-FILES] Environment variables loaded. Has R2 config:', !!(r2Env.SYSTEM_R2_ENDPOINT && r2Env.SYSTEM_R2_BUCKET_NAME));
-
-    // Parse multipart data
-    const parts = parseMultipartData(req);
-    console.log('🔵 [INSTRUCTOR-FILES] Multipart data parsed. Parts count:', parts.length);
-
-    // Extract fields
-    const filePart = parts.find(p => p.name === 'file');
-    const instructorIdPart = parts.find(p => p.name === 'instructor_id');
-    const definitionIdPart = parts.find(p => p.name === 'definition_id');
-    const definitionNamePart = parts.find(p => p.name === 'definition_name');
-
-    if (!filePart || !instructorIdPart) {
-      return respond(context, 400, { error: 'missing_required_fields', details: 'file and instructor_id are required' });
-    }
-
-    const instructorId = instructorIdPart.data.toString('utf8');
-    const definitionId = definitionIdPart?.data.toString('utf8') || null;
-    const definitionName = definitionNamePart?.data.toString('utf8') || null;
-
-    // Permission check: Non-admin users can only upload to their own instructor record
-    if (!isAdmin && instructorId !== user.id) {
-      return respond(context, 403, { error: 'forbidden', message: 'You can only upload files to your own instructor record' });
-    }
-
-    const fileData = filePart.data;
-    const rawFilename = filePart.filename || 'file';
-    const originalName = decodeFilename(rawFilename);
-    const mimeType = filePart.type || 'application/octet-stream';
-
-    console.log('🔵 [INSTRUCTOR-FILES] File parsed:', { originalName, mimeType, size: fileData.length });
-    context.log?.info?.(`📄 File parsed: ${originalName} (${mimeType}, ${fileData.length} bytes)`);
-
-    // Validate file
-    const validation = validateFileUpload(fileData, mimeType);
-    if (!validation.valid) {
-      return respond(context, 400, { error: validation.error, details: validation.details });
-    }
-
-    // Get tenant client
-    tenantClient = await resolveTenantClient(controlClient, orgId);
-
-    // Verify instructor exists
-    const { data: instructor, error: instructorError } = await tenantClient
-      .from('Instructors')
-      .select('id, name')
-      .eq('id', instructorId)
-      .single();
-
-    if (instructorError || !instructor) {
-      return respond(context, 404, { error: 'instructor_not_found' });
-    }
+    // Calculate file hash for deduplication tracking
+    const fileHash = calculateFileHash(filePart.data);
 
     // Generate file metadata
     const fileId = generateFileId();
-    const fileHash = calculateFileHash(fileData);
-    const fileExtension = originalName.split('.').pop() || '';
-    const storagePath = `instructors/${orgId}/${instructorId}/${fileId}.${fileExtension}`;
+    const filenameParts = filePart.filename.split('.');
+    const extension = filenameParts.length > 1 && filenameParts[filenameParts.length - 1] 
+      ? filenameParts[filenameParts.length - 1] 
+      : 'bin';
+    const filePath = `instructors/${orgId}/${instructorId}/${fileId}.${extension}`;
+    const contentType = filePart.type || 'application/octet-stream';
 
-    // Initialize storage driver
+    // Get storage driver
     let driver;
-    if (resolvedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, r2Env);
-    } else if (resolvedProfile.mode === 'byos') {
-      driver = getStorageDriver('byos', resolvedProfile.byos, r2Env);
-    } else {
-      return respond(context, 500, { error: 'invalid_storage_mode' });
+    try {
+      if (decryptedProfile.mode === 'managed') {
+        // Check for required R2 environment variables
+        const hasR2Config = env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_ACCESS_KEY && 
+                           env.SYSTEM_R2_SECRET_KEY && env.SYSTEM_R2_BUCKET_NAME;
+        if (!hasR2Config) {
+          context.log?.error?.('Managed storage R2 environment variables not configured');
+          return respond(context, 500, { 
+            message: 'managed_storage_not_configured',
+            details: 'System administrator needs to configure R2 storage credentials'
+          });
+        }
+        driver = getStorageDriver('managed', null, env);
+      } else if (decryptedProfile.mode === 'byos') {
+        if (!decryptedProfile.byos) {
+          return respond(context, 400, { message: 'byos_config_missing' });
+        }
+        driver = getStorageDriver('byos', decryptedProfile.byos, env);
+      } else {
+        return respond(context, 400, { message: 'invalid_storage_mode' });
+      }
+    } catch (driverError) {
+      context.log?.error?.('Failed to create storage driver', { 
+        message: driverError?.message,
+        stack: driverError?.stack,
+        mode: storageProfile.mode
+      });
+      return respond(context, 500, { 
+        message: 'storage_driver_error', 
+        details: driverError.message 
+      });
     }
 
-    console.log('🔵 [INSTRUCTOR-FILES] Uploading to storage...', { path: storagePath, size: fileData.length });
-    context.log?.info?.(`📤 Uploading file to storage: ${storagePath}`);
+    // Upload file
+    let uploadResult;
+    try {
+      uploadResult = await driver.upload(filePath, filePart.data, contentType);
+    } catch (uploadError) {
+      context.log?.error?.('File upload failed', { message: uploadError?.message });
+      return respond(context, 500, { message: 'file_upload_failed', error: uploadError.message });
+    }
 
-    // Upload to storage
-    await driver.upload(storagePath, fileData, mimeType);
+    // Get tenant client for database update
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
+    }
 
-    console.log('✅ [INSTRUCTOR-FILES] File uploaded to storage');
-    context.log?.info?.('✅ File uploaded to storage successfully');
+    // CRITICAL: Verify instructor record exists BEFORE uploading to storage
+    // This ensures the instructorId actually corresponds to an instructor in the system
+    const { data: currentInstructor, error: fetchError } = await tenantClient
+      .from('Instructors')
+      .select('id, name, files')
+      .eq('id', instructorId)
+      .single();
 
-    // Get download URL for immediate access
-    const url = await driver.getDownloadUrl(storagePath, 3600, originalName); // 1 hour expiry
+    if (fetchError || !currentInstructor) {
+      context.log?.error?.('Instructor not found or fetch failed', { 
+        message: fetchError?.message,
+        code: fetchError?.code,
+        instructorId,
+        orgId,
+      });
+      return respond(context, 404, { 
+        message: 'instructor_not_found',
+        details: 'The specified instructor does not exist in this organization'
+      });
+    }
 
-    console.log('✅ [INSTRUCTOR-FILES] Download URL generated');
-    context.log?.info?.('✅ Download URL generated');
+    // Build proper display name based on definition and instructor
+    let displayName = decodedFilename;
+    
+    if (definitionId && definitionName) {
+      const instructorName = currentInstructor?.name || 'מדריך';
+      displayName = `${definitionName} - ${instructorName}`;
+      
+      context.log?.info?.('Built display name for instructor file', {
+        definitionName,
+        instructorName,
+        displayName,
+      });
+    }
 
-    // Build file metadata
-    const fileMetadata = {
+    // Build complete file metadata object
+    const completeFileMetadata = {
       id: fileId,
-      name: definitionName && definitionId 
-        ? `${definitionName} - ${instructor.name}` 
-        : originalName,
-      original_name: originalName,
-      url,
-      path: storagePath,
-      storage_provider: resolvedProfile.mode === 'managed' ? 'managed_r2' : resolvedProfile.byos?.provider || 'unknown',
+      name: displayName,
+      original_name: decodedFilename,
+      url: uploadResult.url,
+      path: filePath,
+      storage_provider: storageProfile.mode,
       uploaded_at: new Date().toISOString(),
-      uploaded_by: user.id,
-      definition_id: definitionId,
-      definition_name: definitionName,
-      size: fileData.length,
-      type: mimeType,
+      uploaded_by: userId,
+      definition_id: definitionId || null,
+      ...(definitionName && { definition_name: definitionName }),
+      size: filePart.data.length,
+      type: contentType,
       hash: fileHash,
     };
 
-    console.log('🔵 [INSTRUCTOR-FILES] File metadata created:', fileMetadata);
+    const currentFiles = Array.isArray(currentInstructor?.files) ? currentInstructor.files : [];
+    const updatedFiles = [...currentFiles, completeFileMetadata];
 
-    // Update instructor record with new file
-    const currentFiles = Array.isArray(instructor.files) ? instructor.files : [];
-    const updatedFiles = [...currentFiles, fileMetadata];
-
-    console.log('🔵 [INSTRUCTOR-FILES] Updating instructor record. Old file count:', currentFiles.length, 'New count:', updatedFiles.length);
-
+    // Update instructor record
     const { error: updateError } = await tenantClient
       .from('Instructors')
       .update({ files: updatedFiles })
       .eq('id', instructorId);
 
     if (updateError) {
-      console.error('❌ [INSTRUCTOR-FILES] Failed to update instructor files:', updateError.message, updateError);
-      // Try to delete uploaded file from storage
-      try {
-        console.log('🔵 [INSTRUCTOR-FILES] Attempting cleanup of uploaded file...');
-        await driver.delete(storagePath);
-        console.log('✅ [INSTRUCTOR-FILES] Cleanup successful');
-      } catch (cleanupError) {
-        console.error('❌ [INSTRUCTOR-FILES] Failed to cleanup uploaded file:', cleanupError.message);
-      }
-      return respond(context, 500, { error: 'database_update_failed', details: updateError.message });
+      context.log?.error?.('Failed to update instructor files', { message: updateError.message });
+      return respond(context, 500, { message: 'failed_to_update_instructor' });
     }
 
-    console.log('✅ [INSTRUCTOR-FILES] Upload complete! File ID:', fileId);
-    console.log('\n\n✅✅✅ [INSTRUCTOR-FILES] ===== UPLOAD SUCCESS ===== ✅✅✅\n');
-    context.log?.info?.('✅✅✅ INSTRUCTOR FILE UPLOAD SUCCESS ✅✅✅');
+    context.log?.info?.('File uploaded successfully', { fileId, instructorId, mode: storageProfile.mode });
 
     return respond(context, 200, {
-      success: true,
-      file: fileMetadata,
+      file: completeFileMetadata,
     });
-
-  } catch (error) {
-    console.error('❌ [INSTRUCTOR-FILES] Unexpected error:', error.message, error.stack);
-    context.log?.error?.('❌ INSTRUCTOR FILE UPLOAD ERROR:', error.message);
-    return respond(context, 500, { error: 'internal_error', details: error.message });
   }
-}
 
-/**
- * DELETE /api/instructor-files - Delete file
- */
-async function handleDelete(context, req) {
-  let tenantClient = null;
+  // DELETE: Remove file
+  if (req.method === 'DELETE') {
+    const body = parseRequestBody(req);
+    const orgId = resolveOrgId(req, body);
+    const { instructor_id: instructorId, file_id: fileId } = body;
 
-  try {
-    console.log('\n\n🗑️🗑️🗑️ [INSTRUCTOR-FILES] ===== DELETE STARTED ===== 🗑️🗑️🗑️\n');
-    context.log?.info?.('🗑️🗑️🗑️ INSTRUCTOR FILE DELETE STARTED 🗑️🗑️🗑️');
-    
-    // Parse auth and resolve org
-    const bearer = resolveBearerAuthorization(req);
-    if (!bearer) {
-      return respond(context, 401, { error: 'missing_authorization' });
+    if (!orgId || !instructorId || !fileId) {
+      return respond(context, 400, { message: 'missing_required_fields' });
     }
 
-    const env = readEnv(context);
-    const adminConfig = readSupabaseAdminConfig(env);
-    const controlClient = createSupabaseAdminClient(adminConfig);
-
-    // Verify session
-    const { data: { user }, error: authError } = await controlClient.auth.getUser(bearer);
-    if (authError || !user) {
-      return respond(context, 401, { error: 'invalid_token' });
+    // Verify membership
+    let role;
+    try {
+      role = await ensureMembership(controlClient, orgId, userId);
+    } catch (membershipError) {
+      context.log?.error?.('instructor-files failed to verify membership', {
+        message: membershipError?.message,
+        orgId,
+        userId,
+      });
+      return respond(context, 500, { message: 'failed_to_verify_membership' });
     }
 
-    const orgId = resolveOrgId(req);
-    if (!orgId) {
-      return respond(context, 400, { error: 'missing_org_id' });
-    }
-
-    // Ensure user is a member
-    const role = await ensureMembership(controlClient, orgId, user.id);
     if (!role) {
-      return respond(context, 403, { error: 'not_org_member' });
+      return respond(context, 403, { message: 'not_a_member' });
     }
 
     const isAdmin = isAdminRole(role);
 
-    // Parse request body
-    const body = parseRequestBody(req);
-    const { instructor_id, file_id } = body;
-
-    if (!instructor_id || !file_id) {
-      return respond(context, 400, { error: 'missing_required_fields', details: 'instructor_id and file_id are required' });
-    }
-
-    // Permission check: Non-admin users can only delete their own files
-    if (!isAdmin && instructor_id !== user.id) {
-      return respond(context, 403, { error: 'forbidden', message: 'You can only delete your own files' });
-    }
-
-    // CRITICAL: File deletion is restricted to admins only for data integrity
-    // Even if user is deleting their own file, only admins can perform deletions
+    // Permission check: Non-admin users cannot delete files (even their own)
     if (!isAdmin) {
-      return respond(context, 403, { error: 'forbidden', message: 'File deletion is restricted to administrators only' });
+      return respond(context, 403, { 
+        message: 'forbidden',
+        details: 'File deletion is restricted to administrators only'
+      });
     }
 
     // Get storage profile
@@ -436,87 +459,89 @@ async function handleDelete(context, req) {
       .from('org_settings')
       .select('storage_profile')
       .eq('org_id', orgId)
-      .single();
+      .maybeSingle();
 
-    if (settingsError || !orgSettings?.storage_profile) {
-      return respond(context, 424, { error: 'storage_not_configured' });
+    if (settingsError) {
+      context.log?.error?.('Failed to load storage profile', { message: settingsError.message });
+      return respond(context, 500, { message: 'failed_to_load_storage_profile' });
     }
 
-    const storageProfile = orgSettings.storage_profile;
-
-    // Decrypt BYOS credentials if needed
-    let resolvedProfile = storageProfile;
-    if (storageProfile.mode === 'byos' && storageProfile.byos) {
-      const decrypted = decryptStorageProfile(storageProfile);
-      resolvedProfile = { ...storageProfile, byos: decrypted.byos };
+    const storageProfile = orgSettings?.storage_profile;
+    if (!storageProfile || !storageProfile.mode) {
+      return respond(context, 400, { message: 'storage_not_configured' });
     }
-
-    // Get environment variables for managed storage
-    const r2Env = {
-      SYSTEM_R2_ENDPOINT: process.env.SYSTEM_R2_ENDPOINT,
-      SYSTEM_R2_ACCESS_KEY: process.env.SYSTEM_R2_ACCESS_KEY,
-      SYSTEM_R2_SECRET_KEY: process.env.SYSTEM_R2_SECRET_KEY,
-      SYSTEM_R2_BUCKET_NAME: process.env.SYSTEM_R2_BUCKET_NAME,
-    };
 
     // Get tenant client
-    tenantClient = await resolveTenantClient(controlClient, orgId);
-
-    // Get instructor record
-    const { data: instructor, error: instructorError } = await tenantClient
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
+    }
+    
+    // Fetch current files array
+    const { data: instructor, error: fetchError } = await tenantClient
       .from('Instructors')
-      .select('id, files')
-      .eq('id', instructor_id)
+      .select('files')
+      .eq('id', instructorId)
       .single();
 
-    if (instructorError || !instructor) {
-      return respond(context, 404, { error: 'instructor_not_found' });
+    if (fetchError) {
+      context.log?.error?.('Failed to fetch instructor', { message: fetchError.message });
+      return respond(context, 500, { message: 'failed_to_fetch_instructor' });
     }
 
-    const currentFiles = Array.isArray(instructor.files) ? instructor.files : [];
-    const fileToDelete = currentFiles.find(f => f.id === file_id);
+    const currentFiles = Array.isArray(instructor?.files) ? instructor.files : [];
+    const fileToDelete = currentFiles.find(f => f.id === fileId);
 
     if (!fileToDelete) {
-      return respond(context, 404, { error: 'file_not_found' });
+      return respond(context, 404, { message: 'file_not_found' });
     }
 
-    // Delete from storage
+    // Get storage driver
     let driver;
-    if (resolvedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, r2Env);
-    } else if (resolvedProfile.mode === 'byos') {
-      driver = getStorageDriver('byos', resolvedProfile.byos, r2Env);
-    } else {
-      return respond(context, 500, { error: 'invalid_storage_mode' });
+    try {
+      if (storageProfile.mode === 'managed') {
+        driver = getStorageDriver('managed', null, env);
+      } else if (storageProfile.mode === 'byos') {
+        if (!storageProfile.byos) {
+          context.log?.warn?.('BYOS config missing, skipping physical deletion');
+        } else {
+          driver = getStorageDriver('byos', storageProfile.byos, env);
+        }
+      }
+    } catch (driverError) {
+      context.log?.warn?.('Failed to create storage driver for deletion', { message: driverError?.message });
+      // Continue to remove from database even if driver creation fails
     }
 
-    try {
-      await driver.delete(fileToDelete.path);
-    } catch (storageError) {
-      context.log?.error?.('Failed to delete file from storage:', storageError);
-      // Continue with database update even if storage delete fails
+    // Delete physical file
+    if (driver && fileToDelete.path) {
+      try {
+        await driver.delete(fileToDelete.path);
+        context.log?.info?.('Physical file deleted', { path: fileToDelete.path });
+      } catch (deleteError) {
+        context.log?.warn?.('Failed to delete physical file', { message: deleteError?.message });
+        // Continue to remove from database even if physical deletion fails
+      }
     }
+
+    // Remove from files array
+    const updatedFiles = currentFiles.filter(f => f.id !== fileId);
 
     // Update instructor record
-    const updatedFiles = currentFiles.filter(f => f.id !== file_id);
-
     const { error: updateError } = await tenantClient
       .from('Instructors')
       .update({ files: updatedFiles })
-      .eq('id', instructor_id);
+      .eq('id', instructorId);
 
     if (updateError) {
-      context.log?.error?.('Failed to update instructor files:', updateError);
-      return respond(context, 500, { error: 'database_update_failed' });
+      context.log?.error?.('Failed to update instructor files', { message: updateError.message });
+      return respond(context, 500, { message: 'failed_to_update_instructor' });
     }
 
-    return respond(context, 200, {
-      success: true,
-      deleted_file_id: file_id,
-    });
+    context.log?.info?.('File deleted successfully', { fileId, instructorId });
 
-  } catch (error) {
-    context.log?.error?.('Instructor file delete error:', error);
-    return respond(context, 500, { error: 'internal_error', details: error.message });
+    return respond(context, 200, { success: true });
   }
+
+  return respond(context, 405, { message: 'method_not_allowed' });
 }
