@@ -184,15 +184,27 @@ export default async function (context, req) {
   // Get storage driver
   let driver;
   try {
+    context.log?.info?.('🔧 [INSTRUCTOR-DOWNLOAD] Creating storage driver', {
+      mode: decryptedProfile.mode,
+      hasR2Config: !!(env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_BUCKET_NAME),
+      hasByosConfig: !!decryptedProfile.byos
+    });
+    
     if (decryptedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', {}, env);
+      driver = getStorageDriver('managed', null, env);
     } else if (decryptedProfile.mode === 'byos') {
       driver = getStorageDriver('byos', decryptedProfile.byos, env);
     } else {
       throw new Error(`Unknown storage mode: ${decryptedProfile.mode}`);
     }
+    
+    context.log?.info?.('✅ [INSTRUCTOR-DOWNLOAD] Storage driver created successfully');
   } catch (driverError) {
-    context.log?.error?.('Failed to create storage driver', { message: driverError?.message });
+    context.log?.error?.('❌ [INSTRUCTOR-DOWNLOAD] Failed to create storage driver', { 
+      message: driverError?.message,
+      stack: driverError?.stack,
+      mode: decryptedProfile.mode
+    });
     return respond(context, 500, { 
       message: 'storage_driver_error', 
       details: driverError.message 
@@ -292,7 +304,9 @@ export default async function (context, req) {
   try {
     context.log?.info?.('🔗 [INSTRUCTOR-DOWNLOAD] Generating presigned URL', {
       path: file.path,
-      filename: displayFilename
+      filename: displayFilename,
+      hasDriver: !!driver,
+      hasGetDownloadUrl: !!(driver && typeof driver.getDownloadUrl === 'function')
     });
     
     const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename);
@@ -306,9 +320,15 @@ export default async function (context, req) {
   } catch (error) {
     context.log?.error?.('❌ [INSTRUCTOR-DOWNLOAD] Failed to generate download URL', { 
       message: error?.message,
-      path: file.path
+      stack: error?.stack,
+      path: file.path,
+      filename: displayFilename
     });
-    return respond(context, 500, { message: 'failed_to_generate_download_url' });
+    return respond(context, 500, { 
+      message: 'failed_to_generate_download_url',
+      details: error?.message,
+      error: error?.message 
+    });
   }
   } catch (error) {
     context.log?.error?.('instructor-files-download: unhandled error', {

@@ -298,7 +298,9 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to generate download URL');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData?.details || errorData?.message || 'Failed to generate download URL';
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -308,7 +310,8 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       }
     } catch (error) {
       console.error('Download error:', error);
-      toast.error('הורדת הקובץ נכשלה');
+      console.error('Error details:', error.message, error.data);
+      toast.error(`הורדת הקובץ נכשלה: ${error.message || 'שגיאה לא ידועה'}`);
     }
   }, [instructor, orgId, session]);
 
