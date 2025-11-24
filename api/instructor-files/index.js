@@ -255,10 +255,7 @@ async function handleUpload(req, context) {
     const originalName = decodeFilename(rawFilename);
     const mimeType = filePart.type || 'application/octet-stream';
 
-    // Permission check: Non-admin users can only upload to their own instructor record
-    if (!isAdmin && instructorId !== user.id) {
-      return respond(context, 403, { error: 'forbidden', message: 'You can only upload files to your own instructor record' });
-    }
+    console.log('🔵 [INSTRUCTOR-FILES] File parsed:', { originalName, mimeType, size: fileData.length });
 
     // Validate file
     const validation = validateFileUpload(fileData, mimeType);
@@ -348,6 +345,8 @@ async function handleUpload(req, context) {
     }
 
     console.log('✅ [INSTRUCTOR-FILES] Upload complete! File ID:', fileId);
+    console.log('\n\n✅✅✅ [INSTRUCTOR-FILES] ===== UPLOAD SUCCESS ===== ✅✅✅\n');
+    context.log('✅✅✅ INSTRUCTOR FILE UPLOAD SUCCESS ✅✅✅');
 
     return respond(context, 200, {
       success: true,
@@ -363,10 +362,13 @@ async function handleUpload(req, context) {
 /**
  * DELETE /api/instructor-files - Delete file
  */
-async function handleDelete(req, context) {
+async function handleDelete(context, req) {
   let tenantClient = null;
 
   try {
+    console.log('\n\n🗑️🗑️🗑️ [INSTRUCTOR-FILES] ===== DELETE STARTED ===== 🗑️🗑️🗑️\n');
+    context.log('🗑️🗑️🗑️ INSTRUCTOR FILE DELETE STARTED 🗑️🗑️🗑️');
+    
     // Parse auth and resolve org
     const bearer = resolveBearerAuthorization(req);
     if (!bearer) {
