@@ -157,11 +157,9 @@ async function handleUpload(context, req) {
 
     console.log('🔵 [INSTRUCTOR-FILES] Bearer token found');
 
-    const controlDbUrl = readEnv('APP_CONTROL_DB_URL');
-    const controlDbServiceRoleKey = readEnv('APP_CONTROL_DB_SERVICE_ROLE_KEY');
-    const { client: controlClient } = await createSupabaseAdminClient(
-      readSupabaseAdminConfig(controlDbUrl, controlDbServiceRoleKey)
-    );
+    const env = readEnv(context);
+    const adminConfig = readSupabaseAdminConfig(env);
+    const controlClient = createSupabaseAdminClient(adminConfig);
 
     console.log('🔵 [INSTRUCTOR-FILES] Control client created');
 
@@ -223,14 +221,14 @@ async function handleUpload(context, req) {
     }
 
     // Get environment variables for managed storage
-    const env = {
+    const storageEnv = {
       SYSTEM_R2_ENDPOINT: process.env.SYSTEM_R2_ENDPOINT,
       SYSTEM_R2_ACCESS_KEY: process.env.SYSTEM_R2_ACCESS_KEY,
       SYSTEM_R2_SECRET_KEY: process.env.SYSTEM_R2_SECRET_KEY,
       SYSTEM_R2_BUCKET_NAME: process.env.SYSTEM_R2_BUCKET_NAME,
     };
 
-    console.log('🔵 [INSTRUCTOR-FILES] Environment variables loaded. Has R2 config:', !!(env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_BUCKET_NAME));
+    console.log('🔵 [INSTRUCTOR-FILES] Environment variables loaded. Has R2 config:', !!(storageEnv.SYSTEM_R2_ENDPOINT && storageEnv.SYSTEM_R2_BUCKET_NAME));
 
     // Parse multipart data
     const parts = parseMultipartData(req);
@@ -292,9 +290,9 @@ async function handleUpload(context, req) {
     // Initialize storage driver
     let driver;
     if (resolvedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, env);
+      driver = getStorageDriver('managed', null, storageEnv);
     } else if (resolvedProfile.mode === 'byos') {
-      driver = getStorageDriver('byos', resolvedProfile.byos, env);
+      driver = getStorageDriver('byos', resolvedProfile.byos, storageEnv);
     } else {
       return respond(context, 500, { error: 'invalid_storage_mode' });
     }
@@ -391,11 +389,9 @@ async function handleDelete(context, req) {
       return respond(context, 401, { error: 'missing_authorization' });
     }
 
-    const controlDbUrl = readEnv('APP_CONTROL_DB_URL');
-    const controlDbServiceRoleKey = readEnv('APP_CONTROL_DB_SERVICE_ROLE_KEY');
-    const { client: controlClient } = await createSupabaseAdminClient(
-      readSupabaseAdminConfig(controlDbUrl, controlDbServiceRoleKey)
-    );
+    const env = readEnv(context);
+    const adminConfig = readSupabaseAdminConfig(env);
+    const controlClient = createSupabaseAdminClient(adminConfig);
 
     // Verify session
     const { data: { user }, error: authError } = await controlClient.auth.getUser(bearer);
@@ -487,9 +483,9 @@ async function handleDelete(context, req) {
     // Delete from storage
     let driver;
     if (resolvedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, env);
+      driver = getStorageDriver('managed', null, storageEnv);
     } else if (resolvedProfile.mode === 'byos') {
-      driver = getStorageDriver('byos', resolvedProfile.byos, env);
+      driver = getStorageDriver('byos', resolvedProfile.byos, storageEnv);
     } else {
       return respond(context, 500, { error: 'invalid_storage_mode' });
     }
