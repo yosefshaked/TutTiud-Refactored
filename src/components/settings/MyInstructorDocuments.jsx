@@ -126,7 +126,12 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
   }, [session, orgId]);
 
   const handleFileUpload = useCallback(async (file, definitionId = null, definitionName = null) => {
-    if (!file || !instructor) return;
+    console.log('🔵 [UPLOAD] handleFileUpload called', { fileName: file?.name, definitionId, definitionName, hasInstructor: !!instructor });
+    
+    if (!file || !instructor) {
+      console.log('❌ [UPLOAD] Missing file or instructor', { hasFile: !!file, hasInstructor: !!instructor });
+      return;
+    }
 
     const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
     const ALLOWED_MIME_TYPES = [
@@ -141,20 +146,28 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ];
 
+    console.log('🔵 [UPLOAD] Validating file', { size: file.size, type: file.type, maxSize: MAX_FILE_SIZE_BYTES });
+
     // Validate file size
     if (file.size > MAX_FILE_SIZE_BYTES) {
+      console.log('❌ [UPLOAD] File too large', { size: file.size, max: MAX_FILE_SIZE_BYTES });
       toast.error('הקובץ גדול מדי. גודל מקסימלי: 10MB');
       return;
     }
 
     // Validate file type
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      console.log('❌ [UPLOAD] Invalid file type', { type: file.type, allowed: ALLOWED_MIME_TYPES });
       toast.error('סוג קובץ לא נתמך. נא להעלות PDF, תמונה, Word או Excel');
       return;
     }
+    
+    console.log('✅ [UPLOAD] File validation passed');
 
     const uploadId = crypto.randomUUID();
     const displayName = definitionName || file.name;
+
+    console.log('🔵 [UPLOAD] Creating upload tracking', { uploadId, displayName, instructorId: instructor.id, orgId });
 
     // Add to background uploads tracking
     setBackgroundUploads(prev => [...prev, {
@@ -173,11 +186,21 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       formData.append('definition_id', definitionId);
       formData.append('definition_name', definitionName || '');
     }
+    
+    console.log('🔵 [UPLOAD] FormData created', { 
+      hasFile: formData.has('file'),
+      orgId: formData.get('org_id'),
+      instructorId: formData.get('instructor_id'),
+      definitionId: formData.get('definition_id')
+    });
 
     // Use XMLHttpRequest for progress tracking
     const xhr = new XMLHttpRequest();
+    
+    console.log('🔵 [UPLOAD] XHR created, setting up listeners');
 
     xhr.upload.addEventListener('progress', (e) => {
+      console.log('🔵 [UPLOAD] Progress event', { loaded: e.loaded, total: e.total, computable: e.lengthComputable });
       if (e.lengthComputable) {
         const percentComplete = Math.round((e.loaded / e.total) * 100);
         setBackgroundUploads(prev => 
@@ -191,12 +214,15 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
     });
 
     xhr.addEventListener('load', () => {
+      console.log('🔵 [UPLOAD] Load event', { status: xhr.status, statusText: xhr.statusText, responseLength: xhr.responseText?.length });
       setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
       
       if (xhr.status === 200) {
+        console.log('✅ [UPLOAD] Upload successful', xhr.responseText);
         toast.success('הקובץ הועלה בהצלחה');
         refreshInstructor();
       } else {
+        console.log('❌ [UPLOAD] Upload failed', { status: xhr.status, response: xhr.responseText });
         let errorMsg = 'העלאת הקובץ נכשלה';
         try {
           const response = JSON.parse(xhr.responseText);
@@ -217,6 +243,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
     });
 
     xhr.addEventListener('error', () => {
+      console.log('❌ [UPLOAD] Error event - network error or CORS');
       setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
       toast.error('העלאת הקובץ נכשלה');
       
@@ -227,10 +254,13 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       }
     });
 
-    xhr.open('POST', '/api/instructor-files');
+    const uploadUrl = '/api/instructor-files';
+    console.log('🔵 [UPLOAD] Opening XHR', { method: 'POST', url: uploadUrl });
+    xhr.open('POST', uploadUrl);
     
     // Add auth headers
     const token = session?.access_token;
+    console.log('🔵 [UPLOAD] Adding headers', { hasToken: !!token, tokenLength: token?.length });
     if (token) {
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
@@ -238,7 +268,9 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       xhr.setRequestHeader('x-supabase-auth', `Bearer ${token}`);
     }
 
+    console.log('🔵 [UPLOAD] Sending XHR request...');
     xhr.send(formData);
+    console.log('🔵 [UPLOAD] XHR.send() called');
 
     if (definitionId) {
       setUploadingDefId(definitionId);
