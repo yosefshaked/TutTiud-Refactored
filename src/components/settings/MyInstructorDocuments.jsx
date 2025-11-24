@@ -60,13 +60,12 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
         setLoading(true);
         
         // Load instructor record (filtered to current user by backend)
-        console.log('[MyInstructorDocuments] Loading instructor data for userId:', userId);
+        console.log('[MyInstructorDocuments] Loading instructor data for userId:', userId, 'orgId:', orgId);
         const instructors = await authenticatedFetch(
-          'instructors',
+          `instructors?org_id=${orgId}`,
           {
             session,
             method: 'GET',
-            query: { org_id: orgId }
           }
         );
         console.log('[MyInstructorDocuments] Instructors loaded:', instructors);
@@ -109,11 +108,10 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
 
     try {
       const instructors = await authenticatedFetch(
-        'instructors',
+        `instructors?org_id=${orgId}`,
         {
           session,
           method: 'GET',
-          query: { org_id: orgId }
         }
       );
 
