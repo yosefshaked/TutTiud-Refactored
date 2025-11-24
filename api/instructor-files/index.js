@@ -221,14 +221,14 @@ async function handleUpload(context, req) {
     }
 
     // Get environment variables for managed storage
-    const storageEnv = {
+    const r2Env = {
       SYSTEM_R2_ENDPOINT: process.env.SYSTEM_R2_ENDPOINT,
       SYSTEM_R2_ACCESS_KEY: process.env.SYSTEM_R2_ACCESS_KEY,
       SYSTEM_R2_SECRET_KEY: process.env.SYSTEM_R2_SECRET_KEY,
       SYSTEM_R2_BUCKET_NAME: process.env.SYSTEM_R2_BUCKET_NAME,
     };
 
-    console.log('🔵 [INSTRUCTOR-FILES] Environment variables loaded. Has R2 config:', !!(storageEnv.SYSTEM_R2_ENDPOINT && storageEnv.SYSTEM_R2_BUCKET_NAME));
+    console.log('🔵 [INSTRUCTOR-FILES] Environment variables loaded. Has R2 config:', !!(r2Env.SYSTEM_R2_ENDPOINT && r2Env.SYSTEM_R2_BUCKET_NAME));
 
     // Parse multipart data
     const parts = parseMultipartData(req);
@@ -290,9 +290,9 @@ async function handleUpload(context, req) {
     // Initialize storage driver
     let driver;
     if (resolvedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, storageEnv);
+      driver = getStorageDriver('managed', null, r2Env);
     } else if (resolvedProfile.mode === 'byos') {
-      driver = getStorageDriver('byos', resolvedProfile.byos, storageEnv);
+      driver = getStorageDriver('byos', resolvedProfile.byos, r2Env);
     } else {
       return respond(context, 500, { error: 'invalid_storage_mode' });
     }
@@ -452,7 +452,7 @@ async function handleDelete(context, req) {
     }
 
     // Get environment variables for managed storage
-    const env = {
+    const r2Env = {
       SYSTEM_R2_ENDPOINT: process.env.SYSTEM_R2_ENDPOINT,
       SYSTEM_R2_ACCESS_KEY: process.env.SYSTEM_R2_ACCESS_KEY,
       SYSTEM_R2_SECRET_KEY: process.env.SYSTEM_R2_SECRET_KEY,
@@ -483,9 +483,9 @@ async function handleDelete(context, req) {
     // Delete from storage
     let driver;
     if (resolvedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, storageEnv);
+      driver = getStorageDriver('managed', null, r2Env);
     } else if (resolvedProfile.mode === 'byos') {
-      driver = getStorageDriver('byos', resolvedProfile.byos, storageEnv);
+      driver = getStorageDriver('byos', resolvedProfile.byos, r2Env);
     } else {
       return respond(context, 500, { error: 'invalid_storage_mode' });
     }
