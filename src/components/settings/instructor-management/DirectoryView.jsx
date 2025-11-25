@@ -3,16 +3,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar.jsx';
-import { Loader2, UserPlus, UserX, RotateCcw, Info } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Loader2, UserPlus, UserX, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
+import InfoTooltip from '@/components/ui/InfoTooltip.jsx';
 import {
   Select,
   SelectContent,
@@ -237,18 +232,10 @@ export default function DirectoryView({ session, orgId, canLoad }) {
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <div className="flex items-center gap-1 w-full sm:w-auto">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="h-10 w-10 p-0 shrink-0 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground">
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="left">
-                          <p>להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <InfoTooltip 
+                      message="להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים"
+                      side="left"
+                    />
                     <Select
                       value={instructor.instructor_type || '__none__'}
                       onValueChange={(value) => handleChangeType(instructor, value)}
