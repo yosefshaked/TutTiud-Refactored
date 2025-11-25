@@ -271,9 +271,10 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm truncate">
                     {instructor.name || instructor.email || instructor.id}
-                    {instructor.instructor_type && (
-                      <span className="text-muted-foreground font-normal"> ({instructor.instructor_type})</span>
-                    )}
+                    {instructor.instructor_type && (() => {
+                      const type = types.find(t => t.id === instructor.instructor_type);
+                      return type ? <span className="text-muted-foreground font-normal"> ({type.name})</span> : null;
+                    })()}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {instructor.email || '—'}

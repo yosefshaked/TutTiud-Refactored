@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,24 +27,22 @@ function formatFileDate(dateString) {
 }
 
 function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Math.round(bytes / Math.pow(k, i) * 100) / 100} ${sizes[i]}`;
+  const size = Math.round((bytes / Math.pow(k, i)) * 100) / 100;
+  return `${size} ${sizes[i]}`;
 }
 
 export default function StudentDocumentsSection({ student, session, orgId, onRefresh }) {
   const { activeOrg } = useOrg();
   const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
-  const [uploadState, setUploadState] = useState(REQUEST_STATE.idle);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
   const [definitions, setDefinitions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [uploadingDefId, setUploadingDefId] = useState(null);
   const [uploadingAdhoc, setUploadingAdhoc] = useState(false);
-  const [adhocName, setAdhocName] = useState('');
-  const [uploadProgress, setUploadProgress] = useState({}); // Track progress per upload
   const [backgroundUploads, setBackgroundUploads] = useState([]); // Active background uploads
 
   const studentFiles = Array.isArray(student?.files) ? student.files : [];
@@ -72,9 +70,9 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     (def) => def.is_mandatory && !studentFiles.find((f) => f.definition_id === def.id)
   );
 
-  // File upload restrictions
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  const ALLOWED_TYPES = [
+  // File upload restrictions (memoized to avoid recreating on every render)
+  const MAX_FILE_SIZE = useMemo(() => 10 * 1024 * 1024, []); // 10MB
+  const ALLOWED_TYPES = useMemo(() => [
     'application/pdf',
     'image/jpeg',
     'image/jpg',
@@ -84,7 +82,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ];
+  ], []);
 
   // Load document definitions
   useEffect(() => {
@@ -270,23 +268,15 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
           setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
 
           if (xhr.status === 200) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              
-              toast.success(`הקובץ ${file.name} הועלה בהצלחה!`, {
-                id: toastId,
-              });
+            toast.success(`הקובץ ${file.name} הועלה בהצלחה!`, {
+              id: toastId,
+            });
 
-              // Refresh student data
-              if (onRefresh) {
-                await onRefresh();
-              }
-              resolve(true);
-            } catch (error) {
-              console.error('Failed to parse response', error);
-              toast.error(`העלאה הושלמה אך התגובה לא תקינה`, { id: toastId });
-              resolve(false);
+            // Refresh student data
+            if (onRefresh) {
+              await onRefresh();
             }
+            resolve(true);
           } else {
             try {
               const errorData = JSON.parse(xhr.responseText);
@@ -335,7 +325,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         xhr.send(formData);
       });
     },
-    [session, orgId, student?.id, onRefresh, checkForDuplicates]
+    [session, orgId, student?.id, onRefresh, checkForDuplicates, ALLOWED_TYPES, MAX_FILE_SIZE]
   );
 
   const handleFileDelete = useCallback(
@@ -495,15 +485,13 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       if (definitionId) {
         handleFileUpload(file, definitionId);
       } else {
-        // For adhoc files, optionally prompt for custom name
-        const name = adhocName.trim() || file.name;
-        handleFileUpload(file, null, name);
+        handleFileUpload(file, null, file.name);
       }
 
       // Reset input
       event.target.value = '';
     },
-    [handleFileUpload, adhocName]
+    [handleFileUpload]
   );
 
   // Get file for definition
@@ -524,11 +512,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   };
 
   // Get definition name for a file (current name if definition exists, stored name if orphaned)
-  const getDefinitionNameForFile = (file) => {
+  const _getDefinitionNameForFile = (file) => {
     if (!file.definition_id) return null;
     const currentDef = definitions.find(def => def.id === file.definition_id);
     return currentDef?.name || file.definition_name || null;
   };
+  void _getDefinitionNameForFile; // Mark as intentionally unused
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -639,7 +628,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                 {file && (
                                   <div className="text-sm text-slate-600">
                                     <div>הועלה: {formatFileDate(file.uploaded_at)}</div>
-                                    <div>{formatFileSize(file.size)}</div>
+                                    <div dir="ltr">{formatFileSize(file.size)}</div>
                                   </div>
                                 )}
                               </div>
@@ -756,7 +745,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                 )}
                                 <div className="text-sm text-slate-600">
                                   <div>הועלה: {formatFileDate(file.uploaded_at)}</div>
-                                  <div>{formatFileSize(file.size)}</div>
+                                  <div dir="ltr">{formatFileSize(file.size)}</div>
                                 </div>
                               </div>
                             <div className="flex gap-2">

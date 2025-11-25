@@ -34,11 +34,12 @@ function formatFileDate(dateString) {
 }
 
 function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Math.round(bytes / Math.pow(k, i) * 100) / 100} ${sizes[i]}`;
+  const size = Math.round((bytes / Math.pow(k, i)) * 100) / 100;
+  return `${size} ${sizes[i]}`;
 }
 
 export default function MyInstructorDocuments({ session, orgId, userId }) {
@@ -595,7 +596,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{file.name}</p>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span>{formatFileSize(file.size)}</span>
+                                <span dir="ltr">{formatFileSize(file.size)}</span>
                                 <span>•</span>
                                 <span>{formatFileDate(file.uploaded_at)}</span>
                               </div>
@@ -719,7 +720,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                          <span>{formatFileSize(file.size)}</span>
+                          <span dir="ltr">{formatFileSize(file.size)}</span>
                           <span>•</span>
                           <span>{formatFileDate(file.uploaded_at)}</span>
                         </div>

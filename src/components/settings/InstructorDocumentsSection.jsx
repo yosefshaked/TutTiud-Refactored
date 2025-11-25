@@ -26,11 +26,12 @@ function formatFileDate(dateString) {
 }
 
 function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B';
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${Math.round(bytes / Math.pow(k, i) * 100) / 100} ${sizes[i]}`;
+  const size = Math.round((bytes / Math.pow(k, i)) * 100) / 100;
+  return `${size} ${sizes[i]}`;
 }
 
 export default function InstructorDocumentsSection({ instructor, session, orgId, onRefresh }) {
@@ -410,7 +411,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                         >
                           <div className="flex-1 min-w-0 text-right">
                             <p className="text-sm font-medium truncate">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground" dir="ltr">
                               {formatFileSize(file.size)} • {formatFileDate(file.uploaded_at)}
                             </p>
                           </div>
@@ -507,7 +508,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                           </Badge>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground" dir="ltr">
                         {formatFileSize(file.size)} • {formatFileDate(file.uploaded_at)}
                       </p>
                     </div>
