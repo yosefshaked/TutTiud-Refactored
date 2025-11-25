@@ -34,7 +34,7 @@ export default function DocumentRulesManager({ session, orgId }) {
   const [targetType, setTargetType] = useState('students'); // 'students' or 'instructors'
   const [definitions, setDefinitions] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [] });
+  const [editForm, setEditForm] = useState({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [], isNew: false });
   
   const { tagOptions: rawTagOptions, loadingTags, loadTags } = useStudentTags();
   const { typeOptions: rawTypeOptions, loadingTypes, loadTypes } = useInstructorTypes();
@@ -130,6 +130,7 @@ export default function DocumentRulesManager({ session, orgId }) {
       is_mandatory: newDef.is_mandatory,
       target_tags: newDef.target_tags || [],
       target_instructor_types: newDef.target_instructor_types || [],
+      isNew: true, // Mark as new document
     });
   }, [targetType]);
 
@@ -140,6 +141,7 @@ export default function DocumentRulesManager({ session, orgId }) {
       is_mandatory: def.is_mandatory,
       target_tags: def.target_tags || [],
       target_instructor_types: def.target_instructor_types || [],
+      isNew: false, // Editing existing document
     });
   }, []);
 
@@ -163,13 +165,17 @@ export default function DocumentRulesManager({ session, orgId }) {
       )
     );
     setEditingId(null);
-    setEditForm({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [] });
+    setEditForm({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [], isNew: false });
   }, [editingId, editForm, targetType]);
 
   const handleCancelEdit = useCallback(() => {
+    // If canceling a new document that hasn't been saved yet, remove it
+    if (editForm.isNew && editingId) {
+      setDefinitions((prev) => prev.filter((d) => d.id !== editingId));
+    }
     setEditingId(null);
     setEditForm({ name: '', is_mandatory: false, target_tags: [], target_instructor_types: [] });
-  }, []);
+  }, [editingId, editForm.isNew]);
 
   const handleDelete = useCallback((id) => {
     if (!confirm('האם למחוק מסמך זה? פעולה זו אינה ניתנת לביטול.')) return;
