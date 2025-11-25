@@ -127,24 +127,24 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
             variant="ghost"
             size="sm"
             onClick={handleBack}
-            className="gap-2"
+            className="gap-2 h-10"
           >
             <ChevronLeft className="h-4 w-4" />
             חזרה לרשימה
           </Button>
         </div>
 
-        <div className="flex items-center gap-4 p-4 border rounded-lg bg-slate-50">
-          <Avatar className="h-16 w-16">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-slate-50">
+          <Avatar className="h-16 w-16 shrink-0">
             <AvatarFallback className="bg-purple-100 text-purple-700 text-xl">
               {getInitials(selectedInstructor.name || selectedInstructor.email)}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <div className="font-semibold text-lg">
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-base sm:text-lg break-words">
               {selectedInstructor.name || selectedInstructor.email}
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground break-words">
               {selectedInstructor.email}
             </div>
           </div>
@@ -186,11 +186,11 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
             return (
               <div
                 key={instructor.id}
-                className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors cursor-pointer"
                 onClick={() => handleSelectInstructor(instructor)}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-10 w-10 shrink-0">
                     <AvatarFallback className="bg-purple-100 text-purple-700">
                       {getInitials(instructor.name || instructor.email)}
                     </AvatarFallback>
@@ -205,19 +205,19 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between sm:justify-end gap-2">
                   {status.totalRequired > 0 && (
                     <div className="flex items-center gap-1.5">
                       {status.hasMissing ? (
                         <>
-                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
                           <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
                             {status.completed}/{status.totalRequired}
                           </Badge>
                         </>
                       ) : (
                         <>
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
                           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
                             הושלם
                           </Badge>
@@ -225,7 +225,7 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
                       )}
                     </div>
                   )}
-                  <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+                  <ChevronLeft className="h-5 w-5 text-muted-foreground shrink-0" />
                 </div>
               </div>
             );

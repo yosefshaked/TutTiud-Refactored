@@ -100,7 +100,9 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
     const query = searchQuery.toLowerCase();
     const name = (instructor.name || '').toLowerCase();
     const email = (instructor.email || '').toLowerCase();
-    return name.includes(query) || email.includes(query);
+    const phone = (instructor.phone || '').toLowerCase();
+    const type = (instructor.instructor_type || '').toLowerCase();
+    return name.includes(query) || email.includes(query) || phone.includes(query) || type.includes(query);
   });
 
   const getInitials = (name) => {
@@ -138,24 +140,27 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
             variant="ghost"
             size="sm"
             onClick={handleBack}
-            className="gap-2"
+            className="gap-2 h-10"
           >
             <ChevronLeft className="h-4 w-4" />
             חזרה לרשימה
           </Button>
         </div>
 
-        <div className="flex items-center gap-4 p-4 border rounded-lg bg-slate-50">
-          <Avatar className="h-16 w-16">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-slate-50">
+          <Avatar className="h-16 w-16 shrink-0">
             <AvatarFallback className="bg-blue-100 text-blue-700 text-xl">
               {getInitials(selectedInstructor.name || selectedInstructor.email)}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <div className="font-semibold text-lg">
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-base sm:text-lg break-words">
               {selectedInstructor.name || selectedInstructor.email}
+              {selectedInstructor.instructor_type && (
+                <span className="text-muted-foreground font-normal text-sm sm:text-base"> ({selectedInstructor.instructor_type})</span>
+              )}
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground break-words">
               {selectedInstructor.email}
             </div>
           </div>
@@ -211,7 +216,7 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="gap-2"
+              className="gap-2 h-10 w-full sm:w-auto"
             >
               {isSaving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -233,7 +238,7 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="חיפוש לפי שם או אימייל..."
+          placeholder="חיפוש לפי שם, אימייל, טלפון או סוג..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pr-10"
@@ -250,11 +255,11 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
           {filteredInstructors.map((instructor) => (
             <div
               key={instructor.id}
-              className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+              className="flex items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors cursor-pointer"
               onClick={() => handleSelectInstructor(instructor)}
             >
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Avatar className="h-10 w-10">
+                <Avatar className="h-10 w-10 shrink-0">
                   <AvatarFallback className="bg-blue-100 text-blue-700">
                     {getInitials(instructor.name || instructor.email)}
                   </AvatarFallback>
@@ -262,6 +267,9 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm truncate">
                     {instructor.name || instructor.email || instructor.id}
+                    {instructor.instructor_type && (
+                      <span className="text-muted-foreground font-normal"> ({instructor.instructor_type})</span>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">
                     {instructor.email || '—'}
@@ -269,7 +277,7 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
                 </div>
               </div>
 
-              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+              <ChevronLeft className="h-5 w-5 text-muted-foreground shrink-0" />
             </div>
           ))}
         </div>

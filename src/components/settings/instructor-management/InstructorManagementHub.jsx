@@ -43,19 +43,20 @@ export default function InstructorManagementHub({ session, orgId, activeOrgHasCo
   return (
     <Card className="w-full border-0 shadow-lg bg-white/80">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base sm:text-lg">{VIEW_TITLES[currentView]}</CardTitle>
+        <div className="flex items-center justify-between gap-2" dir="rtl">
           {currentView !== 'menu' && (
             <Button
               variant="ghost"
               size="sm"
               onClick={handleBack}
-              className="gap-2"
+              className="gap-2 h-10"
             >
-              <ArrowRight className="h-4 w-4" />
-              חזרה לתפריט
+              <span className="hidden sm:inline">חזרה לתפריט</span>
+              <span className="sm:hidden">חזרה</span>
+              <ArrowRight className="h-4 w-4 rotate-180" />
             </Button>
           )}
+          <CardTitle className="text-base sm:text-lg truncate">{VIEW_TITLES[currentView]}</CardTitle>
         </div>
       </CardHeader>
       <CardContent dir="rtl">

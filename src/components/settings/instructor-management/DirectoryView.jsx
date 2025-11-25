@@ -3,7 +3,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar.jsx';
-import { Loader2, UserPlus, UserX, RotateCcw } from 'lucide-react';
+import { Loader2, UserPlus, UserX, RotateCcw, Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
@@ -205,10 +211,10 @@ export default function DirectoryView({ session, orgId, canLoad }) {
             {activeInstructors.map((instructor) => (
               <div
                 key={instructor.id}
-                className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-10 w-10 shrink-0">
                     <AvatarFallback className="bg-blue-100 text-blue-700">
                       {getInitials(instructor.name || instructor.email)}
                     </AvatarFallback>
@@ -223,34 +229,48 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={instructor.instructor_type || '__none__'}
-                    onValueChange={(value) => handleChangeType(instructor, value)}
-                    disabled={isSaving}
-                  >
-                    <SelectTrigger className="w-40 h-9" dir="rtl">
-                      <SelectValue placeholder="בחר סוג..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">ללא סיווג</SelectItem>
-                      {typeOptions.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-1 w-full sm:w-auto">
+                    <Select
+                      value={instructor.instructor_type || '__none__'}
+                      onValueChange={(value) => handleChangeType(instructor, value)}
+                      disabled={isSaving}
+                    >
+                      <SelectTrigger className="flex-1 sm:w-40 h-10" dir="rtl">
+                        <SelectValue placeholder="בחר סוג..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">ללא סיווג</SelectItem>
+                        {typeOptions.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 shrink-0">
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <p>להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
 
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleDeactivate(instructor)}
                     disabled={isSaving}
-                    className="gap-2"
+                    className="gap-2 h-10 w-full sm:w-auto"
                   >
                     <UserX className="h-4 w-4" />
-                    <span className="hidden sm:inline">השבת</span>
+                    <span>השבת</span>
                   </Button>
                 </div>
               </div>
@@ -268,10 +288,10 @@ export default function DirectoryView({ session, orgId, canLoad }) {
             {inactiveInstructors.map((instructor) => (
               <div
                 key={instructor.id}
-                className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-slate-50"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-slate-50"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-10 w-10 shrink-0">
                     <AvatarFallback className="bg-slate-200 text-slate-600">
                       {getInitials(instructor.name || instructor.email)}
                     </AvatarFallback>
@@ -291,7 +311,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                   size="sm"
                   onClick={() => handleReactivate(instructor)}
                   disabled={isSaving}
-                  className="gap-2"
+                  className="gap-2 h-10 w-full sm:w-auto"
                 >
                   <RotateCcw className="h-4 w-4" />
                   הפעל מחדש
@@ -313,10 +333,10 @@ export default function DirectoryView({ session, orgId, canLoad }) {
             {nonInstructorMembers.map((member) => (
               <div
                 key={member.id}
-                className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-10 w-10 shrink-0">
                     <AvatarFallback className="bg-green-100 text-green-700">
                       {getInitials(member?.profile?.full_name || member?.profile?.email)}
                     </AvatarFallback>
@@ -335,7 +355,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                   size="sm"
                   onClick={() => handlePromoteToInstructor(member)}
                   disabled={isSaving}
-                  className="gap-2"
+                  className="gap-2 h-10 w-full sm:w-auto"
                 >
                   <UserPlus className="h-4 w-4" />
                   הפוך למדריך
