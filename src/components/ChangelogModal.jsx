@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.5.0': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.6.0': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,129 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.6.0 - Documents management and audit logging */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.6.0')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.6.0'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.6.0'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.6.0
+                    </span>
+                    <time dateTime="2025-11-26" style={{ color: '#64748b', fontSize: '14px' }}>
+                      26 בנובמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.6.0'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  📁 ניהול מסמכים, סיווגי מדריכים ואבטחה משופרת
+                </h3>
+              </header>
+
+              {expandedVersions['1.6.0'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תוספות:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>ניהול מסמכים לתלמידים:</strong> מנהלים יכולים להגדיר מסמכים נדרשים לתלמידים, להעלות ולצפות בקבצים. תמיכה בסינון לפי תגיות תלמידים
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>ניהול מסמכים למדריכים:</strong> העלאת וניהול מסמכים למדריכים (תעודות רפואיות, הסמכות וכו'). מדריכים יכולים להעלות קבצים דרך ההגדרות
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>הקצאת מסמכים לפי סיווג:</strong> ניתן להגדיר מסמכים ספציפיים לתגיות תלמידים או לסוגי מדריכים מסוימים
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>מידע אבחון משופר:</strong> מידע ניפוי באגים כעת כולל בדיקת סטטוס מדריך ואפשרות לרענן הרשאות ארגון במקרה של שגיאה
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>ביצועים:</strong> זמני טעינה משופרים באזורים שונים במערכת
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורי אבטחה:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תיעוד פעולות:</strong> המערכת כעת מתעדת פעולות חשובות (הזמנות, שינוי תפקידים, העלאת קבצים ועוד) לצורך מעקב ותחקור
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שינויים טכניים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>עיצוב מחודש:</strong> חלון ניהול מדריכים עבר שדרוג ושיפור במבנה (מנהלים בלבד)
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.5.0 - Safari improvements and visual hierarchy */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>

@@ -7,6 +7,16 @@ This guide covers deploying the complete storage management system including dis
 - Supabase project with control database access
 - Azure Functions deployment
 - Admin access to control DB SQL Editor
+- **For managed storage**: Cloudflare R2 bucket with the following environment variables:
+  - `SYSTEM_R2_ENDPOINT` - R2 S3-compatible endpoint URL
+  - `SYSTEM_R2_ACCESS_KEY` - R2 access key ID
+  - `SYSTEM_R2_SECRET_KEY` - R2 secret access key
+  - `SYSTEM_R2_BUCKET_NAME` - R2 bucket name
+  - `SYSTEM_R2_PUBLIC_URL` - (Optional) Custom domain URL for public file access (e.g., `https://files.yourdomain.com`)
+    - If not set, presigned URLs will use the R2 endpoint directly
+    - Recommended for production to provide branded, user-friendly download URLs
+    - Configure a custom domain in Cloudflare R2 settings and point it to your bucket
+    - Example: Instead of `https://account-id.r2.cloudflarestorage.com/bucket/file.pdf`, users see `https://files.yourdomain.com/file.pdf`
 
 ## Deployment Steps
 
