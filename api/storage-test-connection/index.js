@@ -76,8 +76,8 @@ export default async function handler(req, context) {
 
     // Build test path
     const testPath = mode === 'managed'
-      ? `${config.namespace}/_test/${testFileName}`
-      : `_test/${testFileName}`;
+      ? `managed/${orgId}/_test/${testFileName}`
+      : `${orgId}/_test/${testFileName}`;
 
     // Test 1: Upload file
     context.log(`Testing upload to path: ${testPath}`);

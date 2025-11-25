@@ -320,6 +320,10 @@ export default function StorageSettingsCard({ session, orgId }) {
         if (region.trim()) {
           payload.byos.region = region.trim();
         }
+
+        if (publicUrl.trim()) {
+          payload.byos.public_url = publicUrl.trim();
+        }
       }
 
       const result = await testStorageConnection(payload, { session });
@@ -337,7 +341,7 @@ export default function StorageSettingsCard({ session, orgId }) {
       toast.error(errorMessage);
       setTestState(REQUEST.error);
     }
-  }, [canAct, orgId, session, selectedMode, provider, endpoint, region, bucket, accessKeyId, secretAccessKey]);
+  }, [canAct, orgId, session, selectedMode, provider, endpoint, region, bucket, accessKeyId, secretAccessKey, publicUrl]);
 
 
   // Render locked state
@@ -610,8 +614,8 @@ export default function StorageSettingsCard({ session, orgId }) {
               </Button>
             )}
 
-            {/* Test Connection button - only show if mode is selected and not disconnected */}
-            {selectedMode && !isDisconnected && (
+            {/* Test Connection button - only show for BYOS mode (managed uses pre-configured system credentials) */}
+            {selectedMode === STORAGE_MODES.BYOS && !isDisconnected && (
               <Button
                 variant="outline"
                 onClick={handleTestConnection}
