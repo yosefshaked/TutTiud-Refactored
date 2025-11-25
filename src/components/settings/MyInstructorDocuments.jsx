@@ -536,6 +536,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
                 <li>גודל מקסימלי: 10MB</li>
                 <li>סוגי קבצים נתמכים: PDF, תמונות (JPG, PNG, GIF), מסמכי Word, Excel</li>
                 <li>תמיכה בשמות קבצים בעברית</li>
+                <li className="font-medium">מחיקת מסמכים אפשרית רק על ידי מנהלים - נא לפנות למנהל הארגון</li>
               </ul>
             </div>
           </div>

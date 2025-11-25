@@ -33,8 +33,18 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
         fetchSettingsValue({ session, orgId, key: 'instructor_document_definitions' }),
       ]);
       
-      setInstructors(Array.isArray(roster) ? roster : []);
+      const loadedInstructors = Array.isArray(roster) ? roster : [];
+      setInstructors(loadedInstructors);
       setDefinitions(Array.isArray(settingsData?.value) ? settingsData.value : []);
+      
+      // Update selectedInstructor if it exists to prevent stale data
+      if (selectedInstructor) {
+        const updated = loadedInstructors.find(i => i.id === selectedInstructor.id);
+        if (updated) {
+          setSelectedInstructor(updated);
+        }
+      }
+      
       setLoadState(REQUEST.idle);
     } catch (error) {
       console.error('Failed to load data', error);
@@ -43,7 +53,7 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
       setInstructors([]);
       setDefinitions([]);
     }
-  }, [canLoad, orgId, session]);
+  }, [canLoad, orgId, session, selectedInstructor]);
 
   useEffect(() => {
     loadAll();
