@@ -19,10 +19,11 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
  * @param {string} config.bucket - Bucket name
  * @param {string} config.accessKeyId - Access key ID
  * @param {string} config.secretAccessKey - Secret access key
+ * @param {string} config.publicUrl - Optional public URL base (for R2 custom domains, bypasses presigned URLs)
  * @returns {Object} Storage driver with upload and delete methods
  */
 export function createS3Driver(config) {
-  const { endpoint, region, bucket, accessKeyId, secretAccessKey } = config;
+  const { endpoint, region, bucket, accessKeyId, secretAccessKey, publicUrl } = config;
 
   if (!bucket || !accessKeyId || !secretAccessKey) {
     throw new Error('S3 driver requires bucket, accessKeyId, and secretAccessKey');
@@ -99,9 +100,17 @@ export function createS3Driver(config) {
      * @param {number} expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
      * @param {string} filename - Optional filename for Content-Disposition header
      * @param {string} dispositionType - 'attachment' (download) or 'inline' (preview) (default: 'attachment')
-     * @returns {Promise<string>} Presigned download URL
+     * @returns {Promise<string>} Presigned download URL or public URL
      */
     async getDownloadUrl(path, expiresIn = 3600, filename = null, dispositionType = 'attachment') {
+      // If public URL is configured, use it directly (R2 custom domain)
+      // This is much faster than presigned URLs and works for publicly accessible buckets
+      if (publicUrl) {
+        const baseUrl = publicUrl.replace(/\/$/, '');
+        return `${baseUrl}/${path}`;
+      }
+
+      // Fallback to presigned URLs for private buckets or when public URL not configured
       // Build Content-Disposition header with filename if provided
       // Use RFC 5987 encoding for non-ASCII filenames (Hebrew, etc.)
       let disposition = dispositionType === 'inline' ? 'inline' : 'attachment';

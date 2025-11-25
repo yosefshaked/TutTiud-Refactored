@@ -60,6 +60,7 @@ export default function StorageSettingsCard({ session, orgId }) {
   const [bucket, setBucket] = useState('');
   const [accessKeyId, setAccessKeyId] = useState('');
   const [secretAccessKey, setSecretAccessKey] = useState('');
+  const [publicUrl, setPublicUrl] = useState('');
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [disconnectState, setDisconnectState] = useState(REQUEST.idle);
   const [testState, setTestState] = useState(REQUEST.idle);
@@ -87,6 +88,7 @@ export default function StorageSettingsCard({ session, orgId }) {
         setEndpoint(profile.byos.endpoint || '');
         setRegion(profile.byos.region || '');
         setBucket(profile.byos.bucket || '');
+        setPublicUrl(profile.byos.public_url || '');
         // Don't populate credentials for security (force re-entry)
       }
     }
@@ -162,6 +164,17 @@ export default function StorageSettingsCard({ session, orgId }) {
         if (region.trim()) {
           payload.byos.region = region.trim();
         }
+
+        // Add public URL if provided
+        if (publicUrl.trim()) {
+          const trimmedPublicUrl = publicUrl.trim();
+          if (!trimmedPublicUrl.startsWith('https://')) {
+            toast.error('כתובת URL ציבורית חייבת להשתמש ב-HTTPS');
+            setSaveState(REQUEST.idle);
+            return;
+          }
+          payload.byos.public_url = trimmedPublicUrl;
+        }
       }
 
       await saveStorageConfiguration(orgId, payload, { session });
@@ -172,12 +185,17 @@ export default function StorageSettingsCard({ session, orgId }) {
       // Clear sensitive fields after save
       setAccessKeyId('');
       setSecretAccessKey('');
+      
+      // Refresh org context to reload storage profile
+      if (refreshOrganizations) {
+        await refreshOrganizations({ keepSelection: true });
+      }
     } catch (error) {
       console.error('Save storage configuration failed', error);
       toast.error(error?.message || 'שמירת הגדרות האחסון נכשלה');
       setSaveState(REQUEST.error);
     }
-  }, [canAct, orgId, session, selectedMode, provider, endpoint, region, bucket, accessKeyId, secretAccessKey]);
+  }, [canAct, orgId, session, selectedMode, provider, endpoint, region, bucket, accessKeyId, secretAccessKey, publicUrl, refreshOrganizations]);
 
   const handleDisconnect = useCallback(async () => {
     if (!canAct) return;
@@ -204,6 +222,7 @@ export default function StorageSettingsCard({ session, orgId }) {
       setBucket('');
       setAccessKeyId('');
       setSecretAccessKey('');
+      setPublicUrl('');
     } catch (error) {
       console.error('Disconnect storage failed', error);
       toast.error(error?.message || 'ניתוק האחסון נכשל');
@@ -538,6 +557,25 @@ export default function StorageSettingsCard({ session, orgId }) {
               />
               <p className="text-xs text-slate-500 mt-1">
                 המפתחות נשמרים באופן מוצפן
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-slate-200">
+              <Label htmlFor="publicUrl" className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-500" />
+                Public URL (אופציונלי - לשיפור ביצועים)
+              </Label>
+              <Input
+                id="publicUrl"
+                type="url"
+                value={publicUrl}
+                onChange={(e) => setPublicUrl(e.target.value)}
+                placeholder="https://files.mycompany.com"
+                className="mt-1"
+                dir="ltr"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                אם הגדרת דומיין ציבורי/CDN לאחסון שלך, הזן אותו כאן לביצועים משופרים
               </p>
             </div>
           </div>

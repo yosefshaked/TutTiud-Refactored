@@ -16,6 +16,7 @@
 --     "bucket": "bucket-name",
 --     "access_key_id": "encrypted-key",
 --     "secret_access_key": "encrypted-secret",
+--     "public_url": "https://files.example.com" (optional, for public CDN/custom domain),
 --     "validated_at": "2025-11-22T10:30:00Z"
 --   },
 --   "managed": {

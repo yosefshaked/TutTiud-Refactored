@@ -291,7 +291,11 @@ export default async function (context, req) {
     const extension = filenameParts.length > 1 && filenameParts[filenameParts.length - 1] 
       ? filenameParts[filenameParts.length - 1] 
       : 'bin';
-    const filePath = `instructors/${orgId}/${instructorId}/${fileId}.${extension}`;
+    // Build storage path with proper structure: managed/org-id/instructors/instructor-id/file
+    const mode = decryptedProfile.mode;
+    const filePath = mode === 'managed' 
+      ? `managed/${orgId}/instructors/${instructorId}/${fileId}.${extension}`
+      : `${orgId}/instructors/${instructorId}/${fileId}.${extension}`;
     const contentType = filePart.type || 'application/octet-stream';
 
     // Get storage driver

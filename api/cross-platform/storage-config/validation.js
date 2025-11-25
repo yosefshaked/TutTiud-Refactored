@@ -81,6 +81,23 @@ export function validateByosCredentials(byosConfig) {
     errors.push('Secret access key cannot be empty');
   }
 
+  // Public URL validation (optional)
+  if (byosConfig.public_url !== undefined && byosConfig.public_url !== null) {
+    if (typeof byosConfig.public_url !== 'string') {
+      errors.push('Public URL must be a string');
+    } else {
+      const trimmedUrl = byosConfig.public_url.trim();
+      if (trimmedUrl && !trimmedUrl.startsWith('https://')) {
+        // Security: Require HTTPS for public URLs
+        if (trimmedUrl.startsWith('http://')) {
+          errors.push('Public URL must use HTTPS (not HTTP) for security. Only use HTTP for local development.');
+        } else {
+          errors.push('Public URL must be a valid HTTPS URL');
+        }
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -205,6 +222,11 @@ export function normalizeStorageProfile(rawProfile) {
     // Only include region if it's a non-empty string
     if (typeof rawProfile.byos.region === 'string' && rawProfile.byos.region.trim()) {
       byos.region = rawProfile.byos.region.trim();
+    }
+
+    // Only include public_url if it's a non-empty string
+    if (typeof rawProfile.byos.public_url === 'string' && rawProfile.byos.public_url.trim()) {
+      byos.public_url = rawProfile.byos.public_url.trim();
     }
 
     normalized.byos = byos;

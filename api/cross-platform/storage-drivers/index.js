@@ -26,6 +26,7 @@ export function getStorageDriver(mode, config, env = {}) {
       SYSTEM_R2_ACCESS_KEY,
       SYSTEM_R2_SECRET_KEY,
       SYSTEM_R2_BUCKET_NAME,
+      SYSTEM_R2_PUBLIC_URL,
     } = env;
 
     if (!SYSTEM_R2_ENDPOINT || !SYSTEM_R2_ACCESS_KEY || !SYSTEM_R2_SECRET_KEY || !SYSTEM_R2_BUCKET_NAME) {
@@ -38,6 +39,7 @@ export function getStorageDriver(mode, config, env = {}) {
       bucket: SYSTEM_R2_BUCKET_NAME,
       accessKeyId: SYSTEM_R2_ACCESS_KEY,
       secretAccessKey: SYSTEM_R2_SECRET_KEY,
+      publicUrl: SYSTEM_R2_PUBLIC_URL, // Optional: R2 custom domain for public access
     });
   }
 
@@ -58,6 +60,7 @@ export function getStorageDriver(mode, config, env = {}) {
           bucket: config.bucket,
           accessKeyId: config.access_key_id,
           secretAccessKey: config.secret_access_key,
+          publicUrl: config.public_url, // Optional: Custom domain/CDN for public access
         });
 
       case 'r2':
@@ -68,6 +71,7 @@ export function getStorageDriver(mode, config, env = {}) {
           bucket: config.bucket,
           accessKeyId: config.access_key_id,
           secretAccessKey: config.secret_access_key,
+          publicUrl: config.public_url, // Optional: R2 custom domain for public access
         });
 
       case 'azure':
@@ -101,6 +105,7 @@ export function getStorageDriver(mode, config, env = {}) {
           bucket: config.bucket,
           accessKeyId: config.access_key_id,
           secretAccessKey: config.secret_access_key,
+          publicUrl: config.public_url, // Optional: Custom domain/CDN for public access
         });
 
       default:

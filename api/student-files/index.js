@@ -114,10 +114,10 @@ function parseMultipartData(req) {
 function buildFilePath(mode, orgId, studentId, fileId, extension) {
   if (mode === 'managed') {
     // Managed storage: namespace isolation with 'managed/' prefix
-    return `managed/${orgId}/${studentId}/${fileId}.${extension}`;
+    return `managed/${orgId}/students/${studentId}/${fileId}.${extension}`;
   } else {
-    // BYOS: simpler path without 'managed/' prefix
-    return `students/${studentId}/${fileId}.${extension}`;
+    // BYOS: consistent structure
+    return `${orgId}/students/${studentId}/${fileId}.${extension}`;
   }
 }
 
