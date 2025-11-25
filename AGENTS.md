@@ -484,6 +484,10 @@
 
 ### Student Lifecycle & Visibility (2025-11)
 - Tenant students now include an `is_active` boolean (default `true`). The setup script (`src/lib/setup-sql.js`) adds the column with `ADD COLUMN IF NOT EXISTS` and backfills existing rows, so rerunning the script on legacy tenants is safe.
+- **Student metadata tracking**: Students now automatically track creator and updater information in the `metadata` jsonb column:
+  - On creation (POST): `{ created_by: userId, created_at: ISO timestamp, created_role: role }`
+  - On update (PUT): Preserves existing metadata and adds `{ updated_by: userId, updated_at: ISO timestamp, updated_role: role }`
+  - Metadata is populated server-side in `/api/students` endpoint, frontend doesn't need to send these fields
 - `/api/students` defaults to `status=active`; pass `status=inactive`, `status=all`, or `include_inactive=true` (legacy) when maintenance flows need archived rows. `PUT` handlers accept `is_active` alongside the existing roster fields.
 - `/api/my-students` respects the org setting `instructors_can_view_inactive_students`. Instructors only see inactive records when the flag is enabled; admins/owners always see them when requesting `status=all`.
 - Admin UI (`StudentManagementPage.jsx`) persists the Active/Inactive/All filter in `sessionStorage`, badges inactive rows, and exposes the toggle in `EditStudentForm.jsx`. Instructor surfaces (`MyStudentsPage.jsx`, `NewSessionModal.jsx`, `NewSessionForm.jsx`) automatically hide inactive students unless the setting is on.

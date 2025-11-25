@@ -534,9 +534,21 @@ export default async function (context, req) {
       return respond(context, 400, { message });
     }
 
+    // Build metadata with creator information
+    const metadata = {
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      created_role: role,
+    };
+
+    const recordToInsert = {
+      ...normalized.payload,
+      metadata,
+    };
+
     const { data, error } = await tenantClient
       .from('Students')
-      .insert([normalized.payload])
+      .insert([recordToInsert])
       .select()
       .single();
 
@@ -584,9 +596,39 @@ export default async function (context, req) {
     return respond(context, 400, { message: updateMessage });
   }
 
+  // Fetch existing student to preserve and update metadata
+  const { data: existingStudent, error: fetchError } = await tenantClient
+    .from('Students')
+    .select('metadata')
+    .eq('id', studentId)
+    .maybeSingle();
+
+  if (fetchError) {
+    context.log?.error?.('students failed to fetch existing student', { message: fetchError.message, studentId });
+    return respond(context, 500, { message: 'failed_to_fetch_student' });
+  }
+
+  if (!existingStudent) {
+    return respond(context, 404, { message: 'student_not_found' });
+  }
+
+  // Build updated metadata preserving existing fields
+  const existingMetadata = existingStudent.metadata || {};
+  const updatedMetadata = {
+    ...existingMetadata,
+    updated_by: userId,
+    updated_at: new Date().toISOString(),
+    updated_role: role,
+  };
+
+  const updatesWithMetadata = {
+    ...normalizedUpdates.updates,
+    metadata: updatedMetadata,
+  };
+
   const { data, error } = await tenantClient
     .from('Students')
-    .update(normalizedUpdates.updates)
+    .update(updatesWithMetadata)
     .eq('id', studentId)
     .select()
     .maybeSingle();
