@@ -183,21 +183,21 @@ export default function DirectoryView({ session, orgId, canLoad }) {
   return (
     <Tabs defaultValue="active" className="w-full" dir="rtl">
       <TabsList className="grid w-full grid-cols-3 mb-4 h-auto">
-        <TabsTrigger value="active" className="flex-col sm:flex-row gap-1 py-2">
-          <div className="flex items-center gap-1">
-            <span className="text-xs sm:text-sm">מדריכים פעילים</span>
+        <TabsTrigger value="active" className="flex-col gap-1 py-2 whitespace-normal break-words">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xs sm:text-sm text-center">מדריכים פעילים</span>
             <Badge variant="secondary" className="text-xs sm:mr-2">{activeInstructors.length}</Badge>
           </div>
         </TabsTrigger>
-        <TabsTrigger value="inactive" className="flex-col sm:flex-row gap-1 py-2">
-          <div className="flex items-center gap-1">
-            <span className="text-xs sm:text-sm">מדריכים מושבתים</span>
+        <TabsTrigger value="inactive" className="flex-col gap-1 py-2 whitespace-normal break-words">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xs sm:text-sm text-center">מדריכים מושבתים</span>
             <Badge variant="secondary" className="text-xs sm:mr-2">{inactiveInstructors.length}</Badge>
           </div>
         </TabsTrigger>
-        <TabsTrigger value="members" className="flex-col sm:flex-row gap-1 py-2">
-          <div className="flex items-center gap-1">
-            <span className="text-xs sm:text-sm">חברי ארגון</span>
+        <TabsTrigger value="members" className="flex-col gap-1 py-2 whitespace-normal break-words">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-xs sm:text-sm text-center">חברי ארגון</span>
             <Badge variant="secondary" className="text-xs sm:mr-2">{nonInstructorMembers.length}</Badge>
           </div>
         </TabsTrigger>

@@ -17,18 +17,21 @@ export default function InfoTooltip({ message, side = 'top' }) {
       >
         <Info className="h-3 w-3 text-muted-foreground group-hover:animate-jello-vertical" />
       </button>
-      <span
-        className={`
-          absolute ${positionClasses[side]} z-50
-          px-2 py-1 text-xs text-white rounded shadow-lg
-          bg-gradient-to-br from-blue-400 to-blue-600
-          opacity-0 group-hover:opacity-100
-          transition-opacity duration-200
-          pointer-events-none whitespace-nowrap
-        `}
-      >
-        {message}
-      </span>
+      {typeof window !== 'undefined' && (
+        <div
+          className={`
+            fixed left-1/2 top-1/3 -translate-x-1/2 z-[9999]
+            px-2 py-1 text-xs text-white rounded shadow-lg
+            bg-gradient-to-br from-blue-400 to-blue-600
+            opacity-0 group-hover:opacity-100
+            transition-opacity duration-200
+            pointer-events-none whitespace-nowrap
+          `}
+          style={{ display: 'block' }}
+        >
+          {message}
+        </div>
+      )}
     </div>
   );
 }
