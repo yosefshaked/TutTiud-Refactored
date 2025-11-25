@@ -187,18 +187,24 @@ export default function DirectoryView({ session, orgId, canLoad }) {
 
   return (
     <Tabs defaultValue="active" className="w-full" dir="rtl">
-      <TabsList className="grid w-full grid-cols-3 mb-4">
-        <TabsTrigger value="active">
-          מדריכים פעילים
-          <Badge variant="secondary" className="mr-2">{activeInstructors.length}</Badge>
+      <TabsList className="grid w-full grid-cols-3 mb-4 h-auto">
+        <TabsTrigger value="active" className="flex-col sm:flex-row gap-1 py-2">
+          <div className="flex items-center gap-1">
+            <span className="text-xs sm:text-sm">מדריכים פעילים</span>
+            <Badge variant="secondary" className="text-xs sm:mr-2">{activeInstructors.length}</Badge>
+          </div>
         </TabsTrigger>
-        <TabsTrigger value="inactive">
-          מדריכים מושבתים
-          <Badge variant="secondary" className="mr-2">{inactiveInstructors.length}</Badge>
+        <TabsTrigger value="inactive" className="flex-col sm:flex-row gap-1 py-2">
+          <div className="flex items-center gap-1">
+            <span className="text-xs sm:text-sm">מדריכים מושבתים</span>
+            <Badge variant="secondary" className="text-xs sm:mr-2">{inactiveInstructors.length}</Badge>
+          </div>
         </TabsTrigger>
-        <TabsTrigger value="members">
-          חברי ארגון
-          <Badge variant="secondary" className="mr-2">{nonInstructorMembers.length}</Badge>
+        <TabsTrigger value="members" className="flex-col sm:flex-row gap-1 py-2">
+          <div className="flex items-center gap-1">
+            <span className="text-xs sm:text-sm">חברי ארגון</span>
+            <Badge variant="secondary" className="text-xs sm:mr-2">{nonInstructorMembers.length}</Badge>
+          </div>
         </TabsTrigger>
       </TabsList>
 
@@ -231,6 +237,18 @@ export default function DirectoryView({ session, orgId, canLoad }) {
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <div className="flex items-center gap-1 w-full sm:w-auto">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="h-10 w-10 p-0 shrink-0 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground">
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          <p>להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <Select
                       value={instructor.instructor_type || '__none__'}
                       onValueChange={(value) => handleChangeType(instructor, value)}
@@ -248,18 +266,6 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                         ))}
                       </SelectContent>
                     </Select>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 shrink-0">
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top">
-                          <p>להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
                   </div>
 
                   <Button

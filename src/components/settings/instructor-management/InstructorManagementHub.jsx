@@ -44,6 +44,7 @@ export default function InstructorManagementHub({ session, orgId, activeOrgHasCo
     <Card className="w-full border-0 shadow-lg bg-white/80">
       <CardHeader>
         <div className="flex items-center justify-between gap-2" dir="rtl">
+          <CardTitle className="text-base sm:text-lg truncate">{VIEW_TITLES[currentView]}</CardTitle>
           {currentView !== 'menu' && (
             <Button
               variant="ghost"
@@ -56,7 +57,6 @@ export default function InstructorManagementHub({ session, orgId, activeOrgHasCo
               <ArrowRight className="h-4 w-4 rotate-180" />
             </Button>
           )}
-          <CardTitle className="text-base sm:text-lg truncate">{VIEW_TITLES[currentView]}</CardTitle>
         </div>
       </CardHeader>
       <CardContent dir="rtl">
