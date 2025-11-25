@@ -234,7 +234,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                   <div className="flex items-center gap-1 w-full sm:w-auto">
                     <InfoTooltip 
                       message="להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים"
-                      side="left"
+                      side="top"
                     />
                     <Select
                       value={instructor.instructor_type || '__none__'}
