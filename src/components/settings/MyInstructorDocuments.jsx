@@ -3,11 +3,19 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { FileText, Upload, Download, Loader2, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { FileText, Upload, Download, Loader2, AlertCircle, CheckCircle2, Info, AlertTriangle } from 'lucide-react';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { authenticatedFetch } from '@/lib/api-client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 const REQUEST_STATE = {
   idle: 'idle',
@@ -40,6 +48,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
   const [uploadingAdhoc, setUploadingAdhoc] = useState(false);
   const [backgroundUploads, setBackgroundUploads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [duplicateDialog, setDuplicateDialog] = useState(null); // { file, definitionId, definitionName, duplicates }
 
   const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
   const instructorType = instructor?.instructor_type;
@@ -125,44 +134,8 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
     }
   }, [session, orgId]);
 
-  const handleFileUpload = useCallback(async (file, definitionId = null, definitionName = null) => {
-    console.log('🔵 [UPLOAD] handleFileUpload called', { fileName: file?.name, definitionId, definitionName, hasInstructor: !!instructor });
-    
-    if (!file || !instructor) {
-      console.log('❌ [UPLOAD] Missing file or instructor', { hasFile: !!file, hasInstructor: !!instructor });
-      return;
-    }
-
-    const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-    const ALLOWED_MIME_TYPES = [
-      'application/pdf',
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    ];
-
-    console.log('🔵 [UPLOAD] Validating file', { size: file.size, type: file.type, maxSize: MAX_FILE_SIZE_BYTES });
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      console.log('❌ [UPLOAD] File too large', { size: file.size, max: MAX_FILE_SIZE_BYTES });
-      toast.error('הקובץ גדול מדי. גודל מקסימלי: 10MB');
-      return;
-    }
-
-    // Validate file type
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      console.log('❌ [UPLOAD] Invalid file type', { type: file.type, allowed: ALLOWED_MIME_TYPES });
-      toast.error('סוג קובץ לא נתמך. נא להעלות PDF, תמונה, Word או Excel');
-      return;
-    }
-    
-    console.log('✅ [UPLOAD] File validation passed');
+  const performUpload = useCallback((file, definitionId = null, definitionName = null) => {
+    console.log('🔵 [UPLOAD] performUpload called', { fileName: file?.name, definitionId, definitionName });
 
     const uploadId = crypto.randomUUID();
     const displayName = definitionName || file.name;
@@ -279,6 +252,120 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
     }
   }, [instructor, orgId, session, refreshInstructor]);
 
+  const handleFileUpload = useCallback(async (file, definitionId = null, definitionName = null) => {
+    console.log('🔵 [UPLOAD] handleFileUpload called', { fileName: file?.name, definitionId, definitionName, hasInstructor: !!instructor });
+    
+    if (!file || !instructor) {
+      console.log('❌ [UPLOAD] Missing file or instructor', { hasFile: !!file, hasInstructor: !!instructor });
+      return;
+    }
+
+    const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+    const ALLOWED_MIME_TYPES = [
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+
+    console.log('🔵 [UPLOAD] Validating file', { size: file.size, type: file.type, maxSize: MAX_FILE_SIZE_BYTES });
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      console.log('❌ [UPLOAD] File too large', { size: file.size, max: MAX_FILE_SIZE_BYTES });
+      toast.error('הקובץ גדול מדי. גודל מקסימלי: 10MB');
+      return;
+    }
+
+    // Validate file type
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      console.log('❌ [UPLOAD] Invalid file type', { type: file.type, allowed: ALLOWED_MIME_TYPES });
+      toast.error('סוג קובץ לא נתמך. נא להעלות PDF, תמונה, Word או Excel');
+      return;
+    }
+    
+    console.log('✅ [UPLOAD] File validation passed');
+
+    // Check for duplicates before upload
+    try {
+      console.log('🔍 [UPLOAD] Checking for duplicates...');
+      const checkFormData = new FormData();
+      checkFormData.append('file', file);
+      checkFormData.append('org_id', orgId);
+      checkFormData.append('instructor_id', instructor.id);
+
+      const xhr = new XMLHttpRequest();
+      
+      return new Promise((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              console.log('✅ [UPLOAD] Duplicate check response:', response);
+              
+              if (response.has_duplicates && response.duplicates.length > 0) {
+                console.log('⚠️ [UPLOAD] Duplicates found, showing dialog', response.duplicates);
+                // Show duplicate confirmation dialog
+                setDuplicateDialog({
+                  file,
+                  definitionId,
+                  definitionName,
+                  duplicates: response.duplicates,
+                });
+                resolve();
+              } else {
+                console.log('✅ [UPLOAD] No duplicates, proceeding with upload');
+                // No duplicates, proceed with upload
+                performUpload(file, definitionId, definitionName);
+                resolve();
+              }
+            } catch (error) {
+              console.error('❌ [UPLOAD] Failed to parse duplicate check response:', error);
+              reject(error);
+            }
+          } else {
+            console.error('❌ [UPLOAD] Duplicate check failed:', xhr.status, xhr.responseText);
+            // If check fails, still allow upload (fail open)
+            toast.warning('בדיקת כפילויות נכשלה, ממשיך בהעלאה...');
+            performUpload(file, definitionId, definitionName);
+            resolve();
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          console.error('❌ [UPLOAD] Duplicate check network error');
+          // If check fails, still allow upload (fail open)
+          toast.warning('בדיקת כפילויות נכשלה, ממשיך בהעלאה...');
+          performUpload(file, definitionId, definitionName);
+          resolve();
+        });
+
+        const checkUrl = `/api/instructor-files-check?org_id=${orgId}`;
+        xhr.open('POST', checkUrl);
+        
+        const token = session?.access_token;
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
+          xhr.setRequestHeader('x-supabase-authorization', `Bearer ${token}`);
+          xhr.setRequestHeader('x-supabase-auth', `Bearer ${token}`);
+        }
+
+        xhr.send(checkFormData);
+      });
+    } catch (error) {
+      console.error('❌ [UPLOAD] Duplicate check error:', error);
+      // If check fails, still allow upload (fail open)
+      toast.warning('בדיקת כפילויות נכשלה, ממשיך בהעלאה...');
+      performUpload(file, definitionId, definitionName);
+    }
+  }, [instructor, orgId, session, performUpload]);
+
   const handleDownloadFile = useCallback(async (fileId) => {
     if (!instructor) return;
 
@@ -351,6 +438,65 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
 
   return (
     <div className="space-y-6" dir="rtl">
+      {/* Duplicate Confirmation Dialog */}
+      <Dialog open={!!duplicateDialog} onOpenChange={(open) => !open && setDuplicateDialog(null)}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-right">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              קובץ כפול זוהה
+            </DialogTitle>
+            <DialogDescription className="text-right">
+              קובץ זהה כבר קיים במערכת. האם ברצונך להמשיך בהעלאה?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3" dir="rtl">
+            <div className="text-sm">
+              <p className="font-medium">הקובץ הנוכחי:</p>
+              <p className="text-muted-foreground">{duplicateDialog?.file?.name}</p>
+            </div>
+
+            <div className="text-sm">
+              <p className="font-medium mb-2">נמצא גם אצל:</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {duplicateDialog?.duplicates?.map((dup, idx) => (
+                  <div key={idx} className="p-2 bg-amber-50 border border-amber-200 rounded text-right">
+                    <p className="font-medium">{dup.instructor_name}</p>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      <p>שם קובץ: {dup.file_name}</p>
+                      <p>הועלה ב: {formatFileDate(dup.uploaded_at)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground text-right">
+              ניתן להעלות את הקובץ בכל זאת אם הוא נדרש גם עבור המדריך הנוכחי.
+            </p>
+          </div>
+
+          <DialogFooter className="flex-row-reverse gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDuplicateDialog(null)}
+            >
+              ביטול
+            </Button>
+            <Button
+              onClick={() => {
+                const { file, definitionId, definitionName } = duplicateDialog;
+                setDuplicateDialog(null);
+                performUpload(file, definitionId, definitionName);
+              }}
+            >
+              העלה בכל זאת
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Upload progress indicator */}
       {backgroundUploads.length > 0 && (
         <Card className="border-blue-200 bg-blue-50">
