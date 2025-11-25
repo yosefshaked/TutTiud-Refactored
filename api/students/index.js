@@ -12,6 +12,7 @@ import {
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?(?:Z|[+-](?:0\d|1\d|2[0-3]):[0-5]\d)?$/;
 const ISRAELI_PHONE_PATTERN = /^(?:0(?:5[0-9]|[2-4|8-9][0-9])-?\d{7}|(?:\+?972-?)?5[0-9]-?\d{7})$/;
@@ -534,9 +535,21 @@ export default async function (context, req) {
       return respond(context, 400, { message });
     }
 
+    // Build metadata with creator information
+    const metadata = {
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      created_role: role,
+    };
+
+    const recordToInsert = {
+      ...normalized.payload,
+      metadata,
+    };
+
     const { data, error } = await tenantClient
       .from('Students')
-      .insert([normalized.payload])
+      .insert([recordToInsert])
       .select()
       .single();
 
@@ -544,6 +557,22 @@ export default async function (context, req) {
       context.log?.error?.('students failed to create student', { message: error.message });
       return respond(context, 500, { message: 'failed_to_create_student' });
     }
+
+    // Audit log: student created
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email || '',
+      userRole: role,
+      actionType: AUDIT_ACTIONS.STUDENT_CREATED,
+      actionCategory: AUDIT_CATEGORIES.STUDENTS,
+      resourceType: 'student',
+      resourceId: data.id,
+      details: {
+        student_name: data.name,
+        assigned_instructor_id: data.assigned_instructor_id,
+      },
+    });
 
     return respond(context, 201, data);
   }
@@ -584,9 +613,53 @@ export default async function (context, req) {
     return respond(context, 400, { message: updateMessage });
   }
 
+  // Fetch existing student to compare changes and preserve metadata
+  const { data: existingStudent, error: fetchError } = await tenantClient
+    .from('Students')
+    .select('*')
+    .eq('id', studentId)
+    .maybeSingle();
+
+  if (fetchError) {
+    context.log?.error?.('students failed to fetch existing student', { message: fetchError.message, studentId });
+    return respond(context, 500, { message: 'failed_to_fetch_student' });
+  }
+
+  if (!existingStudent) {
+    return respond(context, 404, { message: 'student_not_found' });
+  }
+
+  // Determine which fields actually changed
+  const changedFields = [];
+  for (const [key, newValue] of Object.entries(normalizedUpdates.updates)) {
+    const oldValue = existingStudent[key];
+    // Handle null/undefined as equivalent
+    const normalizedOld = oldValue === null || oldValue === undefined ? null : oldValue;
+    const normalizedNew = newValue === null || newValue === undefined ? null : newValue;
+    
+    // Deep comparison for objects/arrays, simple comparison for primitives
+    if (JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew)) {
+      changedFields.push(key);
+    }
+  }
+
+  // Build updated metadata preserving existing fields
+  const existingMetadata = existingStudent.metadata || {};
+  const updatedMetadata = {
+    ...existingMetadata,
+    updated_by: userId,
+    updated_at: new Date().toISOString(),
+    updated_role: role,
+  };
+
+  const updatesWithMetadata = {
+    ...normalizedUpdates.updates,
+    metadata: updatedMetadata,
+  };
+
   const { data, error } = await tenantClient
     .from('Students')
-    .update(normalizedUpdates.updates)
+    .update(updatesWithMetadata)
     .eq('id', studentId)
     .select()
     .maybeSingle();
@@ -599,6 +672,22 @@ export default async function (context, req) {
   if (!data) {
     return respond(context, 404, { message: 'student_not_found' });
   }
+
+  // Audit log: student updated
+  await logAuditEvent(supabase, {
+    orgId,
+    userId,
+    userEmail: authResult.data.user.email || '',
+    userRole: role,
+    actionType: AUDIT_ACTIONS.STUDENT_UPDATED,
+    actionCategory: AUDIT_CATEGORIES.STUDENTS,
+    resourceType: 'student',
+    resourceId: studentId,
+    details: {
+      updated_fields: changedFields,
+      student_name: data.name,
+    },
+  });
 
   return respond(context, 200, data);
 }

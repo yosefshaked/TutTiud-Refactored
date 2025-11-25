@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 1.5.0**
-**Last Updated: 2025-11-21**
+**Version: 1.6.0**
+**Last Updated: 2025-11-26**
 
 > **Developer Conventions:** For folder structure, naming rules, API patterns, and feature organization, refer to [Conventions.md](./Conventions.md).
 

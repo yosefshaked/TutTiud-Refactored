@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 import { createClient } from '@supabase/supabase-js';
 import { json, resolveBearerAuthorization } from '../_shared/http.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const ADMIN_CLIENT_OPTIONS = {
   auth: {
@@ -620,6 +621,19 @@ async function handleCreateInvitation(context, req, supabase) {
   respond(context, 201, {
     invitation: sanitizeInvitation(insertResult.data),
   });
+
+  // Audit log: invitation created
+  await logAuditEvent(supabase, {
+    orgId,
+    userId: authUser.id,
+    userEmail: authUser.email || '',
+    userRole: role,
+    actionType: AUDIT_ACTIONS.MEMBER_INVITED,
+    actionCategory: AUDIT_CATEGORIES.MEMBERSHIP,
+    resourceType: 'invitation',
+    resourceId: invitationId,
+    details: { invited_email: email, expires_at: expiresAt },
+  });
 }
 
 async function handleListPending(context, req, supabase) {
@@ -907,6 +921,19 @@ async function revokeInvitation(context, req, supabase, invitationId) {
   }
 
   respond(context, 200, { message: 'invitation revoked' });
+
+  // Audit log: invitation revoked
+  await logAuditEvent(supabase, {
+    orgId: invitation.org_id,
+    userId: authUser.id,
+    userEmail: authUser.email || '',
+    userRole: role,
+    actionType: 'invitation.revoked',
+    actionCategory: AUDIT_CATEGORIES.MEMBERSHIP,
+    resourceType: 'invitation',
+    resourceId: invitationId,
+    details: { invited_email: invitation.email },
+  });
 }
 
 async function handleCheckAuth(context, req, supabase) {

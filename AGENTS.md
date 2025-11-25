@@ -4,6 +4,14 @@
 - Use 2 spaces for indentation.
 - Prefer ES module syntax.
 
+## Azure Logging and Diagnostics
+- **Finding Azure Function logs**: Navigate to Azure Portal → Application Insights → Investigate → Search.
+  - Set view to "Individual items"
+  - Filter by "Trace Severity level = Error" when looking for error logs
+  - Filter by "Trace Severity level = Information" for general logs
+  - Use time range selector (last 24 hours, custom, etc.) to narrow results
+  - Search specific function names in the search box (e.g., "student-files-download")
+
 ## Workflow
 - For premium features, always check permissions in both frontend (UI) and backend (API) before allowing access.
 - PDF export feature uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment.
@@ -11,6 +19,14 @@
 - Run `npm run build` to ensure the project builds.
 - No test script is configured; note this in your testing summary.
 - Run `npm run check:schema` before adding new persistence logic; if it reports missing columns, add a checklist note to the PR instead of coding around the gap.
+- **API Authentication Headers**: All frontend API calls to backend endpoints MUST include Supabase-specific authentication headers in addition to the standard `Authorization` header:
+  - `Authorization: Bearer ${token}`
+  - `X-Supabase-Authorization: Bearer ${token}`
+  - `x-supabase-authorization: Bearer ${token}`
+  - `x-supabase-auth: Bearer ${token}`
+  - The backend expects these headers for authentication. Missing them will result in 401 Unauthorized errors even with a valid token.
+  - See `src/lib/api-client.js`, `src/org/OrgContext.jsx`, or `src/api/students-export.js` for reference implementations.
+  - When using `fetch()` or `XMLHttpRequest`, always include all four headers.
 - Instructor color assignments live in `api/_shared/instructor-colors.js`. Use `ensureInstructorColors()` before returning instructor records or aggregations so every row keeps a unique `metadata.instructor_color` (solid or gradient).
 - `/api/weekly-compliance` powers the dashboard widget with aggregated schedules, legend entries, and dynamic hour ranges. Frontend work should consume its payload instead of duplicating aggregation logic.
 - Weekly compliance status logic: `/api/weekly-compliance` marks undocumented sessions scheduled for the current day as `missing`; only future days are returned as `upcoming`.
@@ -120,6 +136,87 @@
 - Logo refresh: Component refetches when `activeOrgId` changes, ensuring correct logo displays after org switch.
 - Logo sizing: Uses `object-contain` with white background padding to ensure logos fit nicely in all display locations (48px container).
 
+### Cross-System Storage Configuration (2025-11)
+- **Storage profile** is a cross-system capability stored in `org_settings.storage_profile` (control DB).
+  - Supports two modes: **BYOS** (Bring Your Own Storage) and **Managed Storage**
+  - System-agnostic design: reusable by TutTiud, Farm Management System, and future systems
+- **BYOS credentials encryption** (`api/_shared/storage-encryption.js`):
+  - Encrypts `access_key_id` and `secret_access_key` before storing in database
+  - Uses AES-256-GCM authenticated encryption (same as tenant credentials)
+  - Encrypted format: `v1:gcm:iv:authTag:cipherText` (base64-encoded)
+  - **CRITICAL**: Uses snake_case field names (access_key_id, secret_access_key) to match normalizeStorageProfile() output
+  - Decrypts automatically when loading storage profile (admin/owner only)
+  - Uses same encryption key as org credentials (`APP_ORG_CREDENTIALS_ENCRYPTION_KEY`)
+  - Public fields (provider, endpoint, bucket, region) stored unencrypted for admin visibility
+- **Security model**:
+  - **Admin/Owner**: GET endpoint decrypts and returns full profile including credentials
+  - **Non-admin members**: GET endpoint strips sensitive fields (access_key_id, secret_access_key, _encrypted, _credentials)
+  - **Rationale**: Only admins need credentials to configure/troubleshoot storage; regular members only need to know storage is configured
+  - Never expose decrypted credentials to non-admin users to prevent storage bucket takeover
+- Control DB schema: run `scripts/control-db-storage-profile-schema.sql` to add `storage_profile` JSONB column
+- **Shared validation module**: `api/cross-platform/storage-config/`
+  - `validateStorageProfile(profile)` - validates complete profile structure
+  - `validateByosCredentials(byosConfig)` - validates S3-compatible provider credentials
+  - `validateManagedConfig(managedConfig)` - validates managed storage namespace
+  - `normalizeStorageProfile(rawProfile)` - normalizes and sanitizes input, outputs snake_case credentials
+  - No TutTiud-specific logic; pure cross-system validation
+- **API endpoints**:
+  - `/api/user-context` now includes `storage_profile` in organization data (credentials stripped for non-admin)
+  - `/api/org-settings/storage` (GET/POST/DELETE/PATCH) manages storage profile
+    - GET: All members can read (credentials only for admin/owner)
+    - POST: Admin/owner only, encrypts before saving
+    - DELETE: Admin/owner only, marks as disconnected
+    - PATCH: Admin/owner only, reconnects storage
+- **BYOS configuration**:
+  - Supports S3, Azure, GCS, Cloudflare R2, and generic S3-compatible providers
+  - Required fields: provider, endpoint, bucket, access_key_id, secret_access_key
+  - Optional: region (depends on provider)
+  - Validation checks URL format, non-empty credentials, valid provider names
+- **Managed Storage configuration**:
+  - Required fields: namespace (alphanumeric + hyphens/underscores), active status
+  - Namespace format validated: `[a-z0-9-_]+`
+- **Error handling**: Missing or invalid storage profile returns clear error state; no silent fallbacks
+- See `api/cross-platform/README.md` for architectural principles and usage guidelines
+
+### File Upload and Document Management (2025-11)
+- `/api/student-files` (POST/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
+  - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
+  - **File metadata**: Each file record includes `{id, name, original_name, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **Hebrew filename encoding**: Properly decodes UTF-8 filenames from multipart data by detecting latin1 mis-encoding and converting back to UTF-8
+  - **Progress tracking**: Frontend uses XMLHttpRequest with upload progress events for real-time feedback
+  - **Background uploads**: Uploads continue in background with toast notifications; users can navigate away while files upload
+  - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures
+  - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Student Name}" (e.g., "אישור רפואי - יוסי כהן")
+  - **Definition name preservation**: Stores `definition_name` in file metadata so orphaned files (deleted definitions) maintain proper display name
+  - **Configuration changes handling**: When admins modify document definitions after files are uploaded:
+    - **Rename definition**: Files automatically show the NEW definition name (fetched dynamically from current definitions); `definition_name` metadata only used as fallback if definition is deleted
+    - **Change target_tags**: Files remain associated with `definition_id`; display uses current definition regardless of tag changes, so file stays in "Required Documents" section with updated tags
+    - **Delete definition**: Files become orphaned, shown in "Additional Files" with amber styling and "הגדרה ישנה" badge using stored `definition_name`
+    - **Implementation**: Frontend and download endpoint both check current definitions first, falling back to stored `definition_name` only for truly deleted definitions
+- `/api/student-files-check` (POST) performs pre-upload duplicate detection.
+  - Calculates MD5 hash of file content before uploading to storage
+  - Searches for duplicates across ALL students in the organization (not just current student)
+  - Returns list of duplicates with `{file_id, file_name, uploaded_at, student_id, student_name}`
+  - Frontend shows confirmation dialog listing which students have the duplicate file before proceeding
+  - Users can cancel upload or proceed to upload anyway (allows intentional duplicates)
+- `/api/student-files-download` (GET) generates presigned download URLs with proper Hebrew filename encoding.
+  - Uses RFC 5987 encoding for non-ASCII filenames: `filename*=UTF-8''<encoded-name>`
+  - Reconstructs filename from `definition_name` + student name for orphaned files
+  - Ensures file extension is always included from `original_name`
+  - 1-hour expiration on presigned URLs for security
+- Frontend (`StudentDocumentsSection.jsx`):
+  - **Tag-based filtering**: Shows only document definitions relevant to student's tags
+    - Definitions with no `target_tags` apply to all students (shown to everyone)
+    - Definitions with `target_tags` shown only if student has at least one matching tag
+    - Students without tags see only universal documents (no `target_tags`)
+  - **Pre-upload duplicate check**: Calls check endpoint before starting upload, shows confirmation with student names
+  - **Visual progress indicator**: Shows progress bar and percentage for each active upload in blue info box at top of section
+  - **Background upload tracking**: State tracks multiple concurrent uploads with `backgroundUploads` array
+  - **Toast notifications**: Loading toast updates with progress percentage, then success/error on completion
+  - **Delete functionality**: Uses native fetch with proper JSON body and authorization headers
+  - **Orphaned files display**: Files from deleted definitions show with amber background, "הגדרה ישנה" badge, and reconstructed name from stored `definition_name`
+- File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
+
 ### PDF Export Feature (2025-11)
 - `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
   - Validates admin/owner role and permission before processing
@@ -136,6 +233,90 @@
   - Tooltip message: "ייצוא ל-PDF הוא תכונת פרימיום. צור קשר עם התמיכה כדי להפעיל תכונה זו."
   - Uses toast notifications for success/error feedback
   - API client: `src/api/students-export.js` exports `exportStudentPdf()` and `downloadPdfBlob()`
+
+### Storage Grace Period & File Deletion (2025-11)
+- **Configurable grace period**: `permission_registry.storage_grace_period_days` (default 30) controls how many days users have to download files after storage is disconnected before permanent deletion.
+- **Database schema**: `org_settings.storage_grace_ends_at` (timestamptz) tracks when grace period expires and files should be deleted.
+- **Storage disconnection**: Preserves configuration with `disconnected: true` flag instead of deleting profile.
+  - Allows easy reconnection without reconfiguring credentials
+  - For BYOS: Users can maintain read-only access to their storage if desired
+  - For managed: Triggers grace period in separate endpoint
+  - Audit trail maintained with `disconnected_at`, `disconnected_by` metadata
+  - **File operations during disconnection**:
+    - Uploads (`POST /api/student-files`): Blocked with 403 error
+    - Downloads (`GET /api/student-files-download`): Allowed for BYOS (user owns storage); for managed, only during grace period when `storage_access_level = 'read_only_grace'`
+    - Bulk download (`POST /api/storage-bulk-download`): Allowed for BYOS anytime; for managed, only during grace period
+- **Reconnection**: `PATCH /api/org-settings/storage` removes disconnected flag and restores full access
+- **Grace period lifecycle**:
+  1. **Start grace period**: `/api/storage-start-grace-period` (POST) - Admin/owner triggers grace period
+     - Fetches grace period days from `permission_registry`
+     - Calculates `grace_ends_at = current_date + grace_period_days`
+     - Sets `permissions.storage_access_level = 'read_only_grace'`
+     - Updates `org_settings.storage_grace_ends_at`
+  2. **During grace period**: Users can download files but cannot upload new ones
+  3. **Cleanup job**: `/api/storage-cleanup-expired` (POST) - Runs daily to delete expired files
+     - Finds orgs where `storage_grace_ends_at < NOW()`
+     - **Managed storage**: Deletes files from YOUR R2 bucket using `driver.deletePrefix()`
+     - **BYOS**: Skips file deletion (user owns the storage)
+     - Updates `org_settings`: sets `storage_profile = null`, `storage_grace_ends_at = null`, `storage_access_level = false`
+- **Data ownership principles**:
+  - ✅ Delete files from YOUR managed R2 bucket
+  - ❌ Do NOT force-delete from user's tenant database
+  - ℹ️ Leave `Students.files` metadata intact (user owns their DB)
+  - 📧 Send email notifications at grace period start and after deletion
+- **S3 driver enhancement**: `deletePrefix(prefix)` method lists and deletes all objects with given prefix in batches of 1000 (S3 limit).
+- **Permission**: `storage_grace_period_days` in registry allows system-wide control of deletion timeline without code changes.
+- **Deployment**: Run `scripts/control-db-storage-grace-period.sql` to add `storage_grace_ends_at` column and index.
+
+### Audit Logging for Compliance (2025-11)
+- **Audit log table**: `public.audit_log` in control DB tracks all critical admin and system actions for legal compliance and dispute resolution.
+- **Schema**: Includes org_id, user_id, user_email, user_role, action_type, action_category, resource_type, resource_id, details (JSONB), metadata (JSONB), performed_at, expires_at.
+- **Retention**: 7 years by default (configurable via `expires_at`); required for GDPR and legal compliance.
+- **RLS policies**: Users can read audit logs for their own organizations; only service role can insert/modify.
+- **Helper function**: `public.log_audit_event()` - Use this from API endpoints to log actions.
+- **Shared utilities**: `api/_shared/audit-log.js` provides `logAuditEvent()` and action type constants (`AUDIT_ACTIONS`, `AUDIT_CATEGORIES`).
+- **CRITICAL**: `logAuditEvent()` requires a **control DB Supabase client**, NOT a tenant client. Always pass the control DB admin client (typically named `supabase` in `/api/*` endpoints that use `createSupabaseAdminClient()`). Passing a tenant client will write to the wrong database and fail silently.
+- **Implementation status**:
+  - ✅ **Implemented**: Storage operations, Membership operations, Invitations, Backup (create/restore), Students (create/update), Instructors (create/update/delete), Settings (upsert/delete), Logo (upload/delete), Files (student/instructor upload/delete)
+  - ❌ **Not yet implemented**: Permissions changes (no dedicated endpoint yet)
+  - When adding audit logging to new endpoints, ensure you pass the control DB client and follow the pattern in `api/backup/index.js`, `api/students/index.js`, or `api/org-memberships/index.js`.
+- **Logged actions**:
+  - **Storage**: configured, updated, disconnected, reconnected, grace_period_started, files_deleted, migrated_to_byos, bulk_download
+  - **Permissions**: enabled, disabled (constants defined, not yet used in code)
+  - **Membership**: invited, removed, role_changed
+  - **Backup**: created, restored
+  - **Students**: created, updated (with student_name, assigned_instructor_id, updated_fields)
+  - **Instructors**: created, updated, deleted (with instructor_name, instructor_email, soft_delete flag)
+  - **Settings**: updated (with operation type, keys array, count)
+  - **Logo**: updated (with action: upload/delete, logo_url)
+  - **Files**: uploaded, deleted (with resource_type: student_file/instructor_file, file_name, file_size, storage_mode)
+- **Usage pattern**:
+  ```javascript
+  await logAuditEvent(supabase, { // ← MUST be control DB client
+    orgId, userId, userEmail, userRole,
+    actionType: AUDIT_ACTIONS.STORAGE_CONFIGURED,
+    actionCategory: AUDIT_CATEGORIES.STORAGE,
+    resourceType: 'storage_profile',
+    resourceId: orgId,
+    details: { mode: 'managed' }
+  });
+  ```
+- **Deployment**: Run `scripts/control-db-audit-log.sql` to create audit_log table and helper function.
+
+### File Migration and Bulk Download (2025-11)
+- **Bulk download**: `/api/storage-bulk-download` (POST) - Creates ZIP archive of all organization files.
+  - Admin/owner only
+  - Fetches all student files from tenant DB
+  - Downloads files from storage using `driver.getFile(path)` method
+  - Packages files into ZIP organized by student folders
+  - Returns as `application/zip` download
+  - Logs audit event with file count, success/failure counts, and ZIP size
+  - Sanitizes filenames to prevent path traversal attacks
+- **Storage drivers**: All drivers (S3, Azure, GCS) implement `getFile(path)` method that returns file data as Buffer.
+  - S3 adapter: Converts readable stream to Buffer using async iteration
+  - Handles large files efficiently with streaming
+- **BYOS migration** (planned): Export all files → User uploads to their S3/R2 → Reconfigure storage profile
+- **Use cases**: Before grace period ends, manual backup, migration from managed to BYOS
 
 ### Collapsible Table Rows Pattern
 - When a table needs drill-down details, manage expansion manually with `useState` keyed by row id.
@@ -313,6 +494,10 @@
 
 ### Student Lifecycle & Visibility (2025-11)
 - Tenant students now include an `is_active` boolean (default `true`). The setup script (`src/lib/setup-sql.js`) adds the column with `ADD COLUMN IF NOT EXISTS` and backfills existing rows, so rerunning the script on legacy tenants is safe.
+- **Student metadata tracking**: Students now automatically track creator and updater information in the `metadata` jsonb column:
+  - On creation (POST): `{ created_by: userId, created_at: ISO timestamp, created_role: role }`
+  - On update (PUT): Preserves existing metadata and adds `{ updated_by: userId, updated_at: ISO timestamp, updated_role: role }`
+  - Metadata is populated server-side in `/api/students` endpoint, frontend doesn't need to send these fields
 - `/api/students` defaults to `status=active`; pass `status=inactive`, `status=all`, or `include_inactive=true` (legacy) when maintenance flows need archived rows. `PUT` handlers accept `is_active` alongside the existing roster fields.
 - `/api/my-students` respects the org setting `instructors_can_view_inactive_students`. Instructors only see inactive records when the flag is enabled; admins/owners always see them when requesting `status=all`.
 - Admin UI (`StudentManagementPage.jsx`) persists the Active/Inactive/All filter in `sessionStorage`, badges inactive rows, and exposes the toggle in `EditStudentForm.jsx`. Instructor surfaces (`MyStudentsPage.jsx`, `NewSessionModal.jsx`, `NewSessionForm.jsx`) automatically hide inactive students unless the setting is on.
@@ -330,6 +515,50 @@
   - Backend uses `tuttiud.remove_tag_from_students(tag_uuid)` PostgreSQL function for efficient bulk removal with fallback to manual iteration
   - Tag deletion is permanent; confirmation dialog warns users that operation cannot be undone
   - Full RTL support with proper Hebrew text alignment and flex-row-reverse layouts
+
+### Instructor Types and Document Management (2025-11)
+- **Instructor Types**: Similar to student tags, instructors can be categorized by type (e.g., "Therapist", "Volunteer", "Staff")
+  - Tenant type definitions live in `tuttiud."Settings"` row keyed `instructor_types` (JSONB array of `{ id, name }`)
+  - Database schema: `Instructors.instructor_type` (text) and `Instructors.files` (jsonb) columns added in setup script
+  - Frontend hook: `useInstructorTypes()` (`src/features/instructors/hooks/useInstructorTypes.js`) provides load/create/update/delete operations
+  - Management UI: **Unified `TagsManager.jsx`** in Settings manages both student tags and instructor types via mode toggle
+    - Card renamed to "ניהול תגיות וסיווגים" (Manage Tags and Classifications)
+    - Toggle buttons switch between student tags and instructor types modes
+    - Single component handles CRUD for both entity types with mode-aware UI labels
+  - Instructor editing: `InstructorManager.jsx` includes type selector dropdown in expanded edit form
+- **Dual-Mode Document Definitions**:
+  - `DocumentRulesManager.jsx` now supports both students and instructors via target type selector
+  - Settings keys: `document_definitions` (students) and `instructor_document_definitions` (instructors)
+  - Student documents can be filtered by `target_tags` (student tags)
+  - Instructor documents can be filtered by `target_instructor_types` (instructor types)
+  - If no tags/types specified, document applies to all students/instructors
+  - UI shows appropriate badges and icons (Tag for students, Briefcase for instructors)
+- **File Upload for Instructors**:
+  - Backend endpoints: `/api/instructor-files` (POST/DELETE) and `/api/instructor-files-download` (GET)
+  - Storage path: `instructors/{org_id}/{instructor_id}/{file_id}.{ext}`
+  - **Admin UI**: `InstructorDocumentsSection` component integrated into `InstructorManager` via tabs (Details/Documents)
+  - **Instructor Self-Service**: `MyInstructorDocuments` component in Settings page modal
+    - Modal trigger: "המסמכים שלי" card appears for instructor role (non-admin users)
+    - Modal features: Upload required/additional documents, view/download own files, background progress tracking
+    - No delete capability: Instructors cannot delete files to preserve important documentation
+  - Document validation: Filters by `instructor_type` matching `target_instructor_types` in definitions
+  - Upload features: Background progress tracking, duplicate detection (MD5 hash), Hebrew filename support
+  - File management: Upload, download (presigned URLs), delete (admin-only)
+  - Orphaned files: Files from deleted definitions display with amber badge "הגדרה ישנה"
+  - Storage integration: Works with both managed R2 and BYOS storage profiles
+  - **Permission model** (enforced in backend):
+    - Admin/Owner: Can manage files for all instructors (via `InstructorManager`)
+      - Full CRUD: Upload, download, delete any instructor's files
+    - Instructor (non-admin): Can only upload/download their own files
+      - Upload: ✅ Own files only
+      - Download: ✅ Own files only
+      - Delete: ❌ Blocked (admin-only for data integrity)
+    - `GET /api/instructors`: Non-admin users can only fetch their own instructor record (`builder.eq('id', userId)`)
+    - `POST /api/instructor-files`: Validates `instructorId !== user.id` for non-admins, blocks cross-instructor uploads
+    - `DELETE /api/instructor-files`: Blocked for all non-admin users regardless of file ownership
+    - `GET /api/instructor-files-download`: Validates `instructorId !== userId` for non-admins, blocks cross-instructor downloads
+  - **Data isolation**: Instructors cannot see other instructors' files, names, or technical information; only admins have roster visibility
+  - **Rationale for admin-only deletion**: Files (medical certificates, credentials, etc.) are critical documentation that should only be removed with administrative approval to prevent accidental or unauthorized deletion
 
 ### Session Form Question Types (2025-10)
 - Session form questions are managed via `SessionFormManager.jsx` (Settings page) and rendered in `NewSessionForm.jsx`.

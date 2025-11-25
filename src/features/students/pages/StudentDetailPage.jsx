@@ -21,6 +21,7 @@ import EditStudentModal from '@/features/admin/components/EditStudentModal.jsx';
 import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } from '@/features/students/utils/tags.js';
 import { exportStudentPdf, downloadPdfBlob } from '@/api/students-export.js';
 import LegacyImportModal from '@/features/students/components/LegacyImportModal.jsx';
+import StudentDocumentsSection from '@/features/students/components/StudentDocumentsSection.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -358,6 +359,11 @@ export default function StudentDetailPage() {
       setServicesError(error?.message || 'טעינת רשימת השירותים נכשלה.');
     }
   }, [canFetch, activeOrgId]);
+
+  // Refresh student details (for file uploads)
+  const loadStudentDetails = useCallback(async () => {
+    await loadStudent();
+  }, [loadStudent]);
 
   useEffect(() => {
     if (canFetch) {
@@ -977,6 +983,14 @@ export default function StudentDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Documents Section */}
+      <StudentDocumentsSection
+        student={student}
+        session={session}
+        orgId={activeOrgId}
+        onRefresh={loadStudentDetails}
+      />
 
       <div className="space-y-sm md:space-y-md">
         <div className="flex items-center justify-between gap-sm">

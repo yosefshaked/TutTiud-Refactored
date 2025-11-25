@@ -8,6 +8,7 @@ import {
   respond,
   resolveOrgId,
 } from '../_shared/org-bff.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 export default async function (context, req) {
   context.log?.info?.('org-logo: request received', { method: req.method });
@@ -148,6 +149,19 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_save_logo' });
     }
 
+    // Audit log
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.LOGO_UPDATED,
+      actionCategory: AUDIT_CATEGORIES.SETTINGS,
+      resourceType: 'org_logo',
+      resourceId: orgId,
+      details: { action: 'upload', logo_url: logoUrl },
+    });
+
     context.log?.info?.('org-logo uploaded successfully', { orgId, userId });
     return respond(context, 200, { logo_url: logoUrl });
   }
@@ -163,6 +177,19 @@ export default async function (context, req) {
       context.log?.error?.('org-logo failed to delete logo_url', { message: deleteError.message });
       return respond(context, 500, { message: 'failed_to_delete_logo' });
     }
+
+    // Audit log
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.LOGO_UPDATED,
+      actionCategory: AUDIT_CATEGORIES.SETTINGS,
+      resourceType: 'org_logo',
+      resourceId: orgId,
+      details: { action: 'delete' },
+    });
 
     context.log?.info?.('org-logo deleted successfully', { orgId, userId });
     return respond(context, 200, { logo_url: null });

@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, Edit2, Loader2, Plus, Tag, Trash2, X } from 'lucide-react';
+import { AlertCircle, Briefcase, Edit2, Loader2, Plus, Tag, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 import { useOrg } from '@/org/OrgContext';
 import { authenticatedFetch } from '@/lib/api-client';
+import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes';
 import {
   Dialog,
   DialogContent,
@@ -29,11 +30,15 @@ import {
 export default function TagsManager() {
   const { session } = useAuth();
   const { activeOrgId } = useOrg();
+  const [mode, setMode] = useState('tags'); // 'tags' or 'types'
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  // Instructor types hook
+  const { types, loadingTypes, loadTypes, createType, updateType, deleteType } = useInstructorTypes();
 
   // Add/Edit dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -67,6 +72,13 @@ export default function TagsManager() {
   useEffect(() => {
     loadTags();
   }, [loadTags]);
+
+  // Load instructor types when switching to types mode
+  useEffect(() => {
+    if (mode === 'types') {
+      loadTypes();
+    }
+  }, [mode, loadTypes]);
 
   const openAddDialog = () => {
     setEditingTag(null);
@@ -102,11 +114,31 @@ export default function TagsManager() {
     e.preventDefault();
     const trimmedName = tagName.trim();
     if (!trimmedName) {
-      setActionError('יש להזין שם תגית.');
+      setActionError(mode === 'tags' ? 'יש להזין שם תגית.' : 'יש להזין שם סוג.');
       return;
     }
 
-    // Check for duplicate names (excluding current tag when editing)
+    if (mode === 'types') {
+      // Instructor types mode
+      setActionLoading(true);
+      setActionError('');
+      try {
+        if (editingTag) {
+          await updateType(editingTag.id, trimmedName);
+        } else {
+          await createType(trimmedName);
+        }
+        closeDialog();
+      } catch (err) {
+        console.error('Failed to save type', err);
+        setActionError(err?.message || 'שמירת הסוג נכשלה.');
+      } finally {
+        setActionLoading(false);
+      }
+      return;
+    }
+
+    // Student tags mode
     const duplicate = tags.find(
       (t) => t.name.toLowerCase() === trimmedName.toLowerCase() && t.id !== editingTag?.id
     );
@@ -173,6 +205,22 @@ export default function TagsManager() {
 
     setActionLoading(true);
     setDeleteError('');
+
+    if (mode === 'types') {
+      // Instructor types mode
+      try {
+        await deleteType(tagToDelete.id);
+        closeDeleteDialog();
+      } catch (err) {
+        console.error('Failed to delete type', err);
+        setDeleteError(err?.message || 'מחיקת הסוג נכשלה.');
+      } finally {
+        setActionLoading(false);
+      }
+      return;
+    }
+
+    // Student tags mode
     try {
       // First remove tag from all students who have it
       await authenticatedFetch('students-remove-tag', {
@@ -204,20 +252,27 @@ export default function TagsManager() {
     }
   };
 
-  if (loading) {
+  const isLoading = mode === 'tags' ? loading : loadingTypes;
+  const items = mode === 'tags' ? tags : types;
+  const Icon = mode === 'tags' ? Tag : Briefcase;
+  const entityLabel = mode === 'tags' ? 'תגית' : 'סוג';
+  const entityLabelPlural = mode === 'tags' ? 'תגיות' : 'סוגים';
+  const entityContext = mode === 'tags' ? 'תלמידים' : 'מדריכים';
+
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Tag className="h-5 w-5" />
-            ניהול תגיות
+            <Icon className="h-5 w-5" />
+            ניהול תגיות וסיווגים
           </CardTitle>
-          <CardDescription>ניהול תגיות לסיווג ותיוג תלמידים</CardDescription>
+          <CardDescription>ניהול תגיות לתלמידים וסיווגים למדריכים</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>טוען תגיות...</span>
+            <span>טוען {entityLabelPlural}...</span>
           </div>
         </CardContent>
       </Card>
@@ -231,14 +286,36 @@ export default function TagsManager() {
           <div className="flex flex-row-reverse items-center justify-between gap-4">
             <div className="flex-1 text-right">
               <CardTitle className="flex items-center gap-2 justify-end mb-1">
-                <span>ניהול תגיות</span>
-                <Tag className="h-5 w-5" />
+                <span>ניהול תגיות וסיווגים</span>
+                <Icon className="h-5 w-5" />
               </CardTitle>
-              <CardDescription className="text-right">ניהול תגיות לסיווג ותיוג תלמידים</CardDescription>
+              <CardDescription className="text-right">ניהול תגיות לתלמידים וסיווגים למדריכים</CardDescription>
             </div>
             <Button onClick={openAddDialog} size="sm" className="gap-2 shrink-0">
               <Plus className="h-4 w-4" />
-              תגית חדשה
+              {entityLabel} חדש{mode === 'tags' ? 'ה' : ''}
+            </Button>
+          </div>
+          
+          {/* Mode toggle buttons */}
+          <div className="flex gap-2 mt-4" dir="rtl">
+            <Button
+              variant={mode === 'tags' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setMode('tags')}
+              className="gap-2"
+            >
+              <Tag className="h-4 w-4" />
+              תגיות תלמידים
+            </Button>
+            <Button
+              variant={mode === 'types' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setMode('types')}
+              className="gap-2"
+            >
+              <Briefcase className="h-4 w-4" />
+              סוגי מדריכים
             </Button>
           </div>
         </CardHeader>
@@ -250,41 +327,41 @@ export default function TagsManager() {
             </div>
           )}
 
-          {tags.length === 0 ? (
+          {items.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <Tag className="h-12 w-12 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">לא קיימות תגיות. צור תגית ראשונה כדי להתחיל.</p>
+              <Icon className="h-12 w-12 mx-auto mb-3 opacity-20" />
+              <p className="text-sm">לא קיימים {entityLabelPlural}. צור {entityLabel} ראשון{mode === 'tags' ? 'ה' : ''} כדי להתחיל.</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {tags.map((tag) => (
+              {items.map((item) => (
                 <div
-                  key={tag.id}
+                  key={item.id}
                   className="group flex items-center justify-between p-3 rounded-lg border bg-card/90 hover:bg-accent/40 transition-colors focus-within:ring-2 focus-within:ring-primary/30"
                   dir="rtl"
                 >
                   <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    <span className="font-medium select-text">{tag.name}</span>
+                    <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="font-medium select-text">{item.name}</span>
                   </div>
                   <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => openEditDialog(tag)}
+                      onClick={() => openEditDialog(item)}
                       className="h-8 px-2"
-                      title="עריכת תגית"
-                      aria-label={`עריכת תגית ${tag.name}`}
+                      title={`עריכת ${entityLabel}`}
+                      aria-label={`עריכת ${entityLabel} ${item.name}`}
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => openDeleteDialog(tag)}
+                      onClick={() => openDeleteDialog(item)}
                       className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      title="מחיקת תגית"
-                      aria-label={`מחיקת תגית ${tag.name}`}
+                      title={`מחיקת ${entityLabel}`}
+                      aria-label={`מחיקת ${entityLabel} ${item.name}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -300,22 +377,24 @@ export default function TagsManager() {
       <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingTag ? 'עריכת תגית' : 'תגית חדשה'}</DialogTitle>
+            <DialogTitle>{editingTag ? `עריכת ${entityLabel}` : `${entityLabel} חדש${mode === 'tags' ? 'ה' : ''}`}</DialogTitle>
             <DialogDescription>
-              {editingTag ? 'ערוך את שם התגית. השינוי יחול על כל התלמידים המתויגים.' : 'צור תגית חדשה לסיווג תלמידים.'}
+              {editingTag 
+                ? `ערוך את שם ה${entityLabel}. השינוי יחול על כל ה${entityContext} ${mode === 'tags' ? 'המתויגים' : 'המסווגים'}.` 
+                : `צור ${entityLabel} חדש${mode === 'tags' ? 'ה' : ''} לסיווג ${entityContext}.`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveTag} className="space-y-4" dir="rtl">
             <div className="space-y-2">
               <Label htmlFor="tag-name" className="text-right block">
-                שם תגית
+                שם {entityLabel}
               </Label>
               <Input
                 id="tag-name"
                 ref={inputRef}
                 value={tagName}
                 onChange={(e) => setTagName(e.target.value)}
-                placeholder="לדוגמה: תלמיד חדש"
+                placeholder={mode === 'tags' ? 'לדוגמה: תלמיד חדש' : 'לדוגמה: מטפל'}
                 required
                 disabled={actionLoading}
                 dir="rtl"
@@ -327,7 +406,7 @@ export default function TagsManager() {
                   }
                 }}
               />
-              <p className="text-xs text-muted-foreground text-right">השם יוצג בתפריטים ושדות בחירת תגיות.</p>
+              <p className="text-xs text-muted-foreground text-right">השם יוצג בתפריטים ושדות בחירת {entityLabelPlural}.</p>
             </div>
 
             {actionError && (
@@ -340,7 +419,7 @@ export default function TagsManager() {
           <DialogFooter className="flex-row-reverse gap-2">
             <Button type="submit" onClick={handleSaveTag} disabled={actionLoading} className="gap-2">
               {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {editingTag ? 'שמירת שינויים' : 'יצירת תגית'}
+              {editingTag ? 'שמירת שינויים' : `יצירת ${entityLabel}`}
             </Button>
             <Button type="button" variant="outline" onClick={closeDialog} disabled={actionLoading}>
               ביטול
@@ -353,9 +432,9 @@ export default function TagsManager() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={closeDeleteDialog}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-right">האם למחוק את התגית "{tagToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogTitle className="text-right">האם למחוק את ה{entityLabel} "{tagToDelete?.name}"?</AlertDialogTitle>
             <AlertDialogDescription className="text-right">
-              פעולה זו תמחק את התגית מהמערכת ותסיר אותה מכל התלמידים שמתויגים בה. לא ניתן לשחזר את הפעולה.
+              פעולה זו תמחק את ה{entityLabel} מהמערכת ותסיר {mode === 'tags' ? 'אותה מכל התלמידים שמתויגים בה' : 'אותו מכל המדריכים המסווגים בו'}. לא ניתן לשחזר את הפעולה.
             </AlertDialogDescription>
           </AlertDialogHeader>
           
@@ -373,7 +452,7 @@ export default function TagsManager() {
               className="bg-destructive hover:bg-destructive/90 gap-2"
             >
               {actionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-              מחיקת תגית
+              מחיקת {entityLabel}
             </AlertDialogAction>
             <AlertDialogCancel disabled={actionLoading}>ביטול</AlertDialogCancel>
           </AlertDialogFooter>

@@ -13,6 +13,7 @@ import {
 } from '../_shared/org-bff.js';
 import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 import { decryptBackup, validateBackupManifest, restoreTenantData } from '../_shared/backup-utils.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const MAX_BACKUP_SIZE = 100 * 1024 * 1024; // 100 MB
 
@@ -207,6 +208,24 @@ export default async function restore(context, req) {
       initiated_by: userId,
       source_org_id: manifest.org_id,
       records_restored: result.restored,
+    });
+
+    // Audit log: backup restored
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email || '',
+      userRole: role,
+      actionType: AUDIT_ACTIONS.BACKUP_RESTORED,
+      actionCategory: AUDIT_CATEGORIES.BACKUP,
+      resourceType: 'backup',
+      resourceId: orgId,
+      details: {
+        source_org_id: manifest.org_id,
+        records_restored: result.restored,
+        clear_existing: clearExisting,
+        errors_count: result.errors.length,
+      },
     });
 
     const totalMs = Date.now() - startedAt;

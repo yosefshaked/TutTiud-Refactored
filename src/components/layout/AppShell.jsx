@@ -69,6 +69,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
       matchPath('/students/:id', p)
     )
   }, [location.pathname])
+  
   return (
     <nav
       role="navigation"

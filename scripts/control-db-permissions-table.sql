@@ -191,6 +191,17 @@ INSERT INTO public.permission_registry (
     'false'::jsonb,
     'features',
     true
+  ),
+  -- Storage grace period before deletion (in days)
+  (
+    'storage_grace_period_days',
+    'Storage Grace Period (Days)',
+    'תקופת חסד לאחסון (ימים)',
+    'Number of days users have to download files after storage is disconnected before permanent deletion',
+    'מספר הימים שיש למשתמשים להוריד קבצים לאחר ניתוק האחסון לפני מחיקה סופית',
+    '30'::jsonb,
+    'storage',
+    false
   )
 ON CONFLICT (permission_key) DO UPDATE SET
   display_name_en = EXCLUDED.display_name_en,
@@ -219,7 +230,7 @@ BEGIN
 END;
 $$;
 
--- Helper function to initialize org permissions if null/empty
+-- Helper function to initialize org permissions if null/empty and merge missing ones
 CREATE OR REPLACE FUNCTION public.initialize_org_permissions(p_org_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -227,6 +238,9 @@ AS $$
 DECLARE
   current_permissions JSONB;
   default_permissions JSONB;
+  merged_permissions JSONB;
+  permission_key TEXT;
+  default_value JSONB;
 BEGIN
   -- Get current permissions
   SELECT permissions
@@ -234,15 +248,16 @@ BEGIN
   FROM public.org_settings
   WHERE org_id = p_org_id;
   
-  -- If null, empty object, or no keys, initialize with defaults
+  -- Get default permissions from registry
+  default_permissions := public.get_default_permissions();
+  
+  -- If permissions is null or empty, use defaults
   IF current_permissions IS NULL OR 
      current_permissions = '{}'::jsonb OR 
-     jsonb_object_keys(current_permissions) IS NULL THEN
+     jsonb_typeof(current_permissions) = 'null' OR
+     (SELECT COUNT(*) FROM jsonb_object_keys(current_permissions)) = 0 THEN
     
-    -- Get default permissions
-    default_permissions := public.get_default_permissions();
-    
-    -- Update org_settings
+    -- Update org_settings with defaults
     UPDATE public.org_settings
     SET 
       permissions = default_permissions,
@@ -252,7 +267,33 @@ BEGIN
     RETURN default_permissions;
   END IF;
   
-  RETURN current_permissions;
+  -- Otherwise, merge: start with current permissions, add missing ones from defaults
+  merged_permissions := current_permissions;
+  
+  -- Loop through each permission in the registry
+  FOR permission_key, default_value IN 
+    SELECT key, value 
+    FROM jsonb_each(default_permissions)
+  LOOP
+    -- If this permission key doesn't exist in current permissions, add it
+    IF NOT (merged_permissions ? permission_key) THEN
+      merged_permissions := jsonb_set(
+        merged_permissions,
+        ARRAY[permission_key],
+        default_value,
+        true
+      );
+    END IF;
+  END LOOP;
+  
+  -- Update org_settings with merged permissions
+  UPDATE public.org_settings
+  SET 
+    permissions = merged_permissions,
+    updated_at = NOW()
+  WHERE org_id = p_org_id;
+  
+  RETURN merged_permissions;
 END;
 $$;
 

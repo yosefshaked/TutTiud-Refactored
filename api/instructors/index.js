@@ -12,6 +12,7 @@ import {
 } from '../_shared/org-bff.js';
 import { parseJsonBodyWithLimit, validateInstructorCreate, validateInstructorUpdate } from '../_shared/validation.js';
 import { ensureInstructorColors } from '../_shared/instructor-colors.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
       // Intentionally ignore profile fetch errors; fallback to provided values.
 export default async function (context, req) {
@@ -88,7 +89,7 @@ export default async function (context, req) {
 
     let builder = tenantClient
       .from('Instructors')
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_types, files')
       .order('name', { ascending: true });
 
     if (!includeInactive) {
@@ -172,13 +173,29 @@ export default async function (context, req) {
     const { data, error } = await tenantClient
       .from('Instructors')
       .upsert(insertPayload, { onConflict: 'id' })
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_types, files')
       .single();
 
     if (error) {
       context.log?.error?.('instructors failed to upsert instructor', { message: error.message });
       return respond(context, 500, { message: 'failed_to_save_instructor' });
     }
+
+    // Audit log: instructor created
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email || '',
+      userRole: role,
+      actionType: AUDIT_ACTIONS.INSTRUCTOR_CREATED,
+      actionCategory: AUDIT_CATEGORIES.INSTRUCTORS,
+      resourceType: 'instructor',
+      resourceId: data.id,
+      details: {
+        instructor_name: data.name,
+        instructor_email: data.email,
+      },
+    });
 
     return respond(context, 200, data);
   }
@@ -201,11 +218,41 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'no updates provided' });
     }
 
+    // Fetch existing instructor to compare changes
+    const { data: existingInstructor, error: fetchError } = await tenantClient
+      .from('Instructors')
+      .select('*')
+      .eq('id', instructorId)
+      .maybeSingle();
+
+    if (fetchError) {
+      context.log?.error?.('instructors failed to fetch existing instructor', { message: fetchError.message, instructorId });
+      return respond(context, 500, { message: 'failed_to_fetch_instructor' });
+    }
+
+    if (!existingInstructor) {
+      return respond(context, 404, { message: 'instructor_not_found' });
+    }
+
+    // Determine which fields actually changed
+    const changedFields = [];
+    for (const [key, newValue] of Object.entries(updates)) {
+      const oldValue = existingInstructor[key];
+      // Handle null/undefined as equivalent
+      const normalizedOld = oldValue === null || oldValue === undefined ? null : oldValue;
+      const normalizedNew = newValue === null || newValue === undefined ? null : newValue;
+      
+      // Deep comparison for objects/arrays, simple comparison for primitives
+      if (JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew)) {
+        changedFields.push(key);
+      }
+    }
+
     const { data, error } = await tenantClient
       .from('Instructors')
       .update(updates)
       .eq('id', instructorId)
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_types, files')
       .maybeSingle();
 
     if (error) {
@@ -216,6 +263,22 @@ export default async function (context, req) {
     if (!data) {
       return respond(context, 404, { message: 'instructor_not_found' });
     }
+
+    // Audit log: instructor updated
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email || '',
+      userRole: role,
+      actionType: AUDIT_ACTIONS.INSTRUCTOR_UPDATED,
+      actionCategory: AUDIT_CATEGORIES.INSTRUCTORS,
+      resourceType: 'instructor',
+      resourceId: instructorId,
+      details: {
+        updated_fields: changedFields,
+        instructor_name: data.name,
+      },
+    });
 
     return respond(context, 200, data);
   }
@@ -235,7 +298,7 @@ export default async function (context, req) {
       .from('Instructors')
       .update({ is_active: false })
       .eq('id', instructorId)
-      .select('id, name, email, phone, is_active, notes, metadata')
+      .select('id, name, email, phone, is_active, notes, metadata, instructor_types, files')
       .maybeSingle();
 
     if (error) {
