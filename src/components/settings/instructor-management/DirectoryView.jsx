@@ -208,11 +208,11 @@ export default function DirectoryView({ session, orgId, canLoad }) {
         {activeInstructors.length === 0 ? (
           <p className="text-center text-sm text-muted-foreground py-8">אין מדריכים פעילים.</p>
         ) : (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2 max-h-96 overflow-y-auto overflow-x-visible">
             {activeInstructors.map((instructor) => (
               <div
                 key={instructor.id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors"
+                className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <Avatar className="h-10 w-10 shrink-0">
