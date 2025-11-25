@@ -38,7 +38,7 @@ export default function TagsManager() {
   const [actionError, setActionError] = useState('');
 
   // Instructor types hook
-  const { types, loadingTypes, createType, updateType, deleteType } = useInstructorTypes();
+  const { types, loadingTypes, loadTypes, createType, updateType, deleteType } = useInstructorTypes();
 
   // Add/Edit dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -72,6 +72,13 @@ export default function TagsManager() {
   useEffect(() => {
     loadTags();
   }, [loadTags]);
+
+  // Load instructor types when switching to types mode
+  useEffect(() => {
+    if (mode === 'types') {
+      loadTypes();
+    }
+  }, [mode, loadTypes]);
 
   const openAddDialog = () => {
     setEditingTag(null);
