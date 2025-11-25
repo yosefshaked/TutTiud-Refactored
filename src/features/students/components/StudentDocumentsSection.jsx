@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { FileText, Upload, Download, Trash2, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { FileText, Upload, Download, Trash2, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, Eye } from 'lucide-react';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { useOrg } from '@/org/OrgContext.jsx';
 
 const REQUEST_STATE = {
   idle: 'idle',
@@ -34,6 +35,7 @@ function formatFileSize(bytes) {
 }
 
 export default function StudentDocumentsSection({ student, session, orgId, onRefresh }) {
+  const { activeOrg } = useOrg();
   const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
   const [uploadState, setUploadState] = useState(REQUEST_STATE.idle);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
@@ -47,6 +49,11 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
   const studentFiles = Array.isArray(student?.files) ? student.files : [];
   const studentTags = Array.isArray(student?.tags) ? student.tags : [];
+  
+  // Permission check: member role can only preview files (no download/delete)
+  const membershipRole = activeOrg?.membership?.role || 'member';
+  const canDownloadFiles = membershipRole === 'admin' || membershipRole === 'owner';
+  const canDeleteFiles = membershipRole === 'admin' || membershipRole === 'owner';
   
   // Filter definitions to show only those relevant to this student's tags
   const relevantDefinitions = definitions.filter(def => {
@@ -422,6 +429,64 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     [session, orgId, student?.id]
   );
 
+  const handleFilePreview = useCallback(
+    async (fileId) => {
+      if (!session || !orgId || !student?.id) return;
+
+      const token = session.access_token;
+      if (!token) {
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return;
+      }
+
+      try {
+        // Get presigned preview URL (same endpoint, but we'll open differently)
+        const response = await fetch(
+          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}&preview=true`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Supabase-Authorization': `Bearer ${token}`,
+              'x-supabase-authorization': `Bearer ${token}`,
+              'x-supabase-auth': `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to get preview URL');
+        }
+
+        const { url, contentType } = await response.json();
+        
+        // For supported preview types, open in iframe or new tab
+        const previewableTypes = [
+          'application/pdf',
+          'image/jpeg',
+          'image/jpg', 
+          'image/png',
+          'image/gif',
+        ];
+
+        if (previewableTypes.some(type => contentType?.includes(type))) {
+          // Open in new window for preview (browser will render it)
+          const previewWindow = window.open(url, '_blank');
+          if (!previewWindow) {
+            toast.error('נא לאפשר חלונות קופצים כדי לצפות בקובץ');
+          }
+        } else {
+          // For non-previewable types, show message
+          toast.info('תצוגה מקדימה זמינה רק עבור PDF ותמונות');
+        }
+      } catch (error) {
+        console.error('File preview failed', error);
+        toast.error(`תצוגה מקדימה נכשלה: ${error?.message || 'שגיאה לא ידועה'}`);
+      }
+    },
+    [session, orgId, student?.id]
+  );
+
   const handleFileInputChange = useCallback(
     (event, definitionId = null) => {
       const file = event.target.files?.[0];
@@ -552,7 +617,16 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium">{def.name}</span>
+                                  {file && canDownloadFiles ? (
+                                    <button
+                                      onClick={() => handleFilePreview(file.id)}
+                                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-right"
+                                    >
+                                      {def.name}
+                                    </button>
+                                  ) : (
+                                    <span className="font-medium">{def.name}</span>
+                                  )}
                                   {def.is_mandatory && (
                                     <Badge variant="destructive" className="text-xs">
                                       חובה
@@ -572,21 +646,35 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                               <div className="flex gap-2">
                                 {file ? (
                                   <>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleFileDownload(file.id)}
-                                    >
-                                      <Download className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleFileDelete(file.id)}
-                                      disabled={deleteState === REQUEST_STATE.loading}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
+                                    {canDownloadFiles ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleFileDownload(file.id)}
+                                      >
+                                        <Download className="h-4 w-4" />
+                                        הורד
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleFilePreview(file.id)}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                        תצוגה מקדימה
+                                      </Button>
+                                    )}
+                                    {canDeleteFiles && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleFileDelete(file.id)}
+                                        disabled={deleteState === REQUEST_STATE.loading}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    )}
                                   </>
                                 ) : (
                                   <div className="relative">
@@ -645,7 +733,16 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-medium">{displayName}</span>
+                                  {canDownloadFiles ? (
+                                    <button
+                                      onClick={() => handleFilePreview(file.id)}
+                                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-right"
+                                    >
+                                      {displayName}
+                                    </button>
+                                  ) : (
+                                    <span className="font-medium">{displayName}</span>
+                                  )}
                                   {isOrphaned && (
                                     <Badge variant="outline" className="text-xs text-amber-700 border-amber-400">
                                       הגדרה ישנה
@@ -662,14 +759,27 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                   <div>{formatFileSize(file.size)}</div>
                                 </div>
                               </div>
-                              <div className="flex gap-2">
+                            <div className="flex gap-2">
+                              {canDownloadFiles ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleFileDownload(file.id)}
                                 >
                                   <Download className="h-4 w-4" />
+                                  הורד
                                 </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleFilePreview(file.id)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  תצוגה מקדימה
+                                </Button>
+                              )}
+                              {canDeleteFiles && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -678,7 +788,8 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                 >
                                   <Trash2 className="h-4 w-4 text-red-500" />
                                 </Button>
-                              </div>
+                              )}
+                            </div>
                             </div>
                           </div>
                         );

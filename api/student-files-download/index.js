@@ -64,6 +64,7 @@ export default async function (context, req) {
   const orgId = req.query.org_id;
   const studentId = req.query.student_id;
   const fileId = req.query.file_id;
+  const isPreview = req.query.preview === 'true'; // Preview mode for member role
 
   if (!orgId || !studentId || !fileId) {
     return respond(context, 400, { message: 'missing_required_parameters' });
@@ -84,6 +85,13 @@ export default async function (context, req) {
 
   if (!role) {
     return respond(context, 403, { message: 'not_a_member' });
+  }
+
+  // Member role can only preview files (not download for saving)
+  // Admin/Owner can download for saving
+  if (role === 'member' && !isPreview) {
+    context.log?.warn?.('Member role attempted to download file without preview flag', { userId, orgId, studentId, fileId });
+    return respond(context, 403, { message: 'insufficient_permissions', details: 'Only administrators and owners can download student files. Use preview mode instead.' });
   }
 
   // Get storage profile
@@ -272,9 +280,13 @@ export default async function (context, req) {
     context.log('Generated presigned URL', {
       filename: displayFilename,
       urlLength: downloadUrl?.length,
+      contentType: file.type,
     });
     
-    return respond(context, 200, { url: downloadUrl });
+    return respond(context, 200, { 
+      url: downloadUrl,
+      contentType: file.type || 'application/octet-stream'
+    });
   } catch (error) {
     context.log?.error?.('Failed to generate download URL', { message: error?.message });
     return respond(context, 500, { message: 'failed_to_generate_download_url' });

@@ -493,6 +493,12 @@ export default async function (context, req) {
       return respond(context, 403, { message: 'not_a_member' });
     }
 
+    // Member role cannot delete files (admin/owner only)
+    if (role === 'member') {
+      context.log?.warn?.('Member role attempted to delete file', { userId, orgId, studentId, fileId });
+      return respond(context, 403, { message: 'insufficient_permissions', details: 'Only administrators and owners can delete student files' });
+    }
+
     // Get storage profile
     const { data: orgSettings, error: settingsError } = await controlClient
       .from('org_settings')
