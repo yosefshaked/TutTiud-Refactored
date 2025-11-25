@@ -613,10 +613,10 @@ export default async function (context, req) {
     return respond(context, 400, { message: updateMessage });
   }
 
-  // Fetch existing student to preserve and update metadata
+  // Fetch existing student to compare changes and preserve metadata
   const { data: existingStudent, error: fetchError } = await tenantClient
     .from('Students')
-    .select('metadata')
+    .select('*')
     .eq('id', studentId)
     .maybeSingle();
 
@@ -627,6 +627,16 @@ export default async function (context, req) {
 
   if (!existingStudent) {
     return respond(context, 404, { message: 'student_not_found' });
+  }
+
+  // Determine which fields actually changed
+  const changedFields = [];
+  for (const [key, newValue] of Object.entries(normalizedUpdates.updates)) {
+    const oldValue = existingStudent[key];
+    // Deep comparison for objects/arrays, simple comparison for primitives
+    if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+      changedFields.push(key);
+    }
   }
 
   // Build updated metadata preserving existing fields
@@ -670,7 +680,7 @@ export default async function (context, req) {
     resourceType: 'student',
     resourceId: studentId,
     details: {
-      updated_fields: Object.keys(normalizedUpdates.updates),
+      updated_fields: changedFields,
       student_name: data.name,
     },
   });

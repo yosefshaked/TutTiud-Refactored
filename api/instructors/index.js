@@ -218,6 +218,32 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'no updates provided' });
     }
 
+    // Fetch existing instructor to compare changes
+    const { data: existingInstructor, error: fetchError } = await tenantClient
+      .from('Instructors')
+      .select('*')
+      .eq('id', instructorId)
+      .maybeSingle();
+
+    if (fetchError) {
+      context.log?.error?.('instructors failed to fetch existing instructor', { message: fetchError.message, instructorId });
+      return respond(context, 500, { message: 'failed_to_fetch_instructor' });
+    }
+
+    if (!existingInstructor) {
+      return respond(context, 404, { message: 'instructor_not_found' });
+    }
+
+    // Determine which fields actually changed
+    const changedFields = [];
+    for (const [key, newValue] of Object.entries(updates)) {
+      const oldValue = existingInstructor[key];
+      // Deep comparison for objects/arrays, simple comparison for primitives
+      if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+        changedFields.push(key);
+      }
+    }
+
     const { data, error } = await tenantClient
       .from('Instructors')
       .update(updates)
@@ -245,7 +271,7 @@ export default async function (context, req) {
       resourceType: 'instructor',
       resourceId: instructorId,
       details: {
-        updated_fields: Object.keys(updates),
+        updated_fields: changedFields,
         instructor_name: data.name,
       },
     });
