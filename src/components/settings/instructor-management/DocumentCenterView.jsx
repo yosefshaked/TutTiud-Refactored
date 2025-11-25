@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, ChevronLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/api-client';
