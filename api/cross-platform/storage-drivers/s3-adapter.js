@@ -98,18 +98,19 @@ export function createS3Driver(config) {
      * @param {string} path - File path within bucket
      * @param {number} expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
      * @param {string} filename - Optional filename for Content-Disposition header
+     * @param {string} dispositionType - 'attachment' (download) or 'inline' (preview) (default: 'attachment')
      * @returns {Promise<string>} Presigned download URL
      */
-    async getDownloadUrl(path, expiresIn = 3600, filename = null) {
+    async getDownloadUrl(path, expiresIn = 3600, filename = null, dispositionType = 'attachment') {
       // Build Content-Disposition header with filename if provided
       // Use RFC 5987 encoding for non-ASCII filenames (Hebrew, etc.)
-      let disposition = 'attachment';
+      let disposition = dispositionType === 'inline' ? 'inline' : 'attachment';
       if (filename) {
         // ASCII-safe fallback filename
         const asciiFallback = 'document';
         // RFC 5987 encoded filename with UTF-8
         const encodedFilename = encodeURIComponent(filename);
-        disposition = `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodedFilename}`;
+        disposition = `${dispositionType === 'inline' ? 'inline' : 'attachment'}; filename="${asciiFallback}"; filename*=UTF-8''${encodedFilename}`;
       }
 
       const command = new GetObjectCommand({

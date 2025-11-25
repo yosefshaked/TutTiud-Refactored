@@ -275,12 +275,14 @@ export default async function (context, req) {
 
   // Generate presigned URL (valid for 1 hour)
   try {
-    const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename);
+    const dispositionType = isPreview ? 'inline' : 'attachment';
+    const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename, dispositionType);
     
     context.log('Generated presigned URL', {
       filename: displayFilename,
       urlLength: downloadUrl?.length,
       contentType: file.type,
+      dispositionType,
     });
     
     return respond(context, 200, { 

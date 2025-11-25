@@ -64,6 +64,7 @@ export default async function (context, req) {
   const orgId = req.query.org_id;
   const instructorId = req.query.instructor_id;
   const fileId = req.query.file_id;
+  const isPreview = req.query.preview === 'true'; // Preview mode for inline viewing
 
   if (!orgId || !instructorId || !fileId) {
     return respond(context, 400, { message: 'missing_required_parameters' });
@@ -306,14 +307,17 @@ export default async function (context, req) {
       path: file.path,
       filename: displayFilename,
       hasDriver: !!driver,
-      hasGetDownloadUrl: !!(driver && typeof driver.getDownloadUrl === 'function')
+      hasGetDownloadUrl: !!(driver && typeof driver.getDownloadUrl === 'function'),
+      isPreview
     });
     
-    const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename);
+    const dispositionType = isPreview ? 'inline' : 'attachment';
+    const downloadUrl = await driver.getDownloadUrl(file.path, 3600, displayFilename, dispositionType);
     
     context.log?.info?.('✅ [INSTRUCTOR-DOWNLOAD] Download URL generated successfully', {
       filename: displayFilename,
       urlLength: downloadUrl?.length,
+      dispositionType,
     });
     
     return respond(context, 200, { url: downloadUrl });
