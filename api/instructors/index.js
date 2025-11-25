@@ -238,8 +238,12 @@ export default async function (context, req) {
     const changedFields = [];
     for (const [key, newValue] of Object.entries(updates)) {
       const oldValue = existingInstructor[key];
+      // Handle null/undefined as equivalent
+      const normalizedOld = oldValue === null || oldValue === undefined ? null : oldValue;
+      const normalizedNew = newValue === null || newValue === undefined ? null : newValue;
+      
       // Deep comparison for objects/arrays, simple comparison for primitives
-      if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+      if (JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew)) {
         changedFields.push(key);
       }
     }
