@@ -3,18 +3,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar.jsx';
-import { Loader2, UserPlus, UserX, RotateCcw } from 'lucide-react';
+import { Loader2, UserPlus, UserX, RotateCcw, Check, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
 import InfoTooltip from '@/components/ui/InfoTooltip.jsx';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 const SAVE = { idle: 'idle', saving: 'saving', error: 'error' };
@@ -243,57 +242,72 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                       side="top"
                     />
                     <div className="flex-1 sm:min-w-60">
-                      {Array.isArray(instructor.instructor_types) && instructor.instructor_types.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 p-2 border rounded-md bg-background min-h-10 items-center">
-                          {instructor.instructor_types.map(typeId => {
-                            const type = typeOptions.find(t => t.value === typeId);
-                            return type ? (
-                              <Badge
-                                key={typeId}
-                                variant="secondary"
-                                className="gap-1 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                                onClick={() => {
-                                  const newTypes = instructor.instructor_types.filter(t => t !== typeId);
-                                  handleChangeType(instructor, newTypes);
-                                }}
-                                title="לחץ להסרה"
-                              >
-                                {type.label}
-                                <span className="ml-1">×</span>
-                              </Badge>
-                            ) : null;
-                          })}
-                          {typeOptions.filter(t => !instructor.instructor_types.includes(t.value)).length > 0 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-xs text-muted-foreground"
-                              onClick={() => {
-                                const available = typeOptions.filter(t => !instructor.instructor_types.includes(t.value));
-                                if (available.length > 0) {
-                                  handleChangeType(instructor, [...instructor.instructor_types, available[0].value]);
-                                }
-                              }}
-                            >
-                              + הוסף סוג
-                            </Button>
-                          )}
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-10"
-                          onClick={() => {
-                            if (typeOptions.length > 0) {
-                              handleChangeType(instructor, [typeOptions[0].value]);
-                            }
-                          }}
-                          disabled={isSaving || typeOptions.length === 0}
-                        >
-                          + הוסף סיווג
-                        </Button>
-                      )}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between h-auto min-h-10 py-2"
+                            disabled={isSaving || typeOptions.length === 0}
+                          >
+                            <div className="flex flex-wrap gap-1 flex-1">
+                              {Array.isArray(instructor.instructor_types) && instructor.instructor_types.length > 0 ? (
+                                instructor.instructor_types.map(typeId => {
+                                  const type = typeOptions.find(t => t.value === typeId);
+                                  return type ? (
+                                    <Badge key={typeId} variant="secondary" className="text-xs">
+                                      {type.label}
+                                    </Badge>
+                                  ) : null;
+                                })
+                              ) : (
+                                <span className="text-muted-foreground text-sm">בחר סוגי מדריך...</span>
+                              )}
+                            </div>
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-0" align="start">
+                          <div className="max-h-64 overflow-y-auto p-1">
+                            {typeOptions.length === 0 ? (
+                              <div className="py-6 text-center text-sm text-muted-foreground">
+                                אין סוגי מדריכים זמינים
+                              </div>
+                            ) : (
+                              typeOptions.map((option) => {
+                                const isSelected = Array.isArray(instructor.instructor_types) && 
+                                  instructor.instructor_types.includes(option.value);
+                                return (
+                                  <div
+                                    key={option.value}
+                                    className={cn(
+                                      "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer rounded-sm hover:bg-accent",
+                                      isSelected && "bg-accent"
+                                    )}
+                                    onClick={() => {
+                                      const currentTypes = Array.isArray(instructor.instructor_types) 
+                                        ? instructor.instructor_types 
+                                        : [];
+                                      const newTypes = isSelected
+                                        ? currentTypes.filter(t => t !== option.value)
+                                        : [...currentTypes, option.value];
+                                      handleChangeType(instructor, newTypes);
+                                    }}
+                                  >
+                                    <div className={cn(
+                                      "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                      isSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                                    )}>
+                                      {isSelected && <Check className="h-3 w-3" />}
+                                    </div>
+                                    <span>{option.label}</span>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
