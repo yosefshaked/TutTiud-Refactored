@@ -7,13 +7,27 @@ const InfoTooltip = ({ message, side = 'top' }) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef(null);
 
-  useEffect(() => {
-    if (isHovered && buttonRef.current) {
+  const updatePosition = () => {
+    if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setPosition({
-        top: rect.top + window.scrollY,
-        left: rect.left + window.scrollX + rect.width / 2,
+        top: rect.top,
+        left: rect.left + rect.width / 2,
       });
+    }
+  };
+
+  useEffect(() => {
+    if (isHovered) {
+      updatePosition();
+      // Update position on scroll and resize
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
     }
   }, [isHovered]);
 
@@ -97,15 +111,19 @@ const StyledWrapper = styled.div`
 `;
 
 const TooltipPortal = styled.div`
-  position: absolute;
-  transform: translate(-50%, 0);
+  position: fixed;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
   background-color: #60a5fa;
   background-image: linear-gradient(147deg, #60a5fa 0%, #2563eb 74%);
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
-  white-space: nowrap;
+  max-width: 250px;
+  white-space: normal;
+  word-wrap: break-word;
+  text-align: center;
   z-index: 99999;
   pointer-events: none;
   box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.2);
