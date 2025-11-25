@@ -137,6 +137,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
             try {
               const formData = new FormData();
               formData.append('file', file);
+              formData.append('org_id', orgId);
               formData.append('instructor_id', instructor.id);
               if (definitionId) {
                 formData.append('definition_id', definitionId);
@@ -162,7 +163,20 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(JSON.parse(xhr.responseText));
           } else {
-            reject(new Error(xhr.statusText));
+            let errorMessage = xhr.statusText || 'Upload failed';
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              if (errorData.message) {
+                errorMessage = errorData.message;
+              }
+              if (errorData.details) {
+                errorMessage += `: ${errorData.details}`;
+              }
+            } catch {
+              // Use default error message
+            }
+            console.error('Upload error response:', xhr.status, xhr.responseText);
+            reject(new Error(errorMessage));
           }
         });
 
@@ -189,7 +203,8 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       }
     } catch (error) {
       console.error('File upload failed:', error);
-      toast.error('העלאת הקובץ נכשלה', { id: toastId });
+      const errorMessage = error.message || 'העלאת הקובץ נכשלה';
+      toast.error(errorMessage, { id: toastId });
       
       // Remove from background uploads on error
       setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));

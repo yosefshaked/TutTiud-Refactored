@@ -582,37 +582,6 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
                         <p className="text-sm text-muted-foreground mt-1">{definition.description}</p>
                       )}
                     </div>
-                    
-                    <div>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file';
-                          input.accept = '.pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx';
-                          input.onchange = (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleFileUpload(file, definition.id, definition.name);
-                            }
-                          };
-                          input.click();
-                        }}
-                        disabled={uploadingDefId === definition.id}
-                      >
-                        {uploadingDefId === definition.id ? (
-                          <>
-                            <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                            מעלה...
-                          </>
-                        ) : (
-                          <>
-                            <Upload className="h-4 w-4 ml-2" />
-                            העלה קובץ
-                          </>
-                        )}
-                      </Button>
-                    </div>
                   </div>
 
                   {/* Uploaded files for this definition */}
@@ -642,6 +611,39 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
                       ))}
                     </div>
                   )}
+
+                  {/* Upload button for this specific document */}
+                  <div className="pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx';
+                        input.onchange = (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleFileUpload(file, definition.id, definition.name);
+                          }
+                        };
+                        input.click();
+                      }}
+                      disabled={uploadingDefId === definition.id}
+                    >
+                      {uploadingDefId === definition.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                          מעלה...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 ml-2" />
+                          {files.length > 0 ? 'העלה קובץ נוסף' : 'העלה קובץ'}
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               );
             })}
