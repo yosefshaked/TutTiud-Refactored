@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar.jsx';
@@ -17,6 +17,9 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
   const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInstructor, setSelectedInstructor] = useState(null);
+  
+  // Use a ref to track selected instructor ID for refresh without causing dependency loops
+  const selectedInstructorIdRef = useRef(null);
 
   const loadAll = useCallback(async () => {
     if (!canLoad) {
@@ -38,8 +41,9 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
       setDefinitions(Array.isArray(settingsData?.value) ? settingsData.value : []);
       
       // Update selectedInstructor if it exists to prevent stale data
-      if (selectedInstructor) {
-        const updated = loadedInstructors.find(i => i.id === selectedInstructor.id);
+      // Use ref to avoid dependency loop
+      if (selectedInstructorIdRef.current) {
+        const updated = loadedInstructors.find(i => i.id === selectedInstructorIdRef.current);
         if (updated) {
           setSelectedInstructor(updated);
         }
@@ -53,17 +57,19 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
       setInstructors([]);
       setDefinitions([]);
     }
-  }, [canLoad, orgId, session, selectedInstructor]);
+  }, [canLoad, orgId, session]);
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
 
   const handleSelectInstructor = (instructor) => {
+    selectedInstructorIdRef.current = instructor?.id || null;
     setSelectedInstructor(instructor);
   };
 
   const handleBack = () => {
+    selectedInstructorIdRef.current = null;
     setSelectedInstructor(null);
   };
 
