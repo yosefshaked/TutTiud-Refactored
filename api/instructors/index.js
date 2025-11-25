@@ -12,6 +12,7 @@ import {
 } from '../_shared/org-bff.js';
 import { parseJsonBodyWithLimit, validateInstructorCreate, validateInstructorUpdate } from '../_shared/validation.js';
 import { ensureInstructorColors } from '../_shared/instructor-colors.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
       // Intentionally ignore profile fetch errors; fallback to provided values.
 export default async function (context, req) {
@@ -180,6 +181,22 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_save_instructor' });
     }
 
+    // Audit log: instructor created
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email || '',
+      userRole: role,
+      actionType: AUDIT_ACTIONS.INSTRUCTOR_CREATED,
+      actionCategory: AUDIT_CATEGORIES.INSTRUCTORS,
+      resourceType: 'instructor',
+      resourceId: data.id,
+      details: {
+        instructor_name: data.name,
+        instructor_email: data.email,
+      },
+    });
+
     return respond(context, 200, data);
   }
 
@@ -216,6 +233,22 @@ export default async function (context, req) {
     if (!data) {
       return respond(context, 404, { message: 'instructor_not_found' });
     }
+
+    // Audit log: instructor updated
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email || '',
+      userRole: role,
+      actionType: AUDIT_ACTIONS.INSTRUCTOR_UPDATED,
+      actionCategory: AUDIT_CATEGORIES.INSTRUCTORS,
+      resourceType: 'instructor',
+      resourceId: instructorId,
+      details: {
+        updated_fields: Object.keys(updates),
+        instructor_name: data.name,
+      },
+    });
 
     return respond(context, 200, data);
   }

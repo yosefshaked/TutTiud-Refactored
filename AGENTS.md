@@ -275,14 +275,24 @@
 - **RLS policies**: Users can read audit logs for their own organizations; only service role can insert/modify.
 - **Helper function**: `public.log_audit_event()` - Use this from API endpoints to log actions.
 - **Shared utilities**: `api/_shared/audit-log.js` provides `logAuditEvent()` and action type constants (`AUDIT_ACTIONS`, `AUDIT_CATEGORIES`).
+- **CRITICAL**: `logAuditEvent()` requires a **control DB Supabase client**, NOT a tenant client. Always pass the control DB admin client (typically named `supabase` in `/api/*` endpoints that use `createSupabaseAdminClient()`). Passing a tenant client will write to the wrong database and fail silently.
+- **Implementation status**:
+  - ✅ **Implemented**: Storage operations, Membership operations, Invitations, Backup (create/restore), Students (create/update), Instructors (create/update/delete), Settings (upsert/delete), Logo (upload/delete), Files (student/instructor upload/delete)
+  - ❌ **Not yet implemented**: Permissions changes (no dedicated endpoint yet)
+  - When adding audit logging to new endpoints, ensure you pass the control DB client and follow the pattern in `api/backup/index.js`, `api/students/index.js`, or `api/org-memberships/index.js`.
 - **Logged actions**:
   - **Storage**: configured, updated, disconnected, reconnected, grace_period_started, files_deleted, migrated_to_byos, bulk_download
-  - **Permissions**: enabled, disabled
+  - **Permissions**: enabled, disabled (constants defined, not yet used in code)
   - **Membership**: invited, removed, role_changed
   - **Backup**: created, restored
+  - **Students**: created, updated (with student_name, assigned_instructor_id, updated_fields)
+  - **Instructors**: created, updated, deleted (with instructor_name, instructor_email, soft_delete flag)
+  - **Settings**: updated (with operation type, keys array, count)
+  - **Logo**: updated (with action: upload/delete, logo_url)
+  - **Files**: uploaded, deleted (with resource_type: student_file/instructor_file, file_name, file_size, storage_mode)
 - **Usage pattern**:
   ```javascript
-  await logAuditEvent(supabaseClient, {
+  await logAuditEvent(supabase, { // ← MUST be control DB client
     orgId, userId, userEmail, userRole,
     actionType: AUDIT_ACTIONS.STORAGE_CONFIGURED,
     actionCategory: AUDIT_CATEGORIES.STORAGE,

@@ -1,5 +1,4 @@
 /* eslint-env node */
-/* global Buffer */
 /**
  * Student Files API
  * 
@@ -25,6 +24,7 @@ import {
 } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 import { decryptStorageProfile } from '../_shared/storage-encryption.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 import multipart from 'parse-multipart-data';
 import crypto from 'crypto';
 
@@ -459,6 +459,25 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_update_student' });
     }
 
+    // Audit log
+    await logAuditEvent(controlClient, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.FILE_UPLOADED,
+      actionCategory: AUDIT_CATEGORIES.FILES,
+      resourceType: 'student_file',
+      resourceId: fileId,
+      details: {
+        student_id: studentId,
+        file_name: displayName,
+        file_size: filePart.data.length,
+        storage_mode: storageProfile.mode,
+        definition_id: definitionId,
+      },
+    });
+
     context.log?.info?.('File uploaded successfully', { fileId, studentId, mode: storageProfile.mode });
 
     return respond(context, 200, {
@@ -582,6 +601,22 @@ export default async function (context, req) {
       context.log?.error?.('Failed to update student files', { message: updateError.message });
       return respond(context, 500, { message: 'failed_to_update_student' });
     }
+
+    // Audit log
+    await logAuditEvent(controlClient, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.FILE_DELETED,
+      actionCategory: AUDIT_CATEGORIES.FILES,
+      resourceType: 'student_file',
+      resourceId: fileId,
+      details: {
+        student_id: studentId,
+        file_name: fileToDelete.name,
+      },
+    });
 
     context.log?.info?.('File deleted successfully', { fileId, studentId });
 

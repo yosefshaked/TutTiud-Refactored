@@ -12,6 +12,7 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { encryptBackup, exportTenantData } from '../_shared/backup-utils.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const BACKUP_COOLDOWN_DAYS = 7;
 
@@ -203,6 +204,23 @@ export default async function backup(context, req) {
       timestamp: new Date().toISOString(),
       initiated_by: userId,
       size_bytes: encrypted.length,
+    });
+
+    // Audit log: backup created
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email || '',
+      userRole: role,
+      actionType: AUDIT_ACTIONS.BACKUP_CREATED,
+      actionCategory: AUDIT_CATEGORIES.BACKUP,
+      resourceType: 'backup',
+      resourceId: orgId,
+      details: {
+        size_bytes: encrypted.length,
+        total_records: manifest.metadata.total_records,
+        cooldown_override_used: wasOverridden,
+      },
     });
 
     // Clear the override flag if it was used

@@ -13,6 +13,7 @@ import {
 import { normalizeSessionFormConfigValue } from '../_shared/settings-utils.js';
 import { ensureOrgPermissions } from '../_shared/permissions-utils.js';
 import { parseJsonBodyWithLimit } from '../_shared/validation.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const SETTINGS_DIAGNOSTIC_CHECKS = new Set([
   'Table "Settings" exists',
@@ -520,6 +521,23 @@ export default async function (context, req) {
       return respond(context, mapped.status, mapped.body);
     }
 
+    // Audit log
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.SETTINGS_UPDATED,
+      actionCategory: AUDIT_CATEGORIES.SETTINGS,
+      resourceType: 'settings',
+      resourceId: orgId,
+      details: {
+        operation: 'upsert',
+        keys: payload.map(entry => entry.key),
+        count: payload.length,
+      },
+    });
+
     return respond(context, 201, { updated: true, count: payload.length });
   }
 
@@ -641,6 +659,23 @@ export default async function (context, req) {
       return respond(context, mapped.status, mapped.body);
     }
 
+    // Audit log
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.SETTINGS_UPDATED,
+      actionCategory: AUDIT_CATEGORIES.SETTINGS,
+      resourceType: 'settings',
+      resourceId: orgId,
+      details: {
+        operation: 'update',
+        keys: payload.map(entry => entry.key),
+        count: payload.length,
+      },
+    });
+
     return respond(context, 200, { updated: true, count: payload.length });
   }
 
@@ -669,7 +704,25 @@ export default async function (context, req) {
       return respond(context, 404, { message: 'settings_not_found' });
     }
 
-    return respond(context, 200, { deleted: data.map((entry) => entry.key) });
+    // Audit log
+    const deletedKeys = data.map((entry) => entry.key);
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.SETTINGS_UPDATED,
+      actionCategory: AUDIT_CATEGORIES.SETTINGS,
+      resourceType: 'settings',
+      resourceId: orgId,
+      details: {
+        operation: 'delete',
+        keys: deletedKeys,
+        count: deletedKeys.length,
+      },
+    });
+
+    return respond(context, 200, { deleted: deletedKeys });
   }
 
   return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST,PUT,PATCH,DELETE' });
