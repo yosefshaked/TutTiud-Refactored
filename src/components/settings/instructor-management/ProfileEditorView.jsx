@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar.jsx';
 import { Loader2, Search, ChevronLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
+import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
 
 const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 const SAVE = { idle: 'idle', saving: 'saving', error: 'error' };
@@ -18,6 +19,7 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInstructor, setSelectedInstructor] = useState(null);
   const [formData, setFormData] = useState({ name: '', phone: '', notes: '' });
+  const { types, loadTypes } = useInstructorTypes();
 
   const loadInstructors = useCallback(async () => {
     if (!canLoad) {
@@ -41,7 +43,8 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
 
   useEffect(() => {
     loadInstructors();
-  }, [loadInstructors]);
+    loadTypes();
+  }, [loadInstructors, loadTypes]);
 
   const handleSelectInstructor = (instructor) => {
     setSelectedInstructor(instructor);
@@ -156,9 +159,10 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-base sm:text-lg break-words">
               {selectedInstructor.name || selectedInstructor.email}
-              {selectedInstructor.instructor_type && (
-                <span className="text-muted-foreground font-normal text-sm sm:text-base"> ({selectedInstructor.instructor_type})</span>
-              )}
+              {selectedInstructor.instructor_type && (() => {
+                const type = types.find(t => t.id === selectedInstructor.instructor_type);
+                return type ? <span className="text-muted-foreground font-normal text-sm sm:text-base"> ({type.name})</span> : null;
+              })()}
             </div>
             <div className="text-sm text-muted-foreground break-words">
               {selectedInstructor.email}
