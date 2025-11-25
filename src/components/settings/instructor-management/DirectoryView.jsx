@@ -238,7 +238,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <div className="flex flex-row-reverse sm:flex-row items-center gap-1 w-full sm:w-auto">
                     <InfoTooltip 
-                      message="להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים"
+                      message="להגדרת סוגי מדריכים: הגדרות ← ניהול תגיות וסיווגים"
                       side="top"
                     />
                     <div className="flex-1 sm:min-w-60">
