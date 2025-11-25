@@ -52,13 +52,13 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
   const [duplicateDialog, setDuplicateDialog] = useState(null); // { file, definitionId, definitionName, duplicates }
 
   const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
-  const instructorType = instructor?.instructor_type;
+  const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
   
-  // Filter definitions to show only those relevant to this instructor's type
+  // Filter definitions to show only those relevant to this instructor's types
   const relevantDefinitions = definitions.filter(def => {
     if (!def.target_instructor_types || def.target_instructor_types.length === 0) return true;
-    if (!instructorType) return false;
-    return def.target_instructor_types.includes(instructorType);
+    if (instructorTypes.length === 0) return false;
+    return def.target_instructor_types.some(targetType => instructorTypes.includes(targetType));
   });
 
   // Load instructor data and document definitions

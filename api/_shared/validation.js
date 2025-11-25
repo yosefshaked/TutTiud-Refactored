@@ -197,9 +197,14 @@ export function validateInstructorUpdate(body) {
   if (Object.prototype.hasOwnProperty.call(body, 'is_active')) {
     updates.is_active = Boolean(body.is_active);
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'instructor_type')) {
-    const v = normalizeString(body.instructor_type);
-    updates.instructor_type = v || null;
+  if (Object.prototype.hasOwnProperty.call(body, 'instructor_types')) {
+    const raw = body.instructor_types;
+    if (Array.isArray(raw)) {
+      const validated = raw.filter(id => isUUID(normalizeString(id)));
+      updates.instructor_types = validated.length > 0 ? validated : null;
+    } else {
+      updates.instructor_types = null;
+    }
   }
 
   return { instructorId, updates };

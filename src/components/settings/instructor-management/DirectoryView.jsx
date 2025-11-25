@@ -123,24 +123,30 @@ export default function DirectoryView({ session, orgId, canLoad }) {
     }
   };
 
-  const handleChangeType = async (instructor, newType) => {
+  const handleChangeType = async (instructor, newTypes) => {
     if (!canLoad || !instructor?.id) return;
-    const currentValue = instructor.instructor_type || '__none__';
-    if (newType === currentValue) return;
+    const currentTypes = Array.isArray(instructor.instructor_types) ? instructor.instructor_types : [];
+    
+    // Check if arrays are equal
+    const isSame = currentTypes.length === newTypes.length && 
+      currentTypes.every(t => newTypes.includes(t)) && 
+      newTypes.every(t => currentTypes.includes(t));
+    
+    if (isSame) return;
 
     setSaveState(SAVE.saving);
     try {
-      const typeToSave = newType === '__none__' ? null : newType;
+      const typesToSave = newTypes.length > 0 ? newTypes : null;
       await authenticatedFetch('instructors', {
         session,
         method: 'PUT',
-        body: { org_id: orgId, instructor_id: instructor.id, instructor_type: typeToSave },
+        body: { org_id: orgId, instructor_id: instructor.id, instructor_types: typesToSave },
       });
-      toast.success('סוג המדריך עודכן.');
+      toast.success('סוגי המדריך עודכנו.');
       await loadAll();
     } catch (error) {
-      console.error('Failed to update instructor type', error);
-      toast.error('עדכון סוג המדריך נכשל.');
+      console.error('Failed to update instructor types', error);
+      toast.error('עדכון סוגי המדריך נכשל.');
     } finally {
       setSaveState(SAVE.idle);
     }
@@ -236,23 +242,59 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                       message="להגדרת סוגי מדריכים: הגדרות → ניהול תגיות וסיווגים"
                       side="top"
                     />
-                    <Select
-                      value={instructor.instructor_type || '__none__'}
-                      onValueChange={(value) => handleChangeType(instructor, value)}
-                      disabled={isSaving}
-                    >
-                      <SelectTrigger className="flex-1 sm:w-40 h-10" dir="rtl">
-                        <SelectValue placeholder="בחר סוג..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">ללא סיווג</SelectItem>
-                        {typeOptions.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex-1 sm:min-w-60">
+                      {Array.isArray(instructor.instructor_types) && instructor.instructor_types.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 p-2 border rounded-md bg-background min-h-10 items-center">
+                          {instructor.instructor_types.map(typeId => {
+                            const type = typeOptions.find(t => t.value === typeId);
+                            return type ? (
+                              <Badge
+                                key={typeId}
+                                variant="secondary"
+                                className="gap-1 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                                onClick={() => {
+                                  const newTypes = instructor.instructor_types.filter(t => t !== typeId);
+                                  handleChangeType(instructor, newTypes);
+                                }}
+                                title="לחץ להסרה"
+                              >
+                                {type.label}
+                                <span className="ml-1">×</span>
+                              </Badge>
+                            ) : null;
+                          })}
+                          {typeOptions.filter(t => !instructor.instructor_types.includes(t.value)).length > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-muted-foreground"
+                              onClick={() => {
+                                const available = typeOptions.filter(t => !instructor.instructor_types.includes(t.value));
+                                if (available.length > 0) {
+                                  handleChangeType(instructor, [...instructor.instructor_types, available[0].value]);
+                                }
+                              }}
+                            >
+                              + הוסף סוג
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full h-10"
+                          onClick={() => {
+                            if (typeOptions.length > 0) {
+                              handleChangeType(instructor, [typeOptions[0].value]);
+                            }
+                          }}
+                          disabled={isSaving || typeOptions.length === 0}
+                        >
+                          + הוסף סיווג
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   <Button

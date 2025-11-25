@@ -93,6 +93,25 @@ export const AUDIT_ACTIONS = {
   // Backup
   BACKUP_CREATED: 'backup.created',
   BACKUP_RESTORED: 'backup.restored',
+  
+  // Files
+  FILE_UPLOADED: 'file.uploaded',
+  FILE_DELETED: 'file.deleted',
+  FILES_BULK_DOWNLOADED: 'files.bulk_downloaded',
+  
+  // Students
+  STUDENT_CREATED: 'student.created',
+  STUDENT_UPDATED: 'student.updated',
+  STUDENT_DELETED: 'student.deleted',
+  
+  // Instructors
+  INSTRUCTOR_CREATED: 'instructor.created',
+  INSTRUCTOR_UPDATED: 'instructor.updated',
+  INSTRUCTOR_DELETED: 'instructor.deleted',
+  
+  // Settings
+  SETTINGS_UPDATED: 'settings.updated',
+  LOGO_UPDATED: 'logo.updated',
 };
 
 /**
@@ -104,6 +123,9 @@ export const AUDIT_CATEGORIES = {
   MEMBERSHIP: 'membership',
   BACKUP: 'backup',
   SETTINGS: 'settings',
+  FILES: 'files',
+  STUDENTS: 'students',
+  INSTRUCTORS: 'instructors',
 };
 
 /**

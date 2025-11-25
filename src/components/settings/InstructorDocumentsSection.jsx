@@ -42,18 +42,18 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
   const [backgroundUploads, setBackgroundUploads] = useState([]);
 
   const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
-  const instructorType = instructor?.instructor_type;
+  const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
   
-  // Filter definitions to show only those relevant to this instructor's type
+  // Filter definitions to show only those relevant to this instructor's types
   const relevantDefinitions = definitions.filter(def => {
     // If definition has no target_instructor_types, it applies to all instructors
     if (!def.target_instructor_types || def.target_instructor_types.length === 0) return true;
     
-    // If instructor has no type, only show definitions with no target_instructor_types
-    if (!instructorType) return false;
+    // If instructor has no types, only show definitions with no target_instructor_types
+    if (instructorTypes.length === 0) return false;
     
-    // Show definition if instructor type matches
-    return def.target_instructor_types.includes(instructorType);
+    // Show definition if instructor has ANY matching type
+    return def.target_instructor_types.some(targetType => instructorTypes.includes(targetType));
   });
 
   // File upload restrictions

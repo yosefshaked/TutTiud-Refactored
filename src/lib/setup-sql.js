@@ -18,10 +18,36 @@ ALTER TABLE tuttiud."Instructors"
 ALTER TABLE tuttiud."Instructors"
   DROP CONSTRAINT IF EXISTS "Instructors_id_fkey";
 
--- Ensure instructor_type and files columns exist (idempotent)
+-- Ensure instructor_types (array) and files columns exist (idempotent)
 ALTER TABLE tuttiud."Instructors"
-  ADD COLUMN IF NOT EXISTS "instructor_type" text,
+  ADD COLUMN IF NOT EXISTS "instructor_types" uuid[],
   ADD COLUMN IF NOT EXISTS "files" jsonb;
+
+-- Migrate legacy instructor_type (text) to instructor_types (uuid[]) if column exists
+DO $$
+DECLARE
+  has_old_column boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'tuttiud'
+      AND table_name = 'Instructors'
+      AND column_name = 'instructor_type'
+  ) INTO has_old_column;
+
+  IF has_old_column THEN
+    -- Copy non-null values from instructor_type to instructor_types as single-element arrays
+    UPDATE tuttiud."Instructors"
+    SET "instructor_types" = ARRAY["instructor_type"::uuid]
+    WHERE "instructor_type" IS NOT NULL
+      AND "instructor_type" != ''
+      AND "instructor_types" IS NULL;
+
+    -- Drop the old column
+    ALTER TABLE tuttiud."Instructors" DROP COLUMN "instructor_type";
+  END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" text NOT NULL,

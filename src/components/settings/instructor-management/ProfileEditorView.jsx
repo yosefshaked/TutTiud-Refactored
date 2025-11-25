@@ -99,13 +99,17 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
   const isLoading = loadState === REQUEST.loading;
   const isSaving = saveState === SAVE.saving;
 
+  // Create a Map of type IDs to type objects for quick lookup
+  const instructorTypeMap = new Map(types.map(t => [t.id, t]));
+
   const filteredInstructors = instructors.filter((instructor) => {
     const query = searchQuery.toLowerCase();
     const name = (instructor.name || '').toLowerCase();
     const email = (instructor.email || '').toLowerCase();
     const phone = (instructor.phone || '').toLowerCase();
-    const type = (instructor.instructor_type || '').toLowerCase();
-    return name.includes(query) || email.includes(query) || phone.includes(query) || type.includes(query);
+    const instructorTypes = Array.isArray(instructor.instructor_types) ? instructor.instructor_types : [];
+    const typeNames = instructorTypes.map(id => instructorTypeMap.get(id)?.name || '').join(' ').toLowerCase();
+    return name.includes(query) || email.includes(query) || phone.includes(query) || typeNames.includes(query);
   });
 
   const getInitials = (name) => {
@@ -159,9 +163,12 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-base sm:text-lg break-words">
               {selectedInstructor.name || selectedInstructor.email}
-              {selectedInstructor.instructor_type && (() => {
-                const type = types.find(t => t.id === selectedInstructor.instructor_type);
-                return type ? <span className="text-muted-foreground font-normal text-sm sm:text-base"> ({type.name})</span> : null;
+              {Array.isArray(selectedInstructor.instructor_types) && selectedInstructor.instructor_types.length > 0 && (() => {
+                const typeNames = selectedInstructor.instructor_types
+                  .map(typeId => types.find(t => t.id === typeId)?.name)
+                  .filter(Boolean)
+                  .join(', ');
+                return typeNames ? <span className="text-muted-foreground font-normal text-sm sm:text-base"> ({typeNames})</span> : null;
               })()}
             </div>
             <div className="text-sm text-muted-foreground break-words">
@@ -271,9 +278,12 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm truncate">
                     {instructor.name || instructor.email || instructor.id}
-                    {instructor.instructor_type && (() => {
-                      const type = types.find(t => t.id === instructor.instructor_type);
-                      return type ? <span className="text-muted-foreground font-normal"> ({type.name})</span> : null;
+                    {Array.isArray(instructor.instructor_types) && instructor.instructor_types.length > 0 && (() => {
+                      const typeNames = instructor.instructor_types
+                        .map(typeId => types.find(t => t.id === typeId)?.name)
+                        .filter(Boolean)
+                        .join(', ');
+                      return typeNames ? <span className="text-muted-foreground font-normal"> ({typeNames})</span> : null;
                     })()}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">

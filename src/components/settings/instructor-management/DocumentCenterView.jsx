@@ -93,14 +93,14 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
 
   // Calculate document status for each instructor
   const getDocumentStatus = (instructor) => {
-    const instructorType = instructor?.instructor_type;
+    const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
     const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
     
     // Filter definitions relevant to this instructor
     const relevantDefinitions = definitions.filter(def => {
       if (!def.target_instructor_types || def.target_instructor_types.length === 0) return true;
-      if (!instructorType) return false;
-      return def.target_instructor_types.includes(instructorType);
+      if (instructorTypes.length === 0) return false;
+      return def.target_instructor_types.some(targetType => instructorTypes.includes(targetType));
     });
 
     const mandatoryDefs = relevantDefinitions.filter(d => d.is_mandatory);

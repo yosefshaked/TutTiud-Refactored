@@ -2,6 +2,7 @@
 import process from 'node:process';
 import { createClient } from '@supabase/supabase-js';
 import { json, resolveBearerAuthorization } from '../_shared/http.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const ADMIN_CLIENT_OPTIONS = {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -98,6 +99,20 @@ async function handleDelete(context, req, supabase, membershipId){
   if (target.user_id === authUser.id){ respond(context,403,{message:'cannot remove yourself'}); return; }
   const del = await supabase.from('org_memberships').delete().eq('id', membershipId);
   if (del.error){ respond(context,500,{message:'failed to remove member'}); return; }
+  
+  // Audit log: member removed
+  await logAuditEvent(supabase, {
+    orgId: target.org_id,
+    userId: authUser.id,
+    userEmail: authUser.email || '',
+    userRole: actor.role,
+    actionType: AUDIT_ACTIONS.MEMBER_REMOVED,
+    actionCategory: AUDIT_CATEGORIES.MEMBERSHIP,
+    resourceType: 'membership',
+    resourceId: membershipId,
+    details: { removed_user_id: target.user_id, removed_role: targetRole },
+  });
+  
   respond(context,200,{ message: 'removed' });
 }
 
@@ -130,6 +145,19 @@ async function handlePatch(context, req, supabase, membershipId){
     if (role !== targetRole){
       const upd = await supabase.from('org_memberships').update({ role }).eq('id', membershipId);
       if (upd.error){ respond(context,500,{message:'failed to update role'}); return; }
+      
+      // Audit log: role changed
+      await logAuditEvent(supabase, {
+        orgId: target.org_id,
+        userId: authUser.id,
+        userEmail: authUser.email || '',
+        userRole: actor.role,
+        actionType: AUDIT_ACTIONS.MEMBER_ROLE_CHANGED,
+        actionCategory: AUDIT_CATEGORIES.MEMBERSHIP,
+        resourceType: 'membership',
+        resourceId: membershipId,
+        details: { target_user_id: target.user_id, old_role: targetRole, new_role: role },
+      });
     }
   }
 
