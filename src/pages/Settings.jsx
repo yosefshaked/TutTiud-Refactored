@@ -10,7 +10,7 @@ import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
 import ServiceManager from '@/components/settings/ServiceManager.jsx';
-import InstructorManager from '@/components/settings/InstructorManager.jsx';
+import InstructorManagementHub from '@/components/settings/instructor-management/InstructorManagementHub.jsx';
 import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
 import TagsManager from '@/components/settings/TagsManager.jsx';
@@ -803,7 +803,7 @@ export default function Settings() {
                   />
                 )}
                 {selectedModule === 'instructors' && (
-                  <InstructorManager
+                  <InstructorManagementHub
                     session={session}
                     orgId={activeOrgId}
                     activeOrgHasConnection={activeOrgHasConnection}

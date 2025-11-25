@@ -1,0 +1,279 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Loader2, Search, ChevronLeft, Save } from 'lucide-react';
+import { toast } from 'sonner';
+import { authenticatedFetch } from '@/lib/api-client';
+
+const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
+const SAVE = { idle: 'idle', saving: 'saving', error: 'error' };
+
+export default function ProfileEditorView({ session, orgId, canLoad }) {
+  const [instructors, setInstructors] = useState([]);
+  const [loadState, setLoadState] = useState(REQUEST.idle);
+  const [loadError, setLoadError] = useState('');
+  const [saveState, setSaveState] = useState(SAVE.idle);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedInstructor, setSelectedInstructor] = useState(null);
+  const [formData, setFormData] = useState({ name: '', phone: '', notes: '' });
+
+  const loadInstructors = useCallback(async () => {
+    if (!canLoad) {
+      setInstructors([]);
+      return;
+    }
+    setLoadState(REQUEST.loading);
+    setLoadError('');
+    try {
+      const params = new URLSearchParams({ org_id: orgId, include_inactive: 'true' });
+      const roster = await authenticatedFetch(`instructors?${params.toString()}`, { session });
+      setInstructors(Array.isArray(roster) ? roster : []);
+      setLoadState(REQUEST.idle);
+    } catch (error) {
+      console.error('Failed to load instructors', error);
+      setLoadError(error?.message || 'טעינת המדריכים נכשלה.');
+      setLoadState(REQUEST.error);
+      setInstructors([]);
+    }
+  }, [canLoad, orgId, session]);
+
+  useEffect(() => {
+    loadInstructors();
+  }, [loadInstructors]);
+
+  const handleSelectInstructor = (instructor) => {
+    setSelectedInstructor(instructor);
+    setFormData({
+      name: instructor.name || '',
+      phone: instructor.phone || '',
+      notes: instructor.notes || '',
+    });
+  };
+
+  const handleBack = () => {
+    setSelectedInstructor(null);
+    setFormData({ name: '', phone: '', notes: '' });
+  };
+
+  const handleSave = async () => {
+    if (!selectedInstructor) return;
+    setSaveState(SAVE.saving);
+    try {
+      const trimmedName = formData.name.trim() || null;
+      const trimmedPhone = formData.phone.trim() || null;
+      const trimmedNotes = formData.notes.trim() || null;
+      
+      const updates = {
+        ...(trimmedName !== (selectedInstructor.name || null) && { name: trimmedName }),
+        ...(trimmedPhone !== (selectedInstructor.phone || null) && { phone: trimmedPhone }),
+        ...(trimmedNotes !== (selectedInstructor.notes || null) && { notes: trimmedNotes }),
+      };
+
+      if (Object.keys(updates).length === 0) {
+        toast.info('לא בוצעו שינויים.');
+        setSaveState(SAVE.idle);
+        return;
+      }
+
+      await authenticatedFetch('instructors', {
+        session,
+        method: 'PUT',
+        body: { org_id: orgId, instructor_id: selectedInstructor.id, ...updates },
+      });
+      toast.success('פרטי המדריך נשמרו בהצלחה.');
+      await loadInstructors();
+      handleBack();
+    } catch (err) {
+      console.error('Failed to update instructor', err);
+      toast.error('שמירת פרטי המדריך נכשלה.');
+    } finally {
+      setSaveState(SAVE.idle);
+    }
+  };
+
+  const isLoading = loadState === REQUEST.loading;
+  const isSaving = saveState === SAVE.saving;
+
+  const filteredInstructors = instructors.filter((instructor) => {
+    const query = searchQuery.toLowerCase();
+    const name = (instructor.name || '').toLowerCase();
+    const email = (instructor.email || '').toLowerCase();
+    return name.includes(query) || email.includes(query);
+  });
+
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="mr-3 text-sm text-slate-600">טוען נתונים...</span>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
+        {loadError}
+      </div>
+    );
+  }
+
+  // Detail View
+  if (selectedInstructor) {
+    return (
+      <div className="space-y-6" dir="rtl">
+        <div className="flex items-center gap-3 mb-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="gap-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            חזרה לרשימה
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-4 p-4 border rounded-lg bg-slate-50">
+          <Avatar className="h-16 w-16">
+            <AvatarFallback className="bg-blue-100 text-blue-700 text-xl">
+              {getInitials(selectedInstructor.name || selectedInstructor.email)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <div className="font-semibold text-lg">
+              {selectedInstructor.name || selectedInstructor.email}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {selectedInstructor.email}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="edit-name" className="block text-right mb-2">
+              שם מלא
+            </Label>
+            <Input
+              id="edit-name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="שם המדריך"
+              disabled={isSaving}
+              dir="rtl"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="edit-phone" className="block text-right mb-2">
+              מספר טלפון
+            </Label>
+            <Input
+              id="edit-phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="טלפון"
+              disabled={isSaving}
+              dir="ltr"
+              className="text-right"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="edit-notes" className="block text-right mb-2">
+              הערות
+            </Label>
+            <textarea
+              id="edit-notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full resize-y rounded-md border p-3 text-sm"
+              rows={4}
+              placeholder="הערות על המדריך"
+              disabled={isSaving}
+              dir="rtl"
+            />
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="gap-2"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              שמור שינויים
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // List View
+  return (
+    <div className="space-y-4" dir="rtl">
+      <div className="relative">
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="חיפוש לפי שם או אימייל..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pr-10"
+          dir="rtl"
+        />
+      </div>
+
+      {filteredInstructors.length === 0 ? (
+        <p className="text-center text-sm text-muted-foreground py-8">
+          {searchQuery ? 'לא נמצאו תוצאות' : 'אין מדריכים להצגה'}
+        </p>
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {filteredInstructors.map((instructor) => (
+            <div
+              key={instructor.id}
+              className="flex items-center justify-between gap-4 p-4 border rounded-lg bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+              onClick={() => handleSelectInstructor(instructor)}
+            >
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-blue-100 text-blue-700">
+                    {getInitials(instructor.name || instructor.email)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
+                    {instructor.name || instructor.email || instructor.id}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {instructor.email || '—'}
+                  </div>
+                </div>
+              </div>
+
+              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
