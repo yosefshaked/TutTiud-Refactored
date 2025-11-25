@@ -627,8 +627,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                 </div>
                                 {file && (
                                   <div className="text-sm text-slate-600">
-                                    <div>הועלה: {formatFileDate(file.uploaded_at)}</div>
-                                    <div dir="ltr">{formatFileSize(file.size)}</div>
+                                    הועלה: {formatFileDate(file.uploaded_at)} • <span dir="ltr">{formatFileSize(file.size)}</span>
                                   </div>
                                 )}
                               </div>
@@ -744,8 +743,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                   </div>
                                 )}
                                 <div className="text-sm text-slate-600">
-                                  <div>הועלה: {formatFileDate(file.uploaded_at)}</div>
-                                  <div dir="ltr">{formatFileSize(file.size)}</div>
+                                  הועלה: {formatFileDate(file.uploaded_at)} • <span dir="ltr">{formatFileSize(file.size)}</span>
                                 </div>
                               </div>
                             <div className="flex gap-2">
