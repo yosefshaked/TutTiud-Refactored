@@ -602,20 +602,76 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     const toastId = toast.loading('מכין להורדה...');
 
     try {
-      const response = await authenticatedFetch(
-        `org-documents-download?org_id=${orgId}&file_id=${document.id}`,
-        { session, method: 'GET' }
+      const token = session.access_token;
+      if (!token) {
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש', { id: toastId });
+        return;
+      }
+
+      // Get presigned download URL
+      const response = await fetch(
+        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+          },
+        }
       );
 
-      if (response?.url) {
-        toast.success('מוריד מסמך...', { id: toastId });
-        window.open(response.url, '_blank');
-      } else {
-        throw new Error('No download URL returned');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to get download URL');
       }
+
+      const { url } = await response.json();
+      toast.success('מוריד מסמך...', { id: toastId });
+      window.open(url, '_blank');
     } catch (error) {
       console.error('Download failed:', error);
-      toast.error('הורדת המסמך נכשלה', { id: toastId });
+      toast.error(`הורדת המסמך נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
+    }
+  }, [session, orgId]);
+
+  // Handle file preview
+  const handlePreview = useCallback(async (document) => {
+    if (!session || !orgId) return;
+
+    const toastId = toast.loading('פותח תצוגה מקדימה...');
+
+    try {
+      const token = session.access_token;
+      if (!token) {
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש', { id: toastId });
+        return;
+      }
+
+      // Get presigned preview URL
+      const response = await fetch(
+        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to get preview URL');
+      }
+
+      const { url } = await response.json();
+      toast.dismiss(toastId);
+      window.open(url, '_blank');
+    } catch (error) {
+      console.error('Preview failed:', error);
+      toast.error(`תצוגה מקדימה נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
     }
   }, [session, orgId]);
 
@@ -676,12 +732,12 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
               </div>
             </div>
             {canManage && documents.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant={sortBy === 'name' ? 'default' : 'outline'}
                   onClick={() => toggleSort('name')}
-                  className="gap-1 shrink-0 h-8 text-xs"
+                  className="gap-1 h-8 text-xs"
                 >
                   {sortBy === 'name' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
                   {sortBy === 'name' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
@@ -692,7 +748,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                   size="sm"
                   variant={sortBy === 'uploaded_at' ? 'default' : 'outline'}
                   onClick={() => toggleSort('uploaded_at')}
-                  className="gap-1 shrink-0 h-8 text-xs"
+                  className="gap-1 h-8 text-xs"
                 >
                   {sortBy === 'uploaded_at' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
                   {sortBy === 'uploaded_at' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
@@ -703,7 +759,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                   size="sm"
                   variant={sortBy === 'expiration_date' ? 'default' : 'outline'}
                   onClick={() => toggleSort('expiration_date')}
-                  className="gap-1 shrink-0 h-8 text-xs"
+                  className="gap-1 h-8 text-xs"
                 >
                   {sortBy === 'expiration_date' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
                   {sortBy === 'expiration_date' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
@@ -743,7 +799,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                     <ul className="list-disc list-inside space-y-0.5 text-xs text-blue-800">
                       <li>גודל מקסימלי: 10MB</li>
                       <li>PDF, תמונות, Word, Excel</li>
-                      <li className="hidden sm:list-item">ניתן לערוך שם, תאריכים ופרטים לפני ואחרי ההעלאה</li>
+                      <li>ניתן לערוך שם, תאריכים ופרטים לפני ואחרי ההעלאה</li>
                     </ul>
                   </div>
                 </div>
@@ -830,6 +886,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                       onEdit={() => setEditingDocument(doc)}
                       onDelete={() => handleDelete(doc.id, doc.name)}
                       onDownload={() => handleDownload(doc)}
+                      onPreview={() => handlePreview(doc)}
                     />
                   ))}
                 </div>
@@ -854,6 +911,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                       onEdit={() => setEditingDocument(doc)}
                       onDelete={() => handleDelete(doc.id, doc.name)}
                       onDownload={() => handleDownload(doc)}
+                      onPreview={() => handlePreview(doc)}
                     />
                   ))}
                 </div>
@@ -889,7 +947,9 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 /**
  * Document card component
  */
-function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDelete, onDownload }) {
+function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDelete, onDownload, onPreview }) {
+  const [showFullOriginalName, setShowFullOriginalName] = React.useState(false);
+
   return (
     <div
       className={`p-3 sm:p-4 border rounded-lg ${
@@ -899,7 +959,13 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
       <div className="flex items-start justify-between gap-2 sm:gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
-            <h5 className="font-medium text-slate-900 text-sm sm:text-base leading-tight">{document.name}</h5>
+            <button
+              onClick={onPreview}
+              className="font-medium text-slate-900 text-sm sm:text-base leading-tight hover:text-primary underline-offset-2 hover:underline text-right"
+              title="לחץ לתצוגה מקדימה"
+            >
+              {document.name}
+            </button>
             {expired && (
               <Badge variant="destructive" className="text-xs shrink-0">
                 פג תוקף
@@ -909,7 +975,17 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
 
           <div className="text-sm text-slate-600 space-y-1">
             {document.original_name && document.original_name !== document.name && (
-              <p className="text-xs text-slate-500 truncate">קובץ: {document.original_name}</p>
+              <div className="relative">
+                <button
+                  onClick={() => setShowFullOriginalName(!showFullOriginalName)}
+                  className="text-xs text-slate-500 hover:text-slate-700 underline-offset-2 hover:underline text-right w-full"
+                  title={showFullOriginalName ? 'לחץ להסתרה' : 'לחץ לצפייה בשם המלא'}
+                >
+                  <span className={showFullOriginalName ? 'break-words' : 'truncate block'}>
+                    קובץ: {document.original_name}
+                  </span>
+                </button>
+              </div>
             )}
             
             <div className="flex flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 text-xs">

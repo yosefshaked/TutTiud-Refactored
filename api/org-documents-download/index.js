@@ -22,7 +22,7 @@ import {
 /**
  * Main handler
  */
-export default async function handler(req, context) {
+export default async function handler(context, req) {
   if (req.method !== 'GET') {
     return respond(context, 405, { message: 'method_not_allowed' });
   }
@@ -31,11 +31,31 @@ export default async function handler(req, context) {
 
   try {
     // Parse authorization
-    const authResult = resolveBearerAuthorization(req);
-    if (!authResult.user) {
-      return respond(context, 401, { message: authResult.message || 'unauthorized' });
+    const authorization = resolveBearerAuthorization(req);
+    if (!authorization?.token) {
+      return respond(context, 401, { message: 'missing_bearer' });
     }
-    userId = authResult.user.id;
+
+    const env = readEnv(context);
+
+    // Create control DB client
+    const supabaseAdminConfig = readSupabaseAdminConfig(env);
+    const controlClient = createSupabaseAdminClient(supabaseAdminConfig, context);
+
+    // Validate token
+    let authResult;
+    try {
+      authResult = await controlClient.auth.getUser(authorization.token);
+    } catch (error) {
+      context.log?.error?.('org-documents-download failed to validate token', { message: error?.message });
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    if (authResult.error || !authResult.data?.user?.id) {
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    userId = authResult.data.user.id;
 
     // Parse query parameters
     const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
@@ -49,12 +69,6 @@ export default async function handler(req, context) {
     if (!fileId) {
       return respond(context, 400, { message: 'missing_file_id' });
     }
-
-    const env = readEnv(context);
-
-    // Create control DB client
-    const supabaseAdminConfig = readSupabaseAdminConfig(env);
-    const controlClient = createSupabaseAdminClient(supabaseAdminConfig, context);
 
     // Verify membership
     let role;
@@ -74,9 +88,9 @@ export default async function handler(req, context) {
     }
 
     // Get tenant client
-    const tenantClient = await resolveTenantClient(controlClient, orgId, context);
-    if (!tenantClient) {
-      return respond(context, 500, { message: 'failed_to_resolve_tenant_client' });
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
     }
 
     // Load documents from Settings
