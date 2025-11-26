@@ -608,9 +608,9 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
         return;
       }
 
-      // Get presigned download URL
+      // Get download URL (attachment disposition)
       const response = await fetch(
-        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}`,
+        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}&preview=false`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -627,8 +627,17 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
       }
 
       const { url } = await response.json();
-      toast.success('מוריד מסמך...', { id: toastId });
-      window.open(url, '_blank');
+      
+      // Create temporary anchor element to trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = document.original_name || document.name;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast.success('מסמך הורד בהצלחה', { id: toastId });
     } catch (error) {
       console.error('Download failed:', error);
       toast.error(`הורדת המסמך נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
@@ -648,9 +657,9 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
         return;
       }
 
-      // Get presigned preview URL
+      // Get preview URL (inline disposition)
       const response = await fetch(
-        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}`,
+        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}&preview=true`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

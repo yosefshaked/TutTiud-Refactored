@@ -297,6 +297,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
         org_id: orgId,
         instructor_id: instructor.id,
         file_id: file.id,
+        preview: 'false',
       });
 
       const response = await authenticatedFetch(
@@ -305,8 +306,15 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       );
 
       if (response?.url) {
-        toast.success('מוריד קובץ...', { id: toastId });
-        window.open(response.url, '_blank');
+        // Create temporary anchor element to trigger download
+        const a = document.createElement('a');
+        a.href = response.url;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        toast.success('קובץ הורד בהצלחה', { id: toastId });
       } else {
         throw new Error('No download URL returned');
       }

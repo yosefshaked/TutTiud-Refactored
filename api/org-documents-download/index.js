@@ -2,11 +2,17 @@
 /**
  * Organization Documents Download API
  * 
- * Returns public URLs for downloading organizational documents.
- * Uses public URLs directly (same as student/instructor files).
- * In the future, Cloudflare worker will handle custom domain presigned URLs.
+ * Returns download URLs for organizational documents using the storage driver.
+ * The driver automatically handles public URLs (custom domain) or presigned URLs.
  * 
- * GET /api/org-documents-download?org_id={org_id}&file_id={file_id}
+ * GET /api/org-documents-download?org_id={org_id}&file_id={file_id}&preview={true|false}
+ * 
+ * Query Parameters:
+ * - org_id: Organization ID (required)
+ * - file_id: File ID (required)
+ * - preview: If true, returns URL with inline disposition (opens in browser).
+ *            If false, returns URL with attachment disposition (downloads file).
+ *            Default: false
  */
 
 import { resolveBearerAuthorization } from '../_shared/http.js';
@@ -15,7 +21,6 @@ import {
   ensureMembership,
   readEnv,
   respond,
-  resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
@@ -59,20 +64,19 @@ export default async function handler(context, req) {
 
     userId = authResult.data.user.id;
 
-    // Parse query parameters
-    const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
-    orgId = url.searchParams.get('org_id');
-    const fileId = url.searchParams.get('file_id');
+  // Parse query parameters
+  const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`);
+  orgId = url.searchParams.get('org_id');
+  const fileId = url.searchParams.get('file_id');
+  const isPreview = url.searchParams.get('preview') === 'true';
 
-    if (!orgId) {
-      return respond(context, 400, { message: 'missing_org_id' });
-    }
+  if (!orgId) {
+    return respond(context, 400, { message: 'missing_org_id' });
+  }
 
-    if (!fileId) {
-      return respond(context, 400, { message: 'missing_file_id' });
-    }
-
-    // Verify membership
+  if (!fileId) {
+    return respond(context, 400, { message: 'missing_file_id' });
+  }    // Verify membership
     let role;
     try {
       role = await ensureMembership(controlClient, orgId, userId);
@@ -146,72 +150,41 @@ export default async function handler(context, req) {
       }
     }
 
-    // Determine URL strategy based on storage mode and configuration
+    // Determine Content-Disposition: inline for preview, attachment for download
+    const dispositionType = isPreview ? 'inline' : 'attachment';
+
+    // Get storage driver and generate download URL
     let downloadUrl;
-    let usePresignedUrl = false;
-
-    if (decryptedProfile.mode === 'managed') {
-      // Check if R2 public URL environment variable exists
-      const hasR2PublicUrl = env.SYSTEM_R2_PUBLIC_URL;
-      
-      if (hasR2PublicUrl) {
-        // Use public URL with custom domain (constructed from env var + path)
-        const baseUrl = env.SYSTEM_R2_PUBLIC_URL.replace(/\/$/, '');
-        downloadUrl = `${baseUrl}/${file.path}`;
-        context.log?.info?.('Using managed storage public URL with custom domain', { baseUrl });
-      } else {
-        // Fallback to presigned URL
-        usePresignedUrl = true;
-        context.log?.info?.('R2 public URL not configured, using presigned URL');
-      }
-    } else if (decryptedProfile.mode === 'byos') {
-      // Check if custom public URL is configured in control DB
-      const hasCustomPublicUrl = decryptedProfile.byos?.public_url || 
-                                 decryptedProfile.byos?.publicUrl ||
-                                 decryptedProfile.byos?.custom_domain;
-      
-      if (hasCustomPublicUrl) {
-        // Use custom public URL (constructed from config + path)
-        const customUrl = decryptedProfile.byos.public_url || 
-                         decryptedProfile.byos.publicUrl || 
-                         decryptedProfile.byos.custom_domain;
-        const baseUrl = customUrl.replace(/\/$/, '');
-        downloadUrl = `${baseUrl}/${file.path}`;
-        context.log?.info?.('Using BYOS custom public URL', { baseUrl });
-      } else {
-        // Fallback to presigned URL
-        usePresignedUrl = true;
-        context.log?.info?.('BYOS custom URL not configured, using presigned URL');
-      }
-    } else {
-      return respond(context, 400, { message: 'invalid_storage_mode' });
-    }
-
-    // Generate presigned URL if needed
-    if (usePresignedUrl) {
-      try {
-        let driver;
-        if (decryptedProfile.mode === 'managed') {
-          driver = getStorageDriver('managed', null, env);
-        } else if (decryptedProfile.mode === 'byos') {
-          if (!decryptedProfile.byos) {
-            return respond(context, 400, { message: 'byos_config_missing' });
-          }
-          driver = getStorageDriver('byos', decryptedProfile.byos, env);
+    try {
+      let driver;
+      if (decryptedProfile.mode === 'managed') {
+        driver = getStorageDriver('managed', null, env);
+      } else if (decryptedProfile.mode === 'byos') {
+        if (!decryptedProfile.byos) {
+          return respond(context, 400, { message: 'byos_config_missing' });
         }
-
-        downloadUrl = await driver.getDownloadUrl(file.path, 3600, finalFilename, 'attachment');
-        context.log?.info?.('Generated presigned download URL', { expiresIn: 3600 });
-      } catch (driverError) {
-        context.log?.error?.('Failed to generate presigned URL', { 
-          message: driverError?.message,
-          mode: decryptedProfile.mode
-        });
-        return respond(context, 500, { 
-          message: 'failed_to_generate_download_url', 
-          details: driverError.message 
-        });
+        driver = getStorageDriver('byos', decryptedProfile.byos, env);
+      } else {
+        return respond(context, 400, { message: 'invalid_storage_mode' });
       }
+
+      // Driver handles URL generation (public URL if configured, presigned otherwise)
+      downloadUrl = await driver.getDownloadUrl(file.path, 3600, finalFilename, dispositionType);
+      
+      context.log?.info?.('Generated download URL via driver', { 
+        mode: decryptedProfile.mode,
+        dispositionType,
+        expiresIn: 3600 
+      });
+    } catch (driverError) {
+      context.log?.error?.('Failed to generate download URL', { 
+        message: driverError?.message,
+        mode: decryptedProfile.mode
+      });
+      return respond(context, 500, { 
+        message: 'failed_to_generate_download_url', 
+        details: driverError.message 
+      });
     }
 
     context.log?.info?.('Org document download URL generated', {
@@ -219,7 +192,8 @@ export default async function handler(context, req) {
       orgId,
       filename: finalFilename,
       mode: decryptedProfile.mode,
-      usedPresignedUrl: usePresignedUrl,
+      dispositionType,
+      isPreview,
     });
 
     return respond(context, 200, { 

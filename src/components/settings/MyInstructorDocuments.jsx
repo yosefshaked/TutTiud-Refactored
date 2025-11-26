@@ -370,11 +370,14 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
   const handleDownloadFile = useCallback(async (fileId) => {
     if (!instructor) return;
 
+    const toastId = toast.loading('מכין קובץ להורדה...');
+
     try {
       const params = new URLSearchParams({
         org_id: orgId,
         instructor_id: instructor.id,
         file_id: fileId,
+        preview: 'false',
       });
 
       const data = await authenticatedFetch(
@@ -386,14 +389,22 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       );
       
       if (data?.url) {
-        window.open(data.url, '_blank');
+        // Create temporary anchor element to trigger download
+        const a = document.createElement('a');
+        a.href = data.url;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        toast.success('קובץ הורד בהצלחה', { id: toastId });
       } else {
         throw new Error('No download URL in response');
       }
     } catch (error) {
       console.error('Download error:', error);
       console.error('Error details:', error.message, error.data);
-      toast.error(`הורדת הקובץ נכשלה: ${error.message || 'שגיאה לא ידועה'}`);
+      toast.error(`הורדת הקובץ נכשלה: ${error.message || 'שגיאה לא ידועה'}`, { id: toastId });
     }
   }, [instructor, orgId, session]);
 

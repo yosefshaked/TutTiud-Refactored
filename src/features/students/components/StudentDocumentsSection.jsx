@@ -441,10 +441,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         return;
       }
 
+      const toastId = toast.loading('מכין להורדה...');
+
       try {
-        // Get presigned download URL
+        // Get download URL (attachment disposition)
         const response = await fetch(
-          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}`,
+          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}&preview=false`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -461,10 +463,19 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         }
 
         const { url } = await response.json();
-        window.open(url, '_blank');
+        
+        // Create temporary anchor element to trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        toast.success('קובץ הורד בהצלחה', { id: toastId });
       } catch (error) {
         console.error('File download failed', error);
-        toast.error(`הורדת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`);
+        toast.error(`הורדת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
       }
     },
     [session, orgId, student?.id]
