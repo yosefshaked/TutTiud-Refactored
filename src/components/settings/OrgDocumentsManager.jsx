@@ -596,7 +596,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   }, [session, orgId, loadDocuments]);
 
   // Handle download
-  const handleDownload = useCallback(async (document) => {
+  const handleDownload = useCallback(async (doc) => {
     if (!session || !orgId) return;
 
     const toastId = toast.loading('מכין להורדה...');
@@ -610,7 +610,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 
       // Get download URL (attachment disposition)
       const response = await fetch(
-        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}&preview=false`,
+        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(doc.id)}&preview=false`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -628,14 +628,20 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 
       const { url } = await response.json();
       
-      // Create temporary anchor element to trigger download
+      // Fetch the file as blob to force download behavior
+      const fileResponse = await fetch(url);
+      const blob = await fileResponse.blob();
+      
+      // Create object URL and trigger download
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = document.original_name || document.name;
+      a.href = blobUrl;
+      a.download = doc.original_name || doc.name;
       a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
       
       toast.success('מסמך הורד בהצלחה', { id: toastId });
     } catch (error) {
@@ -645,7 +651,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   }, [session, orgId]);
 
   // Handle file preview
-  const handlePreview = useCallback(async (document) => {
+  const handlePreview = useCallback(async (doc) => {
     if (!session || !orgId) return;
 
     const toastId = toast.loading('פותח תצוגה מקדימה...');
@@ -659,7 +665,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 
       // Get preview URL (inline disposition)
       const response = await fetch(
-        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(document.id)}&preview=true`,
+        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(doc.id)}&preview=true`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -956,7 +962,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 /**
  * Document card component
  */
-function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDelete, onDownload, onPreview }) {
+function DocumentCard({ document: doc, expired, canManage, deleteState, onEdit, onDelete, onDownload, onPreview }) {
   const [showFullOriginalName, setShowFullOriginalName] = React.useState(false);
 
   return (
@@ -973,7 +979,7 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
               className="font-medium text-slate-900 text-sm sm:text-base leading-tight hover:text-primary underline-offset-2 hover:underline text-right"
               title="לחץ לתצוגה מקדימה"
             >
-              {document.name}
+              {doc.name}
             </button>
             {expired && (
               <Badge variant="destructive" className="text-xs shrink-0">
@@ -983,7 +989,7 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
           </div>
 
           <div className="text-sm text-slate-600 space-y-1">
-            {document.original_name && document.original_name !== document.name && (
+            {doc.original_name && doc.original_name !== doc.name && (
               <div className="relative">
                 <button
                   onClick={() => setShowFullOriginalName(!showFullOriginalName)}
@@ -991,30 +997,30 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
                   title={showFullOriginalName ? 'לחץ להסתרה' : 'לחץ לצפייה בשם המלא'}
                 >
                   <span className={showFullOriginalName ? 'break-words' : 'truncate block'}>
-                    קובץ: {document.original_name}
+                    קובץ: {doc.original_name}
                   </span>
                 </button>
               </div>
             )}
             
             <div className="flex flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 text-xs">
-              <span dir="ltr" className="shrink-0">{formatFileSize(document.size)}</span>
-              <span className="hidden sm:inline">הועלה: {formatDateTime(document.uploaded_at)}</span>
-              <span className="sm:hidden">{formatFileDate(document.uploaded_at.split('T')[0])}</span>
+              <span dir="ltr" className="shrink-0">{formatFileSize(doc.size)}</span>
+              <span className="hidden sm:inline">הועלה: {formatDateTime(doc.uploaded_at)}</span>
+              <span className="sm:hidden">{formatFileDate(doc.uploaded_at.split('T')[0])}</span>
             </div>
 
-            {document.relevant_date && (
+            {doc.relevant_date && (
               <div className="flex items-center gap-1 text-xs">
                 <Calendar className="h-3 w-3 shrink-0" />
-                <span className="hidden sm:inline">תאריך רלוונטי: {formatFileDate(document.relevant_date)}</span>
-                <span className="sm:hidden">רלוונטי: {formatFileDate(document.relevant_date)}</span>
+                <span className="hidden sm:inline">תאריך רלוונטי: {formatFileDate(doc.relevant_date)}</span>
+                <span className="sm:hidden">רלוונטי: {formatFileDate(doc.relevant_date)}</span>
               </div>
             )}
 
-            {document.expiration_date && (
+            {doc.expiration_date && (
               <div className={`flex items-center gap-1 text-xs ${expired ? 'text-red-700 font-medium' : ''}`}>
                 <CalendarX className="h-3 w-3 shrink-0" />
-                <span>תפוגה: {formatFileDate(document.expiration_date)}</span>
+                <span>תפוגה: {formatFileDate(doc.expiration_date)}</span>
               </div>
             )}
           </div>
