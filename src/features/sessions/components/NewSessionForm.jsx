@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Loader2, ListChecks, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,8 @@ export default function NewSessionForm({
   onSelectedStudentChange, // Callback to notify parent of selection changes
   onFormValidityChange, // Callback to inform parent when form validity changes
   onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
+  formResetRef, // Ref to expose reset function to parent
+  successState, // Success state from parent { studentId, studentName, date }
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
@@ -254,6 +256,43 @@ export default function NewSessionForm({
     onSubmit?.(payload);
   };
 
+  // Expose reset function to parent via ref
+  useImperativeHandle(formResetRef, () => (options = {}) => {
+    const { keepStudent = false, studentId = null } = options;
+    
+    // Reset all form fields
+    const initialAnswers = {};
+    for (const question of questions) {
+      if (question?.key) {
+        if (question.type === 'scale' && typeof question?.range?.min === 'number') {
+          initialAnswers[question.key] = String(question.range.min);
+        } else {
+          initialAnswers[question.key] = '';
+        }
+      }
+    }
+    setAnswers(initialAnswers);
+    setSessionDate('');
+    
+    // Preserve service context when keeping same student
+    if (!keepStudent) {
+      setServiceContext('');
+      setServiceTouched(false);
+    }
+    
+    setStudentQuery('');
+    setStudentDayFilter(null);
+    
+    // Conditionally reset student selection
+    if (keepStudent && studentId) {
+      setSelectedStudentId(studentId);
+      onSelectedStudentChange?.(studentId);
+    } else {
+      setSelectedStudentId('');
+      onSelectedStudentChange?.('');
+    }
+  }, [questions, onSelectedStudentChange]);
+
   useEffect(() => {
     const form = formRef.current;
     if (!form) {
@@ -274,6 +313,16 @@ export default function NewSessionForm({
       onSubmit={handleSubmit}
       dir="rtl"
     >
+      {successState && (
+        <div className="rounded-lg bg-success-50 border-2 border-success-200 p-md text-center animate-in fade-in duration-300">
+          <p className="text-base font-semibold text-success-700">
+            ✓ מפגש עבור {successState.studentName} נשמר בהצלחה!
+          </p>
+          <p className="text-sm text-success-600 mt-1">
+            בחרו פעולה מהתפריט מטה
+          </p>
+        </div>
+      )}
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
         <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>

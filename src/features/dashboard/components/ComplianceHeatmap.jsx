@@ -246,7 +246,7 @@ export function ComplianceHeatmap({ orgId }) {
   }
 
   function handleDetailDocCreated() {
-    setDetailQuickDoc(null)
+    // Modal now stays open with success state - refresh data but don't close modal
     if (detailRequestDate) {
       loadDetailDay(detailRequestDate, { preserveView: true, keepData: true })
     }
@@ -508,7 +508,13 @@ export function ComplianceHeatmap({ orgId }) {
       {detailQuickDoc && (
         <NewSessionModal
           open={!!detailQuickDoc}
-          onClose={() => setDetailQuickDoc(null)}
+          onClose={() => {
+            setDetailQuickDoc(null)
+            // Refresh data one final time when modal closes
+            if (detailRequestDate) {
+              loadDetailDay(detailRequestDate, { preserveView: true, keepData: false })
+            }
+          }}
           initialStudentId={detailQuickDoc.studentId}
           initialDate={detailQuickDoc.date}
           onCreated={handleDetailDocCreated}

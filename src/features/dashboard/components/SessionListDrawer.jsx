@@ -29,8 +29,8 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
   }
 
   function handleQuickDocComplete() {
-    setQuickDocModal(null)
-    onClose()
+    // Modal now stays open with success state - no need to close it here
+    // Data refresh will happen when user finally closes the modal
     // Optionally reload the compliance data
   }
 
@@ -65,7 +65,11 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
       {quickDocModal && (
         <NewSessionModal
           open={!!quickDocModal}
-          onClose={() => setQuickDocModal(null)}
+          onClose={() => {
+            setQuickDocModal(null)
+            // Close drawer when modal is finally closed (after user clicks Close button)
+            onClose()
+          }}
           initialStudentId={quickDocModal.studentId}
           initialDate={quickDocModal.date}
           onCreated={handleQuickDocComplete}

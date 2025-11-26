@@ -663,6 +663,30 @@
   - This gracefully handles legacy records (no version) while supporting future versioned forms when history tracking is implemented.
   - Database structure: `session_form_config` is stored as `{"current": {"version": N, "saved_at": "...", "questions": [...]}, "history": [...]}`
 
+### Session Report Success Flow (2025-11)
+- **Success state UX**: After successfully saving a session report, the modal stays open and shows a success state instead of closing immediately.
+- **Implementation** (`NewSessionModal.jsx` + `NewSessionForm.jsx`):
+  - Modal tracks success state: `{ studentId, studentName, date }`
+  - Toast displayed with enhanced configuration for mobile: `toast.success('...', { duration: 2500, position: 'top-center' })`
+  - Success footer (`SuccessFooter` component) replaces standard form footer with three action buttons:
+    1. **סגור** (Close) - Closes modal, returns to parent view
+    2. **דיווח נוסף - תלמיד אחר** (New report - another student) - Resets entire form, allows selecting different student
+    3. **דיווח נוסף - [Student Name]** (New report - same student) - Resets form but keeps student selected for quick consecutive reports
+  - Form reset via `formResetRef` using `useImperativeHandle`:
+    - Resets all fields: answers, date, service, filters
+    - Optionally preserves student selection (for same-student workflow)
+    - Called from parent via ref: `formResetRef.current({ keepStudent: true, studentId })`
+  - Visual feedback: Green success banner appears at top of form showing student name and prompting user to choose action
+- **Mobile optimization**:
+  - Toast duration increased to 2500ms (from default) for better visibility
+  - Toast positioned `top-center` on mobile for maximum visibility
+  - Success state prevents race condition where modal closes before toast renders on mobile browsers
+- **User benefits**:
+  - No confusion about whether report was saved (success state stays visible)
+  - Faster bulk documentation: instructors can create multiple reports without reopening modal
+  - Flexible workflow: choose to document same student multiple times or switch students
+  - Eliminates mobile Android issue where toasts disappeared due to rapid modal closure
+
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.
 - Supabase tenant clients must set `db: { schema: 'tuttiud' }`. Existing endpoints that used default schema have been updated accordingly.
