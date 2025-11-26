@@ -661,63 +661,61 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   return (
     <>
       <Card dir="rtl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-blue-600" />
-              <CardTitle>מסמכי הארגון</CardTitle>
-              {expiredDocs.length > 0 && (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {expiredDocs.length} פג תוקף
-                </Badge>
-              )}
-            </div>
-            {canManage && (
-              <div className="flex gap-2">
-                {documents.length > 0 && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant={sortBy === 'name' ? 'default' : 'outline'}
-                      onClick={() => toggleSort('name')}
-                      className="gap-1"
-                    >
-                      {sortBy === 'name' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
-                      {sortBy === 'name' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
-                      {sortBy !== 'name' && <ArrowUpDown className="h-3 w-3" />}
-                      שם
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={sortBy === 'uploaded_at' ? 'default' : 'outline'}
-                      onClick={() => toggleSort('uploaded_at')}
-                      className="gap-1"
-                    >
-                      {sortBy === 'uploaded_at' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
-                      {sortBy === 'uploaded_at' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
-                      {sortBy !== 'uploaded_at' && <ArrowUpDown className="h-3 w-3" />}
-                      תאריך העלאה
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={sortBy === 'expiration_date' ? 'default' : 'outline'}
-                      onClick={() => toggleSort('expiration_date')}
-                      className="gap-1"
-                    >
-                      {sortBy === 'expiration_date' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
-                      {sortBy === 'expiration_date' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
-                      {sortBy !== 'expiration_date' && <ArrowUpDown className="h-3 w-3" />}
-                      תפוגה
-                    </Button>
-                  </>
+        <CardHeader className="pb-3">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Building2 className="h-5 w-5 text-blue-600" />
+                <CardTitle className="text-lg">מסמכי הארגון</CardTitle>
+                {expiredDocs.length > 0 && (
+                  <Badge variant="destructive" className="gap-1 text-xs">
+                    <AlertCircle className="h-3 w-3" />
+                    {expiredDocs.length} פג תוקף
+                  </Badge>
                 )}
+              </div>
+            </div>
+            {canManage && documents.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                <Button
+                  size="sm"
+                  variant={sortBy === 'name' ? 'default' : 'outline'}
+                  onClick={() => toggleSort('name')}
+                  className="gap-1 shrink-0 h-8 text-xs"
+                >
+                  {sortBy === 'name' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                  {sortBy === 'name' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                  {sortBy !== 'name' && <ArrowUpDown className="h-3 w-3" />}
+                  שם
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortBy === 'uploaded_at' ? 'default' : 'outline'}
+                  onClick={() => toggleSort('uploaded_at')}
+                  className="gap-1 shrink-0 h-8 text-xs"
+                >
+                  {sortBy === 'uploaded_at' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                  {sortBy === 'uploaded_at' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                  {sortBy !== 'uploaded_at' && <ArrowUpDown className="h-3 w-3" />}
+                  העלאה
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortBy === 'expiration_date' ? 'default' : 'outline'}
+                  onClick={() => toggleSort('expiration_date')}
+                  className="gap-1 shrink-0 h-8 text-xs"
+                >
+                  {sortBy === 'expiration_date' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                  {sortBy === 'expiration_date' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                  {sortBy !== 'expiration_date' && <ArrowUpDown className="h-3 w-3" />}
+                  תפוגה
+                </Button>
               </div>
             )}
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4">
           {/* Visibility Restriction Message for Non-Admin Members */}
           {visibilityRestricted && !canManage && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
@@ -737,15 +735,15 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
           {!visibilityRestricted && (
             <>
               {/* Upload Guidelines */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 text-sm">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-700" />
                   <div className="space-y-1">
-                    <p className="font-medium text-blue-900">הנחיות העלאה:</p>
+                    <p className="font-medium text-blue-900 text-xs sm:text-sm">הנחיות העלאה:</p>
                     <ul className="list-disc list-inside space-y-0.5 text-xs text-blue-800">
                       <li>גודל מקסימלי: 10MB</li>
-                      <li>סוגי קבצים: PDF, תמונות, Word, Excel</li>
-                      <li>ניתן לערוך שם, תאריכים ופרטים לפני ואחרי ההעלאה</li>
+                      <li>PDF, תמונות, Word, Excel</li>
+                      <li className="hidden sm:list-item">ניתן לערוך שם, תאריכים ופרטים לפני ואחרי ההעלאה</li>
                     </ul>
                   </div>
                 </div>
@@ -753,12 +751,12 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 
           {/* Member Visibility Toggle (Admin Only) */}
           {canManage && (
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-900">אפשר צפייה לחברים</p>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    כאשר מופעל, חברי צוות יוכלו לצפות ולהוריד מסמכים (ללא אפשרות העלאה/מחיקה)
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:p-4">
+              <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-slate-900">אפשר צפייה לחברים</p>
+                  <p className="text-xs text-slate-600 mt-0.5 leading-snug">
+                    חברי צוות יוכלו לצפות ולהוריד <span className="hidden sm:inline">(ללא העלאה/מחיקה)</span>
                   </p>
                 </div>
                 <Switch
@@ -766,6 +764,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                   onCheckedChange={handleVisibilityToggle}
                   disabled={savingVisibility}
                   aria-label="החלפת אפשרות צפייה לחברים"
+                  className="shrink-0"
                 />
               </div>
             </div>
@@ -785,7 +784,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
               <Button
                 onClick={() => document.getElementById('org-doc-upload')?.click()}
                 disabled={uploadState === REQUEST_STATE.loading}
-                className="w-full gap-2"
+                className="w-full gap-2 h-11 sm:h-10 font-medium"
               >
                 {uploadState === REQUEST_STATE.loading ? (
                   <>
@@ -817,9 +816,9 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
               {/* Expired Documents */}
               {expiredDocs.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-red-700 flex items-center gap-2 justify-end">
+                  <h4 className="text-xs sm:text-sm font-semibold text-red-700 flex items-center gap-1.5 sm:gap-2 justify-end">
                     <span>מסמכים שפג תוקפם ({expiredDocs.length})</span>
-                    <CalendarX className="h-4 w-4" />
+                    <CalendarX className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </h4>
                   {expiredDocs.map(doc => (
                     <DocumentCard
@@ -840,9 +839,9 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
               {activeDocs.length > 0 && (
                 <div className="space-y-2">
                   {expiredDocs.length > 0 && (
-                    <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2 justify-end">
+                    <h4 className="text-xs sm:text-sm font-semibold text-slate-700 flex items-center gap-1.5 sm:gap-2 justify-end">
                       <span>מסמכים פעילים ({activeDocs.length})</span>
-                      <FileText className="h-4 w-4" />
+                      <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </h4>
                   )}
                   {activeDocs.map(doc => (
@@ -893,16 +892,16 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDelete, onDownload }) {
   return (
     <div
-      className={`p-4 border rounded-lg ${
+      className={`p-3 sm:p-4 border rounded-lg ${
         expired ? 'border-red-300 bg-red-50/50' : 'border-slate-200 bg-white'
       }`}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-2 sm:gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h5 className="font-medium text-slate-900">{document.name}</h5>
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+            <h5 className="font-medium text-slate-900 text-sm sm:text-base leading-tight">{document.name}</h5>
             {expired && (
-              <Badge variant="destructive" className="text-xs">
+              <Badge variant="destructive" className="text-xs shrink-0">
                 פג תוקף
               </Badge>
             )}
@@ -910,36 +909,39 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
 
           <div className="text-sm text-slate-600 space-y-1">
             {document.original_name && document.original_name !== document.name && (
-              <p className="text-xs text-slate-500">קובץ מקורי: {document.original_name}</p>
+              <p className="text-xs text-slate-500 truncate">קובץ: {document.original_name}</p>
             )}
             
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <span dir="ltr">{formatFileSize(document.size)}</span>
-              <span>הועלה: {formatDateTime(document.uploaded_at)}</span>
+            <div className="flex flex-wrap gap-x-2 sm:gap-x-3 gap-y-1 text-xs">
+              <span dir="ltr" className="shrink-0">{formatFileSize(document.size)}</span>
+              <span className="hidden sm:inline">הועלה: {formatDateTime(document.uploaded_at)}</span>
+              <span className="sm:hidden">{formatFileDate(document.uploaded_at.split('T')[0])}</span>
             </div>
 
             {document.relevant_date && (
               <div className="flex items-center gap-1 text-xs">
-                <Calendar className="h-3 w-3" />
-                <span>תאריך רלוונטי: {formatFileDate(document.relevant_date)}</span>
+                <Calendar className="h-3 w-3 shrink-0" />
+                <span className="hidden sm:inline">תאריך רלוונטי: {formatFileDate(document.relevant_date)}</span>
+                <span className="sm:hidden">רלוונטי: {formatFileDate(document.relevant_date)}</span>
               </div>
             )}
 
             {document.expiration_date && (
               <div className={`flex items-center gap-1 text-xs ${expired ? 'text-red-700 font-medium' : ''}`}>
-                <CalendarX className="h-3 w-3" />
+                <CalendarX className="h-3 w-3 shrink-0" />
                 <span>תפוגה: {formatFileDate(document.expiration_date)}</span>
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           <Button
             size="sm"
             variant="ghost"
             onClick={onDownload}
             title="הורדה"
+            className="h-9 w-9 p-0"
           >
             <Download className="h-4 w-4" />
           </Button>
@@ -950,6 +952,7 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
                 variant="ghost"
                 onClick={onEdit}
                 title="עריכה"
+                className="h-9 w-9 p-0"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -958,7 +961,7 @@ function DocumentCard({ document, expired, canManage, deleteState, onEdit, onDel
                 variant="ghost"
                 onClick={onDelete}
                 disabled={deleteState === REQUEST_STATE.loading}
-                className="text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive h-9 w-9 p-0"
                 title="מחיקה"
               >
                 <Trash2 className="h-4 w-4" />
