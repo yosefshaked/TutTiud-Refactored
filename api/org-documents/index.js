@@ -461,10 +461,10 @@ async function handleUpload(req, context, env) {
 
     // Get tenant client
     console.info('[ORG-DOCS] Resolving tenant client');
-    const tenantClient = await resolveTenantClient(controlClient, orgId, context);
-    if (!tenantClient) {
-      console.error('[ORG-DOCS] Failed to resolve tenant client');
-      return respond(context, 500, { message: 'failed_to_resolve_tenant_client' });
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      console.error('[ORG-DOCS] Failed to resolve tenant client', tenantError);
+      return respond(context, tenantError.status, tenantError.body);
     }
     console.info('[ORG-DOCS] Tenant client resolved');
 
@@ -623,9 +623,9 @@ async function handleUpdate(req, context, env) {
     }
 
     // Get tenant client
-    const tenantClient = await resolveTenantClient(controlClient, orgId, context);
-    if (!tenantClient) {
-      return respond(context, 500, { message: 'failed_to_resolve_tenant_client' });
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
     }
 
     // Load existing documents
@@ -769,9 +769,9 @@ async function handleDelete(req, context, env) {
     }
 
     // Get tenant client
-    const tenantClient = await resolveTenantClient(controlClient, orgId, context);
-    if (!tenantClient) {
-      return respond(context, 500, { message: 'failed_to_resolve_tenant_client' });
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
     }
 
     // Load existing documents
@@ -939,9 +939,9 @@ async function handleList(req, context, env) {
     }
 
     // Get tenant client
-    const tenantClient = await resolveTenantClient(controlClient, orgId, context);
-    if (!tenantClient) {
-      return respond(context, 500, { message: 'failed_to_resolve_tenant_client' });
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
     }
 
     // Check if non-admin members can view org documents
