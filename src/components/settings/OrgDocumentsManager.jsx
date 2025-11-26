@@ -343,7 +343,13 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
         method: 'GET',
       });
 
-      setDocuments(response.documents || []);
+      // Handle empty or null responses gracefully
+      if (!response || !response.documents) {
+        console.log('No org documents found, starting with empty list');
+        setDocuments([]);
+      } else {
+        setDocuments(response.documents);
+      }
       setLoadState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to load org documents:', error);
