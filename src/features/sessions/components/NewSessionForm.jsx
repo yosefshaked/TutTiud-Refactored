@@ -323,6 +323,8 @@ export default function NewSessionForm({
           </p>
         </div>
       )}
+      {!successState && (
+      <>
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
         <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>
@@ -798,6 +800,8 @@ export default function NewSessionForm({
             </Button>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Preconfigured Answers Picker Dialog */}
