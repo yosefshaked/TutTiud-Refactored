@@ -820,7 +820,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                   checked={memberVisibility}
                   onCheckedChange={handleVisibilityToggle}
                   disabled={savingVisibility}
-                  aria-label="החלפת אפשרות צפייה לחברים"
+                  aria-label="החלפת אפשרות צפייה לכלל חברי הצוות"
                   className="shrink-0"
                 />
               </div>
