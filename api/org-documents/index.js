@@ -78,6 +78,22 @@ function calculateFileHash(buffer) {
 }
 
 /**
+ * Validate ISO date string
+ */
+function isValidISODate(dateString) {
+  if (!dateString) return true; // null/undefined/empty is valid (optional)
+  if (typeof dateString !== 'string') return false;
+  
+  // Check format: YYYY-MM-DD
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(dateString)) return false;
+  
+  // Check if it's a valid date
+  const date = new Date(dateString);
+  return !isNaN(date.getTime());
+}
+
+/**
  * Validate file upload
  */
 function validateFileUpload(fileData, mimeType) {
@@ -101,12 +117,12 @@ function parseMultipartData(req) {
     throw new Error('Request must be multipart/form-data');
   }
 
-  const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
   if (!boundaryMatch) {
     throw new Error('No boundary found in content-type');
   }
 
-  const boundary = boundaryMatch[1];
+  const boundary = boundaryMatch[1] || boundaryMatch[2];
   
   let bodyBuffer;
   if (Buffer.isBuffer(req.body)) {
@@ -204,9 +220,27 @@ async function handleUpload(req, context, env) {
       return respond(context, 401, { message: 'missing_bearer' });
     }
 
-    // Parse org ID
+    // Parse org ID from query string first
     orgId = resolveOrgId(req);
-    console.info('[ORG-DOCS] Org ID resolved', { orgId });
+    console.info('[ORG-DOCS] Org ID resolved from query', { orgId });
+    
+    // If not in query string, try to parse from multipart body
+    if (!orgId) {
+      try {
+        const parts = parseMultipartData(req);
+        const orgIdPart = parts.find(p => p.name === 'org_id');
+        if (orgIdPart?.data) {
+          const candidate = orgIdPart.data.toString('utf8').trim();
+          if (isValidOrgId(candidate)) {
+            orgId = candidate;
+            console.info('[ORG-DOCS] Org ID extracted from multipart body', { orgId });
+          }
+        }
+      } catch (parseError) {
+        console.warn('[ORG-DOCS] Failed to parse multipart for org_id', { message: parseError.message });
+      }
+    }
+    
     if (!orgId) {
       return respond(context, 400, { message: 'missing_org_id' });
     }
@@ -297,6 +331,22 @@ async function handleUpload(req, context, env) {
     const customName = namePart ? namePart.data.toString('utf8').trim() : decodedFilename;
     const relevantDate = relevantDatePart ? relevantDatePart.data.toString('utf8').trim() : null;
     const expirationDate = expirationDatePart ? expirationDatePart.data.toString('utf8').trim() : null;
+
+    // Validate dates
+    if (!isValidISODate(relevantDate)) {
+      console.warn('[ORG-DOCS] Invalid relevant_date format', { relevantDate });
+      return respond(context, 400, { 
+        message: 'invalid_date_format',
+        details: 'relevant_date must be in YYYY-MM-DD format'
+      });
+    }
+    if (!isValidISODate(expirationDate)) {
+      console.warn('[ORG-DOCS] Invalid expiration_date format', { expirationDate });
+      return respond(context, 400, { 
+        message: 'invalid_date_format',
+        details: 'expiration_date must be in YYYY-MM-DD format'
+      });
+    }
 
     console.info('[ORG-DOCS] File metadata extracted', {
       filename: decodedFilename,
@@ -493,10 +543,20 @@ async function handleUpload(req, context, env) {
       .upsert({
         key: 'org_documents',
         settings_value: updatedDocs,
+      }, {
+        onConflict: 'key',
       });
 
     if (upsertError) {
-      console.error('[ORG-DOCS] Failed to save org documents', { message: upsertError.message, code: upsertError.code });
+      console.error('[ORG-DOCS] Failed to save org documents', { 
+        message: upsertError.message, 
+        code: upsertError.code,
+        details: upsertError.details,
+        hint: upsertError.hint,
+        schema: 'tuttiud',
+        table: 'Settings',
+        operation: 'upsert',
+      });
       return respond(context, 500, { message: 'failed_to_save_documents' });
     }
     console.info('[ORG-DOCS] Documents saved successfully');
@@ -574,18 +634,34 @@ async function handleUpdate(req, context, env) {
       return respond(context, 401, { message: 'missing_bearer' });
     }
 
-    // Parse org ID
-    orgId = resolveOrgId(req);
+    // Parse request body first
+    const body = parseRequestBody(req);
+    const { file_id, name, relevant_date, expiration_date } = body;
+    console.info('[ORG-DOCS] Request body parsed', { file_id, name, hasOrgIdInBody: !!body.org_id });
+
+    // Validate dates if provided
+    if (relevant_date !== undefined && !isValidISODate(relevant_date)) {
+      console.warn('[ORG-DOCS] Invalid relevant_date format', { relevant_date });
+      return respond(context, 400, { 
+        message: 'invalid_date_format',
+        details: 'relevant_date must be in YYYY-MM-DD format or null'
+      });
+    }
+    if (expiration_date !== undefined && !isValidISODate(expiration_date)) {
+      console.warn('[ORG-DOCS] Invalid expiration_date format', { expiration_date });
+      return respond(context, 400, { 
+        message: 'invalid_date_format',
+        details: 'expiration_date must be in YYYY-MM-DD format or null'
+      });
+    }
+
+    // Parse org ID from query string or body
+    orgId = resolveOrgId(req, body);
     console.info('[ORG-DOCS] Org ID resolved', { orgId });
     if (!orgId) {
       console.error('[ORG-DOCS] Missing org ID');
       return respond(context, 400, { message: 'missing_org_id' });
     }
-
-    // Parse request body
-    const body = parseRequestBody(req);
-    const { file_id, name, relevant_date, expiration_date } = body;
-    console.info('[ORG-DOCS] Request body parsed', { file_id, name });
 
     if (!file_id) {
       console.error('[ORG-DOCS] Missing file ID');
@@ -665,6 +741,11 @@ async function handleUpdate(req, context, env) {
 
     const updatedDocs = [...existingDocs];
     updatedDocs[fileIndex] = updatedFile;
+    console.info('[ORG-DOCS] Preparing to save updated documents after metadata update', {
+      fileIndex,
+      totalCount: updatedDocs.length,
+      fileId: file_id,
+    });
 
     // Save updated documents
     const { error: upsertError } = await tenantClient
@@ -672,12 +753,20 @@ async function handleUpdate(req, context, env) {
       .upsert({
         key: 'org_documents',
         settings_value: updatedDocs,
+      }, {
+        onConflict: 'key',
       });
 
     if (upsertError) {
-      console.error('Failed to save updated org documents', { message: upsertError.message });
+      console.error('[ORG-DOCS] Failed to save updated org documents after metadata update', { 
+        message: upsertError.message,
+        code: upsertError.code,
+        details: upsertError.details,
+        hint: upsertError.hint,
+      });
       return respond(context, 500, { message: 'failed_to_save_documents' });
     }
+    console.info('[ORG-DOCS] Documents saved successfully after metadata update');
 
     // Log audit event
     await logAuditEvent(controlClient, {
@@ -866,6 +955,11 @@ async function handleDelete(req, context, env) {
 
     // Remove from documents list
     const updatedDocs = existingDocs.filter(f => f.id !== file_id);
+    console.info('[ORG-DOCS] Preparing to save updated documents after delete', { 
+      originalCount: existingDocs.length,
+      newCount: updatedDocs.length,
+      fileId: file_id,
+    });
 
     // Save updated list
     const { error: upsertError } = await tenantClient
@@ -873,12 +967,20 @@ async function handleDelete(req, context, env) {
       .upsert({
         key: 'org_documents',
         settings_value: updatedDocs,
+      }, {
+        onConflict: 'key',
       });
 
     if (upsertError) {
-      console.error('Failed to save updated org documents', { message: upsertError.message });
+      console.error('[ORG-DOCS] Failed to save updated org documents after delete', { 
+        message: upsertError.message,
+        code: upsertError.code,
+        details: upsertError.details,
+        hint: upsertError.hint,
+      });
       return respond(context, 500, { message: 'failed_to_save_documents' });
     }
+    console.info('[ORG-DOCS] Documents saved successfully after delete');
 
     // Log audit event
     await logAuditEvent(controlClient, {
