@@ -367,12 +367,44 @@ async function handleUpload(req, context, env) {
 
     // Upload to storage
     console.info('[ORG-DOCS] Getting storage driver');
-    const driver = getStorageDriver(decryptedProfile.mode, decryptedProfile, env);
+    let driver;
+    try {
+      if (decryptedProfile.mode === 'managed') {
+        // Check for required R2 environment variables
+        const hasR2Config = env.SYSTEM_R2_ENDPOINT && env.SYSTEM_R2_ACCESS_KEY && 
+                           env.SYSTEM_R2_SECRET_KEY && env.SYSTEM_R2_BUCKET_NAME;
+        if (!hasR2Config) {
+          console.error('[ORG-DOCS] Managed storage R2 environment variables not configured');
+          return respond(context, 500, { 
+            message: 'managed_storage_not_configured',
+            details: 'System administrator needs to configure R2 storage credentials'
+          });
+        }
+        driver = getStorageDriver('managed', null, env);
+      } else if (decryptedProfile.mode === 'byos') {
+        if (!decryptedProfile.byos) {
+          return respond(context, 400, { message: 'byos_config_missing' });
+        }
+        driver = getStorageDriver('byos', decryptedProfile.byos, env);
+      } else {
+        return respond(context, 400, { message: 'invalid_storage_mode' });
+      }
+    } catch (driverError) {
+      console.error('[ORG-DOCS] Failed to create storage driver', { 
+        message: driverError?.message,
+        stack: driverError?.stack,
+        mode: decryptedProfile.mode
+      });
+      return respond(context, 500, { 
+        message: 'storage_driver_error', 
+        details: driverError.message 
+      });
+    }
     console.info('[ORG-DOCS] Storage driver obtained, starting upload');
     
     let uploadResult;
     try {
-      uploadResult = await driver.uploadFile(storagePath, filePart.data, filePart.type);
+      uploadResult = await driver.upload(storagePath, filePart.data, filePart.type);
       console.info('[ORG-DOCS] Storage upload successful', { 
         url: uploadResult.url,
         path: storagePath,
@@ -732,14 +764,31 @@ async function handleDelete(req, context, env) {
       const decryptedProfile = decryptStorageProfile(storageProfile, env);
 
       // Delete from storage (best effort - don't fail if already deleted)
+      let driver;
       try {
-        const driver = getStorageDriver(decryptedProfile.mode, decryptedProfile, env);
-        await driver.deleteFile(fileToDelete.path);
-      } catch (deleteError) {
-        console.warn('Failed to delete file from storage (continuing anyway)', {
-          message: deleteError.message,
-          path: fileToDelete.path,
-        });
+        if (decryptedProfile.mode === 'managed') {
+          driver = getStorageDriver('managed', null, env);
+        } else if (decryptedProfile.mode === 'byos') {
+          if (!decryptedProfile.byos) {
+            console.warn('BYOS config missing, skipping physical deletion');
+          } else {
+            driver = getStorageDriver('byos', decryptedProfile.byos, env);
+          }
+        }
+      } catch (driverError) {
+        console.warn('Failed to create storage driver for deletion', { message: driverError?.message });
+        // Continue to remove from database even if driver creation fails
+      }
+
+      // Delete physical file
+      if (driver && fileToDelete.path) {
+        try {
+          await driver.delete(fileToDelete.path);
+          console.info('Physical file deleted', { path: fileToDelete.path });
+        } catch (deleteError) {
+          console.warn('Failed to delete physical file', { message: deleteError?.message });
+          // Continue to remove from database even if physical deletion fails
+        }
       }
     }
 
