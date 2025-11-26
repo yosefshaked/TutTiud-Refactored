@@ -563,24 +563,32 @@ async function handleUpload(req, context, env) {
 async function handleUpdate(req, context, env) {
   let userId, orgId, role;
 
+  console.info('[ORG-DOCS] Update handler started');
+
   try {
     // Parse authorization
     const authorization = resolveBearerAuthorization(req);
+    console.info('[ORG-DOCS] Authorization parsed', { hasToken: !!authorization?.token });
     if (!authorization?.token) {
+      console.warn('[ORG-DOCS] Missing bearer token');
       return respond(context, 401, { message: 'missing_bearer' });
     }
 
     // Parse org ID
     orgId = resolveOrgId(req);
+    console.info('[ORG-DOCS] Org ID resolved', { orgId });
     if (!orgId) {
+      console.error('[ORG-DOCS] Missing org ID');
       return respond(context, 400, { message: 'missing_org_id' });
     }
 
     // Parse request body
     const body = parseRequestBody(req);
     const { file_id, name, relevant_date, expiration_date } = body;
+    console.info('[ORG-DOCS] Request body parsed', { file_id, name });
 
     if (!file_id) {
+      console.error('[ORG-DOCS] Missing file ID');
       return respond(context, 400, { message: 'missing_file_id' });
     }
 
@@ -687,15 +695,23 @@ async function handleUpdate(req, context, env) {
       },
     });
 
+    console.info('[ORG-DOCS] ✅ Update completed successfully', {
+      fileId: file_id,
+      orgId,
+      filename: updatedFile.name,
+    });
+
     return respond(context, 200, { 
       message: 'update_success',
       file: updatedFile,
     });
 
   } catch (error) {
-    console.error('Org document update error', {
+    console.error('[ORG-DOCS] ❌ Update error - UNCAUGHT EXCEPTION', {
       message: error.message,
       stack: error.stack,
+      orgId,
+      userId,
     });
     return respond(context, 500, { 
       message: 'internal_server_error',
@@ -710,23 +726,32 @@ async function handleUpdate(req, context, env) {
 async function handleDelete(req, context, env) {
   let userId, orgId, role;
 
+  console.info('[ORG-DOCS] Delete handler started');
+
   try {
     // Parse authorization
     const authorization = resolveBearerAuthorization(req);
+    console.info('[ORG-DOCS] Authorization parsed', { hasToken: !!authorization?.token });
     if (!authorization?.token) {
+      console.warn('[ORG-DOCS] Missing bearer token');
       return respond(context, 401, { message: 'missing_bearer' });
     }
 
-    // Parse org ID and file ID
-    orgId = resolveOrgId(req);
+    // Parse request body first
+    const body = parseRequestBody(req);
+    const { file_id } = body;
+    console.info('[ORG-DOCS] Request body parsed', { file_id, hasOrgIdInBody: !!body.org_id });
+
+    // Parse org ID from query string or body
+    orgId = resolveOrgId(req, body);
+    console.info('[ORG-DOCS] Org ID resolved', { orgId });
     if (!orgId) {
+      console.error('[ORG-DOCS] Missing org ID');
       return respond(context, 400, { message: 'missing_org_id' });
     }
 
-    const body = parseRequestBody(req);
-    const { file_id } = body;
-
     if (!file_id) {
+      console.error('[ORG-DOCS] Missing file ID');
       return respond(context, 400, { message: 'missing_file_id' });
     }
 
@@ -870,12 +895,20 @@ async function handleDelete(req, context, env) {
       },
     });
 
+    console.info('[ORG-DOCS] ✅ Delete completed successfully', {
+      fileId: file_id,
+      orgId,
+      filename: fileToDelete.name,
+    });
+
     return respond(context, 200, { message: 'delete_success' });
 
   } catch (error) {
-    console.error('Org document delete error', {
+    console.error('[ORG-DOCS] ❌ Delete error - UNCAUGHT EXCEPTION', {
       message: error.message,
       stack: error.stack,
+      orgId,
+      userId,
     });
     return respond(context, 500, { 
       message: 'internal_server_error',
@@ -890,16 +923,22 @@ async function handleDelete(req, context, env) {
 async function handleList(req, context, env) {
   let userId, orgId;
 
+  console.info('[ORG-DOCS] List handler started');
+
   try {
     // Parse authorization
     const authorization = resolveBearerAuthorization(req);
+    console.info('[ORG-DOCS] Authorization parsed', { hasToken: !!authorization?.token });
     if (!authorization?.token) {
+      console.warn('[ORG-DOCS] Missing bearer token');
       return respond(context, 401, { message: 'missing_bearer' });
     }
 
     // Parse org ID
     orgId = resolveOrgId(req);
+    console.info('[ORG-DOCS] Org ID resolved', { orgId });
     if (!orgId) {
+      console.error('[ORG-DOCS] Missing org ID');
       return respond(context, 400, { message: 'missing_org_id' });
     }
 
@@ -979,14 +1018,21 @@ async function handleList(req, context, env) {
 
     const documents = existingSettings?.settings_value || [];
 
+    console.info('[ORG-DOCS] ✅ List completed successfully', {
+      orgId,
+      documentCount: documents.length,
+    });
+
     return respond(context, 200, { 
       documents,
     });
 
   } catch (error) {
-    console.error('Org documents list error', {
+    console.error('[ORG-DOCS] ❌ List error - UNCAUGHT EXCEPTION', {
       message: error.message,
       stack: error.stack,
+      orgId,
+      userId,
     });
     return respond(context, 500, { 
       message: 'internal_server_error',
