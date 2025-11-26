@@ -146,21 +146,45 @@ function decodeFilename(filename) {
  * Main handler
  */
 export default async function handler(req, context) {
+  console.info('[ORG-DOCS] Handler invoked', { 
+    method: req.method,
+    url: req.url,
+    hasBody: !!req.body,
+    contentType: req.headers?.['content-type']
+  });
+  
   const method = req.method;
   const env = readEnv(context);
 
-  // Handle different HTTP methods
-  if (method === 'POST') {
-    return await handleUpload(req, context, env);
-  } else if (method === 'PUT') {
-    return await handleUpdate(req, context, env);
-  } else if (method === 'DELETE') {
-    return await handleDelete(req, context, env);
-  } else if (method === 'GET') {
-    return await handleList(req, context, env);
-  }
+  try {
+    // Handle different HTTP methods
+    if (method === 'POST') {
+      console.info('[ORG-DOCS] Routing to handleUpload');
+      const result = await handleUpload(req, context, env);
+      console.info('[ORG-DOCS] handleUpload returned', { 
+        status: result?.status,
+        hasBody: !!result?.body
+      });
+      return result;
+    } else if (method === 'PUT') {
+      return await handleUpdate(req, context, env);
+    } else if (method === 'DELETE') {
+      return await handleDelete(req, context, env);
+    } else if (method === 'GET') {
+      return await handleList(req, context, env);
+    }
 
-  return respond(context, 405, { message: 'method_not_allowed' });
+    return respond(context, 405, { message: 'method_not_allowed' });
+  } catch (error) {
+    console.error('[ORG-DOCS] Handler crashed', {
+      message: error.message,
+      stack: error.stack
+    });
+    return respond(context, 500, { 
+      message: 'handler_error',
+      details: error.message
+    });
+  }
 }
 
 /**
