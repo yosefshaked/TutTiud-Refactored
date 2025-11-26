@@ -169,9 +169,12 @@ export default async function handler(req, context) {
 async function handleUpload(req, context, env) {
   let userId, orgId, role;
 
+  context.log?.info?.('[ORG-DOCS] Upload handler started');
+
   try {
     // Parse authorization
     const authResult = resolveBearerAuthorization(req);
+    context.log?.info?.('[ORG-DOCS] Authorization parsed', { hasUser: !!authResult.user });
     if (!authResult.user) {
       return respond(context, 401, { message: authResult.message || 'unauthorized' });
     }
@@ -179,6 +182,7 @@ async function handleUpload(req, context, env) {
 
     // Parse org ID
     orgId = resolveOrgId(req);
+    context.log?.info?.('[ORG-DOCS] Org ID resolved', { orgId });
     if (!orgId) {
       return respond(context, 400, { message: 'missing_org_id' });
     }
@@ -186,12 +190,14 @@ async function handleUpload(req, context, env) {
     // Create control DB client
     const supabaseAdminConfig = readSupabaseAdminConfig(env);
     const controlClient = createSupabaseAdminClient(supabaseAdminConfig, context);
+    context.log?.info?.('[ORG-DOCS] Control DB client created');
 
     // Verify membership and require admin/owner
     try {
       role = await ensureMembership(controlClient, orgId, userId);
+      context.log?.info?.('[ORG-DOCS] Membership verified', { role });
     } catch (membershipError) {
-      context.log?.error?.('org-documents failed to verify membership', {
+      context.log?.error?.('[ORG-DOCS] Membership verification failed', {
         message: membershipError?.message,
         orgId,
         userId,
@@ -200,20 +206,24 @@ async function handleUpload(req, context, env) {
     }
 
     if (!role) {
+      context.log?.warn?.('[ORG-DOCS] User is not a member');
       return respond(context, 403, { message: 'not_a_member' });
     }
 
     // Only admin/owner can upload org documents
     if (role !== 'admin' && role !== 'owner') {
+      context.log?.warn?.('[ORG-DOCS] Insufficient permissions', { role });
       return respond(context, 403, { message: 'insufficient_permissions', details: 'Only admins and owners can manage organizational documents' });
     }
 
     // Parse multipart form data
     let parts;
     try {
+      context.log?.info?.('[ORG-DOCS] Starting multipart parse');
       parts = parseMultipartData(req);
+      context.log?.info?.('[ORG-DOCS] Multipart parsed', { partsCount: parts.length });
     } catch (parseError) {
-      context.log?.error?.('Failed to parse multipart data', { message: parseError.message });
+      context.log?.error?.('[ORG-DOCS] Failed to parse multipart data', { message: parseError.message, stack: parseError.stack });
       return respond(context, 400, { message: 'invalid_multipart_data', details: parseError.message });
     }
 
@@ -223,7 +233,15 @@ async function handleUpload(req, context, env) {
     const relevantDatePart = parts.find(p => p.name === 'relevant_date');
     const expirationDatePart = parts.find(p => p.name === 'expiration_date');
 
+    context.log?.info?.('[ORG-DOCS] Form parts extracted', {
+      hasFile: !!filePart,
+      hasName: !!namePart,
+      hasRelevantDate: !!relevantDatePart,
+      hasExpirationDate: !!expirationDatePart,
+    });
+
     if (!filePart || !filePart.data) {
+      context.log?.error?.('[ORG-DOCS] No file in upload');
       return respond(context, 400, { message: 'no_file_uploaded' });
     }
 
@@ -235,7 +253,7 @@ async function handleUpload(req, context, env) {
     const relevantDate = relevantDatePart ? relevantDatePart.data.toString('utf8').trim() : null;
     const expirationDate = expirationDatePart ? expirationDatePart.data.toString('utf8').trim() : null;
 
-    context.log?.info?.('Org document upload parsed', {
+    context.log?.info?.('[ORG-DOCS] File metadata extracted', {
       filename: decodedFilename,
       customName,
       mimeType: filePart.type,
@@ -246,16 +264,19 @@ async function handleUpload(req, context, env) {
     });
 
     // Validate file
+    context.log?.info?.('[ORG-DOCS] Validating file');
     const validation = validateFileUpload(filePart.data, filePart.type);
     if (!validation.valid) {
-      context.log?.warn?.('File validation failed', { error: validation.error, details: validation.details });
+      context.log?.warn?.('[ORG-DOCS] File validation failed', { error: validation.error, details: validation.details });
       return respond(context, 400, { 
         message: validation.error,
         details: validation.details 
       });
     }
+    context.log?.info?.('[ORG-DOCS] File validation passed');
 
     // Get storage profile
+    context.log?.info?.('[ORG-DOCS] Loading storage profile');
     const { data: orgSettings, error: settingsError } = await controlClient
       .from('org_settings')
       .select('storage_profile')
@@ -263,20 +284,32 @@ async function handleUpload(req, context, env) {
       .maybeSingle();
 
     if (settingsError) {
-      context.log?.error?.('Failed to load storage profile', { message: settingsError.message });
+      context.log?.error?.('[ORG-DOCS] Failed to load storage profile', { message: settingsError.message });
       return respond(context, 500, { message: 'failed_to_load_storage_profile' });
     }
 
+    context.log?.info?.('[ORG-DOCS] Storage profile loaded', { 
+      hasProfile: !!orgSettings?.storage_profile,
+      mode: orgSettings?.storage_profile?.mode,
+    });
+
     const storageProfile = orgSettings?.storage_profile;
     if (!storageProfile || !storageProfile.mode) {
+      context.log?.error?.('[ORG-DOCS] Storage not configured');
       return respond(context, 400, { message: 'storage_not_configured' });
     }
 
     // Decrypt BYOS credentials if present
+    context.log?.info?.('[ORG-DOCS] Decrypting storage profile');
     const decryptedProfile = decryptStorageProfile(storageProfile, env);
+    context.log?.info?.('[ORG-DOCS] Storage profile decrypted', {
+      mode: decryptedProfile.mode,
+      disconnected: decryptedProfile.disconnected,
+    });
 
     // Block uploads if storage is disconnected
     if (decryptedProfile.disconnected === true) {
+      context.log?.warn?.('[ORG-DOCS] Storage is disconnected');
       return respond(context, 403, { 
         message: 'storage_disconnected',
         details: 'Storage is disconnected. Please reconnect or reconfigure storage to upload files.'
@@ -284,7 +317,9 @@ async function handleUpload(req, context, env) {
     }
 
     // Calculate file hash
+    context.log?.info?.('[ORG-DOCS] Calculating file hash');
     const fileHash = calculateFileHash(filePart.data);
+    context.log?.info?.('[ORG-DOCS] File hash calculated', { hash: fileHash });
 
     // Generate file metadata
     const fileId = generateFileId();
@@ -300,15 +335,28 @@ async function handleUpload(req, context, env) {
       storagePath = `general-docs/${orgId}/${storageFilename}`;
     }
 
+    context.log?.info?.('[ORG-DOCS] Storage path constructed', {
+      fileId,
+      storagePath,
+      mode: decryptedProfile.mode,
+    });
+
     // Upload to storage
+    context.log?.info?.('[ORG-DOCS] Getting storage driver');
     const driver = getStorageDriver(decryptedProfile.mode, decryptedProfile, env);
+    context.log?.info?.('[ORG-DOCS] Storage driver obtained, starting upload');
     
     let uploadResult;
     try {
       uploadResult = await driver.uploadFile(storagePath, filePart.data, filePart.type);
+      context.log?.info?.('[ORG-DOCS] Storage upload successful', { 
+        url: uploadResult.url,
+        path: storagePath,
+      });
     } catch (uploadError) {
-      context.log?.error?.('Storage upload failed', { 
+      context.log?.error?.('[ORG-DOCS] Storage upload failed', { 
         message: uploadError.message,
+        stack: uploadError.stack,
         path: storagePath,
       });
       return respond(context, 500, { 
@@ -335,12 +383,16 @@ async function handleUpload(req, context, env) {
     };
 
     // Get tenant client
+    context.log?.info?.('[ORG-DOCS] Resolving tenant client');
     const tenantClient = await resolveTenantClient(controlClient, orgId, context);
     if (!tenantClient) {
+      context.log?.error?.('[ORG-DOCS] Failed to resolve tenant client');
       return respond(context, 500, { message: 'failed_to_resolve_tenant_client' });
     }
+    context.log?.info?.('[ORG-DOCS] Tenant client resolved');
 
     // Load existing org documents from Settings
+    context.log?.info?.('[ORG-DOCS] Loading existing documents from Settings');
     const { data: existingSettings, error: loadError } = await tenantClient
       .from('Settings')
       .select('settings_value')
@@ -348,12 +400,15 @@ async function handleUpload(req, context, env) {
       .maybeSingle();
 
     if (loadError && loadError.code !== 'PGRST116') {
-      context.log?.error?.('Failed to load org documents', { message: loadError.message });
+      context.log?.error?.('[ORG-DOCS] Failed to load org documents', { message: loadError.message });
       return respond(context, 500, { message: 'failed_to_load_documents' });
     }
 
     const existingDocs = existingSettings?.settings_value || [];
+    context.log?.info?.('[ORG-DOCS] Existing documents loaded', { count: existingDocs.length });
+    
     const updatedDocs = [...existingDocs, fileRecord];
+    context.log?.info?.('[ORG-DOCS] Preparing to save updated documents', { newCount: updatedDocs.length });
 
     // Save updated documents list
     const { error: upsertError } = await tenantClient
@@ -364,11 +419,13 @@ async function handleUpload(req, context, env) {
       });
 
     if (upsertError) {
-      context.log?.error?.('Failed to save org documents', { message: upsertError.message });
+      context.log?.error?.('[ORG-DOCS] Failed to save org documents', { message: upsertError.message, code: upsertError.code });
       return respond(context, 500, { message: 'failed_to_save_documents' });
     }
+    context.log?.info?.('[ORG-DOCS] Documents saved successfully');
 
     // Log audit event
+    context.log?.info?.('[ORG-DOCS] Logging audit event');
     await logAuditEvent(controlClient, {
       orgId,
       userId,
@@ -388,10 +445,11 @@ async function handleUpload(req, context, env) {
       },
     });
 
-    context.log?.info?.('Org document uploaded successfully', {
+    context.log?.info?.('[ORG-DOCS] ✅ Upload completed successfully', {
       fileId,
       orgId,
       filename: customName,
+      url: uploadResult.url,
     });
 
     return respond(context, 200, { 
@@ -400,9 +458,11 @@ async function handleUpload(req, context, env) {
     });
 
   } catch (error) {
-    context.log?.error?.('Org document upload error', {
+    context.log?.error?.('[ORG-DOCS] ❌ Upload error - UNCAUGHT EXCEPTION', {
       message: error.message,
       stack: error.stack,
+      orgId,
+      userId,
     });
     return respond(context, 500, { 
       message: 'internal_server_error',
