@@ -452,10 +452,19 @@ async function handleUpload(req, context, env) {
       url: uploadResult.url,
     });
 
-    return respond(context, 200, { 
+    const responseBody = { 
       message: 'upload_success',
       file: fileRecord,
+    };
+    
+    console.info('[ORG-DOCS] Returning response', { 
+      status: 200,
+      hasFile: !!fileRecord,
+      fileId: fileRecord?.id,
+      responseBodyKeys: Object.keys(responseBody)
     });
+
+    return respond(context, 200, responseBody);
 
   } catch (error) {
     console.error('[ORG-DOCS] ❌ Upload error - UNCAUGHT EXCEPTION', {
