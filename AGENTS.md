@@ -219,6 +219,69 @@
   - **Orphaned files display**: Files from deleted definitions show with amber background, "הגדרה ישנה" badge, and reconstructed name from stored `definition_name`
 - File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
 
+### Organizational Documents (2025-11)
+- `/api/org-documents` (POST/PUT/DELETE/GET) manages organization-level documents (licenses, approvals, certificates) not tied to specific students or instructors.
+  - **Storage paths**:
+    - Managed R2: `managed/{org_id}/general-docs/{file_id}.{ext}`
+    - BYOS: `general-docs/{org_id}/{file_id}.{ext}`
+  - **Metadata storage**: Stored in `tuttiud.Settings` table with key `'org_documents'` as JSONB array
+  - **Metadata schema**: `{id, name, original_name, relevant_date, expiration_date, url, path, storage_provider, uploaded_at, uploaded_by, size, type, hash}`
+  - **Member visibility control**: Setting `org_documents_member_visibility` (boolean, default false) controls whether non-admin members can view org documents
+    - Admin/owner can always view and manage documents
+    - Non-admin members require the setting to be enabled to view documents
+    - GET endpoint checks this setting and returns 403 `members_cannot_view_org_documents` error when disabled
+    - Frontend hides the org documents card from non-admin members when visibility is disabled
+    - Backend enforces restriction as security layer in case of UI bugs
+  - **POST (upload)**: Multipart form data with file + optional metadata (name, relevant_date, expiration_date)
+    - Validates file size (10MB max) and MIME types (PDF, images, Word, Excel)
+    - Decodes Hebrew filenames properly (UTF-8/latin1 encoding)
+    - Generates MD5 hash for duplicate detection
+    - Uploads to storage and saves metadata to Settings
+    - Requires admin/owner role
+    - Logs FILE_UPLOADED audit event
+  - **PUT (update metadata)**: Update name, relevant_date, or expiration_date for existing document
+    - Admin/owner only
+    - Logs org_document_updated audit event
+  - **DELETE**: Remove file from storage and metadata from Settings
+    - Admin/owner only
+    - Logs FILE_DELETED audit event
+  - **GET (list)**: Returns all org documents for the organization
+    - Available to members when visibility setting is enabled
+    - Admin/owner can always access
+- `/api/org-documents-download` (GET) returns public URLs for org documents.
+  - Query params: `org_id` and `file_id`
+  - Verifies membership (any org member can download if visibility enabled)
+  - Uses public URLs directly (same approach as student/instructor files)
+  - Future: Cloudflare worker will handle custom domain presigned URLs
+- Frontend (`OrgDocumentsManager.jsx`):
+  - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant date, and add expiration date
+    - Name auto-populated from filename (without extension)
+    - Both dates optional
+    - Confirmation triggers upload with metadata via multipart/form-data
+    - Fresh session token obtained before upload to prevent silent failures
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
+    - Edit name, relevant_date, expiration_date
+    - Admin/owner only
+  - **Document separation**: Expired documents (expiration_date < today) displayed in separate section with red badges and CalendarX icon
+  - **Sorting**: Three-way sort by upload date, name, or expiration date with asc/desc toggle
+  - **Download**: Fetches public URL and triggers browser download with proper Hebrew filename
+  - **Delete**: Admin/owner only, confirmation dialog before deletion
+  - **Upload guidelines**: Info box explaining 10MB limit, allowed file types, Hebrew filename support
+  - **Visibility toggle (admin-only)**: Checkbox inside card to enable/disable member access
+    - Stored in tenant DB setting `org_documents_member_visibility`
+    - When disabled: Only admin/owner can view documents
+    - When enabled: All org members can view and download (but not upload/delete)
+  - **Visibility restriction handling**: Non-admin members see amber warning message when visibility is disabled
+- Settings page integration:
+  - Card: "מסמכי הארגון" (Organization Documents) with Briefcase icon
+  - Positioned after Document Rules Manager card (admin section)
+  - Visibility logic:
+    - Admins/owners: Always see the card when storage is enabled
+    - Non-admin members: Card only visible when `org_documents_member_visibility = true` AND storage is enabled
+  - Opens dialog with `OrgDocumentsManager` component
+  - Backend enforces visibility restriction as security layer
+- **Use cases**: Organization licenses, veterinary approvals, business permits, insurance certificates, general documentation not tied to specific students or instructors
+
 ### PDF Export Feature (2025-11)
 - `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
   - Validates admin/owner role and permission before processing

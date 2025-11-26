@@ -18,6 +18,8 @@ import StudentVisibilitySettings from '@/components/settings/StudentVisibilitySe
 import StorageSettingsCard from '@/components/settings/StorageSettingsCard.jsx';
 import DocumentRulesManager from '@/components/settings/DocumentRulesManager.jsx';
 import MyInstructorDocuments from '@/components/settings/MyInstructorDocuments.jsx';
+import OrgDocumentsManager from '@/components/settings/OrgDocumentsManager.jsx';
+import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -30,10 +32,11 @@ export default function Settings() {
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage' | 'documents'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage' | 'documents' | 'orgDocuments' | 'myDocuments'
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
   const [storageEnabled, setStorageEnabled] = useState(false);
+  const [orgDocsVisibility, setOrgDocsVisibility] = useState(false);
   const [refreshingPermissions, setRefreshingPermissions] = useState(false);
   const [isInstructor, setIsInstructor] = useState(false);
 
@@ -160,6 +163,33 @@ export default function Settings() {
 
     checkInstructorStatus();
   }, [user?.id, session, tenantClientReady, activeOrgId]);
+
+  // Fetch org documents visibility setting
+  useEffect(() => {
+    const isAdmin = normalizedRole === 'admin' || normalizedRole === 'owner';
+    
+    if (!session || !activeOrgId || !activeOrgHasConnection || isAdmin) {
+      // Admins always see the card, so set to true for them
+      setOrgDocsVisibility(isAdmin);
+      return;
+    }
+
+    const loadVisibility = async () => {
+      try {
+        const response = await fetchSettingsValue({
+          session,
+          orgId: activeOrgId,
+          key: 'org_documents_member_visibility',
+        });
+        setOrgDocsVisibility(response?.value === true || response?.value === 'true');
+      } catch (error) {
+        console.error('Failed to load org docs visibility:', error);
+        setOrgDocsVisibility(false);
+      }
+    };
+
+    loadVisibility();
+  }, [session, activeOrgId, activeOrgHasConnection, normalizedRole]);
 
   useEffect(() => {
     if (activeOrgHasConnection) {
@@ -674,11 +704,11 @@ export default function Settings() {
                   <FileText className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <CardTitle className="text-lg font-bold text-slate-900">
-                  ניהול מסמכים
+                  ניהול מסמכים נדרשים
                 </CardTitle>
               </div>
               <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
-                הגדרת רשימת מסמכים תקניים ומחויבים עבור תלמידי הארגון
+                הגדרת רשימת מסמכים תקניים ומחויבים עבור תלמידים ומדריכים
               </p>
             </CardHeader>
             <CardContent className="pt-0 mt-auto">
@@ -689,10 +719,40 @@ export default function Settings() {
                 disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
                 variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
               >
-                <FileText className="h-4 w-4" /> ניהול מסמכים
+                <FileText className="h-4 w-4" /> ניהול מסמכים נדרשים
               </Button>
             </CardContent>
           </Card>
+
+          {/* Organization Documents Card - Show to admins always, or to members if visibility enabled */}
+          {(storageEnabled && orgDocsVisibility) && (
+          <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+            <CardHeader className="space-y-2 pb-3 flex-1">
+              <div className="flex items-start gap-2">
+                <div className="rounded-lg bg-blue-100 p-2 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                  <Briefcase className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <CardTitle className="text-lg font-bold text-slate-900">
+                  מסמכי הארגון
+                </CardTitle>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
+                העלאה וניהול מסמכים ארגוניים כלליים (רישיונות, אישורים וכדומה)
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0 mt-auto">
+              <Button 
+                size="sm" 
+                className="w-full gap-2" 
+                onClick={() => setSelectedModule('orgDocuments')} 
+                disabled={!activeOrgHasConnection || !tenantClientReady}
+                variant={(!activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+              >
+                <Briefcase className="h-4 w-4" /> ניהול מסמכי ארגון
+              </Button>
+            </CardContent>
+          </Card>
+          )}
         </div>
         )}
 
@@ -751,6 +811,7 @@ export default function Settings() {
                 selectedModule === 'studentVisibility' ? <EyeOff /> :
                 selectedModule === 'storage' ? <HardDrive /> :
                 selectedModule === 'documents' ? <FileText /> :
+                selectedModule === 'orgDocuments' ? <Briefcase /> :
                 selectedModule === 'myDocuments' ? <FileText /> :
                 null
               }
@@ -766,6 +827,7 @@ export default function Settings() {
                 selectedModule === 'studentVisibility' ? 'תצוגת תלמידים לא פעילים' :
                 selectedModule === 'storage' ? 'הגדרות אחסון' :
                 selectedModule === 'documents' ? 'ניהול מסמכים' :
+                selectedModule === 'orgDocuments' ? 'מסמכי הארגון' :
                 selectedModule === 'myDocuments' ? 'המסמכים שלי' :
                 ''
               }
@@ -831,6 +893,9 @@ export default function Settings() {
                 )}
                 {selectedModule === 'documents' && (
                   <DocumentRulesManager session={session} orgId={activeOrgId} />
+                )}
+                {selectedModule === 'orgDocuments' && (
+                  <OrgDocumentsManager session={session} orgId={activeOrgId} membershipRole={membershipRole} />
                 )}
                 {selectedModule === 'myDocuments' && (
                   <MyInstructorDocuments session={session} orgId={activeOrgId} userId={user?.id} />
