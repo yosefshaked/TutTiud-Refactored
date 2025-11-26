@@ -1,13 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { FileText, Upload, Download, Trash2, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { FileText, Upload, Download, Trash2, Loader2, AlertCircle, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { authenticatedFetch } from '@/lib/api-client';
+import { getAuthClient } from '@/lib/supabase-manager.js';
 
 const REQUEST_STATE = {
   idle: 'idle',
@@ -40,6 +41,8 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
   const [uploadingAdhoc, setUploadingAdhoc] = useState(false);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
   const [backgroundUploads, setBackgroundUploads] = useState([]);
+  const [sortBy, setSortBy] = useState('date'); // 'date' | 'name'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
 
   const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
   const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
@@ -136,6 +139,41 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
             });
 
             try {
+              // Get fresh session token right before upload
+              let token;
+              try {
+                const authClient = getAuthClient();
+                const { data, error } = await authClient.auth.getSession();
+                
+                if (error || !data?.session?.access_token) {
+                  console.error('Failed to get fresh session:', error);
+                  toast.error('ההרשאה פגה. נא לרענן את הדף ולהתחבר מחדש', {
+                    id: toastId,
+                    duration: 5000,
+                    action: {
+                      label: 'רענן',
+                      onClick: () => window.location.reload(),
+                    },
+                  });
+                  setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+                  return;
+                }
+                
+                token = data.session.access_token;
+              } catch (error) {
+                console.error('Session refresh error:', error);
+                toast.error('שגיאה בקבלת הרשאה. נא לרענן את הדף', {
+                  id: toastId,
+                  duration: 5000,
+                  action: {
+                    label: 'רענן',
+                    onClick: () => window.location.reload(),
+                  },
+                });
+                setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+                return;
+              }
+
               const formData = new FormData();
               formData.append('file', file);
               formData.append('org_id', orgId);
@@ -173,8 +211,16 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
               if (errorData.details) {
                 errorMessage += `: ${errorData.details}`;
               }
+              
+              // Check for auth errors
+              if (xhr.status === 401 || errorData.message === 'invalid_or_expired_token' || errorData.message === 'missing_bearer') {
+                errorMessage = 'ההרשאה פגה במהלך ההעלאה';
+              }
             } catch {
               // Use default error message
+              if (xhr.status === 401) {
+                errorMessage = 'ההרשאה פגה במהלך ההעלאה';
+              }
             }
             console.error('Upload error response:', xhr.status, xhr.responseText);
             reject(new Error(errorMessage));
@@ -184,7 +230,6 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
         xhr.addEventListener('error', () => reject(new Error('Network error')));
         xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
 
-        const token = session?.access_token;
         xhr.open('POST', `/api/instructor-files?org_id=${orgId}`);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
@@ -273,18 +318,67 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
 
   // Group files by definition
   const filesByDefinition = {};
-  const adhocFiles = [];
-
-  instructorFiles.forEach(file => {
-    if (file.definition_id) {
-      if (!filesByDefinition[file.definition_id]) {
-        filesByDefinition[file.definition_id] = [];
+  const adhocFiles = useMemo(() => {
+    const files = [];
+    instructorFiles.forEach(file => {
+      if (!file.definition_id) {
+        files.push(file);
       }
-      filesByDefinition[file.definition_id].push(file);
+    });
+    return files;
+  }, [instructorFiles]);
+
+  useMemo(() => {
+    instructorFiles.forEach(file => {
+      if (file.definition_id) {
+        if (!filesByDefinition[file.definition_id]) {
+          filesByDefinition[file.definition_id] = [];
+        }
+        filesByDefinition[file.definition_id].push(file);
+      }
+    });
+    return filesByDefinition;
+  }, [instructorFiles, filesByDefinition]);
+
+  // Sort adhoc files based on current sort settings
+  const sortedAdhocFiles = useMemo(() => {
+    const sorted = [...adhocFiles];
+    
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'date') {
+        // Sort by uploaded_at date
+        const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
+        const dateB = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
+        comparison = dateA - dateB;
+      } else if (sortBy === 'name') {
+        // Sort by file name
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        comparison = nameA.localeCompare(nameB, 'he');
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return sorted;
+  }, [adhocFiles, sortBy, sortOrder]);
+
+  // Toggle sort order
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  }, []);
+
+  // Change sort field
+  const changeSortBy = useCallback((newSortBy) => {
+    if (newSortBy === sortBy) {
+      toggleSortOrder();
     } else {
-      adhocFiles.push(file);
+      setSortBy(newSortBy);
+      setSortOrder('desc'); // Default to descending when changing sort field
     }
-  });
+  }, [sortBy, toggleSortOrder]);
 
   // Check if definition still exists
   const getDefinitionById = (defId) => {
@@ -374,13 +468,15 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                             const input = document.createElement('input');
                             input.type = 'file';
                             input.accept = ALLOWED_TYPES.join(',');
-                            input.onchange = (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
+                            input.multiple = true;
+                            input.onchange = async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length > 0) {
                                 setUploadingDefId(def.id);
-                                handleFileUpload(file, def.id, def.name).finally(() => {
-                                  setUploadingDefId(null);
-                                });
+                                for (const file of files) {
+                                  await handleFileUpload(file, def.id, def.name);
+                                }
+                                setUploadingDefId(null);
                               }
                             };
                             input.click();
@@ -449,10 +545,38 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       {/* Additional Files */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 justify-end">
-            <span>קבצים נוספים</span>
-            <FileText className="h-5 w-5" />
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              <CardTitle>קבצים נוספים</CardTitle>
+            </div>
+            {adhocFiles.length > 0 && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={sortBy === 'name' ? 'default' : 'outline'}
+                  onClick={() => changeSortBy('name')}
+                  className="gap-1"
+                >
+                  {sortBy === 'name' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                  {sortBy === 'name' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                  {sortBy !== 'name' && <ArrowUpDown className="h-3 w-3" />}
+                  שם
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortBy === 'date' ? 'default' : 'outline'}
+                  onClick={() => changeSortBy('date')}
+                  className="gap-1"
+                >
+                  {sortBy === 'date' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                  {sortBy === 'date' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                  {sortBy !== 'date' && <ArrowUpDown className="h-3 w-3" />}
+                  תאריך
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
@@ -463,13 +587,15 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.accept = ALLOWED_TYPES.join(',');
-                input.onchange = (e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
+                input.multiple = true;
+                input.onchange = async (e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) {
                     setUploadingAdhoc(true);
-                    handleFileUpload(file).finally(() => {
-                      setUploadingAdhoc(false);
-                    });
+                    for (const file of files) {
+                      await handleFileUpload(file);
+                    }
+                    setUploadingAdhoc(false);
                   }
                 };
                 input.click();
@@ -482,13 +608,13 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
               ) : (
                 <Upload className="h-4 w-4" />
               )}
-              העלאת קובץ חופשי
+              העלאת קבצים חופשיים
             </Button>
           </div>
 
           {adhocFiles.length > 0 ? (
             <div className="space-y-2">
-              {adhocFiles.map(file => {
+              {sortedAdhocFiles.map(file => {
                 // Check if file references a deleted definition
                 const isOrphaned = file.definition_id && !getDefinitionById(file.definition_id);
 

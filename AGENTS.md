@@ -183,6 +183,8 @@
   - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
   - **File metadata**: Each file record includes `{id, name, original_name, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
   - **Hebrew filename encoding**: Properly decodes UTF-8 filenames from multipart data by detecting latin1 mis-encoding and converting back to UTF-8
+  - **Bulk upload support (2025-11)**: File inputs accept `multiple` attribute, allowing users to select and upload multiple files at once
+  - **Sorting functionality (2025-11)**: Additional files section includes sort controls for name (alphabetical) and date (chronological), with ascending/descending toggle
   - **Progress tracking**: Frontend uses XMLHttpRequest with upload progress events for real-time feedback
   - **Background uploads**: Uploads continue in background with toast notifications; users can navigate away while files upload
   - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures

@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { FileText, Upload, Download, Trash2, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, Eye } from 'lucide-react';
+import { FileText, Upload, Download, Trash2, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, Eye, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { useOrg } from '@/org/OrgContext.jsx';
+import { getAuthClient } from '@/lib/supabase-manager.js';
 
 const REQUEST_STATE = {
   idle: 'idle',
@@ -44,6 +45,8 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   const [uploadingDefId, setUploadingDefId] = useState(null);
   const [uploadingAdhoc, setUploadingAdhoc] = useState(false);
   const [backgroundUploads, setBackgroundUploads] = useState([]); // Active background uploads
+  const [sortBy, setSortBy] = useState('date'); // 'date' | 'name'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
 
   const studentFiles = Array.isArray(student?.files) ? student.files : [];
   const studentTags = Array.isArray(student?.tags) ? student.tags : [];
@@ -172,12 +175,36 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
   const handleFileUpload = useCallback(
     async (file, definitionId = null, customName = null) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!orgId || !student?.id) return;
 
-      const token = session.access_token;
-      if (!token) {
-        console.error('Session missing access_token');
-        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+      // Get fresh session token right before upload
+      let token;
+      try {
+        const authClient = getAuthClient();
+        const { data, error } = await authClient.auth.getSession();
+        
+        if (error || !data?.session?.access_token) {
+          console.error('Failed to get fresh session:', error);
+          toast.error('ההרשאה פגה. נא לרענן את הדף ולהתחבר מחדש', {
+            duration: 5000,
+            action: {
+              label: 'רענן',
+              onClick: () => window.location.reload(),
+            },
+          });
+          return;
+        }
+        
+        token = data.session.access_token;
+      } catch (error) {
+        console.error('Session refresh error:', error);
+        toast.error('שגיאה בקבלת הרשאה. נא לרענן את הדף', {
+          duration: 5000,
+          action: {
+            label: 'רענן',
+            onClick: () => window.location.reload(),
+          },
+        });
         return;
       }
 
@@ -282,17 +309,41 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
               const errorData = JSON.parse(xhr.responseText);
               let errorMsg = 'העלאת הקובץ נכשלה';
               
-              if (errorData.message === 'file_too_large') {
+              if (xhr.status === 401 || errorData.message === 'invalid_or_expired_token' || errorData.message === 'missing_bearer') {
+                errorMsg = 'ההרשאה פגה במהלך ההעלאה';
+                toast.error(errorMsg, { 
+                  id: toastId,
+                  duration: 5000,
+                  action: {
+                    label: 'רענן',
+                    onClick: () => window.location.reload(),
+                  },
+                });
+              } else if (errorData.message === 'file_too_large') {
                 errorMsg = 'הקובץ גדול מדי (מקסימום 10MB)';
+                toast.error(errorMsg, { id: toastId });
               } else if (errorData.message === 'invalid_file_type') {
                 errorMsg = 'סוג קובץ לא נתמך';
+                toast.error(errorMsg, { id: toastId });
               } else if (errorData.details) {
                 errorMsg = errorData.details;
+                toast.error(errorMsg, { id: toastId });
+              } else {
+                toast.error(errorMsg, { id: toastId });
               }
-              
-              toast.error(errorMsg, { id: toastId });
             } catch {
-              toast.error(`העלאת הקובץ נכשלה (שגיאה ${xhr.status})`, { id: toastId });
+              if (xhr.status === 401) {
+                toast.error('ההרשאה פגה במהלך ההעלאה', { 
+                  id: toastId,
+                  duration: 5000,
+                  action: {
+                    label: 'רענן',
+                    onClick: () => window.location.reload(),
+                  },
+                });
+              } else {
+                toast.error(`העלאת הקובץ נכשלה (שגיאה ${xhr.status})`, { id: toastId });
+              }
             }
             resolve(false);
           }
@@ -325,7 +376,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         xhr.send(formData);
       });
     },
-    [session, orgId, student?.id, onRefresh, checkForDuplicates, ALLOWED_TYPES, MAX_FILE_SIZE]
+    [orgId, student?.id, onRefresh, checkForDuplicates, ALLOWED_TYPES, MAX_FILE_SIZE]
   );
 
   const handleFileDelete = useCallback(
@@ -478,14 +529,17 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   );
 
   const handleFileInputChange = useCallback(
-    (event, definitionId = null) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+    async (event, definitionId = null) => {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
 
-      if (definitionId) {
-        handleFileUpload(file, definitionId);
-      } else {
-        handleFileUpload(file, null, file.name);
+      // Upload files sequentially to avoid overwhelming the server
+      for (const file of files) {
+        if (definitionId) {
+          await handleFileUpload(file, definitionId);
+        } else {
+          await handleFileUpload(file, null, file.name);
+        }
       }
 
       // Reset input
@@ -505,6 +559,50 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     // Include files whose definition no longer exists in ANY definitions list (truly deleted)
     return !definitions.find(def => def.id === f.definition_id);
   });
+
+  // Sort adhoc files based on current sort settings
+  const sortedAdhocFiles = useMemo(() => {
+    const sorted = [...adhocFiles];
+    
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'date') {
+        // Sort by uploaded_at date
+        const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
+        const dateB = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
+        comparison = dateA - dateB;
+      } else if (sortBy === 'name') {
+        // Sort by file name (handle orphaned files with definition_name)
+        const nameA = (a.definition_name && !definitions.find(def => def.id === a.definition_id))
+          ? `${a.definition_name} - ${student?.name || ''}`
+          : (a.name || '');
+        const nameB = (b.definition_name && !definitions.find(def => def.id === b.definition_id))
+          ? `${b.definition_name} - ${student?.name || ''}`
+          : (b.name || '');
+        comparison = nameA.localeCompare(nameB, 'he');
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return sorted;
+  }, [adhocFiles, sortBy, sortOrder, definitions, student?.name]);
+
+  // Toggle sort order
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  }, []);
+
+  // Change sort field
+  const changeSortBy = useCallback((newSortBy) => {
+    if (newSortBy === sortBy) {
+      toggleSortOrder();
+    } else {
+      setSortBy(newSortBy);
+      setSortOrder('desc'); // Default to descending when changing sort field
+    }
+  }, [sortBy, toggleSortOrder]);
 
   // Helper to check if a file is orphaned (definition was truly deleted)
   const isOrphanedFile = (file) => {
@@ -672,6 +770,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                       className="sr-only"
                                       onChange={(e) => handleFileInputChange(e, def.id)}
                                       disabled={isUploading}
+                                      multiple
                                     />
                                     <Button
                                       size="sm"
@@ -704,12 +803,40 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
                 {/* Adhoc Files */}
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-slate-900">קבצים נוספים</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-900">קבצים נוספים</h3>
+                    {adhocFiles.length > 0 && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={sortBy === 'name' ? 'default' : 'outline'}
+                          onClick={() => changeSortBy('name')}
+                          className="gap-1"
+                        >
+                          {sortBy === 'name' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                          {sortBy === 'name' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                          {sortBy !== 'name' && <ArrowUpDown className="h-3 w-3" />}
+                          שם
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={sortBy === 'date' ? 'default' : 'outline'}
+                          onClick={() => changeSortBy('date')}
+                          className="gap-1"
+                        >
+                          {sortBy === 'date' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                          {sortBy === 'date' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                          {sortBy !== 'date' && <ArrowUpDown className="h-3 w-3" />}
+                          תאריך
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   {adhocFiles.length === 0 ? (
                     <p className="text-sm text-slate-500 py-4 text-center">אין קבצים נוספים</p>
                   ) : (
                     <div className="space-y-2">
-                      {adhocFiles.map((file) => {
+                      {sortedAdhocFiles.map((file) => {
                         const isOrphaned = isOrphanedFile(file);
                         // For orphaned files, use stored definition_name; otherwise use current file name
                         const displayName = isOrphaned && file.definition_name 
@@ -784,7 +911,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                     </div>
                   )}
 
-                  {/* Upload Adhoc File */}
+                  {/* Upload Adhoc Files */}
                   <div className="pt-2">
                     <div className="relative">
                       <input
@@ -793,6 +920,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                         className="sr-only"
                         onChange={(e) => handleFileInputChange(e)}
                         disabled={uploadingAdhoc}
+                        multiple
                       />
                       <Button
                         variant="outline"
@@ -803,12 +931,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                         {uploadingAdhoc ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            מעלה קובץ...
+                            מעלה קבצים...
                           </>
                         ) : (
                           <>
                             <Upload className="h-4 w-4" />
-                            העלאת קובץ נוסף
+                            העלאת קבצים נוספים
                           </>
                         )}
                       </Button>
