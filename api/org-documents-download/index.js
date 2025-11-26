@@ -138,12 +138,19 @@ export default async function handler(context, req) {
     // Decrypt BYOS credentials if present
     const decryptedProfile = decryptStorageProfile(storageProfile, env);
 
-    // Prepare display filename
-    const downloadFilename = file.original_name || file.name;
+    // Prepare display filename - use custom name (file.name) instead of original_name
+    const downloadFilename = file.name;
     const hasExtension = /\.[^.]+$/.test(downloadFilename);
     
     let finalFilename = downloadFilename;
-    if (!hasExtension && file.path) {
+    if (!hasExtension && file.original_name) {
+      // Extract extension from original filename
+      const extensionMatch = file.original_name.match(/\.[^.]+$/);
+      if (extensionMatch) {
+        finalFilename = downloadFilename + extensionMatch[0];
+      }
+    } else if (!hasExtension && file.path) {
+      // Fallback: extract from storage path
       const extensionMatch = file.path.match(/\.[^.]+$/);
       if (extensionMatch) {
         finalFilename = downloadFilename + extensionMatch[0];
