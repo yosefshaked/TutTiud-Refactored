@@ -18,6 +18,8 @@ import {
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
+import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
+import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 
 /**
  * Main handler
@@ -129,33 +131,100 @@ export default async function handler(context, req) {
       return respond(context, 400, { message: 'storage_not_configured' });
     }
 
-    // Return public URL (same approach as student/instructor files)
-    // For custom domain support in the future, Cloudflare worker will handle presigned URLs
-    // For now, using the stored public URL directly
+    // Decrypt BYOS credentials if present
+    const decryptedProfile = decryptStorageProfile(storageProfile, env);
+
+    // Prepare display filename
     const downloadFilename = file.original_name || file.name;
-    const hasExtension = downloadFilename.includes('.');
+    const hasExtension = /\.[^.]+$/.test(downloadFilename);
     
-    // If no extension in original_name, try to add it from the file path
     let finalFilename = downloadFilename;
     if (!hasExtension && file.path) {
-      const pathParts = file.path.split('.');
-      if (pathParts.length > 1) {
-        const extension = pathParts[pathParts.length - 1];
-        finalFilename = `${downloadFilename}.${extension}`;
+      const extensionMatch = file.path.match(/\.[^.]+$/);
+      if (extensionMatch) {
+        finalFilename = downloadFilename + extensionMatch[0];
+      }
+    }
+
+    // Determine URL strategy based on storage mode and configuration
+    let downloadUrl;
+    let usePresignedUrl = false;
+
+    if (decryptedProfile.mode === 'managed') {
+      // Check if R2 public URL environment variable exists
+      const hasR2PublicUrl = env.SYSTEM_R2_PUBLIC_URL;
+      
+      if (hasR2PublicUrl) {
+        // Use public URL with custom domain (constructed from env var + path)
+        const baseUrl = env.SYSTEM_R2_PUBLIC_URL.replace(/\/$/, '');
+        downloadUrl = `${baseUrl}/${file.path}`;
+        context.log?.info?.('Using managed storage public URL with custom domain', { baseUrl });
+      } else {
+        // Fallback to presigned URL
+        usePresignedUrl = true;
+        context.log?.info?.('R2 public URL not configured, using presigned URL');
+      }
+    } else if (decryptedProfile.mode === 'byos') {
+      // Check if custom public URL is configured in control DB
+      const hasCustomPublicUrl = decryptedProfile.byos?.public_url || 
+                                 decryptedProfile.byos?.publicUrl ||
+                                 decryptedProfile.byos?.custom_domain;
+      
+      if (hasCustomPublicUrl) {
+        // Use custom public URL (constructed from config + path)
+        const customUrl = decryptedProfile.byos.public_url || 
+                         decryptedProfile.byos.publicUrl || 
+                         decryptedProfile.byos.custom_domain;
+        const baseUrl = customUrl.replace(/\/$/, '');
+        downloadUrl = `${baseUrl}/${file.path}`;
+        context.log?.info?.('Using BYOS custom public URL', { baseUrl });
+      } else {
+        // Fallback to presigned URL
+        usePresignedUrl = true;
+        context.log?.info?.('BYOS custom URL not configured, using presigned URL');
+      }
+    } else {
+      return respond(context, 400, { message: 'invalid_storage_mode' });
+    }
+
+    // Generate presigned URL if needed
+    if (usePresignedUrl) {
+      try {
+        let driver;
+        if (decryptedProfile.mode === 'managed') {
+          driver = getStorageDriver('managed', null, env);
+        } else if (decryptedProfile.mode === 'byos') {
+          if (!decryptedProfile.byos) {
+            return respond(context, 400, { message: 'byos_config_missing' });
+          }
+          driver = getStorageDriver('byos', decryptedProfile.byos, env);
+        }
+
+        downloadUrl = await driver.getDownloadUrl(file.path, 3600, finalFilename, 'attachment');
+        context.log?.info?.('Generated presigned download URL', { expiresIn: 3600 });
+      } catch (driverError) {
+        context.log?.error?.('Failed to generate presigned URL', { 
+          message: driverError?.message,
+          mode: decryptedProfile.mode
+        });
+        return respond(context, 500, { 
+          message: 'failed_to_generate_download_url', 
+          details: driverError.message 
+        });
       }
     }
 
     context.log?.info?.('Org document download URL generated', {
       fileId,
       orgId,
-      filename: file.name,
+      filename: finalFilename,
+      mode: decryptedProfile.mode,
+      usedPresignedUrl: usePresignedUrl,
     });
 
     return respond(context, 200, { 
-      url: file.url,
-      filename: finalFilename,
-      size: file.size,
-      type: file.type,
+      url: downloadUrl,
+      contentType: file.type || 'application/octet-stream'
     });
 
   } catch (error) {
