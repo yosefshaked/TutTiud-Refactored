@@ -197,12 +197,12 @@ async function handleUpload(req, context, env) {
 
   try {
     // Parse authorization
-    const authResult = resolveBearerAuthorization(req);
-    console.info('[ORG-DOCS] Authorization parsed', { hasUser: !!authResult.user });
-    if (!authResult.user) {
-      return respond(context, 401, { message: authResult.message || 'unauthorized' });
+    const authorization = resolveBearerAuthorization(req);
+    console.info('[ORG-DOCS] Authorization parsed', { hasToken: !!authorization?.token });
+    if (!authorization?.token) {
+      console.warn('[ORG-DOCS] Missing bearer token');
+      return respond(context, 401, { message: 'missing_bearer' });
     }
-    userId = authResult.user.id;
 
     // Parse org ID
     orgId = resolveOrgId(req);
@@ -215,6 +215,27 @@ async function handleUpload(req, context, env) {
     const supabaseAdminConfig = readSupabaseAdminConfig(env);
     const controlClient = createSupabaseAdminClient(supabaseAdminConfig, context);
     console.info('[ORG-DOCS] Control DB client created');
+
+    // Validate token
+    let authResult;
+    try {
+      authResult = await controlClient.auth.getUser(authorization.token);
+    } catch (error) {
+      console.error('[ORG-DOCS] Failed to validate token', { message: error?.message });
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    if (authResult.error || !authResult.data?.user?.id) {
+      console.warn('[ORG-DOCS] Token validation failed', {
+        hasError: !!authResult.error,
+        errorMessage: authResult.error?.message,
+        hasUser: !!authResult.data?.user,
+      });
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    userId = authResult.data.user.id;
+    console.info('[ORG-DOCS] User authenticated', { userId });
 
     // Verify membership and require admin/owner
     try {
@@ -485,7 +506,7 @@ async function handleUpload(req, context, env) {
     await logAuditEvent(controlClient, {
       orgId,
       userId,
-      userEmail: authResult.user.email,
+      userEmail: authResult.data.user.email,
       userRole: role,
       actionType: AUDIT_ACTIONS.FILE_UPLOADED,
       actionCategory: AUDIT_CATEGORIES.FILES,
@@ -544,11 +565,10 @@ async function handleUpdate(req, context, env) {
 
   try {
     // Parse authorization
-    const authResult = resolveBearerAuthorization(req);
-    if (!authResult.user) {
-      return respond(context, 401, { message: authResult.message || 'unauthorized' });
+    const authorization = resolveBearerAuthorization(req);
+    if (!authorization?.token) {
+      return respond(context, 401, { message: 'missing_bearer' });
     }
-    userId = authResult.user.id;
 
     // Parse org ID
     orgId = resolveOrgId(req);
@@ -567,6 +587,20 @@ async function handleUpdate(req, context, env) {
     // Create control DB client
     const supabaseAdminConfig = readSupabaseAdminConfig(env);
     const controlClient = createSupabaseAdminClient(supabaseAdminConfig, context);
+
+    // Validate token
+    let authResult;
+    try {
+      authResult = await controlClient.auth.getUser(authorization.token);
+    } catch (error) {
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    if (authResult.error || !authResult.data?.user?.id) {
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    userId = authResult.data.user.id;
 
     // Verify membership and require admin/owner
     try {
@@ -641,7 +675,7 @@ async function handleUpdate(req, context, env) {
     await logAuditEvent(controlClient, {
       orgId,
       userId,
-      userEmail: authResult.user.email,
+      userEmail: authResult.data.user.email,
       userRole: role,
       actionType: 'org_document_updated',
       actionCategory: AUDIT_CATEGORIES.FILES,
@@ -678,11 +712,10 @@ async function handleDelete(req, context, env) {
 
   try {
     // Parse authorization
-    const authResult = resolveBearerAuthorization(req);
-    if (!authResult.user) {
-      return respond(context, 401, { message: authResult.message || 'unauthorized' });
+    const authorization = resolveBearerAuthorization(req);
+    if (!authorization?.token) {
+      return respond(context, 401, { message: 'missing_bearer' });
     }
-    userId = authResult.user.id;
 
     // Parse org ID and file ID
     orgId = resolveOrgId(req);
@@ -700,6 +733,20 @@ async function handleDelete(req, context, env) {
     // Create control DB client
     const supabaseAdminConfig = readSupabaseAdminConfig(env);
     const controlClient = createSupabaseAdminClient(supabaseAdminConfig, context);
+
+    // Validate token
+    let authResult;
+    try {
+      authResult = await controlClient.auth.getUser(authorization.token);
+    } catch (error) {
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    if (authResult.error || !authResult.data?.user?.id) {
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    userId = authResult.data.user.id;
 
     // Verify membership and require admin/owner
     try {
@@ -812,7 +859,7 @@ async function handleDelete(req, context, env) {
     await logAuditEvent(controlClient, {
       orgId,
       userId,
-      userEmail: authResult.user.email,
+      userEmail: authResult.data.user.email,
       userRole: role,
       actionType: AUDIT_ACTIONS.FILE_DELETED,
       actionCategory: AUDIT_CATEGORIES.FILES,
@@ -845,11 +892,10 @@ async function handleList(req, context, env) {
 
   try {
     // Parse authorization
-    const authResult = resolveBearerAuthorization(req);
-    if (!authResult.user) {
-      return respond(context, 401, { message: authResult.message || 'unauthorized' });
+    const authorization = resolveBearerAuthorization(req);
+    if (!authorization?.token) {
+      return respond(context, 401, { message: 'missing_bearer' });
     }
-    userId = authResult.user.id;
 
     // Parse org ID
     orgId = resolveOrgId(req);
@@ -860,6 +906,20 @@ async function handleList(req, context, env) {
     // Create control DB client
     const supabaseAdminConfig = readSupabaseAdminConfig(env);
     const controlClient = createSupabaseAdminClient(supabaseAdminConfig, context);
+
+    // Validate token
+    let authResult;
+    try {
+      authResult = await controlClient.auth.getUser(authorization.token);
+    } catch (error) {
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    if (authResult.error || !authResult.data?.user?.id) {
+      return respond(context, 401, { message: 'invalid_or_expired_token' });
+    }
+
+    userId = authResult.data.user.id;
 
     // Verify membership
     let role;
