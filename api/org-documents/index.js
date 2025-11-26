@@ -145,7 +145,7 @@ function decodeFilename(filename) {
 /**
  * Main handler
  */
-export default async function handler(req, context) {
+export default async function handler(context, req) {
   console.info('[ORG-DOCS] Handler invoked', { 
     method: req.method,
     url: req.url,
