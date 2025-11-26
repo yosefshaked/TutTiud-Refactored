@@ -96,6 +96,10 @@ export function createS3Driver(config) {
     /**
      * Get presigned download URL
      * 
+     * Strategy:
+     * - Preview (inline): Use public URL if available (fast, custom domain)
+     * - Download (attachment): Always use presigned URL with Content-Disposition header
+     * 
      * @param {string} path - File path within bucket
      * @param {number} expiresIn - URL expiration time in seconds (default: 3600 = 1 hour)
      * @param {string} filename - Optional filename for Content-Disposition header
@@ -103,14 +107,15 @@ export function createS3Driver(config) {
      * @returns {Promise<string>} Presigned download URL or public URL
      */
     async getDownloadUrl(path, expiresIn = 3600, filename = null, dispositionType = 'attachment') {
-      // If public URL is configured, use it directly (R2 custom domain)
-      // This is much faster than presigned URLs and works for publicly accessible buckets
-      if (publicUrl) {
+      // For preview (inline): use public URL if available (custom domain, fast)
+      // For download (attachment): always use presigned URL to force download behavior
+      if (dispositionType === 'inline' && publicUrl) {
         const baseUrl = publicUrl.replace(/\/$/, '');
         return `${baseUrl}/${path}`;
       }
 
-      // Fallback to presigned URLs for private buckets or when public URL not configured
+      // Generate presigned URL with Content-Disposition header
+      // This ensures proper download behavior with correct filename
       // Build Content-Disposition header with filename if provided
       // Use RFC 5987 encoding for non-ASCII filenames (Hebrew, etc.)
       let disposition = dispositionType === 'inline' ? 'inline' : 'attachment';

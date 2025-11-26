@@ -608,7 +608,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
         return;
       }
 
-      // Get download URL (attachment disposition)
+      // Get download URL (attachment disposition = presigned URL)
       const response = await fetch(
         `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(doc.id)}&preview=false`,
         {
@@ -627,17 +627,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
       }
 
       const { url } = await response.json();
-      
-      // Use download attribute to trigger download (bypasses CORS)
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = doc.original_name || doc.name;
-      a.target = '_blank'; // Fallback for some browsers
-      a.rel = 'noopener noreferrer';
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      window.location.href = url; // Navigate to presigned URL to trigger download
       
       toast.success('מסמך הורד בהצלחה', { id: toastId });
     } catch (error) {
@@ -821,9 +811,9 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:p-4">
               <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-slate-900">אפשר צפייה לחברים</p>
+                  <p className="text-xs sm:text-sm font-medium text-slate-900">אפשר צפייה לכלל חברי הצוות</p>
                   <p className="text-xs text-slate-600 mt-0.5 leading-snug">
-                    חברי צוות יוכלו לצפות ולהוריד <span className="hidden sm:inline">(ללא העלאה/מחיקה)</span>
+                    חברי צוות שאינם מנהלים יוכלו לצפות ולהוריד <span className="hidden sm:inline">(ללא העלאה/מחיקה)</span>
                   </p>
                 </div>
                 <Switch

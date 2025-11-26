@@ -444,7 +444,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       const toastId = toast.loading('מכין להורדה...');
 
       try {
-        // Get download URL (attachment disposition)
+        // Get download URL (attachment disposition = presigned URL)
         const response = await fetch(
           `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}&preview=false`,
           {
@@ -463,20 +463,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         }
 
         const { url } = await response.json();
-        
-        // Find the file to get its name
-        const file = student.files?.find(f => f.id === fileId);
-        
-        // Use download attribute to trigger download (bypasses CORS)
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file?.original_name || file?.name || 'download';
-        a.target = '_blank'; // Fallback for some browsers
-        a.rel = 'noopener noreferrer';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        window.location.href = url; // Navigate to presigned URL to trigger download
         
         toast.success('קובץ הורד בהצלחה', { id: toastId });
       } catch (error) {
@@ -484,7 +471,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         toast.error(`הורדת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
       }
     },
-    [session, orgId, student?.id, student?.files]
+    [session, orgId, student?.id]
   );
 
   const handleFilePreview = useCallback(

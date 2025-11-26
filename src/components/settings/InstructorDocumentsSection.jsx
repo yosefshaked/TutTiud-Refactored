@@ -306,17 +306,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       );
 
       if (response?.url) {
-        // Use download attribute to trigger download (bypasses CORS)
-        const a = document.createElement('a');
-        a.href = response.url;
-        a.download = file.original_name || file.name;
-        a.target = '_blank'; // Fallback for some browsers
-        a.rel = 'noopener noreferrer';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        
+        window.location.href = response.url; // Navigate to presigned URL to trigger download
         toast.success('קובץ הורד בהצלחה', { id: toastId });
       } else {
         throw new Error('No download URL returned');
