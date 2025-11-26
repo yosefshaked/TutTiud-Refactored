@@ -107,6 +107,10 @@ function PreUploadDialog({ file, onConfirm, onCancel }) {
   }, [file]);
 
   const handleConfirm = () => {
+    console.log('[ORG-DOCS-UI] PreUpload dialog confirm clicked', { 
+      fileName: file?.name,
+      name: name.trim() 
+    });
     onConfirm({
       file: file,
       name: name.trim() || file.name,
@@ -415,20 +419,24 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   // Handle file selection
   const handleFileSelect = useCallback((event) => {
     const file = event.target.files?.[0];
+    console.log('[ORG-DOCS-UI] File selected', { fileName: file?.name, fileSize: file?.size });
     if (!file) return;
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
+      console.log('[ORG-DOCS-UI] File too large', { size: file.size, max: MAX_FILE_SIZE });
       toast.error('הקובץ גדול מדי. גודל מקסימלי: 10MB');
       return;
     }
 
     // Validate file type
     if (!ALLOWED_TYPES.includes(file.type)) {
+      console.log('[ORG-DOCS-UI] Invalid file type', { type: file.type, allowed: ALLOWED_TYPES });
       toast.error('סוג קובץ לא נתמך. קבצים מותרים: PDF, תמונות, Word, Excel');
       return;
     }
 
+    console.log('[ORG-DOCS-UI] File validated, showing pre-upload dialog');
     // Show pre-upload dialog
     setPendingFile(file);
 
@@ -438,7 +446,17 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
 
   // Handle upload with metadata
   const handleUploadConfirm = useCallback(async (fileData) => {
-    if (!session || !orgId) return;
+    console.log('[ORG-DOCS-UI] Upload confirm called', { 
+      fileName: fileData.name, 
+      hasFile: !!fileData.file,
+      hasSession: !!session,
+      orgId 
+    });
+    
+    if (!session || !orgId) {
+      console.error('[ORG-DOCS-UI] Missing session or orgId', { hasSession: !!session, orgId });
+      return;
+    }
 
     setPendingFile(null);
     setUploadState(REQUEST_STATE.loading);
@@ -446,11 +464,13 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     const toastId = toast.loading(`מעלה: ${fileData.name}...`);
 
     try {
+      console.log('[ORG-DOCS-UI] Getting fresh session token');
       // Get fresh session token
       const authClient = getAuthClient();
       const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
       
       if (sessionError || !sessionData?.session?.access_token) {
+        console.error('[ORG-DOCS-UI] Failed to get session token', { error: sessionError });
         toast.error('ההרשאה פגה. נא לרענן את הדף', {
           id: toastId,
           action: { label: 'רענן', onClick: () => window.location.reload() },
@@ -460,6 +480,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
       }
 
       const token = sessionData.session.access_token;
+      console.log('[ORG-DOCS-UI] Token obtained, building form data');
 
       // Build form data
       const formData = new FormData();
@@ -471,6 +492,12 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
       if (fileData.expirationDate) {
         formData.append('expiration_date', fileData.expirationDate);
       }
+
+      console.log('[ORG-DOCS-UI] Form data built, starting upload', {
+        url: `/api/org-documents?org_id=${orgId}`,
+        fileSize: fileData.file.size,
+        fileName: fileData.file.name
+      });
 
       // Upload
       const response = await fetch(`/api/org-documents?org_id=${orgId}`, {
@@ -484,18 +511,27 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
         body: formData,
       });
 
+      console.log('[ORG-DOCS-UI] Upload response received', { 
+        status: response.status, 
+        ok: response.ok 
+      });
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('[ORG-DOCS-UI] Upload failed', { status: response.status, errorData });
         throw new Error(errorData.details || errorData.message || 'Upload failed');
       }
 
+      const result = await response.json();
+      console.log('[ORG-DOCS-UI] Upload successful', { fileId: result.id });
+      
       toast.success('המסמך הועלה בהצלחה!', { id: toastId });
       setUploadState(REQUEST_STATE.idle);
 
       // Reload documents
       await loadDocuments();
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error('[ORG-DOCS-UI] Upload failed:', error);
       toast.error(`העלאה נכשלה: ${error.message}`, { id: toastId });
       setUploadState(REQUEST_STATE.error);
     }
