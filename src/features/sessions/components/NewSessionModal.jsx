@@ -18,34 +18,27 @@ const REQUEST_STATE = Object.freeze({
 
 function SuccessFooter({ studentName, onClose, onNewReport, onNewReportSameStudent }) {
   return (
-    <div className="flex flex-col gap-sm">
-      <div className="rounded-lg bg-success-50 p-md text-center">
-        <p className="text-sm font-medium text-success-700">
-          ✓ מפגש עבור {studentName} נשמר בהצלחה!
-        </p>
-      </div>
-      <div className="flex flex-col gap-sm sm:flex-row-reverse sm:justify-end">
-        <Button 
-          onClick={onNewReportSameStudent}
-          className="gap-xs shadow-md hover:shadow-lg transition-shadow"
-        >
-          דיווח נוסף - {studentName}
-        </Button>
-        <Button 
-          onClick={onNewReport}
-          variant="secondary"
-          className="gap-xs shadow-sm hover:shadow-md transition-shadow"
-        >
-          דיווח נוסף - תלמיד אחר
-        </Button>
-        <Button 
-          onClick={onClose}
-          variant="outline"
-          className="hover:shadow-sm"
-        >
-          סגור
-        </Button>
-      </div>
+    <div className="flex flex-col gap-sm sm:flex-row sm:justify-center">
+      <Button 
+        onClick={onNewReportSameStudent}
+        className="gap-xs shadow-md hover:shadow-lg transition-shadow"
+      >
+        דיווח נוסף - {studentName}
+      </Button>
+      <Button 
+        onClick={onNewReport}
+        variant="outline"
+        className="gap-xs shadow-sm hover:shadow-md transition-shadow"
+      >
+        דיווח נוסף - תלמיד אחר
+      </Button>
+      <Button 
+        onClick={onClose}
+        variant="outline"
+        className="hover:shadow-sm"
+      >
+        סגור
+      </Button>
     </div>
   );
 }
