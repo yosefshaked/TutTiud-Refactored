@@ -306,20 +306,16 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       );
 
       if (response?.url) {
-        // Fetch the file as blob to force download behavior
-        const fileResponse = await fetch(response.url);
-        const blob = await fileResponse.blob();
-        
-        // Create object URL and trigger download
-        const blobUrl = URL.createObjectURL(blob);
+        // Use download attribute to trigger download (bypasses CORS)
         const a = document.createElement('a');
-        a.href = blobUrl;
+        a.href = response.url;
         a.download = file.original_name || file.name;
+        a.target = '_blank'; // Fallback for some browsers
+        a.rel = 'noopener noreferrer';
         a.style.display = 'none';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
         
         toast.success('קובץ הורד בהצלחה', { id: toastId });
       } else {
