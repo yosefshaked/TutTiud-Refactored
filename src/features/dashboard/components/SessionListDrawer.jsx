@@ -67,8 +67,7 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
           open={!!quickDocModal}
           onClose={() => {
             setQuickDocModal(null)
-            // Close drawer when modal is finally closed (after user clicks Close button)
-            onClose()
+            // Don't close the drawer - let it stay open after modal closes
           }}
           initialStudentId={quickDocModal.studentId}
           initialDate={quickDocModal.date}
