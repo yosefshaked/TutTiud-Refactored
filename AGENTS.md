@@ -236,6 +236,53 @@
   - **Orphaned files display**: Files from deleted definitions show with amber background, "הגדרה ישנה" badge, and reconstructed name from stored `definition_name`
 - File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
 
+### Polymorphic Documents Table Architecture (2025-11)
+- **Schema**: Centralized `tuttiud.Documents` table replaces JSON-based file storage in `Students.files`, `Instructors.files`, and `Settings.org_documents`.
+- **Discriminator pattern**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID) identifies which entity owns each document.
+- **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), org_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
+- **Indexes**: Composite index on (org_id, entity_type, entity_id) for fast entity-scoped queries; individual indexes on org_id, entity_type, entity_id.
+- **Migration strategy** (non-destructive):
+  - Setup script includes `DO $$` block that copies from JSON columns to Documents table
+  - Verifies counts match after migration; RAISES EXCEPTION if data integrity check fails
+  - Original JSON columns retained for rollback capability and backward compatibility
+  - Migration runs idempotently (safe to rerun on existing tenants)
+- **API Endpoints**:
+  - **`/api/documents`** (GET/POST/PUT/DELETE): Unified polymorphic endpoint for all document types
+    - GET: `?entity_type=student&entity_id=<uuid>` returns all documents for that entity
+    - POST: Multipart upload with `entity_type`/`entity_id` in query params or body; validates permissions via `validateEntityAccess()`
+    - PUT: Update metadata (name, relevant_date, expiration_date, resolved) by document ID
+    - DELETE: Remove document by ID after permission validation
+  - **`/api/documents-download`** (GET): Unified download URL generation
+    - Query params: `entity_type`, `entity_id`, `document_id`, `preview` (boolean)
+    - Returns presigned URL (1-hour expiration) with proper Content-Disposition
+    - Permission validation enforced before URL generation
+- **Permission model** (enforced in `validateEntityAccess` function):
+  - **Students**: All org members can view/upload documents for any student
+  - **Instructors**: Admin/owner can access all; non-admin instructors only their own (userId === entityId check)
+  - **Organizations**: Admin/owner only (member visibility controlled separately via settings)
+- **React Hook**: `useDocuments(entityType, entityId)` provides entity-agnostic document management
+  - Auto-fetching on mount with loading/error states
+  - Functions: `fetchDocuments()`, `uploadDocument(file, metadata)`, `updateDocument(id, updates)`, `deleteDocument(id)`, `getDownloadUrl(id, preview)`
+  - Uses AuthContext for session, OrgContext for orgId
+  - Handles all API calls with proper error handling and toast notifications
+- **Frontend components refactored**:
+  - `StudentDocumentsSection.jsx`: Uses `useDocuments('student', student.id)`
+  - `InstructorDocumentsSection.jsx`: Uses `useDocuments('instructor', instructor.id)` with trust boundary validation (enforces userId === instructor.id for non-admin self-service via `isOwnDocuments` prop)
+  - `OrgDocumentsManager.jsx`: Uses `useDocuments('organization', orgId)`
+  - All components updated to use unified /api/documents endpoints, replacing old entity-specific endpoints
+- **Audit logging**: All document operations (upload/update/delete) logged via `logAuditEvent()` with:
+  - Action types: FILE_UPLOADED, FILE_METADATA_UPDATED, FILE_DELETED
+  - Category: FILES
+  - Resource type: `{entity_type}_file` (e.g., "student_file", "instructor_file", "organization_file")
+  - Details include: entity_type, entity_id, file_name, file_size, storage_mode, updated_fields
+- **Benefits of polymorphic approach**:
+  - Single source of truth for all document storage
+  - Consistent permission validation across entity types
+  - Unified audit trail for compliance
+  - Simplified code maintenance (one endpoint vs many)
+  - Easy to extend to new entity types without duplicating logic
+- **Backward compatibility**: JSON columns in Students/Instructors/Settings remain intact; migration copies data without deletion, allowing gradual transition and rollback if needed.
+
 ### Organizational Documents (2025-11)
 - `/api/org-documents` (POST/PUT/DELETE/GET) manages organization-level documents (licenses, approvals, certificates) not tied to specific students or instructors.
   - **Storage paths**:

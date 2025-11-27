@@ -246,6 +246,216 @@ CREATE TABLE IF NOT EXISTS tuttiud."Settings" (
 );
 ALTER TABLE tuttiud."Settings"
   ADD COLUMN IF NOT EXISTS "metadata" jsonb;
+
+-- =================================================================
+-- Documents Table (Polymorphic File Storage)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS tuttiud."Documents" (
+  "id" uuid NOT NULL PRIMARY KEY,
+  "entity_type" text NOT NULL CHECK ("entity_type" IN ('student', 'instructor', 'organization')),
+  "entity_id" uuid NOT NULL,
+  "name" text NOT NULL,
+  "original_name" text NOT NULL,
+  "relevant_date" date,
+  "expiration_date" date,
+  "resolved" boolean DEFAULT false,
+  "url" text,
+  "path" text NOT NULL,
+  "storage_provider" text,
+  "uploaded_at" timestamptz NOT NULL DEFAULT now(),
+  "uploaded_by" uuid,
+  "definition_id" uuid,
+  "definition_name" text,
+  "size" bigint,
+  "type" text,
+  "hash" text,
+  "metadata" jsonb,
+  "created_at" timestamptz NOT NULL DEFAULT now(),
+  "updated_at" timestamptz NOT NULL DEFAULT now()
+);
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS "Documents_entity_idx" ON tuttiud."Documents" ("entity_type", "entity_id");
+CREATE INDEX IF NOT EXISTS "Documents_uploaded_at_idx" ON tuttiud."Documents" ("uploaded_at");
+CREATE INDEX IF NOT EXISTS "Documents_expiration_idx" ON tuttiud."Documents" ("expiration_date") WHERE "expiration_date" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "Documents_hash_idx" ON tuttiud."Documents" ("hash") WHERE "hash" IS NOT NULL;
+
+-- Migrate existing file data from JSON columns to Documents table
+-- CRITICAL: This must be idempotent and verify data integrity
+DO $$
+DECLARE
+  student_files_count integer := 0;
+  instructor_files_count integer := 0;
+  total_source_files integer;
+  inserted_documents integer := 0;
+  rec RECORD;
+  file_obj jsonb;
+BEGIN
+  -- Count existing files in JSON columns
+  SELECT COALESCE(SUM(jsonb_array_length(COALESCE("files", '[]'::jsonb))), 0)
+  INTO student_files_count
+  FROM tuttiud."Students"
+  WHERE "files" IS NOT NULL AND jsonb_array_length("files") > 0;
+
+  SELECT COALESCE(SUM(jsonb_array_length(COALESCE("files", '[]'::jsonb))), 0)
+  INTO instructor_files_count
+  FROM tuttiud."Instructors"
+  WHERE "files" IS NOT NULL AND jsonb_array_length("files") > 0;
+
+  total_source_files := student_files_count + instructor_files_count;
+
+  RAISE NOTICE 'Migration starting: % student files, % instructor files (total: %)',
+    student_files_count, instructor_files_count, total_source_files;
+
+  -- Skip migration if no files exist
+  IF total_source_files = 0 THEN
+    RAISE NOTICE 'No files to migrate. Skipping migration.';
+    RETURN;
+  END IF;
+
+  -- Migrate student files
+  FOR rec IN
+    SELECT "id" as student_id, "files"
+    FROM tuttiud."Students"
+    WHERE "files" IS NOT NULL AND jsonb_array_length("files") > 0
+  LOOP
+    FOR file_obj IN SELECT * FROM jsonb_array_elements(rec.files)
+    LOOP
+      -- Only insert if this exact file ID doesn't already exist in Documents
+      IF NOT EXISTS (
+        SELECT 1 FROM tuttiud."Documents"
+        WHERE "id" = (file_obj->>'id')::uuid
+      ) THEN
+        INSERT INTO tuttiud."Documents" (
+          "id",
+          "entity_type",
+          "entity_id",
+          "name",
+          "original_name",
+          "relevant_date",
+          "expiration_date",
+          "resolved",
+          "url",
+          "path",
+          "storage_provider",
+          "uploaded_at",
+          "uploaded_by",
+          "definition_id",
+          "definition_name",
+          "size",
+          "type",
+          "hash",
+          "metadata"
+        ) VALUES (
+          (file_obj->>'id')::uuid,
+          'student',
+          rec.student_id,
+          file_obj->>'name',
+          file_obj->>'original_name',
+          (file_obj->>'relevant_date')::date,
+          (file_obj->>'expiration_date')::date,
+          COALESCE((file_obj->>'resolved')::boolean, false),
+          file_obj->>'url',
+          file_obj->>'path',
+          file_obj->>'storage_provider',
+          COALESCE((file_obj->>'uploaded_at')::timestamptz, now()),
+          (file_obj->>'uploaded_by')::uuid,
+          (file_obj->>'definition_id')::uuid,
+          file_obj->>'definition_name',
+          (file_obj->>'size')::bigint,
+          file_obj->>'type',
+          file_obj->>'hash',
+          NULL
+        );
+        inserted_documents := inserted_documents + 1;
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  -- Migrate instructor files
+  FOR rec IN
+    SELECT "id" as instructor_id, "files"
+    FROM tuttiud."Instructors"
+    WHERE "files" IS NOT NULL AND jsonb_array_length("files") > 0
+  LOOP
+    FOR file_obj IN SELECT * FROM jsonb_array_elements(rec.files)
+    LOOP
+      -- Only insert if this exact file ID doesn't already exist in Documents
+      IF NOT EXISTS (
+        SELECT 1 FROM tuttiud."Documents"
+        WHERE "id" = (file_obj->>'id')::uuid
+      ) THEN
+        INSERT INTO tuttiud."Documents" (
+          "id",
+          "entity_type",
+          "entity_id",
+          "name",
+          "original_name",
+          "relevant_date",
+          "expiration_date",
+          "resolved",
+          "url",
+          "path",
+          "storage_provider",
+          "uploaded_at",
+          "uploaded_by",
+          "definition_id",
+          "definition_name",
+          "size",
+          "type",
+          "hash",
+          "metadata"
+        ) VALUES (
+          (file_obj->>'id')::uuid,
+          'instructor',
+          rec.instructor_id,
+          file_obj->>'name',
+          file_obj->>'original_name',
+          (file_obj->>'relevant_date')::date,
+          (file_obj->>'expiration_date')::date,
+          COALESCE((file_obj->>'resolved')::boolean, false),
+          file_obj->>'url',
+          file_obj->>'path',
+          file_obj->>'storage_provider',
+          COALESCE((file_obj->>'uploaded_at')::timestamptz, now()),
+          (file_obj->>'uploaded_by')::uuid,
+          (file_obj->>'definition_id')::uuid,
+          file_obj->>'definition_name',
+          (file_obj->>'size')::bigint,
+          file_obj->>'type',
+          file_obj->>'hash',
+          NULL
+        );
+        inserted_documents := inserted_documents + 1;
+      END IF;
+    END LOOP;
+  END LOOP;
+
+  RAISE NOTICE 'Migration completed: Inserted % documents', inserted_documents;
+
+  -- CRITICAL VERIFICATION: Ensure no data loss
+  -- If this was a fresh migration, inserted count should equal source count
+  -- If re-running script, some may already exist, so we check >= instead of =
+  IF inserted_documents < total_source_files THEN
+    -- Count what's actually in Documents table now
+    DECLARE
+      final_doc_count integer;
+    BEGIN
+      SELECT COUNT(*) INTO final_doc_count FROM tuttiud."Documents";
+      
+      IF final_doc_count < total_source_files THEN
+        RAISE EXCEPTION 'DATA INTEGRITY VIOLATION: Expected % files, but only % documents exist in table. Transaction rolled back.',
+          total_source_files, final_doc_count;
+      ELSE
+        RAISE NOTICE 'Verification passed: % documents in table (some may have existed from previous run)', final_doc_count;
+      END IF;
+    END;
+  ELSE
+    RAISE NOTICE 'Verification passed: All files successfully migrated';
+  END IF;
+END;
+$$;
+
 CREATE INDEX IF NOT EXISTS "SessionRecords_student_date_idx" ON tuttiud."SessionRecords" ("student_id", "date");
 CREATE INDEX IF NOT EXISTS "SessionRecords_instructor_idx" ON tuttiud."SessionRecords" ("instructor_id");
 

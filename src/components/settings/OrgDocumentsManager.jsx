@@ -28,6 +28,7 @@ import { he } from 'date-fns/locale';
 import { authenticatedFetch } from '@/lib/api-client';
 import { getAuthClient } from '@/lib/supabase-manager.js';
 import { fetchSettingsValue, upsertSetting } from '@/features/settings/api/settings.js';
+import { useDocuments } from '@/hooks/useDocuments';
 import {
   Dialog,
   DialogContent,
@@ -307,10 +308,20 @@ function EditMetadataDialog({ document, onSave, onCancel }) {
  * Main component
  */
 export default function OrgDocumentsManager({ session, orgId, membershipRole }) {
-  const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
+  // Use polymorphic Documents table hook
+  const {
+    documents,
+    loading: documentsLoading,
+    error: documentsError,
+    fetchDocuments,
+    uploadDocument,
+    updateDocument,
+    deleteDocument,
+    getDownloadUrl
+  } = useDocuments('organization', orgId);
+  
   const [uploadState, setUploadState] = useState(REQUEST_STATE.idle);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
-  const [documents, setDocuments] = useState([]);
   const [pendingFile, setPendingFile] = useState(null);
   const [editingDocument, setEditingDocument] = useState(null);
   const [sortBy, setSortBy] = useState('uploaded_at'); // 'uploaded_at' | 'name' | 'expiration_date'
@@ -320,6 +331,13 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   const [savingVisibility, setSavingVisibility] = useState(false);
 
   const canManage = membershipRole === 'admin' || membershipRole === 'owner';
+  
+  // Handle document loading errors (visibility restriction)
+  useEffect(() => {
+    if (documentsError?.message === 'members_cannot_view_org_documents') {
+      setVisibilityRestricted(true);
+    }
+  }, [documentsError]);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const ALLOWED_TYPES = [
@@ -333,41 +351,6 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ];
-
-  // Load documents
-  const loadDocuments = useCallback(async () => {
-    if (!session || !orgId) return;
-
-    setLoadState(REQUEST_STATE.loading);
-    setVisibilityRestricted(false);
-
-    try {
-      const response = await authenticatedFetch(`org-documents?org_id=${orgId}`, {
-        session,
-        method: 'GET',
-      });
-
-      // Handle empty or null responses gracefully
-      if (!response || !response.documents) {
-        console.log('No org documents found, starting with empty list');
-        setDocuments([]);
-      } else {
-        setDocuments(response.documents);
-      }
-      setLoadState(REQUEST_STATE.idle);
-    } catch (error) {
-      console.error('Failed to load org documents:', error);
-      
-      // Check if it's a visibility restriction error
-      if (error.message === 'members_cannot_view_org_documents') {
-        setVisibilityRestricted(true);
-        setLoadState(REQUEST_STATE.idle);
-      } else {
-        toast.error('שגיאה בטעינת מסמכים');
-        setLoadState(REQUEST_STATE.error);
-      }
-    }
-  }, [session, orgId]);
 
   // Load member visibility setting
   const loadVisibilitySetting = useCallback(async () => {
@@ -412,9 +395,8 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   }, [session, orgId]);
 
   useEffect(() => {
-    loadDocuments();
     loadVisibilitySetting();
-  }, [loadDocuments, loadVisibilitySetting]);
+  }, [loadVisibilitySetting]);
 
   // Handle file selection
   const handleFileSelect = useCallback((event) => {
@@ -464,106 +446,50 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     const toastId = toast.loading(`מעלה: ${fileData.name}...`);
 
     try {
-      console.log('[ORG-DOCS-UI] Getting fresh session token');
-      // Get fresh session token
-      const authClient = getAuthClient();
-      const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
+      console.log('[ORG-DOCS-UI] Starting polymorphic upload via useDocuments hook');
       
-      if (sessionError || !sessionData?.session?.access_token) {
-        console.error('[ORG-DOCS-UI] Failed to get session token', { error: sessionError });
-        toast.error('ההרשאה פגה. נא לרענן את הדף', {
-          id: toastId,
-          action: { label: 'רענן', onClick: () => window.location.reload() },
-        });
-        setUploadState(REQUEST_STATE.idle);
-        return;
-      }
-
-      const token = sessionData.session.access_token;
-      console.log('[ORG-DOCS-UI] Token obtained, building form data');
-
-      // Build form data
-      const formData = new FormData();
-      formData.append('file', fileData.file);
-      formData.append('name', fileData.name);
-      if (fileData.relevantDate) {
-        formData.append('relevant_date', fileData.relevantDate);
-      }
-      if (fileData.expirationDate) {
-        formData.append('expiration_date', fileData.expirationDate);
-      }
-
-      console.log('[ORG-DOCS-UI] Form data built, starting upload', {
-        url: `/api/org-documents?org_id=${orgId}`,
-        fileSize: fileData.file.size,
-        fileName: fileData.file.name
+      // Use the uploadDocument function from useDocuments hook
+      await uploadDocument(fileData.file, {
+        name: fileData.name,
+        relevant_date: fileData.relevantDate || null,
+        expiration_date: fileData.expirationDate || null,
       });
-
-      // Upload
-      const response = await fetch(`/api/org-documents?org_id=${orgId}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Supabase-Authorization': `Bearer ${token}`,
-          'x-supabase-authorization': `Bearer ${token}`,
-          'x-supabase-auth': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      console.log('[ORG-DOCS-UI] Upload response received', { 
-        status: response.status, 
-        ok: response.ok 
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[ORG-DOCS-UI] Upload failed', { status: response.status, errorData });
-        throw new Error(errorData.details || errorData.message || 'Upload failed');
-      }
-
-      const result = await response.json();
-      console.log('[ORG-DOCS-UI] Upload successful', { fileId: result.id });
       
+      console.log('[ORG-DOCS-UI] Upload successful');
       toast.success('המסמך הועלה בהצלחה!', { id: toastId });
       setUploadState(REQUEST_STATE.idle);
-
-      // Reload documents
-      await loadDocuments();
+      
+      // Refresh documents list
+      await fetchDocuments();
     } catch (error) {
       console.error('[ORG-DOCS-UI] Upload failed:', error);
       toast.error(`העלאה נכשלה: ${error.message}`, { id: toastId });
       setUploadState(REQUEST_STATE.error);
     }
-  }, [session, orgId, loadDocuments]);
+  }, [session, orgId, uploadDocument, fetchDocuments]);
 
   // Handle metadata update
   const handleUpdateMetadata = useCallback(async (updateData) => {
     if (!session || !orgId) return;
 
     try {
-      await authenticatedFetch('org-documents', {
-        method: 'PUT',
-        session,
-        body: {
-          org_id: orgId,
-          file_id: updateData.id,
-          name: updateData.name,
-          relevant_date: updateData.relevantDate,
-          expiration_date: updateData.expirationDate,
-        },
+      // Use updateDocument from useDocuments hook
+      await updateDocument(updateData.id, {
+        name: updateData.name,
+        relevant_date: updateData.relevantDate,
+        expiration_date: updateData.expirationDate,
       });
 
       toast.success('המסמך עודכן בהצלחה');
       setEditingDocument(null);
 
-      // Reload documents
-      await loadDocuments();
+      // Refresh documents list
+      await fetchDocuments();
     } catch (error) {
       console.error('Update failed:', error);
       toast.error('עדכון המסמך נכשל');
     }
-  }, [session, orgId, loadDocuments]);
+  }, [session, orgId, updateDocument, fetchDocuments]);
 
   // Handle delete
   const handleDelete = useCallback(async (documentId, documentName) => {
@@ -574,26 +500,20 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     const toastId = toast.loading('מוחק מסמך...');
 
     try {
-      await authenticatedFetch('org-documents', {
-        method: 'DELETE',
-        session,
-        body: {
-          org_id: orgId,
-          file_id: documentId,
-        },
-      });
+      // Use deleteDocument from useDocuments hook
+      await deleteDocument(documentId);
 
       toast.success('המסמך נמחק בהצלחה', { id: toastId });
       setDeleteState(REQUEST_STATE.idle);
 
-      // Reload documents
-      await loadDocuments();
+      // Refresh documents list
+      await fetchDocuments();
     } catch (error) {
       console.error('Delete failed:', error);
       toast.error('מחיקת המסמך נכשלה', { id: toastId });
       setDeleteState(REQUEST_STATE.error);
     }
-  }, [session, orgId, loadDocuments]);
+  }, [session, orgId, deleteDocument, fetchDocuments]);
 
   // Handle download
   const handleDownload = useCallback(async (doc) => {
@@ -602,31 +522,8 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     const toastId = toast.loading('מכין להורדה...');
 
     try {
-      const token = session.access_token;
-      if (!token) {
-        toast.error('שגיאת הרשאה. נא להתחבר מחדש', { id: toastId });
-        return;
-      }
-
-      // Get download URL (attachment disposition = presigned URL)
-      const response = await fetch(
-        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(doc.id)}&preview=false`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Supabase-Authorization': `Bearer ${token}`,
-            'x-supabase-authorization': `Bearer ${token}`,
-            'x-supabase-auth': `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to get download URL');
-      }
-
-      const { url } = await response.json();
+      // Use getDownloadUrl from useDocuments hook (attachment mode)
+      const url = await getDownloadUrl(doc.id, false);
       window.location.href = url; // Navigate to presigned URL to trigger download
       
       toast.success('מסמך הורד בהצלחה', { id: toastId });
@@ -634,7 +531,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
       console.error('Download failed:', error);
       toast.error(`הורדת המסמך נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
     }
-  }, [session, orgId]);
+  }, [session, orgId, getDownloadUrl]);
 
   // Handle file preview
   const handlePreview = useCallback(async (doc) => {
@@ -643,38 +540,15 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     const toastId = toast.loading('פותח תצוגה מקדימה...');
 
     try {
-      const token = session.access_token;
-      if (!token) {
-        toast.error('שגיאת הרשאה. נא להתחבר מחדש', { id: toastId });
-        return;
-      }
-
-      // Get preview URL (inline disposition)
-      const response = await fetch(
-        `/api/org-documents-download?org_id=${encodeURIComponent(orgId)}&file_id=${encodeURIComponent(doc.id)}&preview=true`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Supabase-Authorization': `Bearer ${token}`,
-            'x-supabase-authorization': `Bearer ${token}`,
-            'x-supabase-auth': `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to get preview URL');
-      }
-
-      const { url } = await response.json();
+      // Use getDownloadUrl from useDocuments hook (inline/preview mode)
+      const url = await getDownloadUrl(doc.id, true);
       toast.dismiss(toastId);
       window.open(url, '_blank');
     } catch (error) {
       console.error('Preview failed:', error);
       toast.error(`תצוגה מקדימה נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
     }
-  }, [session, orgId]);
+  }, [session, orgId, getDownloadUrl]);
 
   // Sort documents
   const sortedDocuments = useMemo(() => {
@@ -859,7 +733,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
           )}
 
           {/* Documents List */}
-          {loadState === REQUEST_STATE.loading ? (
+          {documentsLoading ? (
             <div className="text-center py-8">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-slate-400" />
               <p className="text-sm text-slate-600">טוען מסמכים...</p>

@@ -1,0 +1,198 @@
+/**
+ * useDocuments Hook - Unified document management for students, instructors, organizations
+ * Fetches documents from Documents table via /api/documents endpoint
+ * Replaces prop-based file arrays from Students.files, Instructors.files
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrg } from '@/org/OrgContext';
+
+export function useDocuments(entityType, entityId) {
+  const { session } = useAuth();
+  const { activeOrgId } = useOrg();
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  /**
+   * Fetch documents for the entity
+   */
+  const fetchDocuments = useCallback(async () => {
+    if (!session?.access_token || !activeOrgId || !entityId) {
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `/api/documents?entity_type=${entityType}&entity_id=${entityId}&org_id=${activeOrgId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'fetch_failed');
+      }
+
+      const data = await response.json();
+      setDocuments(data.documents || []);
+    } catch (err) {
+      console.error('Documents fetch error:', err);
+      setError(err.message);
+      setDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [session?.access_token, activeOrgId, entityType, entityId]);
+
+  /**
+   * Upload a new document
+   */
+  const uploadDocument = useCallback(async (file, metadata = {}) => {
+    if (!session?.access_token || !activeOrgId || !entityId) {
+      throw new Error('Missing authentication or context');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('entity_type', entityType);
+    formData.append('entity_id', entityId);
+    formData.append('org_id', activeOrgId);
+
+    if (metadata.custom_name) {
+      formData.append('custom_name', metadata.custom_name);
+    }
+    if (metadata.relevant_date) {
+      formData.append('relevant_date', metadata.relevant_date);
+    }
+    if (metadata.expiration_date) {
+      formData.append('expiration_date', metadata.expiration_date);
+    }
+    if (metadata.definition_id) {
+      formData.append('definition_id', metadata.definition_id);
+    }
+
+    const response = await fetch('/api/documents', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'upload_failed');
+    }
+
+    const data = await response.json();
+    
+    // Refresh documents list
+    await fetchDocuments();
+    
+    return data.file;
+  }, [session?.access_token, activeOrgId, entityType, entityId, fetchDocuments]);
+
+  /**
+   * Update document metadata
+   */
+  const updateDocument = useCallback(async (documentId, updates) => {
+    if (!session?.access_token || !activeOrgId) {
+      throw new Error('Missing authentication or context');
+    }
+
+    const response = await fetch(`/api/documents/${documentId}?org_id=${activeOrgId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updates)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'update_failed');
+    }
+
+    // Refresh documents list
+    await fetchDocuments();
+  }, [session?.access_token, activeOrgId, fetchDocuments]);
+
+  /**
+   * Delete a document
+   */
+  const deleteDocument = useCallback(async (documentId) => {
+    if (!session?.access_token || !activeOrgId) {
+      throw new Error('Missing authentication or context');
+    }
+
+    const response = await fetch(`/api/documents/${documentId}?org_id=${activeOrgId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'delete_failed');
+    }
+
+    // Refresh documents list
+    await fetchDocuments();
+  }, [session?.access_token, activeOrgId, fetchDocuments]);
+
+  /**
+   * Get download URL for a document
+   */
+  const getDownloadUrl = useCallback(async (documentId) => {
+    if (!session?.access_token || !activeOrgId) {
+      throw new Error('Missing authentication or context');
+    }
+
+    const response = await fetch(
+      `/api/documents-download?document_id=${documentId}&org_id=${activeOrgId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'download_failed');
+    }
+
+    const data = await response.json();
+    return data;
+  }, [session?.access_token, activeOrgId]);
+
+  // Auto-fetch on mount and when dependencies change
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  return {
+    documents,
+    loading,
+    error,
+    fetchDocuments,
+    uploadDocument,
+    updateDocument,
+    deleteDocument,
+    getDownloadUrl
+  };
+}

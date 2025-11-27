@@ -12,6 +12,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { getAuthClient } from '@/lib/supabase-manager.js';
+import { useDocuments } from '@/hooks/useDocuments';
 import {
   Dialog,
   DialogContent,
@@ -276,6 +277,15 @@ function PreUploadDialog({ file, definitionName, onConfirm, onCancel }) {
 
 export default function StudentDocumentsSection({ student, session, orgId, onRefresh }) {
   const { activeOrg } = useOrg();
+  
+  // Use polymorphic Documents table hook for fetching documents
+  const {
+    documents,
+    loading: documentsLoading,
+    error: documentsError,
+    fetchDocuments
+  } = useDocuments('student', student.id);
+  
   const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
   const [definitions, setDefinitions] = useState([]);
@@ -289,7 +299,8 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   const [pendingDefinitionId, setPendingDefinitionId] = useState(null); // Associated definition for pending file
   const [editingFile, setEditingFile] = useState(null); // File being edited post-upload
 
-  const studentFiles = Array.isArray(student?.files) ? student.files : [];
+  // Use documents from hook instead of student.files prop
+  const studentFiles = documents;
   const studentTags = Array.isArray(student?.tags) ? student.tags : [];
   
   // Permission check: member role can only preview files (no download/delete)
@@ -504,7 +515,8 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       return new Promise((resolve) => {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('student_id', student.id);
+        formData.append('entity_type', 'student');
+        formData.append('entity_id', student.id);
         formData.append('org_id', orgId);
         if (definitionId) {
           formData.append('definition_id', definitionId);
@@ -546,7 +558,10 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
               id: toastId,
             });
 
-            // Refresh student data
+            // Refresh documents from hook
+            await fetchDocuments();
+            
+            // Also refresh parent if callback provided
             if (onRefresh) {
               await onRefresh();
             }
@@ -615,7 +630,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         });
 
         // Send request
-        xhr.open('POST', '/api/student-files');
+        xhr.open('POST', '/api/documents');
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('x-supabase-authorization', `Bearer ${token}`);
@@ -623,12 +638,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         xhr.send(formData);
       });
     },
-    [orgId, student?.id, onRefresh, checkForDuplicates, ALLOWED_TYPES, MAX_FILE_SIZE]
+    [orgId, student?.id, onRefresh, checkForDuplicates, ALLOWED_TYPES, MAX_FILE_SIZE, fetchDocuments]
   );
 
   const handleFileDelete = useCallback(
     async (fileId) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
       if (!confirm('האם למחוק קובץ זה? פעולה זו אינה ניתנת לביטול.')) return;
 
       const token = session.access_token;
@@ -641,7 +656,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       setDeleteState(REQUEST_STATE.loading);
 
       try {
-        const response = await fetch('/api/student-files', {
+        const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -650,22 +665,20 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
             'x-supabase-auth': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            org_id: orgId,
-            student_id: student.id,
-            file_id: fileId,
-          }),
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: 'Delete failed' }));
-          throw new Error(errorData.message || 'Delete failed');
+          const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));
+          throw new Error(errorData.error || 'Delete failed');
         }
 
         toast.success('הקובץ נמחק בהצלחה!');
         setDeleteState(REQUEST_STATE.idle);
         
-        // Refresh student data
+        // Refresh documents from hook
+        await fetchDocuments();
+        
+        // Also refresh parent if callback provided
         if (onRefresh) {
           await onRefresh();
         }
@@ -675,12 +688,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         setDeleteState(REQUEST_STATE.error);
       }
     },
-    [session, orgId, student?.id, onRefresh]
+    [session, orgId, onRefresh, fetchDocuments]
   );
 
   const handleToggleResolved = useCallback(
     async (fileId, currentResolved) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
 
       const token = session.access_token;
       if (!token) {
@@ -693,7 +706,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       const toastId = toast.loading(newResolved ? 'מסמן כטופל...' : 'מבטל סימון...');
 
       try {
-        const response = await fetch('/api/student-files', {
+        const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -703,21 +716,21 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            org_id: orgId,
-            student_id: student.id,
-            file_id: fileId,
             resolved: newResolved,
           }),
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: 'Update failed' }));
-          throw new Error(errorData.message || 'Update failed');
+          const errorData = await response.json().catch(() => ({ error: 'Update failed' }));
+          throw new Error(errorData.error || 'Update failed');
         }
 
         toast.success(newResolved ? 'המסמך סומן כטופל!' : 'הסימון בוטל!', { id: toastId });
         
-        // Refresh student data
+        // Refresh documents from hook
+        await fetchDocuments();
+        
+        // Also refresh parent if callback provided
         if (onRefresh) {
           await onRefresh();
         }
@@ -726,12 +739,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
       }
     },
-    [session, orgId, student?.id, onRefresh]
+    [session, orgId, onRefresh, fetchDocuments]
   );
 
   const handleEditFile = useCallback(
     async ({ fileId, name, relevantDate, expirationDate }) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
 
       const token = session.access_token;
       if (!token) {
@@ -743,7 +756,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       const toastId = toast.loading('מעדכן מסמך...');
 
       try {
-        const response = await fetch('/api/student-files', {
+        const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -753,9 +766,6 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            org_id: orgId,
-            student_id: student.id,
-            file_id: fileId,
             name: name,
             relevant_date: relevantDate,
             expiration_date: expirationDate,
@@ -763,14 +773,17 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: 'Update failed' }));
-          throw new Error(errorData.message || 'Update failed');
+          const errorData = await response.json().catch(() => ({ error: 'Update failed' }));
+          throw new Error(errorData.error || 'Update failed');
         }
 
         toast.success('המסמך עודכן בהצלחה!', { id: toastId });
         setEditingFile(null);
         
-        // Refresh student data
+        // Refresh documents from hook
+        await fetchDocuments();
+        
+        // Also refresh parent if callback provided
         if (onRefresh) {
           await onRefresh();
         }
@@ -779,12 +792,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
       }
     },
-    [session, orgId, student?.id, onRefresh]
+    [session, orgId, onRefresh, fetchDocuments]
   );
 
   const handleFileDownload = useCallback(
     async (fileId) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
 
       const token = session.access_token;
       if (!token) {
@@ -795,9 +808,9 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       const toastId = toast.loading('מכין להורדה...');
 
       try {
-        // Get download URL (attachment disposition = presigned URL)
+        // Get download URL
         const response = await fetch(
-          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}&preview=false`,
+          `/api/documents-download?document_id=${encodeURIComponent(fileId)}&org_id=${encodeURIComponent(orgId)}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -810,11 +823,11 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to get download URL');
+          throw new Error(errorData.error || 'Failed to get download URL');
         }
 
         const { url } = await response.json();
-        window.location.href = url; // Navigate to presigned URL to trigger download
+        window.location.href = url; // Navigate to URL to trigger download
         
         toast.success('קובץ הורד בהצלחה', { id: toastId });
       } catch (error) {
@@ -822,7 +835,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         toast.error(`הורדת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
       }
     },
-    [session, orgId, student?.id]
+    [session, orgId]
   );
 
   const handleFilePreview = useCallback(

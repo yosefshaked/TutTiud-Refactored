@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrg } from '@/org/OrgContext';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +13,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { authenticatedFetch } from '@/lib/api-client';
 import { getAuthClient } from '@/lib/supabase-manager.js';
+import { useDocuments } from '@/hooks/useDocuments';
 import {
   Dialog,
   DialogContent,
@@ -272,7 +275,30 @@ function PreUploadDialog({ file, definitionName, onConfirm, onCancel }) {
   );
 }
 
-export default function InstructorDocumentsSection({ instructor, session, orgId, onRefresh }) {
+export default function InstructorDocumentsSection({ instructor, session, orgId, onRefresh, isOwnDocuments = false }) {
+  // Trust boundary: Non-admin users can only view their own documents
+  // When isOwnDocuments=true, enforce that instructor.id matches authenticated user
+  const { session: authSession } = useAuth();
+  const { activeOrg } = useOrg();
+  const isAdmin = ['admin', 'owner'].includes(activeOrg?.membership?.role);
+  
+  // Security check: If not admin and isOwnDocuments=true, verify instructor.id matches user.id
+  const effectiveInstructorId = React.useMemo(() => {
+    if (isOwnDocuments && !isAdmin && authSession?.user?.id) {
+      // Force use of authenticated user's ID for non-admin self-service
+      return authSession.user.id;
+    }
+    return instructor.id;
+  }, [isOwnDocuments, isAdmin, authSession?.user?.id, instructor.id]);
+  
+  // Use polymorphic Documents table hook for fetching documents
+  const {
+    documents,
+    loading: documentsLoading,
+    error: documentsError,
+    fetchDocuments
+  } = useDocuments('instructor', effectiveInstructorId);
+
   const [definitions, setDefinitions] = useState([]);
   const [uploadingDefId] = useState(null);
   const [uploadingAdhoc] = useState(false);
@@ -284,7 +310,8 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
   const [pendingDefinitionId, setPendingDefinitionId] = useState(null)
   const [editingFile, setEditingFile] = useState(null); // File being edited post-upload
 
-  const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
+  // Use documents from hook instead of instructor.files prop
+  const instructorFiles = documents;
   const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
   
   // Filter definitions to show only those relevant to this instructor's types
@@ -420,7 +447,8 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
               const formData = new FormData();
               formData.append('file', file);
               formData.append('org_id', orgId);
-              formData.append('instructor_id', instructor.id);
+              formData.append('entity_type', 'instructor');
+              formData.append('entity_id', instructor.id);
               if (definitionId) {
                 formData.append('definition_id', definitionId);
                 formData.append('definition_name', customName);
@@ -482,7 +510,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
         xhr.addEventListener('error', () => reject(new Error('Network error')));
         xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')));
 
-        xhr.open('POST', `/api/instructor-files?org_id=${orgId}`);
+        xhr.open('POST', '/api/documents');
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('x-supabase-authorization', `Bearer ${token}`);
@@ -495,6 +523,9 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       
       // Remove from background uploads
       setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+
+      // Refresh documents from hook
+      await fetchDocuments();
 
       if (onRefresh) {
         await onRefresh();
@@ -518,18 +549,32 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
     const toastId = toast.loading('מוחק קובץ...');
 
     try {
-      await authenticatedFetch('instructor-files', {
+      const token = session.access_token;
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
+
+      const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
         method: 'DELETE',
-        session,
-        body: {
-          org_id: orgId,
-          instructor_id: instructor.id,
-          file_id: fileId,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Supabase-Authorization': `Bearer ${token}`,
+          'x-supabase-authorization': `Bearer ${token}`,
+          'x-supabase-auth': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));
+        throw new Error(errorData.error || 'Delete failed');
+      }
+
       toast.success('הקובץ נמחק בהצלחה', { id: toastId });
       setDeleteState(REQUEST_STATE.idle);
+
+      // Refresh documents from hook
+      await fetchDocuments();
 
       if (onRefresh) {
         await onRefresh();
@@ -539,38 +584,45 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       toast.error('מחיקת הקובץ נכשלה', { id: toastId });
       setDeleteState(REQUEST_STATE.idle);
     }
-  }, [instructor, session, orgId, onRefresh]);
+  }, [session, orgId, onRefresh, fetchDocuments]);
 
   const handleDownloadFile = useCallback(async (file) => {
     const toastId = toast.loading('מכין קובץ להורדה...');
 
     try {
-      const params = new URLSearchParams({
-        org_id: orgId,
-        instructor_id: instructor.id,
-        file_id: file.id,
-        preview: 'false',
-      });
+      const token = session.access_token;
+      if (!token) {
+        throw new Error('Missing auth token');
+      }
 
-      const response = await authenticatedFetch(
-        `instructor-files-download?${params.toString()}`,
-        { session, method: 'GET' }
+      const response = await fetch(
+        `/api/documents-download?document_id=${encodeURIComponent(file.id)}&org_id=${encodeURIComponent(orgId)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+          },
+        }
       );
 
-      if (response?.url) {
-        window.location.href = response.url; // Navigate to presigned URL to trigger download
-        toast.success('קובץ הורד בהצלחה', { id: toastId });
-      } else {
-        throw new Error('No download URL returned');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to get download URL');
       }
+
+      const { url } = await response.json();
+      window.location.href = url;
+      toast.success('קובץ הורד בהצלחה', { id: toastId });
     } catch (error) {
       console.error('File download failed:', error);
       toast.error('הורדת הקובץ נכשלה', { id: toastId });
     }
-  }, [instructor, session, orgId]);
+  }, [session, orgId]);
 
   const handleToggleResolved = useCallback(async (fileId, currentResolved) => {
-    if (!session || !orgId || !instructor?.id) return;
+    if (!session || !orgId) return;
 
     const token = session.access_token;
     if (!token) {
@@ -583,7 +635,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
     const toastId = toast.loading(newResolved ? 'מסמן כטופל...' : 'מבטל סימון...');
 
     try {
-      const response = await fetch('/api/instructor-files', {
+      const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -593,19 +645,19 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          org_id: orgId,
-          instructor_id: instructor.id,
-          file_id: fileId,
           resolved: newResolved,
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Update failed' }));
-        throw new Error(errorData.message || 'Update failed');
+        const errorData = await response.json().catch(() => ({ error: 'Update failed' }));
+        throw new Error(errorData.error || 'Update failed');
       }
 
       toast.success(newResolved ? 'המסמך סומן כטופל!' : 'הסימון בוטל!', { id: toastId });
+      
+      // Refresh documents from hook
+      await fetchDocuments();
       
       // Refresh instructor data
       if (onRefresh) {
@@ -619,7 +671,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
 
   const handleEditFile = useCallback(
     async ({ fileId, name, relevantDate, expirationDate }) => {
-      if (!session || !orgId || !instructor?.id) return;
+      if (!session || !orgId) return;
 
       const token = session.access_token;
       if (!token) {
@@ -631,7 +683,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       const toastId = toast.loading('מעדכן מסמך...');
 
       try {
-        const response = await fetch('/api/instructor-files', {
+        const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -641,9 +693,6 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            org_id: orgId,
-            instructor_id: instructor.id,
-            file_id: fileId,
             name: name,
             relevant_date: relevantDate,
             expiration_date: expirationDate,
@@ -651,12 +700,15 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: 'Update failed' }));
-          throw new Error(errorData.message || 'Update failed');
+          const errorData = await response.json().catch(() => ({ error: 'Update failed' }));
+          throw new Error(errorData.error || 'Update failed');
         }
 
         toast.success('המסמך עודכן בהצלחה!', { id: toastId });
         setEditingFile(null);
+        
+        // Refresh documents from hook
+        await fetchDocuments();
         
         // Refresh instructor data
         if (onRefresh) {
@@ -667,7 +719,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
         toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
       }
     },
-    [session, orgId, instructor?.id, onRefresh]
+    [session, orgId, onRefresh, fetchDocuments]
   );
 
   // Group files by definition
