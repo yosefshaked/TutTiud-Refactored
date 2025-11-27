@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { Loader2, Users, Search, X, User, RotateCcw } from "lucide-react"
+import { Loader2, Users, Search, X, User, RotateCcw, FileWarning } from "lucide-react"
+import { parseISO, isBefore, startOfDay } from 'date-fns'
 
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
@@ -24,6 +25,26 @@ const REQUEST_STATUS = Object.freeze({
   success: "success",
   error: "error",
 })
+
+/**
+ * Count expired documents for a student
+ */
+function countExpiredDocuments(student) {
+  if (!student?.files || !Array.isArray(student.files)) return 0;
+  
+  const today = startOfDay(new Date());
+  
+  return student.files.filter(file => {
+    if (!file.expiration_date) return false;
+    if (file.resolved === true) return false; // Exclude resolved files
+    try {
+      const expDate = parseISO(file.expiration_date);
+      return isBefore(expDate, today);
+    } catch {
+      return false;
+    }
+  }).length;
+}
 
 export default function MyStudentsPage() {
   const { loading: supabaseLoading } = useSupabase()
@@ -372,6 +393,7 @@ export default function MyStudentsPage() {
             const legacyContactInfo = student?.contact_info?.trim?.()
             const finalContactDisplay = contactDisplay || legacyContactInfo || "לא סופק מידע ליצירת קשר"
             const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time)
+            const expiredCount = countExpiredDocuments(student)
 
             return (
               <Card key={student.id || student.name}>
@@ -383,6 +405,12 @@ export default function MyStudentsPage() {
                         לא פעיל
                       </Badge>
                     ) : null}
+                    {expiredCount > 0 && (
+                      <Badge variant="destructive" className="gap-1 text-xs">
+                        <FileWarning className="h-3 w-3" />
+                        {expiredCount}
+                      </Badge>
+                    )}
                     {(contactName || contactPhone) && (
                       <Popover>
                         <PopoverTrigger asChild>

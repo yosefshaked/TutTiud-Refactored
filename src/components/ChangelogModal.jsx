@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.6.0': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.6.1': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,115 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.6.1 - Organizational documents, session report UX, and document management improvements */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.6.1')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.6.1'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.6.1'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.6.1
+                    </span>
+                    <time dateTime="2025-11-27" style={{ color: '#64748b', fontSize: '14px' }}>
+                      27 בנובמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.6.1'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  📋 מסמכי ארגון ושיפורי חוויית משתמש
+                </h3>
+              </header>
+
+              {expandedVersions['1.6.1'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תוספות:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>מסמכי ארגון:</strong> אפשרות להעלות ולנהל מסמכים ארגוניים כלליים (רישיונות, אישורים, תעודות) שאינם קשורים לתלמיד או מדריך ספציפי. מנהלים יכולים לשלוט מי רואה את המסמכים
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>חלון הצלחה בתיעוד מפגש:</strong> לאחר שמירת מפגש, החלון נשאר פתוח עם אפשרות לתעד מפגש נוסף עם אותו תלמיד או תלמיד אחר - חוסך זמן ומקל על תיעוד מרוכז
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>מיון מסמכים משופר:</strong> ניתן למיין מסמכים לפי שם, תאריך העלאה או תאריך תפוגה בסדר עולה או יורד
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>סינון מתקדם בחלון תיעוד:</strong> הסינונים המתקדמים כעת מוסתרים כברירת מחדל לחווית משתמש נקייה יותר - לחצו על "סינון מתקדם" כדי להציג אותם
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תיקוני באגים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תיקון הורדת מסמכים:</strong> הורדת קבצים כעת מוריד את המסמך במקום לפתוח בתצוגה מקדימה
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תיקון סגירת חלונות:</strong> כאשר פותחים תיעוד מפגש מתוך רשימת מפגשים, לחיצה על X תסגור רק את חלון התיעוד ולא את הרשימה
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.6.0 - Documents management and audit logging */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>

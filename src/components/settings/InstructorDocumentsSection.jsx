@@ -1,14 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { FileText, Upload, Download, Trash2, Loader2, AlertCircle, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { FileText, Upload, Download, Trash2, Loader2, AlertCircle, CheckCircle, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown, Calendar, CalendarX, Edit } from 'lucide-react';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { authenticatedFetch } from '@/lib/api-client';
 import { getAuthClient } from '@/lib/supabase-manager.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 const REQUEST_STATE = {
   idle: 'idle',
@@ -35,14 +44,245 @@ function formatFileSize(bytes) {
   return `${size} ${sizes[i]}`;
 }
 
+/**
+ * Check if a document is expired
+ */
+function _isExpired(expirationDate) {
+  if (!expirationDate) return false;
+  try {
+    const expDate = parseISO(expirationDate);
+    const today = startOfDay(new Date());
+    return isBefore(expDate, today);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Post-upload dialog for editing file metadata after upload
+ */
+function EditFileDialog({ file, onConfirm, onCancel }) {
+  const [name, setName] = useState('');
+  const [relevantDate, setRelevantDate] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
+
+  useEffect(() => {
+    if (file) {
+      setName(file.name || '');
+      setRelevantDate(file.relevant_date || '');
+      setExpirationDate(file.expiration_date || '');
+    }
+  }, [file]);
+
+  const handleConfirm = () => {
+    onConfirm({
+      fileId: file.id,
+      name: name.trim(),
+      relevantDate: relevantDate || null,
+      expirationDate: expirationDate || null,
+    });
+  };
+
+  if (!file) return null;
+
+  return (
+    <Dialog open={!!file} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-[500px]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">עריכת מסמך</DialogTitle>
+          <DialogDescription className="text-right">
+            ערוך את פרטי המסמך
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-doc-name" className="text-right block">
+              שם המסמך <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="edit-doc-name"
+              dir="rtl"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="שם המסמך"
+              className="text-right"
+            />
+            {file.original_name && (
+              <p className="text-xs text-muted-foreground text-right">
+                קובץ מקורי: {file.original_name}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-relevant-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך רלוונטי</span>
+              <Calendar className="h-4 w-4" />
+            </Label>
+            <Input
+              id="edit-relevant-date"
+              type="date"
+              dir="ltr"
+              value={relevantDate}
+              onChange={(e) => setRelevantDate(e.target.value)}
+              className="text-right"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-expiration-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך תפוגה</span>
+              <CalendarX className="h-4 w-4" />
+            </Label>
+            <Input
+              id="edit-expiration-date"
+              type="date"
+              dir="ltr"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              className="text-right"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 flex-row-reverse">
+          <Button onClick={handleConfirm} disabled={!name.trim()}>
+            שמור שינויים
+          </Button>
+          <Button onClick={onCancel} variant="outline">
+            ביטול
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Pre-upload dialog for editing file metadata before uploading
+ */
+function PreUploadDialog({ file, definitionName, onConfirm, onCancel }) {
+  const [name, setName] = useState(file?.name || '');
+  const [relevantDate, setRelevantDate] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
+
+  useEffect(() => {
+    if (file) {
+      // For files with definition, use definition name; otherwise remove extension
+      if (definitionName) {
+        setName(definitionName);
+      } else {
+        const nameParts = file.name.split('.');
+        if (nameParts.length > 1) {
+          nameParts.pop();
+        }
+        setName(nameParts.join('.'));
+      }
+    }
+  }, [file, definitionName]);
+
+  const handleConfirm = () => {
+    onConfirm({
+      file: file,
+      name: name.trim() || file.name,
+      relevantDate: relevantDate || null,
+      expirationDate: expirationDate || null,
+    });
+  };
+
+  if (!file) return null;
+
+  return (
+    <Dialog open={!!file} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-[500px]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">הגדרות מסמך</DialogTitle>
+          <DialogDescription className="text-right">
+            ערוך את פרטי המסמך לפני ההעלאה
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="doc-name" className="text-right block">
+              שם המסמך <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="doc-name"
+              dir="rtl"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="לדוגמה: אישור רפואי"
+              className="text-right"
+              disabled={!!definitionName}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {definitionName ? `שם מוגדר מראש: ${definitionName}` : `קובץ מקורי: ${file.name}`}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="relevant-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך רלוונטי</span>
+              <Calendar className="h-4 w-4" />
+            </Label>
+            <Input
+              id="relevant-date"
+              type="date"
+              dir="ltr"
+              value={relevantDate}
+              onChange={(e) => setRelevantDate(e.target.value)}
+              className="text-right"
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              תאריך הנפקה, אישור וכדומה
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="expiration-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך תפוגה</span>
+              <CalendarX className="h-4 w-4" />
+            </Label>
+            <Input
+              id="expiration-date"
+              type="date"
+              dir="ltr"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              className="text-right"
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              תאריך תפוגת המסמך (אופציונלי)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end" dir="rtl">
+          <Button variant="outline" onClick={onCancel}>
+            ביטול
+          </Button>
+          <Button onClick={handleConfirm} disabled={!name.trim()}>
+            אישור והעלאה
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function InstructorDocumentsSection({ instructor, session, orgId, onRefresh }) {
   const [definitions, setDefinitions] = useState([]);
-  const [uploadingDefId, setUploadingDefId] = useState(null);
-  const [uploadingAdhoc, setUploadingAdhoc] = useState(false);
+  const [uploadingDefId] = useState(null);
+  const [uploadingAdhoc] = useState(false);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
   const [backgroundUploads, setBackgroundUploads] = useState([]);
   const [sortBy, setSortBy] = useState('date'); // 'date' | 'name'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+  const [pendingFile, setPendingFile] = useState(null);
+  const [pendingDefinitionId, setPendingDefinitionId] = useState(null)
+  const [editingFile, setEditingFile] = useState(null); // File being edited post-upload
 
   const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
   const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
@@ -96,7 +336,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
     loadDefinitions();
   }, [session, orgId]);
 
-  const handleFileUpload = useCallback(async (file, definitionId = null, definitionName = null) => {
+  const handleFileUpload = useCallback(async (file, definitionId = null, customName = null, relevantDate = null, expirationDate = null) => {
     if (!file) return;
 
     const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -125,11 +365,14 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
 
     const uploadId = crypto.randomUUID();
     
+    // Use custom name or definition name for display
+    const displayName = customName || file.name;
+    
     // Add to background uploads
     setBackgroundUploads(prev => [...prev, {
               id: uploadId,
-              filename: file.name,
-              definitionName: definitionName || null,
+              filename: displayName,
+              definitionName: null,
               progress: 0,
             }]);
 
@@ -180,7 +423,16 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
               formData.append('instructor_id', instructor.id);
               if (definitionId) {
                 formData.append('definition_id', definitionId);
-                formData.append('definition_name', definitionName);
+                formData.append('definition_name', customName);
+              }
+              if (customName) {
+                formData.append('custom_name', customName);
+              }
+              if (relevantDate) {
+                formData.append('relevant_date', relevantDate);
+              }
+              if (expirationDate) {
+                formData.append('expiration_date', expirationDate);
               }
 
               // Use XMLHttpRequest for upload progress
@@ -317,6 +569,107 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
     }
   }, [instructor, session, orgId]);
 
+  const handleToggleResolved = useCallback(async (fileId, currentResolved) => {
+    if (!session || !orgId || !instructor?.id) return;
+
+    const token = session.access_token;
+    if (!token) {
+      console.error('Session missing access_token');
+      toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+      return;
+    }
+
+    const newResolved = !currentResolved;
+    const toastId = toast.loading(newResolved ? 'מסמן כטופל...' : 'מבטל סימון...');
+
+    try {
+      const response = await fetch('/api/instructor-files', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Supabase-Authorization': `Bearer ${token}`,
+          'x-supabase-authorization': `Bearer ${token}`,
+          'x-supabase-auth': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          org_id: orgId,
+          instructor_id: instructor.id,
+          file_id: fileId,
+          resolved: newResolved,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Update failed' }));
+        throw new Error(errorData.message || 'Update failed');
+      }
+
+      toast.success(newResolved ? 'המסמך סומן כטופל!' : 'הסימון בוטל!', { id: toastId });
+      
+      // Refresh instructor data
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('Toggle resolved failed', error);
+      toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
+    }
+  }, [session, orgId, instructor?.id, onRefresh]);
+
+  const handleEditFile = useCallback(
+    async ({ fileId, name, relevantDate, expirationDate }) => {
+      if (!session || !orgId || !instructor?.id) return;
+
+      const token = session.access_token;
+      if (!token) {
+        console.error('Session missing access_token');
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return;
+      }
+
+      const toastId = toast.loading('מעדכן מסמך...');
+
+      try {
+        const response = await fetch('/api/instructor-files', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            org_id: orgId,
+            instructor_id: instructor.id,
+            file_id: fileId,
+            name: name,
+            relevant_date: relevantDate,
+            expiration_date: expirationDate,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Update failed' }));
+          throw new Error(errorData.message || 'Update failed');
+        }
+
+        toast.success('המסמך עודכן בהצלחה!', { id: toastId });
+        setEditingFile(null);
+        
+        // Refresh instructor data
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } catch (error) {
+        console.error('Edit file failed', error);
+        toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
+      }
+    },
+    [session, orgId, instructor?.id, onRefresh]
+  );
+
   // Group files by definition
   const filesByDefinition = {};
   const adhocFiles = useMemo(() => {
@@ -386,8 +739,66 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
     return definitions.find(d => d.id === defId);
   };
 
+  // Handler for file input change - shows dialog before uploading
+  const handleFileInputChange = useCallback((files, definitionId = null) => {
+    if (!files || files.length === 0) return;
+    
+    const file = files[0]; // Take single file
+    
+    // Validate file upfront
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`הקובץ גדול מדי. גודל מקסימלי: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+      return;
+    }
+    
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast.error('סוג קובץ לא נתמך. קבצים מותרים: PDF, תמונות, Word, Excel');
+      return;
+    }
+    
+    // Show dialog for metadata input
+    setPendingFile(file);
+    setPendingDefinitionId(definitionId);
+  }, [MAX_FILE_SIZE, ALLOWED_TYPES]);
+
+  // Handler for upload confirmation from dialog
+  const handleUploadConfirm = useCallback(async ({ file, name, relevantDate, expirationDate }) => {
+    const definitionId = pendingDefinitionId;
+    setPendingFile(null);
+    setPendingDefinitionId(null);
+    
+    await handleFileUpload(file, definitionId, name, relevantDate, expirationDate);
+  }, [pendingDefinitionId, handleFileUpload]);
+
+  // Handler for upload cancellation
+  const handleUploadCancel = useCallback(() => {
+    setPendingFile(null);
+    setPendingDefinitionId(null);
+  }, []);
+
+  // Get definition name for pending upload
+  const pendingDefinitionName = useMemo(() => {
+    if (!pendingDefinitionId) return null;
+    const def = definitions.find(d => d.id === pendingDefinitionId);
+    return def?.name || null;
+  }, [pendingDefinitionId, definitions]);
+
   return (
-    <div className="space-y-4" dir="rtl">
+    <>
+      <PreUploadDialog
+        file={pendingFile}
+        definitionName={pendingDefinitionName}
+        onConfirm={handleUploadConfirm}
+        onCancel={handleUploadCancel}
+      />
+
+      <EditFileDialog
+        file={editingFile}
+        onConfirm={handleEditFile}
+        onCancel={() => setEditingFile(null)}
+      />
+      
+      <div className="space-y-4" dir="rtl">
       {/* Upload progress indicator */}
       {backgroundUploads.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
@@ -469,16 +880,9 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                             const input = document.createElement('input');
                             input.type = 'file';
                             input.accept = ALLOWED_TYPES.join(',');
-                            input.multiple = true;
-                            input.onchange = async (e) => {
+                            input.onchange = (e) => {
                               const files = Array.from(e.target.files || []);
-                              if (files.length > 0) {
-                                setUploadingDefId(def.id);
-                                for (const file of files) {
-                                  await handleFileUpload(file, def.id, def.name);
-                                }
-                                setUploadingDefId(null);
-                              }
+                              handleFileInputChange(files, def.id);
                             };
                             input.click();
                           }}
@@ -510,6 +914,37 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                             <p className="text-sm font-medium truncate">{file.name}</p>
                             <p className="text-xs text-muted-foreground" dir="ltr">
                               {formatFileSize(file.size)} • {formatFileDate(file.uploaded_at)}
+                              {file.relevant_date && (
+                                <>
+                                  {' • '}
+                                  <span className="inline-flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    {format(parseISO(file.relevant_date), 'dd/MM/yyyy')}
+                                  </span>
+                                </>
+                              )}
+                              {file.expiration_date && (
+                                <>
+                                  {' • '}
+                                  <span className={`inline-flex items-center gap-1 ${
+                                    file.resolved ? 'text-green-600 font-medium' : 
+                                    _isExpired(file.expiration_date) ? 'text-red-600 font-medium' : ''
+                                  }`}>
+                                    <CalendarX className="h-3 w-3" />
+                                    {format(parseISO(file.expiration_date), 'dd/MM/yyyy')}
+                                    {file.resolved ? (
+                                      <Badge variant="outline" className="text-xs mr-1 bg-green-50 text-green-700 border-green-300">
+                                        <CheckCircle className="h-3 w-3 ml-1" />
+                                        טופל
+                                      </Badge>
+                                    ) : _isExpired(file.expiration_date) ? (
+                                      <Badge variant="destructive" className="text-xs mr-1">
+                                        פג תוקף
+                                      </Badge>
+                                    ) : null}
+                                  </span>
+                                </>
+                              )}
                             </p>
                           </div>
                           <div className="flex items-center gap-1 mr-3">
@@ -520,6 +955,25 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                               title="הורדה"
                             >
                               <Download className="h-4 w-4" />
+                            </Button>
+                            {file.expiration_date && (
+                              <Button
+                                size="sm"
+                                variant={file.resolved ? "outline" : "default"}
+                                onClick={() => handleToggleResolved(file.id, file.resolved)}
+                                className={file.resolved ? "" : "bg-green-600 hover:bg-green-700 text-white"}
+                                title={file.resolved ? "בטל סימון" : "סמן כטופל"}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingFile(file)}
+                              title="עריכה"
+                            >
+                              <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
@@ -588,16 +1042,9 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.accept = ALLOWED_TYPES.join(',');
-                input.multiple = true;
-                input.onchange = async (e) => {
+                input.onchange = (e) => {
                   const files = Array.from(e.target.files || []);
-                  if (files.length > 0) {
-                    setUploadingAdhoc(true);
-                    for (const file of files) {
-                      await handleFileUpload(file);
-                    }
-                    setUploadingAdhoc(false);
-                  }
+                  handleFileInputChange(files, null);
                 };
                 input.click();
               }}
@@ -637,6 +1084,37 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                       </div>
                       <p className="text-xs text-muted-foreground" dir="ltr">
                         {formatFileSize(file.size)} • {formatFileDate(file.uploaded_at)}
+                        {file.relevant_date && (
+                          <>
+                            {' • '}
+                            <span className="inline-flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(parseISO(file.relevant_date), 'dd/MM/yyyy')}
+                            </span>
+                          </>
+                        )}
+                        {file.expiration_date && (
+                          <>
+                            {' • '}
+                            <span className={`inline-flex items-center gap-1 ${
+                              file.resolved ? 'text-green-600 font-medium' : 
+                              _isExpired(file.expiration_date) ? 'text-red-600 font-medium' : ''
+                            }`}>
+                              <CalendarX className="h-3 w-3" />
+                              {format(parseISO(file.expiration_date), 'dd/MM/yyyy')}
+                              {file.resolved ? (
+                                <Badge variant="outline" className="text-xs mr-1 bg-green-50 text-green-700 border-green-300">
+                                  <CheckCircle className="h-3 w-3 ml-1" />
+                                  טופל
+                                </Badge>
+                              ) : _isExpired(file.expiration_date) ? (
+                                <Badge variant="destructive" className="text-xs mr-1">
+                                  פג תוקף
+                                </Badge>
+                              ) : null}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 mr-3">
@@ -647,6 +1125,25 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                         title="הורדה"
                       >
                         <Download className="h-4 w-4" />
+                      </Button>
+                      {file.expiration_date && (
+                        <Button
+                          size="sm"
+                          variant={file.resolved ? "outline" : "default"}
+                          onClick={() => handleToggleResolved(file.id, file.resolved)}
+                          className={file.resolved ? "" : "bg-green-600 hover:bg-green-700 text-white"}
+                          title={file.resolved ? "בטל סימון" : "סמן כטופל"}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingFile(file)}
+                        title="עריכה"
+                      >
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
@@ -671,5 +1168,6 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

@@ -179,9 +179,12 @@
 - See `api/cross-platform/README.md` for architectural principles and usage guidelines
 
 ### File Upload and Document Management (2025-11)
-- `/api/student-files` (POST/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
+- `/api/student-files` (POST/PUT/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
   - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
-  - **File metadata**: Each file record includes `{id, name, original_name, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **File metadata**: Each file record includes `{id, name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **PUT endpoint**: Updates file metadata (name, relevant_date, expiration_date, resolved) post-upload
+    - Admin/owner only
+    - Logs audit event with updated fields
   - **Hebrew filename encoding**: Properly decodes UTF-8 filenames from multipart data by detecting latin1 mis-encoding and converting back to UTF-8
   - **Bulk upload support (2025-11)**: File inputs accept `multiple` attribute, allowing users to select and upload multiple files at once
   - **Sorting functionality (2025-11)**: Additional files section includes sort controls for name (alphabetical) and date (chronological), with ascending/descending toggle
@@ -190,6 +193,20 @@
   - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures
   - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Student Name}" (e.g., "אישור רפואי - יוסי כהן")
   - **Definition name preservation**: Stores `definition_name` in file metadata so orphaned files (deleted definitions) maintain proper display name
+  - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant_date, and add expiration_date
+    - Name auto-populated from filename (without extension) or definition name
+    - Name locked for required documents (uses admin-configured definition name)
+    - Both dates optional
+    - Confirmation triggers upload with metadata via multipart/form-data
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
+    - Edit name, relevant_date, expiration_date
+    - Admin/owner only
+    - Edit button next to each file (required and adhoc)
+  - **Resolved status for expired documents**: Files with expiration dates can be marked as "taken care of"
+    - Green "טופל" badge for resolved files vs red "פג תוקף" for expired unresolved
+    - Resolved files excluded from expired document counts on student list pages
+    - Toggle button appears for files with expiration_date
+    - Allows marking files as resolved when: new version uploaded, expiration no longer relevant, or issue addressed
   - **Configuration changes handling**: When admins modify document definitions after files are uploaded:
     - **Rename definition**: Files automatically show the NEW definition name (fetched dynamically from current definitions); `definition_name` metadata only used as fallback if definition is deleted
     - **Change target_tags**: Files remain associated with `definition_id`; display uses current definition regardless of tag changes, so file stays in "Required Documents" section with updated tags
@@ -342,7 +359,7 @@
 - **Shared utilities**: `api/_shared/audit-log.js` provides `logAuditEvent()` and action type constants (`AUDIT_ACTIONS`, `AUDIT_CATEGORIES`).
 - **CRITICAL**: `logAuditEvent()` requires a **control DB Supabase client**, NOT a tenant client. Always pass the control DB admin client (typically named `supabase` in `/api/*` endpoints that use `createSupabaseAdminClient()`). Passing a tenant client will write to the wrong database and fail silently.
 - **Implementation status**:
-  - ✅ **Implemented**: Storage operations, Membership operations, Invitations, Backup (create/restore), Students (create/update), Instructors (create/update/delete), Settings (upsert/delete), Logo (upload/delete), Files (student/instructor upload/delete)
+  - ✅ **Implemented**: Storage operations, Membership operations, Invitations, Backup (create/restore), Students (create/update), Instructors (create/update/delete), Settings (upsert/delete), Logo (upload/delete), Files (student/instructor upload/delete/metadata_update)
   - ❌ **Not yet implemented**: Permissions changes (no dedicated endpoint yet)
   - When adding audit logging to new endpoints, ensure you pass the control DB client and follow the pattern in `api/backup/index.js`, `api/students/index.js`, or `api/org-memberships/index.js`.
 - **Logged actions**:
@@ -354,7 +371,7 @@
   - **Instructors**: created, updated, deleted (with instructor_name, instructor_email, soft_delete flag)
   - **Settings**: updated (with operation type, keys array, count)
   - **Logo**: updated (with action: upload/delete, logo_url)
-  - **Files**: uploaded, deleted (with resource_type: student_file/instructor_file, file_name, file_size, storage_mode)
+  - **Files**: uploaded, deleted, metadata_updated (with resource_type: student_file/instructor_file, file_name, file_size, storage_mode, updated_fields)
 - **Usage pattern**:
   ```javascript
   await logAuditEvent(supabase, { // ← MUST be control DB client
@@ -599,8 +616,12 @@
   - If no tags/types specified, document applies to all students/instructors
   - UI shows appropriate badges and icons (Tag for students, Briefcase for instructors)
 - **File Upload for Instructors**:
-  - Backend endpoints: `/api/instructor-files` (POST/DELETE) and `/api/instructor-files-download` (GET)
+  - Backend endpoints: `/api/instructor-files` (POST/PUT/DELETE) and `/api/instructor-files-download` (GET)
   - Storage path: `instructors/{org_id}/{instructor_id}/{file_id}.{ext}`
+  - **File metadata**: Each file record includes `{id, name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **PUT endpoint**: Updates file metadata (name, relevant_date, expiration_date, resolved) post-upload
+    - Admin/owner only (instructors can update their own files)
+    - Logs audit event with updated fields
   - **Admin UI**: `InstructorDocumentsSection` component integrated into `InstructorManager` via tabs (Details/Documents)
   - **Instructor Self-Service**: `MyInstructorDocuments` component in Settings page modal
     - Modal trigger: "המסמכים שלי" card appears for instructor role (non-admin users)
@@ -608,7 +629,18 @@
     - No delete capability: Instructors cannot delete files to preserve important documentation
   - Document validation: Filters by `instructor_type` matching `target_instructor_types` in definitions
   - Upload features: Background progress tracking, duplicate detection (MD5 hash), Hebrew filename support
-  - File management: Upload, download (presigned URLs), delete (admin-only)
+  - File management: Upload, download (presigned URLs), delete (admin-only), edit metadata (admin or own files)
+  - **Pre-upload metadata editor**: Dialog opens before upload (same pattern as student files)
+    - Name auto-populated from filename or definition name
+    - Name locked for required documents
+    - Both dates optional
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
+    - Edit name, relevant_date, expiration_date
+    - Admin/owner or instructor (own files only)
+    - Edit button next to each file
+  - **Resolved status for expired documents**: Same pattern as student files
+    - Green "טופל" badge for resolved, red "פג תוקף" for expired unresolved
+    - Toggle button for files with expiration_date
   - Orphaned files: Files from deleted definitions display with amber badge "הגדרה ישנה"
   - Storage integration: Works with both managed R2 and BYOS storage profiles
   - **Permission model** (enforced in backend):
@@ -617,9 +649,11 @@
     - Instructor (non-admin): Can only upload/download their own files
       - Upload: ✅ Own files only
       - Download: ✅ Own files only
+      - Edit metadata: ✅ Own files only
       - Delete: ❌ Blocked (admin-only for data integrity)
     - `GET /api/instructors`: Non-admin users can only fetch their own instructor record (`builder.eq('id', userId)`)
     - `POST /api/instructor-files`: Validates `instructorId !== user.id` for non-admins, blocks cross-instructor uploads
+    - `PUT /api/instructor-files`: Validates `instructorId !== user.id` for non-admins, blocks cross-instructor edits
     - `DELETE /api/instructor-files`: Blocked for all non-admin users regardless of file ownership
     - `GET /api/instructor-files-download`: Validates `instructorId !== userId` for non-admins, blocks cross-instructor downloads
   - **Data isolation**: Instructors cannot see other instructors' files, names, or technical information; only admins have roster visibility

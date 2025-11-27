@@ -162,6 +162,7 @@ export default async function (context, req) {
   }
 
   const userId = authResult.data.user.id;
+  const userEmail = authResult.data.user.email;
 
   // POST: Upload file
   if (req.method === 'POST') {
@@ -179,6 +180,8 @@ export default async function (context, req) {
     const orgIdPart = parts.find(p => p.name === 'org_id');
     const defIdPart = parts.find(p => p.name === 'definition_id');
     const fileNamePart = parts.find(p => p.name === 'custom_name');
+    const relevantDatePart = parts.find(p => p.name === 'relevant_date');
+    const expirationDatePart = parts.find(p => p.name === 'expiration_date');
 
     if (!filePart) {
       return respond(context, 400, { message: 'no_file_provided' });
@@ -192,6 +195,8 @@ export default async function (context, req) {
     const orgId = orgIdPart.data.toString('utf8').trim();
     const definitionId = defIdPart ? defIdPart.data.toString('utf8').trim() : null;
     const customName = fileNamePart ? fileNamePart.data.toString('utf8').trim() : null;
+    const relevantDate = relevantDatePart ? relevantDatePart.data.toString('utf8').trim() : null;
+    const expirationDate = expirationDatePart ? expirationDatePart.data.toString('utf8').trim() : null;
 
     // Decode filename properly to handle Hebrew and other UTF-8 characters
     // The multipart parser gives us filePart.filename which may be mis-encoded
@@ -394,10 +399,12 @@ export default async function (context, req) {
     }
 
     // Build proper display name based on definition and student
-    let displayName = customName || decodedFilename;
+    let baseName = customName || decodedFilename;
     let definitionName = null;
+    const studentName = currentStudent?.name || 'תלמיד';
 
-    if (definitionId) {
+    if (definitionId && !customName) {
+      // Only auto-generate base name if no custom name provided
       // Fetch document definitions from settings to get the definition name
       // Note: Settings are in the TENANT DB, not control DB
       const { data: settingsData, error: settingsError } = await tenantClient
@@ -424,23 +431,43 @@ export default async function (context, req) {
         
         if (definition?.name) {
           definitionName = definition.name;
-          const studentName = currentStudent?.name || 'תלמיד';
-          // Build filename: "Definition Name - Student Name"
-          displayName = `${definitionName} - ${studentName}`;
+          // Use definition name as base
+          baseName = definitionName;
           
-          context.log?.info?.('Upload: Built display name', {
+          context.log?.info?.('Upload: Using definition name as base', {
             definitionName,
-            studentName,
-            displayName,
+            baseName,
           });
         }
       }
+    } else if (definitionId && customName) {
+      // Custom name provided (from PreUploadDialog)
+      // For required documents, this is the locked admin-configured name
+      // For adhoc assigned to definition, this is the user-edited name
+      definitionName = customName;
+      baseName = customName;
+      context.log?.info?.('Upload: Using custom name as base', {
+        customName,
+        definitionName,
+        baseName,
+      });
     }
+
+    // Always append student name to base name
+    const displayName = `${baseName} - ${studentName}`;
+    
+    context.log?.info?.('Upload: Built final display name', {
+      baseName,
+      studentName,
+      displayName,
+    });
 
     // Build complete file metadata object with all properties
     const completeFileMetadata = {
       ...fileMetadata,
       name: displayName,
+      relevant_date: relevantDate || null,
+      expiration_date: expirationDate || null,
       ...(definitionName && { definition_name: definitionName }),
     };
 
@@ -482,6 +509,107 @@ export default async function (context, req) {
 
     return respond(context, 200, {
       file: completeFileMetadata,
+    });
+  }
+
+  // PUT: Update file metadata (name, relevant_date, expiration_date, resolved)
+  if (req.method === 'PUT') {
+    const body = parseRequestBody(req);
+    const orgId = resolveOrgId(req, body);
+    const { student_id: studentId, file_id: fileId, name, relevant_date, expiration_date, resolved } = body;
+
+    if (!orgId || !studentId || !fileId) {
+      return respond(context, 400, { message: 'missing_required_fields' });
+    }
+
+    // Verify membership
+    let role;
+    try {
+      role = await ensureMembership(controlClient, orgId, userId);
+    } catch (membershipError) {
+      context.log?.error?.('student-files PUT failed to verify membership', {
+        message: membershipError?.message,
+        orgId,
+        userId,
+      });
+      return respond(context, 500, { message: 'failed_to_verify_membership' });
+    }
+
+    if (!role) {
+      return respond(context, 403, { message: 'not_a_member' });
+    }
+
+    // Get tenant client
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
+    }
+
+    // Fetch student record
+    const { data: currentStudent, error: fetchError } = await tenantClient
+      .from('Students')
+      .select('id, name, files')
+      .eq('id', studentId)
+      .single();
+
+    if (fetchError || !currentStudent) {
+      context.log?.error?.('Student not found', { message: fetchError?.message, studentId });
+      return respond(context, 404, { message: 'student_not_found' });
+    }
+
+    // Find and update the file in the array
+    const currentFiles = Array.isArray(currentStudent?.files) ? currentStudent.files : [];
+    const fileIndex = currentFiles.findIndex(f => f.id === fileId);
+
+    if (fileIndex === -1) {
+      return respond(context, 404, { message: 'file_not_found' });
+    }
+
+    const existingFile = currentFiles[fileIndex];
+    const updatedFile = {
+      ...existingFile,
+      ...(name !== undefined && { name }),
+      ...(relevant_date !== undefined && { relevant_date }),
+      ...(expiration_date !== undefined && { expiration_date }),
+      ...(resolved !== undefined && { resolved }),
+    };
+
+    const updatedFiles = [...currentFiles];
+    updatedFiles[fileIndex] = updatedFile;
+
+    // Update student record
+    const { error: updateError } = await tenantClient
+      .from('Students')
+      .update({ files: updatedFiles })
+      .eq('id', studentId);
+
+    if (updateError) {
+      context.log?.error?.('Failed to update student file metadata', { message: updateError.message });
+      return respond(context, 500, { message: 'failed_to_update_file_metadata' });
+    }
+
+    // Log audit event
+    await logAuditEvent(controlClient, {
+      orgId,
+      userId,
+      userEmail: userEmail || 'unknown',
+      userRole: role,
+      actionType: 'file_metadata_updated',
+      actionCategory: AUDIT_CATEGORIES.FILES,
+      resourceType: 'student_file',
+      resourceId: fileId,
+      details: {
+        student_id: studentId,
+        student_name: currentStudent.name,
+        file_name: updatedFile.name,
+        updated_fields: Object.keys(body).filter(k => k !== 'student_id' && k !== 'file_id' && k !== 'org_id'),
+      },
+    });
+
+    context.log?.info?.('File metadata updated successfully', { fileId, studentId, updates: Object.keys(body).filter(k => k !== 'student_id' && k !== 'file_id' && k !== 'org_id') });
+
+    return respond(context, 200, {
+      file: updatedFile,
     });
   }
 

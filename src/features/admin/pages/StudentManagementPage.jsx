@@ -8,8 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Loader2, Pencil, Search, X, User, RotateCcw } from 'lucide-react';
+import { Plus, Loader2, Pencil, Search, X, User, RotateCcw, FileWarning } from 'lucide-react';
 import { toast } from 'sonner';
+import { parseISO, isBefore, startOfDay } from 'date-fns';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
@@ -28,6 +29,26 @@ const REQUEST_STATES = {
   loading: 'loading',
   error: 'error',
 };
+
+/**
+ * Count expired documents for a student
+ */
+function countExpiredDocuments(student) {
+  if (!student?.files || !Array.isArray(student.files)) return 0;
+  
+  const today = startOfDay(new Date());
+  
+  return student.files.filter(file => {
+    if (!file.expiration_date) return false;
+    if (file.resolved === true) return false; // Exclude resolved files
+    try {
+      const expDate = parseISO(file.expiration_date);
+      return isBefore(expDate, today);
+    } catch {
+      return false;
+    }
+  }).length;
+}
 
 export default function StudentManagementPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
@@ -619,6 +640,7 @@ export default function StudentManagementPage() {
                   const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ') || '—';
                   const dayLabel = DAY_NAMES[student.default_day_of_week] || '—';
                   const timeLabel = formatDefaultTime(student.default_session_time) || '—';
+                  const expiredCount = countExpiredDocuments(student);
                   
                   return (
                     <TableRow key={student.id}>
@@ -638,6 +660,12 @@ export default function StudentManagementPage() {
                                   לא פעיל
                                 </Badge>
                               ) : null}
+                              {expiredCount > 0 && (
+                                <Badge variant="destructive" className="gap-1 text-xs">
+                                  <FileWarning className="h-3 w-3" />
+                                  {expiredCount} מסמכים פגי תוקף
+                                </Badge>
+                              )}
                             </div>
                             {filterMode === 'all' ? (
                               <div className="mt-0.5 text-xs text-neutral-500">
