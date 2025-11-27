@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Loader2, ListChecks, RotateCcw } from 'lucide-react';
+import { Loader2, ListChecks, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,8 @@ export default function NewSessionForm({
   onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
   formResetRef, // Ref to expose reset function to parent
   successState, // Success state from parent { studentId, studentName, date }
+  showAdvancedFilters: externalShowAdvancedFilters, // Controlled from parent
+  onShowAdvancedFiltersChange, // Callback to update parent state
 }) {
   const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId || '');
   const [studentQuery, setStudentQuery] = useState('');
@@ -49,6 +51,10 @@ export default function NewSessionForm({
   const [activeQuestionKey, setActiveQuestionKey] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
   const formRef = useRef(null);
+  
+  // Use controlled state from parent, or local state as fallback
+  const showAdvancedFilters = externalShowAdvancedFilters ?? false;
+  const setShowAdvancedFilters = onShowAdvancedFiltersChange ?? (() => {});
   const [answers, setAnswers] = useState(() => {
     const initial = {};
     for (const question of questions) {
@@ -282,6 +288,7 @@ export default function NewSessionForm({
     
     setStudentQuery('');
     setStudentDayFilter(null);
+    // Keep advanced filters state when creating additional reports (don't reset showAdvancedFilters)
     
     // Conditionally reset student selection
     if (keepStudent && studentId) {
@@ -328,92 +335,129 @@ export default function NewSessionForm({
       <div className="space-y-sm">
         <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
         <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>
+        
+        {/* Search Box - Always Visible */}
         <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
-          <p className="text-xs font-medium text-neutral-600 text-right mb-2">🔍 מסנני חיפוש</p>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="relative min-w-[200px] flex-1">
-              <Input
-                type="text"
-                placeholder="חיפוש לפי שם, יום או שעה..."
-                value={studentQuery}
-                onChange={(e) => setStudentQuery(e.target.value)}
-                className="w-full pr-3 text-sm"
-                disabled={isSubmitting || students.length === 0}
-                aria-label="חיפוש תלמיד"
-              />
-            </div>
-            {canFilterByInstructor ? (
-              <div className="min-w-[200px] flex-1 sm:flex-none">
-                <Select
-                  value={studentScope}
-                  onValueChange={(v) => onScopeChange?.(v)}
-                  onOpenChange={onSelectOpenChange}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="כל התלמידים" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">כל התלמידים</SelectItem>
-                    {/* 'mine' option is still useful for admins who are also instructors */}
-                    <SelectItem value="mine">התלמידים שלי</SelectItem>
-                    {instructors.map((inst) => (
-                      <SelectItem key={inst.id} value={`inst:${inst.id}`}>
-                        התלמידים של {inst.name || inst.email || inst.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-            <div className="min-w-[160px] flex-1 sm:flex-none">
-              <DayOfWeekSelect
-                value={studentDayFilter}
-                onChange={setStudentDayFilter}
-                disabled={isSubmitting || students.length === 0}
-                placeholder="סינון לפי יום"
-              />
-            </div>
-            {canViewInactive ? (
-              <div className="flex items-center gap-2">
-                <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
-                  מצב:
-                </Label>
-                <Select
-                  value={statusFilter}
-                  onValueChange={(value) => onStatusFilterChange?.(value)}
-                  onOpenChange={onSelectOpenChange}
-                  disabled={isSubmitting || !visibilityLoaded}
-                >
-                  <SelectTrigger id="session-status-filter" className="w-auto min-w-[160px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">תלמידים פעילים</SelectItem>
-                    <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
-                    <SelectItem value="all">הצג הכל</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-            {hasActiveFilters ? (
-              <div className="flex-shrink-0 ltr:ml-auto rtl:mr-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResetFilters}
-                  className="gap-xs"
-                  disabled={isSubmitting}
-                  title="נקה מסנני תלמיד"
-                >
-                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">נקה מסננים</span>
-                </Button>
-              </div>
-            ) : null}
+          <p className="text-xs font-medium text-neutral-600 text-right mb-2">🔍 חיפוש</p>
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder="חיפוש לפי שם, יום או שעה..."
+              value={studentQuery}
+              onChange={(e) => setStudentQuery(e.target.value)}
+              className="w-full pr-3 text-sm"
+              disabled={isSubmitting || students.length === 0}
+              aria-label="חיפוש תלמיד"
+            />
           </div>
         </div>
+
+        {/* Advanced Filters Toggle Button */}
+        <div className="flex items-center justify-between mb-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="gap-2 text-primary hover:text-primary/80"
+            disabled={isSubmitting}
+          >
+            {showAdvancedFilters ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                <span>סינון מתקדם</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4" />
+                <span>סינון מתקדם</span>
+              </>
+            )}
+            {hasActiveFilters && !showAdvancedFilters && (
+              <span className="inline-flex h-2 w-2 rounded-full bg-primary" title="יש מסננים פעילים" />
+            )}
+          </Button>
+        </div>
+
+        {/* Advanced Filters - Collapsible */}
+        {showAdvancedFilters && (
+          <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200 animate-in fade-in slide-in-from-top-2 duration-200">
+            <p className="text-xs font-medium text-neutral-600 text-right mb-2">⚙️ מסננים מתקדמים</p>
+            <div className="flex flex-wrap items-end gap-2">
+              {canFilterByInstructor ? (
+                <div className="min-w-[200px] flex-1 sm:flex-none">
+                  <Select
+                    value={studentScope}
+                    onValueChange={(v) => onScopeChange?.(v)}
+                    onOpenChange={onSelectOpenChange}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="כל התלמידים" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">כל התלמידים</SelectItem>
+                      {/* 'mine' option is still useful for admins who are also instructors */}
+                      <SelectItem value="mine">התלמידים שלי</SelectItem>
+                      {instructors.map((inst) => (
+                        <SelectItem key={inst.id} value={`inst:${inst.id}`}>
+                          התלמידים של {inst.name || inst.email || inst.id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              <div className="min-w-[160px] flex-1 sm:flex-none">
+                <DayOfWeekSelect
+                  value={studentDayFilter}
+                  onChange={setStudentDayFilter}
+                  disabled={isSubmitting || students.length === 0}
+                  placeholder="סינון לפי יום"
+                />
+              </div>
+              {canViewInactive ? (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
+                    מצב:
+                  </Label>
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(value) => onStatusFilterChange?.(value)}
+                    onOpenChange={onSelectOpenChange}
+                    disabled={isSubmitting || !visibilityLoaded}
+                  >
+                    <SelectTrigger id="session-status-filter" className="w-auto min-w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">תלמידים פעילים</SelectItem>
+                      <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
+                      <SelectItem value="all">הצג הכל</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              {hasActiveFilters ? (
+                <div className="flex-shrink-0 ltr:ml-auto rtl:mr-auto">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetFilters}
+                    className="gap-xs"
+                    disabled={isSubmitting}
+                    title="נקה מסנני תלמיד"
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">נקה מסננים</span>
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+        
         <div className="pt-2">
           <Label htmlFor="session-student-select" className="block text-right text-sm font-medium text-primary mb-2">
             ✓ בחירת תלמיד

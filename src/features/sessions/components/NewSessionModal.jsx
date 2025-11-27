@@ -72,6 +72,7 @@ export default function NewSessionModal({
   const [initialStatusApplied, setInitialStatusApplied] = useState(false);
   const [successState, setSuccessState] = useState(null); // { studentId, studentName, date }
   const formResetRef = useRef(null); // Will hold the form's reset function
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false); // Track advanced filter visibility
 
   // Fix for mobile: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
@@ -168,6 +169,7 @@ export default function NewSessionModal({
       setSubmitState(REQUEST_STATE.idle);
       setSubmitError('');
       setSuccessState(null);
+      setShowAdvancedFilters(false); // Reset advanced filters visibility when modal closes
     }
   }, [open]);
 
@@ -510,6 +512,8 @@ export default function NewSessionModal({
             onSelectOpenChange={handleSelectOpenChange}
             formResetRef={formResetRef}
             successState={successState}
+            showAdvancedFilters={showAdvancedFilters}
+            onShowAdvancedFiltersChange={setShowAdvancedFilters}
           />
         )}
       </DialogContent>

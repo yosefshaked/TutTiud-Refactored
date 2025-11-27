@@ -686,6 +686,14 @@
   - Faster bulk documentation: instructors can create multiple reports without reopening modal
   - Flexible workflow: choose to document same student multiple times or switch students
   - Eliminates mobile Android issue where toasts disappeared due to rapid modal closure
+- **Advanced Filters Pattern (2025-11)**:
+  - Filter section now separates basic search (always visible) from advanced filters (collapsible)
+  - Advanced filters section includes: instructor scope selector (admin only), day-of-week filter, and active/inactive status filter
+  - Toggle button shows/hides advanced filters with "סינון מתקדם" label and chevron icons (up when expanded, down when collapsed)
+  - Visual indicator (blue dot) appears on toggle button when advanced filters are collapsed but active
+  - State persistence: Advanced filter visibility persists when creating additional reports from success window, but resets when modal is closed/reopened
+  - Controlled state pattern: `showAdvancedFilters` state managed in `NewSessionModal` and passed to `NewSessionForm` via props
+  - Implementation uses `animate-in fade-in slide-in-from-top-2` classes for smooth expansion animation
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.
