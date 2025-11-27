@@ -336,7 +336,7 @@ export default function NewSessionForm({
         <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
         <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>
         
-        {/* Search Box - Always Visible */}
+        {/* Search Box with Collapsible Advanced Filters */}
         <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
           <div className="flex items-center justify-between gap-2 mb-2">
             <p className="text-xs font-medium text-neutral-600 text-right">🔍 חיפוש</p>
@@ -371,86 +371,86 @@ export default function NewSessionForm({
               aria-label="חיפוש תלמיד"
             />
           </div>
-        </div>
 
-        {/* Advanced Filters - Collapsible */}
-        {showAdvancedFilters && (
-          <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200 animate-in fade-in slide-in-from-top-2 duration-200">
-            <p className="text-xs font-medium text-neutral-600 text-right mb-2">⚙️ מסננים מתקדמים</p>
-            <div className="flex flex-wrap items-end gap-2">
-              {canFilterByInstructor ? (
-                <div className="min-w-[200px] flex-1 sm:flex-none">
-                  <Select
-                    value={studentScope}
-                    onValueChange={(v) => onScopeChange?.(v)}
-                    onOpenChange={onSelectOpenChange}
-                    disabled={isSubmitting}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="כל התלמידים" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">כל התלמידים</SelectItem>
-                      {/* 'mine' option is still useful for admins who are also instructors */}
-                      <SelectItem value="mine">התלמידים שלי</SelectItem>
-                      {instructors.map((inst) => (
-                        <SelectItem key={inst.id} value={`inst:${inst.id}`}>
-                          התלמידים של {inst.name || inst.email || inst.id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          {/* Advanced Filters - Collapsible within search box */}
+          {showAdvancedFilters && (
+            <div className="pt-2 border-t border-neutral-200 animate-in fade-in slide-in-from-top-2 duration-200">
+              <p className="text-xs font-medium text-neutral-600 text-right mb-2">⚙️ מסננים מתקדמים</p>
+              <div className="flex flex-wrap items-end gap-2">
+                {canFilterByInstructor ? (
+                  <div className="min-w-[200px] flex-1 sm:flex-none">
+                    <Select
+                      value={studentScope}
+                      onValueChange={(v) => onScopeChange?.(v)}
+                      onOpenChange={onSelectOpenChange}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="כל התלמידים" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל התלמידים</SelectItem>
+                        {/* 'mine' option is still useful for admins who are also instructors */}
+                        <SelectItem value="mine">התלמידים שלי</SelectItem>
+                        {instructors.map((inst) => (
+                          <SelectItem key={inst.id} value={`inst:${inst.id}`}>
+                            התלמידים של {inst.name || inst.email || inst.id}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <div className="min-w-[160px] flex-1 sm:flex-none">
+                  <DayOfWeekSelect
+                    value={studentDayFilter}
+                    onChange={setStudentDayFilter}
+                    disabled={isSubmitting || students.length === 0}
+                    placeholder="סינון לפי יום"
+                  />
                 </div>
-              ) : null}
-              <div className="min-w-[160px] flex-1 sm:flex-none">
-                <DayOfWeekSelect
-                  value={studentDayFilter}
-                  onChange={setStudentDayFilter}
-                  disabled={isSubmitting || students.length === 0}
-                  placeholder="סינון לפי יום"
-                />
+                {canViewInactive ? (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
+                      מצב:
+                    </Label>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(value) => onStatusFilterChange?.(value)}
+                      onOpenChange={onSelectOpenChange}
+                      disabled={isSubmitting || !visibilityLoaded}
+                    >
+                      <SelectTrigger id="session-status-filter" className="w-auto min-w-[160px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">תלמידים פעילים</SelectItem>
+                        <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
+                        <SelectItem value="all">הצג הכל</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                {hasActiveFilters ? (
+                  <div className="flex-shrink-0 ltr:ml-auto rtl:mr-auto">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetFilters}
+                      className="gap-xs"
+                      disabled={isSubmitting}
+                      title="נקה מסנני תלמיד"
+                    >
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                      <span className="hidden sm:inline">נקה מסננים</span>
+                    </Button>
+                  </div>
+                ) : null}
               </div>
-              {canViewInactive ? (
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="session-status-filter" className="text-sm text-neutral-600">
-                    מצב:
-                  </Label>
-                  <Select
-                    value={statusFilter}
-                    onValueChange={(value) => onStatusFilterChange?.(value)}
-                    onOpenChange={onSelectOpenChange}
-                    disabled={isSubmitting || !visibilityLoaded}
-                  >
-                    <SelectTrigger id="session-status-filter" className="w-auto min-w-[160px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">תלמידים פעילים</SelectItem>
-                      <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
-                      <SelectItem value="all">הצג הכל</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {hasActiveFilters ? (
-                <div className="flex-shrink-0 ltr:ml-auto rtl:mr-auto">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleResetFilters}
-                    className="gap-xs"
-                    disabled={isSubmitting}
-                    title="נקה מסנני תלמיד"
-                  >
-                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                    <span className="hidden sm:inline">נקה מסננים</span>
-                  </Button>
-                </div>
-              ) : null}
             </div>
-          </div>
-        )}
+          )}
+        </div>
         
         <div className="pt-2">
           <Label htmlFor="session-student-select" className="block text-right text-sm font-medium text-primary mb-2">
