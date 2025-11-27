@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Loader2, ListChecks, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, ListChecks, RotateCcw, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -338,7 +338,28 @@ export default function NewSessionForm({
         
         {/* Search Box - Always Visible */}
         <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
-          <p className="text-xs font-medium text-neutral-600 text-right mb-2">🔍 חיפוש</p>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs font-medium text-neutral-600 text-right">🔍 חיפוש</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="gap-2 text-sm"
+              disabled={isSubmitting}
+            >
+              <span>סינון מתקדם</span>
+              <ChevronDown 
+                className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  showAdvancedFilters && "rotate-180"
+                )}
+              />
+              {hasActiveFilters && !showAdvancedFilters && (
+                <span className="inline-flex h-2 w-2 rounded-full bg-primary" title="יש מסננים פעילים" />
+              )}
+            </Button>
+          </div>
           <div className="relative">
             <Input
               type="text"
@@ -350,33 +371,6 @@ export default function NewSessionForm({
               aria-label="חיפוש תלמיד"
             />
           </div>
-        </div>
-
-        {/* Advanced Filters Toggle Button */}
-        <div className="flex items-center justify-between mb-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className="gap-2 text-primary hover:text-primary/80"
-            disabled={isSubmitting}
-          >
-            {showAdvancedFilters ? (
-              <>
-                <ChevronUp className="h-4 w-4" />
-                <span>סינון מתקדם</span>
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4" />
-                <span>סינון מתקדם</span>
-              </>
-            )}
-            {hasActiveFilters && !showAdvancedFilters && (
-              <span className="inline-flex h-2 w-2 rounded-full bg-primary" title="יש מסננים פעילים" />
-            )}
-          </Button>
         </div>
 
         {/* Advanced Filters - Collapsible */}
