@@ -227,25 +227,11 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   }
 
   // Build storage path
-  const fileId = crypto.randomUUID();
   let storagePath;
-  if (storageProfile.mode === 'managed') {
-    storagePath = `managed/${orgId}/${entityType}s/${entityId}/${fileId}.${ext}`;
-  } else {
-    storagePath = `${entityType}s/${orgId}/${entityId}/${fileId}.${ext}`;
-  }
-
-  // Upload to storage
-  try {
-    await driver.uploadFile(storagePath, fileBuffer, fileType);
-  } catch (err) {
-    console.error('Storage upload error:', err);
-    return { status: 500, body: { error: 'upload_failed', details: err.message } };
-  }
-
-  // Insert into Documents table
-  const documentRecord = {
-    id: fileId,
+  
+  // For managed storage, we'll use a temporary ID; for BYOS, we'll generate the path after insert
+  // We need the document ID from DB to build the final path
+  const tempDocRecord = {
     entity_type: entityType,
     entity_id: entityId,
     name: finalName,
@@ -253,8 +239,8 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     relevant_date: relevantDate || null,
     expiration_date: expirationDate || null,
     resolved: false,
-    url: null, // Will be generated on download
-    path: storagePath,
+    url: null,
+    path: 'temp', // Will update after we get the ID
     storage_provider: storageProfile.mode === 'managed' ? 'managed_r2' : storageProfile.provider,
     uploaded_at: new Date().toISOString(),
     uploaded_by: userId,
@@ -266,19 +252,53 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     metadata: null
   };
 
-  const { error: insertError } = await tenantClient
+  // Insert into Documents table first to get auto-generated UUID
+  const { data: insertedDoc, error: insertError } = await tenantClient
     .from('Documents')
-    .insert([documentRecord]);
+    .insert([tempDocRecord])
+    .select()
+    .single();
 
-  if (insertError) {
+  if (insertError || !insertedDoc) {
     console.error('Document insert error:', insertError);
-    // Attempt to clean up uploaded file
+    return { status: 500, body: { error: 'insert_failed', details: insertError?.message } };
+  }
+
+  const fileId = insertedDoc.id;
+
+  // Now build the correct storage path with the real ID
+  if (storageProfile.mode === 'managed') {
+    storagePath = `managed/${orgId}/${entityType}s/${entityId}/${fileId}.${ext}`;
+  } else {
+    storagePath = `${entityType}s/${orgId}/${entityId}/${fileId}.${ext}`;
+  }
+
+  // Upload to storage
+  try {
+    await driver.uploadFile(storagePath, fileBuffer, fileType);
+  } catch (err) {
+    console.error('Storage upload error:', err);
+    // Rollback: delete the document record
+    await tenantClient.from('Documents').delete().eq('id', fileId);
+    return { status: 500, body: { error: 'upload_failed', details: err.message } };
+  }
+
+  // Update the document with the correct path
+  const { error: updateError } = await tenantClient
+    .from('Documents')
+    .update({ path: storagePath })
+    .eq('id', fileId);
+
+  if (updateError) {
+    console.error('Document path update error:', updateError);
+    // Try to clean up storage
     try {
       await driver.deleteFile(storagePath);
     } catch (cleanupErr) {
-      console.error('Cleanup error after failed insert:', cleanupErr);
+      console.error('Cleanup error after failed path update:', cleanupErr);
     }
-    return { status: 500, body: { error: 'insert_failed', details: insertError.message } };
+    await tenantClient.from('Documents').delete().eq('id', fileId);
+    return { status: 500, body: { error: 'path_update_failed', details: updateError.message } };
   }
 
   // Audit log
@@ -300,7 +320,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     }
   });
 
-  return { status: 201, body: { file: documentRecord } };
+  return { status: 201, body: { file: { ...insertedDoc, path: storagePath } } };
 }
 
 /**

@@ -251,7 +251,7 @@ ALTER TABLE tuttiud."Settings"
 -- Documents Table (Polymorphic File Storage)
 -- =================================================================
 CREATE TABLE IF NOT EXISTS tuttiud."Documents" (
-  "id" uuid NOT NULL PRIMARY KEY,
+  "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "entity_type" text NOT NULL CHECK ("entity_type" IN ('student', 'instructor', 'organization')),
   "entity_id" uuid NOT NULL,
   "name" text NOT NULL,
