@@ -466,38 +466,25 @@ ALTER TABLE tuttiud."Documents" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Documents_view_policy" ON tuttiud."Documents";
 CREATE POLICY "Documents_view_policy" ON tuttiud."Documents"
   FOR SELECT
-  USING (
-    -- Must be authenticated
-    auth.uid() IS NOT NULL
-  );
+  USING (true);
 
 -- Policy: Allow authenticated users to insert documents (permission check happens in API)
 DROP POLICY IF EXISTS "Documents_insert_policy" ON tuttiud."Documents";
 CREATE POLICY "Documents_insert_policy" ON tuttiud."Documents"
   FOR INSERT
-  WITH CHECK (
-    -- Must be authenticated and uploaded_by matches user
-    auth.uid() IS NOT NULL AND
-    "uploaded_by" = auth.uid()
-  );
+  WITH CHECK (true);
 
 -- Policy: Allow authenticated users to update their own uploaded documents (permission check in API)
 DROP POLICY IF EXISTS "Documents_update_policy" ON tuttiud."Documents";
 CREATE POLICY "Documents_update_policy" ON tuttiud."Documents"
   FOR UPDATE
-  USING (
-    -- Must be authenticated
-    auth.uid() IS NOT NULL
-  );
+  USING (true);
 
 -- Policy: Allow authenticated users to delete documents (permission check happens in API)
 DROP POLICY IF EXISTS "Documents_delete_policy" ON tuttiud."Documents";
 CREATE POLICY "Documents_delete_policy" ON tuttiud."Documents"
   FOR DELETE
-  USING (
-    -- Must be authenticated
-    auth.uid() IS NOT NULL
-  );
+  USING (true);
 
 CREATE INDEX IF NOT EXISTS "SessionRecords_student_date_idx" ON tuttiud."SessionRecords" ("student_id", "date");
 CREATE INDEX IF NOT EXISTS "SessionRecords_instructor_idx" ON tuttiud."SessionRecords" ("instructor_id");
