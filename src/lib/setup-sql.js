@@ -274,6 +274,10 @@ CREATE TABLE IF NOT EXISTS tuttiud."Documents" (
   "updated_at" timestamptz NOT NULL DEFAULT now()
 );
 
+-- Ensure id column has DEFAULT gen_random_uuid() (for existing tables created without it)
+ALTER TABLE tuttiud."Documents"
+  ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS "Documents_entity_idx" ON tuttiud."Documents" ("entity_type", "entity_id");
 CREATE INDEX IF NOT EXISTS "Documents_uploaded_at_idx" ON tuttiud."Documents" ("uploaded_at");
