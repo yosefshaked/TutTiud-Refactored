@@ -6,11 +6,10 @@
  */
 
 import { createSupabaseAdminClient } from '../_shared/supabase-admin.js';
-import { decryptCredentials, checkOrgMembership } from '../_shared/org-bff.js';
-import { createTenantClient } from '../_shared/supabase-tenant.js';
+import { checkOrgMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../_shared/storage-drivers/index.js';
 
-export default async function handler(req) {
+export default async function handler(req, context) {
   if (req.method !== 'GET') {
     return { status: 405, body: { error: 'method_not_allowed' } };
   }
@@ -46,18 +45,19 @@ export default async function handler(req) {
   const isAdmin = ['admin', 'owner'].includes(userRole);
 
   // Get tenant client
+  const env = readEnv(context);
+  const tenantResult = await resolveTenantClient(context, supabase, env, org_id);
+  if (tenantResult.error) {
+    return { status: 424, body: { error: 'tenant_not_configured', details: tenantResult.error } };
+  }
+  const tenantClient = tenantResult.client;
+
+  // Get storage profile
   const { data: orgSettings } = await supabase
     .from('org_settings')
-    .select('db_url, db_service_role_key, storage_profile')
+    .select('storage_profile')
     .eq('organization_id', org_id)
     .single();
-
-  if (!orgSettings?.db_url || !orgSettings?.db_service_role_key) {
-    return { status: 424, body: { error: 'tenant_not_configured' } };
-  }
-
-  const decrypted = decryptCredentials(orgSettings.db_url, orgSettings.db_service_role_key);
-  const tenantClient = createTenantClient(decrypted.dbUrl, decrypted.serviceRoleKey);
 
   // Fetch document
   const { data: document, error: fetchError } = await tenantClient

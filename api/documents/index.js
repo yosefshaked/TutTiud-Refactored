@@ -9,9 +9,8 @@
  */
 
 import { createSupabaseAdminClient } from '../_shared/supabase-admin.js';
-import { decryptCredentials, checkOrgMembership } from '../_shared/org-bff.js';
+import { checkOrgMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
-import { createTenantClient } from '../_shared/supabase-tenant.js';
 import { parseMultipartData } from 'parse-multipart-data';
 import { createHash } from 'crypto';
 import { getStorageDriver } from '../_shared/storage-drivers/index.js';
@@ -504,7 +503,7 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
   return { status: 200, body: { message: 'deleted' } };
 }
 
-export default async function handler(req) {
+export default async function handler(req, context) {
   const method = req.method;
 
   // Auth check
@@ -545,18 +544,12 @@ export default async function handler(req) {
   const isAdmin = ['admin', 'owner'].includes(userRole);
 
   // Get tenant client
-  const { data: orgSettings } = await supabase
-    .from('org_settings')
-    .select('db_url, db_service_role_key')
-    .eq('organization_id', orgId)
-    .single();
-
-  if (!orgSettings?.db_url || !orgSettings?.db_service_role_key) {
-    return { status: 424, body: { error: 'tenant_not_configured' } };
+  const env = readEnv(context);
+  const tenantResult = await resolveTenantClient(context, supabase, env, orgId);
+  if (tenantResult.error) {
+    return { status: 424, body: { error: 'tenant_not_configured', details: tenantResult.error } };
   }
-
-  const decrypted = decryptCredentials(orgSettings.db_url, orgSettings.db_service_role_key);
-  const tenantClient = createTenantClient(decrypted.dbUrl, decrypted.serviceRoleKey);
+  const tenantClient = tenantResult.client;
 
   // Route to handler
   if (method === 'GET') {
