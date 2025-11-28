@@ -241,6 +241,11 @@
 - **Discriminator pattern**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID) identifies which entity owns each document.
 - **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), org_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
 - **Indexes**: Composite index on (org_id, entity_type, entity_id) for fast entity-scoped queries; individual indexes on org_id, entity_type, entity_id.
+- **RLS Policies**: Row-level security enabled with policies for SELECT, INSERT, UPDATE, DELETE
+  - All authenticated users can view documents (org-level permission checks in API layer)
+  - INSERT requires `uploaded_by` matches authenticated user ID
+  - UPDATE/DELETE allowed for authenticated users (entity-level permission checks in API layer)
+  - API layer (`validateEntityAccess`) enforces org membership and entity-specific permissions
 - **Migration strategy** (non-destructive):
   - Setup script includes `DO $$` block that copies from JSON columns to Documents table
   - Verifies counts match after migration; RAISES EXCEPTION if data integrity check fails

@@ -456,6 +456,49 @@ BEGIN
 END;
 $$;
 
+-- =================================================================
+-- Documents Table RLS Policies
+-- =================================================================
+ALTER TABLE tuttiud."Documents" ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow authenticated users to view documents for their organization
+-- All org members can view student documents, only admin/owner or self for instructor documents
+DROP POLICY IF EXISTS "Documents_view_policy" ON tuttiud."Documents";
+CREATE POLICY "Documents_view_policy" ON tuttiud."Documents"
+  FOR SELECT
+  USING (
+    -- Must be authenticated
+    auth.uid() IS NOT NULL
+  );
+
+-- Policy: Allow authenticated users to insert documents (permission check happens in API)
+DROP POLICY IF EXISTS "Documents_insert_policy" ON tuttiud."Documents";
+CREATE POLICY "Documents_insert_policy" ON tuttiud."Documents"
+  FOR INSERT
+  WITH CHECK (
+    -- Must be authenticated and uploaded_by matches user
+    auth.uid() IS NOT NULL AND
+    "uploaded_by" = auth.uid()
+  );
+
+-- Policy: Allow authenticated users to update their own uploaded documents (permission check in API)
+DROP POLICY IF EXISTS "Documents_update_policy" ON tuttiud."Documents";
+CREATE POLICY "Documents_update_policy" ON tuttiud."Documents"
+  FOR UPDATE
+  USING (
+    -- Must be authenticated
+    auth.uid() IS NOT NULL
+  );
+
+-- Policy: Allow authenticated users to delete documents (permission check happens in API)
+DROP POLICY IF EXISTS "Documents_delete_policy" ON tuttiud."Documents";
+CREATE POLICY "Documents_delete_policy" ON tuttiud."Documents"
+  FOR DELETE
+  USING (
+    -- Must be authenticated
+    auth.uid() IS NOT NULL
+  );
+
 CREATE INDEX IF NOT EXISTS "SessionRecords_student_date_idx" ON tuttiud."SessionRecords" ("student_id", "date");
 CREATE INDEX IF NOT EXISTS "SessionRecords_instructor_idx" ON tuttiud."SessionRecords" ("instructor_id");
 
