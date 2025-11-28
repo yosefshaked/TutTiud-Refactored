@@ -146,6 +146,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   // Decode Hebrew filename
   let decodedFileName = fileName;
   try {
+    // eslint-disable-next-line no-control-regex
     if (fileName.match(/[^\x00-\x7F]/)) {
       const latinBuffer = Buffer.from(fileName, 'latin1');
       decodedFileName = latinBuffer.toString('utf8');
@@ -335,6 +336,7 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
   const updatedFields = [];
 
   if (name !== undefined && name !== existingDoc.name) {
+    // eslint-disable-next-line no-restricted-syntax
     updates.name = name;
     updatedFields.push('name');
   }
@@ -482,7 +484,7 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
   return { status: 200, body: { message: 'deleted' } };
 }
 
-export default async function handler(req, context) {
+export default async function handler(req) {
   const method = req.method;
 
   // Auth check

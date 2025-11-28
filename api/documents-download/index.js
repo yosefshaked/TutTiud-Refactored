@@ -10,7 +10,7 @@ import { decryptCredentials, checkOrgMembership } from '../_shared/org-bff.js';
 import { createTenantClient } from '../_shared/supabase-tenant.js';
 import { getStorageDriver } from '../_shared/storage-drivers/index.js';
 
-export default async function handler(req, context) {
+export default async function handler(req) {
   if (req.method !== 'GET') {
     return { status: 405, body: { error: 'method_not_allowed' } };
   }
@@ -122,7 +122,6 @@ export default async function handler(req, context) {
   }
 
   // Encode filename for download header (RFC 5987)
-  const encodedFilename = encodeURIComponent(document.name);
   const ext = document.original_name.split('.').pop();
   const filenameWithExt = document.name.endsWith(`.${ext}`) ? document.name : `${document.name}.${ext}`;
   const encodedFilenameWithExt = encodeURIComponent(filenameWithExt);

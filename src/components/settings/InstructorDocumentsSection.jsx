@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrg } from '@/org/OrgContext';
+import { useAuth } from '@/auth/AuthContext.jsx';
+import { useOrg } from '@/org/OrgContext.jsx';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,6 @@ import { FileText, Upload, Download, Trash2, Loader2, AlertCircle, CheckCircle, 
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { authenticatedFetch } from '@/lib/api-client';
 import { getAuthClient } from '@/lib/supabase-manager.js';
 import { useDocuments } from '@/hooks/useDocuments';
 import {
@@ -294,8 +293,6 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
   // Use polymorphic Documents table hook for fetching documents
   const {
     documents,
-    loading: documentsLoading,
-    error: documentsError,
     fetchDocuments
   } = useDocuments('instructor', effectiveInstructorId);
 
@@ -328,7 +325,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
 
   // File upload restrictions
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  const ALLOWED_TYPES = [
+  const ALLOWED_TYPES = useMemo(() => [
     'application/pdf',
     'image/jpeg',
     'image/jpg',
@@ -338,7 +335,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ];
+  ], []);
 
   // Load document definitions
   useEffect(() => {
@@ -538,7 +535,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       // Remove from background uploads on error
       setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
     }
-  }, [instructor, session, orgId, onRefresh]);
+  }, [instructor, session, orgId, onRefresh, fetchDocuments]);
 
   const handleDeleteFile = useCallback(async (fileId) => {
     if (!confirm('האם למחוק את הקובץ? פעולה זו בלתי הפיכה.')) {
@@ -667,7 +664,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       console.error('Toggle resolved failed', error);
       toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
     }
-  }, [session, orgId, instructor?.id, onRefresh]);
+  }, [session, orgId, instructor?.id, onRefresh, fetchDocuments]);
 
   const handleEditFile = useCallback(
     async ({ fileId, name, relevantDate, expirationDate }) => {
@@ -723,7 +720,19 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
   );
 
   // Group files by definition
-  const filesByDefinition = {};
+  const filesByDefinition = useMemo(() => {
+    const grouped = {};
+    instructorFiles.forEach(file => {
+      if (file.definition_id) {
+        if (!grouped[file.definition_id]) {
+          grouped[file.definition_id] = [];
+        }
+        grouped[file.definition_id].push(file);
+      }
+    });
+    return grouped;
+  }, [instructorFiles]);
+
   const adhocFiles = useMemo(() => {
     const files = [];
     instructorFiles.forEach(file => {
@@ -733,18 +742,6 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
     });
     return files;
   }, [instructorFiles]);
-
-  useMemo(() => {
-    instructorFiles.forEach(file => {
-      if (file.definition_id) {
-        if (!filesByDefinition[file.definition_id]) {
-          filesByDefinition[file.definition_id] = [];
-        }
-        filesByDefinition[file.definition_id].push(file);
-      }
-    });
-    return filesByDefinition;
-  }, [instructorFiles, filesByDefinition]);
 
   // Sort adhoc files based on current sort settings
   const sortedAdhocFiles = useMemo(() => {

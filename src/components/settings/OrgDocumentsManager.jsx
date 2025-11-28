@@ -25,8 +25,6 @@ import {
 } from 'lucide-react';
 import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { authenticatedFetch } from '@/lib/api-client';
-import { getAuthClient } from '@/lib/supabase-manager.js';
 import { fetchSettingsValue, upsertSetting } from '@/features/settings/api/settings.js';
 import { useDocuments } from '@/hooks/useDocuments';
 import {
@@ -340,7 +338,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   }, [documentsError]);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  const ALLOWED_TYPES = [
+  const ALLOWED_TYPES = useMemo(() => [
     'application/pdf',
     'image/jpeg',
     'image/jpg',
@@ -348,9 +346,8 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     'image/gif',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ];
+  ], []);
 
   // Load member visibility setting
   const loadVisibilitySetting = useCallback(async () => {
