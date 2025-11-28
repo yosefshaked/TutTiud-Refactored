@@ -5,8 +5,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOrg } from '@/org/OrgContext';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { useOrg } from '@/org/OrgContext.jsx';
 
 export function useDocuments(entityType, entityId) {
   const { session } = useAuth();
