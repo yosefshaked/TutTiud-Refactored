@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext.jsx';
+import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 
 export function useDocuments(entityType, entityId) {
