@@ -34,6 +34,9 @@ export function useDocuments(entityType, entityId) {
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
+            'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+            'x-supabase-authorization': `Bearer ${session.access_token}`,
+            'x-supabase-auth': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json'
           }
         }
@@ -85,7 +88,10 @@ export function useDocuments(entityType, entityId) {
     const response = await fetch('/api/documents', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`
+        'Authorization': `Bearer ${session.access_token}`,
+        'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+        'x-supabase-authorization': `Bearer ${session.access_token}`,
+        'x-supabase-auth': `Bearer ${session.access_token}`
       },
       body: formData
     });
@@ -115,6 +121,9 @@ export function useDocuments(entityType, entityId) {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+        'x-supabase-authorization': `Bearer ${session.access_token}`,
+        'x-supabase-auth': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(updates)
@@ -141,6 +150,9 @@ export function useDocuments(entityType, entityId) {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+        'x-supabase-authorization': `Bearer ${session.access_token}`,
+        'x-supabase-auth': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
       }
     });
@@ -166,7 +178,10 @@ export function useDocuments(entityType, entityId) {
       `/api/documents-download?document_id=${documentId}&org_id=${activeOrgId}`,
       {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${session.access_token}`,
+          'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+          'x-supabase-authorization': `Bearer ${session.access_token}`,
+          'x-supabase-auth': `Bearer ${session.access_token}`
         }
       }
     );
