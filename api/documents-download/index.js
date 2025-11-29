@@ -273,13 +273,6 @@ export default async function handler(context, req) {
       contentType: document.type || 'application/octet-stream'
     });
   } catch (error) {
-    console.error('[ERROR] documents-download unhandled exception:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name,
-      document_id: req.query?.document_id,
-      org_id: req.query?.org_id
-    });
     context.log?.error?.('documents-download unhandled exception', {
       message: error.message,
       stack: error.stack

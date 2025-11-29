@@ -281,10 +281,10 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   // Use polymorphic Documents table hook for fetching documents
   const {
     documents,
-    loading: documentsLoading,
-    error: documentsError,
+    loading: _documentsLoading,
+    error: _documentsError,
     fetchDocuments
-  } = useDocuments('student', student.id);
+  } = useDocuments('student', student?.id);
   
   const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);

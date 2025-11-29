@@ -673,15 +673,6 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
 }
 
 export default async function handler(context, req) {
-  console.log('[DEBUG] ========== Documents API Request Started ==========');
-  console.log('[DEBUG] Request details:', {
-    method: req.method,
-    url: req.url,
-    query: req.query,
-    hasAuth: !!(req.headers?.authorization || req.headers?.Authorization),
-    headers: Object.keys(req.headers || {})
-  });
-
   try {
     const method = req.method;
 
@@ -693,29 +684,16 @@ export default async function handler(context, req) {
           const bodyText = req.body.toString('utf8');
           req.body = bodyText ? JSON.parse(bodyText) : {};
         } else if (typeof req.body === 'string') {
-          // Handle case where body is already a string
           req.body = req.body ? JSON.parse(req.body) : {};
         }
-        // If req.body is already an object, leave it as-is
       } catch (err) {
-        console.error('[ERROR] Failed to parse JSON body:', err, {
-          bodyType: typeof req.body,
-          isBuffer: Buffer.isBuffer(req.body),
-          bodyPreview: req.body ? req.body.toString('utf8').substring(0, 100) : 'null'
-        });
+        console.error('Failed to parse JSON body:', err.message);
         return respond(context, 400, { error: 'invalid_json_body', details: err.message });
       }
     }
 
     // Read environment and create Supabase admin client
-    console.log('[DEBUG] Step 1: Reading environment...');
     const env = readEnv(context);
-    console.log('[DEBUG] Environment read complete', {
-      hasEnv: !!env,
-      envKeys: env ? Object.keys(env).filter(k => k.includes('SUPABASE') || k.includes('CONTROL_DB') || k.includes('APP_')) : []
-    });
-
-    console.log('[DEBUG] Step 2: Reading Supabase admin config...');
     const adminConfig = readSupabaseAdminConfig(env);
 
     if (!adminConfig?.supabaseUrl || !adminConfig?.serviceRoleKey) {
@@ -730,58 +708,25 @@ export default async function handler(context, req) {
       return respond(context, 500, { error: 'server_misconfigured', message: 'Missing Supabase credentials', debug: errorDetails });
     }
 
-    console.log('[DEBUG] Step 3: Creating Supabase admin client...');
     // Auth check
     const supabase = createSupabaseAdminClient(adminConfig);
-    console.log('[DEBUG] Supabase admin client created');
 
-    console.log('[DEBUG] Step 4: Checking authentication header...');
     const authorization = resolveBearerAuthorization(req);
     if (!authorization?.token) {
-      console.warn('[WARN] Missing or invalid auth header');
       return respond(context, 401, { error: 'missing_auth' });
     }
 
     const token = authorization.token;
-    console.log('[DEBUG] Step 5: Verifying user token...', { 
-      tokenLength: token.length,
-      tokenPrefix: token.substring(0, 20) + '...',
-      supabaseUrl: adminConfig.supabaseUrl?.substring(0, 50)
-    });
     
     let authResult;
     try {
       authResult = await supabase.auth.getUser(token);
-      
-      console.log('[DEBUG] Token verification response:', {
-        hasResult: !!authResult,
-        hasData: !!authResult?.data,
-        hasUser: !!authResult?.data?.user,
-        userId: authResult?.data?.user?.id,
-        hasError: !!authResult?.error,
-        errorMessage: authResult?.error?.message,
-        errorName: authResult?.error?.name,
-        errorStatus: authResult?.error?.status
-      });
     } catch (err) {
-      console.error('[ERROR] Token verification threw exception:', {
-        message: err.message,
-        name: err.name,
-        stack: err.stack
-      });
+      console.error('Token verification threw exception:', err.message);
       return respond(context, 401, { error: 'invalid_token', details: err.message });
     }
     
     if (authResult.error || !authResult?.data?.user?.id) {
-      console.error('[ERROR] Token verification failed', { 
-        hasError: !!authResult.error,
-        errorMessage: authResult.error?.message,
-        errorName: authResult.error?.name,
-        errorStatus: authResult.error?.status,
-        hasData: !!authResult?.data,
-        hasUser: !!authResult?.data?.user,
-        hasUserId: !!authResult?.data?.user?.id
-      });
       return respond(context, 401, { error: 'invalid_token', details: authResult.error?.message });
     }
 
@@ -803,95 +748,40 @@ export default async function handler(context, req) {
         details: 'User email required for audit logging' 
       });
     }
-    
-    console.log('[DEBUG] Step 5.1: User data extracted from auth', { 
-      userId, 
-      userEmail,
-      hasUserId: !!userId,
-      hasUserEmail: !!userEmail,
-      userEmailType: typeof userEmail
-    });
 
     // Determine org from query or body
-    console.log('[DEBUG] Step 6: Determining org_id...', { 
-      queryOrgId: req.query?.org_id, 
-      bodyOrgId: req.body?.org_id,
-      method,
-      contentType: req.headers['content-type'],
-      hasBody: !!req.body,
-      bodyType: typeof req.body,
-      bodyLength: req.body?.length || 0
-    });
-    let orgId = req.query?.org_id; // Note: req.body won't have parsed multipart data
+    let orgId = req.query?.org_id;
     let multipartParts = null; // Store parsed parts to avoid double-parsing
     
     // For POST with multipart data, extract org_id from form data
     if (method === 'POST') {
-      console.log('[DEBUG] POST request, parsing multipart data...');
       try {
         const contentType = req.headers['content-type'] || '';
-        console.log('[DEBUG] Content-Type header:', contentType);
         const boundary = contentType.split('boundary=')[1];
-        console.log('[DEBUG] Extracted boundary:', boundary);
         
         if (boundary) {
-          console.log('[DEBUG] Calling multipart.parse...');
           multipartParts = multipart.parse(req.body, boundary);
-          console.log('[DEBUG] Multipart parts parsed:', {
-            partsCount: multipartParts?.length || 0,
-            partNames: multipartParts?.map(p => p.name) || []
-          });
-          
           const orgIdPart = multipartParts.find(p => p.name === 'org_id');
-          console.log('[DEBUG] Looking for org_id part:', {
-            found: !!orgIdPart,
-            partData: orgIdPart?.data?.toString('utf8')
-          });
           
           if (orgIdPart) {
             orgId = orgIdPart.data.toString('utf8');
-            console.log('[DEBUG] Extracted org_id from multipart:', orgId);
-          } else {
-            console.warn('[WARN] org_id part not found in multipart data');
           }
-        } else {
-          console.warn('[WARN] No boundary found in Content-Type header');
         }
       } catch (err) {
-        console.error('[ERROR] Failed to parse multipart data for org_id extraction:', {
-          error: err.message,
-          stack: err.stack,
-          errorName: err.name
-        });
+        console.error('Failed to parse multipart data for org_id extraction:', err.message);
       }
-    }
-    
-    // For GET with entity_id, infer org from entity ownership
-    if (!orgId && method === 'GET' && req.query?.entity_id && req.query?.entity_type) {
-      console.log('[DEBUG] GET request without org_id, will validate in membership check');
-      // Will validate in membership check
     }
 
     if (!orgId) {
-      console.warn('[WARN] org_id missing from request');
       return respond(context, 400, { error: 'org_id_required' });
     }
 
-    console.log('[DEBUG] Using org_id:', orgId);
-
     // Step 7: Verify membership
-    console.log('[DEBUG] Step 7: Verifying organization membership...', { orgId, userId });
     let role;
     try {
       role = await ensureMembership(supabase, orgId, userId);
-      console.log('[DEBUG] Membership verified successfully', { role });
     } catch (membershipError) {
-      console.error('[ERROR] Membership check failed', {
-        error: membershipError?.message,
-        stack: membershipError?.stack,
-        orgId,
-        userId
-      });
+      console.error('Membership check failed:', membershipError.message);
       context.log?.error?.('documents failed to verify membership', {
         message: membershipError?.message,
         orgId,
@@ -907,73 +797,32 @@ export default async function handler(context, req) {
 
     const userRole = role;
     const isAdmin = ['admin', 'owner'].includes(userRole);
-    console.log('[DEBUG] Step 7.1: User role determined', { 
-      userRole, 
-      isAdmin,
-      hasUserRole: !!userRole,
-      userRoleType: typeof userRole
-    });
 
     // Step 8: Get tenant client
-    console.log('[DEBUG] Step 8: Resolving tenant database client...', { orgId });
     const tenantResult = await resolveTenantClient(context, supabase, env, orgId);
     if (tenantResult.error) {
-      console.error('[ERROR] Tenant client resolution failed', { error: tenantResult.error });
+      console.error('Tenant client resolution failed:', tenantResult.error);
       return respond(context, 424, { error: 'tenant_not_configured', details: tenantResult.error });
     }
     const tenantClient = tenantResult.client;
-    console.log('[DEBUG] Tenant client resolved successfully');
 
     // Route to handler
-    console.log('[DEBUG] Step 9: Routing to method handler...', { method });
     let result;
     if (method === 'GET') {
-      console.log('[DEBUG] Calling handleGet...');
       result = await handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin);
     } else if (method === 'POST') {
-      console.log('[DEBUG] Calling handlePost...');
       result = await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin, context, env, multipartParts);
     } else if (method === 'PUT') {
-      console.log('[DEBUG] Calling handlePut with parameters:', {
-        hasReq: !!req,
-        hasSupabase: !!supabase,
-        hasTenantClient: !!tenantClient,
-        orgId,
-        userId,
-        userEmail,
-        userRole,
-        isAdmin,
-        hasOrgId: !!orgId,
-        hasUserId: !!userId,
-        hasUserEmail: !!userEmail,
-        hasUserRole: !!userRole,
-        allParamsPresent: !!(orgId && userId && userEmail && userRole)
-      });
       result = await handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else if (method === 'DELETE') {
-      console.log('[DEBUG] Calling handleDelete...');
       result = await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin, env);
     } else {
-      console.warn('[WARN] Method not allowed:', method);
       return respond(context, 405, { error: 'method_not_allowed' });
     }
-
-    console.log('[DEBUG] Handler completed', { 
-      status: result.status, 
-      hasBody: !!result.body,
-      bodyKeys: result.body ? Object.keys(result.body) : []
-    });
-    console.log('[DEBUG] ========== Documents API Request Completed ==========');
     
-    // CRITICAL: Use respond() helper to set context.res AND stringify body
     return respond(context, result.status, result.body);
   } catch (error) {
-    console.error('[ERROR] ========== Unhandled error in documents API ==========');
-    console.error('[ERROR] Error details:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack
-    });
+    console.error('Unhandled error in documents API:', error);
     context.log?.error?.('Documents API crashed:', error);
     return respond(context, 500, { 
       error: 'internal_server_error', 
