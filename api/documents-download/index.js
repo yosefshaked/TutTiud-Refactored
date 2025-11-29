@@ -13,9 +13,9 @@
  */
 
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
-import { ensureMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
+import { ensureMembership, resolveTenantClient, readEnv, respond } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
-import { resolveBearerAuthorization, respond } from '../_shared/http.js';
+import { resolveBearerAuthorization } from '../_shared/http.js';
 import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 
 export default async function handler(context, req) {
