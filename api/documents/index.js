@@ -259,13 +259,37 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
 
   // Get entity name for file naming
   let entityName = '';
+  console.log('[DEBUG] Fetching entity name for file naming', { entityType, entityId });
+  
   if (entityType === 'student') {
-    const { data: student } = await tenantClient.from('Students').select('full_name').eq('id', entityId).single();
+    const { data: student, error: studentError } = await tenantClient.from('Students').select('full_name').eq('id', entityId).single();
+    console.log('[DEBUG] Student query result', { 
+      hasData: !!student, 
+      fullName: student?.full_name,
+      error: studentError?.message,
+      errorCode: studentError?.code,
+      errorDetails: studentError?.details
+    });
+    if (studentError) {
+      console.error('Failed to fetch student name:', { entityId, error: studentError.message, code: studentError.code });
+    }
     entityName = student?.full_name || 'Unknown';
   } else if (entityType === 'instructor') {
-    const { data: instructor } = await tenantClient.from('Instructors').select('full_name').eq('id', entityId).single();
+    const { data: instructor, error: instructorError } = await tenantClient.from('Instructors').select('full_name').eq('id', entityId).single();
+    console.log('[DEBUG] Instructor query result', { 
+      hasData: !!instructor, 
+      fullName: instructor?.full_name,
+      error: instructorError?.message,
+      errorCode: instructorError?.code,
+      errorDetails: instructorError?.details
+    });
+    if (instructorError) {
+      console.error('Failed to fetch instructor name:', { entityId, error: instructorError.message, code: instructorError.code });
+    }
     entityName = instructor?.full_name || 'Unknown';
   }
+  
+  console.log('[DEBUG] Entity name resolved to:', entityName);
 
   // Build final file name
   const ext = decodedFileName.split('.').pop();
