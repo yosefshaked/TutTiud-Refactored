@@ -553,13 +553,15 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
           setUploadingAdhoc(false);
           setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
 
-          if (xhr.status === 200) {
+          if (xhr.status >= 200 && xhr.status < 300) {
             toast.success(`הקובץ ${file.name} הועלה בהצלחה!`, {
               id: toastId,
             });
 
-            // Refresh documents from hook
-            await fetchDocuments();
+            // Refresh documents from hook only if student still exists
+            if (student?.id) {
+              await fetchDocuments();
+            }
             
             // Also refresh parent if callback provided
             if (onRefresh) {
