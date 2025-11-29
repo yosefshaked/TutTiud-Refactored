@@ -415,6 +415,21 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
  * PUT - Update document metadata
  */
 async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin) {
+  console.log('[DEBUG] ========== handlePut START ==========');
+  console.log('[DEBUG] handlePut parameters:', {
+    hasReq: !!req,
+    hasSupabase: !!supabase,
+    hasTenantClient: !!tenantClient,
+    orgId,
+    userId,
+    userEmail,
+    userRole,
+    isAdmin,
+    hasReqParams: !!req.params,
+    hasReqBody: !!req.body,
+    reqUrl: req.url
+  });
+  
   let documentId = req.params?.id;
   
   // Fallback: extract from URL if params not populated
@@ -434,7 +449,7 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
     return { status: 400, body: { error: 'document_id_required' } };
   }
 
-  console.log('[DEBUG] handlePut: Processing update', { documentId });
+  console.log('[DEBUG] handlePut: Processing update', { documentId, bodyType: typeof req.body, bodyKeys: req.body ? Object.keys(req.body) : [] });
   const { name, relevant_date, expiration_date, resolved } = req.body;
 
   // Fetch existing document
