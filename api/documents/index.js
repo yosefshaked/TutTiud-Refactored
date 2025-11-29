@@ -525,7 +525,7 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
     userId,
     userEmail,
     userRole,
-    actionType: AUDIT_ACTIONS.FILE_METADATA_UPDATED,
+    actionType: AUDIT_ACTIONS.DOCUMENT_UPDATED,
     actionCategory: AUDIT_CATEGORIES.FILES,
     resourceType: `${existingDoc.entity_type}_file`,
     resourceId: documentId,
@@ -764,7 +764,30 @@ export default async function handler(context, req) {
 
     const userId = authResult.data.user.id;
     const userEmail = authResult.data.user.email;
-    console.log('[DEBUG] User authenticated successfully', { userId, userEmail });
+    
+    // Validate email exists (required for audit logging)
+    if (!userEmail) {
+      console.error('[ERROR] User email missing from auth token', {
+        userId,
+        userHasEmail: 'email' in authResult.data.user,
+        emailValue: authResult.data.user.email,
+        emailType: typeof authResult.data.user.email,
+        userKeys: Object.keys(authResult.data.user),
+        fullUserObject: JSON.stringify(authResult.data.user, null, 2)
+      });
+      return respond(context, 401, { 
+        error: 'invalid_token', 
+        details: 'User email required for audit logging' 
+      });
+    }
+    
+    console.log('[DEBUG] Step 5.1: User data extracted from auth', { 
+      userId, 
+      userEmail,
+      hasUserId: !!userId,
+      hasUserEmail: !!userEmail,
+      userEmailType: typeof userEmail
+    });
 
     // Determine org from query or body
     console.log('[DEBUG] Step 6: Determining org_id...', { 
@@ -834,7 +857,12 @@ export default async function handler(context, req) {
 
     const userRole = role;
     const isAdmin = ['admin', 'owner'].includes(userRole);
-    console.log('[DEBUG] User role determined', { userRole, isAdmin });
+    console.log('[DEBUG] Step 7.1: User role determined', { 
+      userRole, 
+      isAdmin,
+      hasUserRole: !!userRole,
+      userRoleType: typeof userRole
+    });
 
     // Get tenant client
     console.log('[DEBUG] Step 8: Resolving tenant database client...', { orgId });
@@ -856,7 +884,21 @@ export default async function handler(context, req) {
       console.log('[DEBUG] Calling handlePost...');
       result = await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else if (method === 'PUT') {
-      console.log('[DEBUG] Calling handlePut...');
+      console.log('[DEBUG] Calling handlePut with parameters:', {
+        hasReq: !!req,
+        hasSupabase: !!supabase,
+        hasTenantClient: !!tenantClient,
+        orgId,
+        userId,
+        userEmail,
+        userRole,
+        isAdmin,
+        hasOrgId: !!orgId,
+        hasUserId: !!userId,
+        hasUserEmail: !!userEmail,
+        hasUserRole: !!userRole,
+        allParamsPresent: !!(orgId && userId && userEmail && userRole)
+      });
       result = await handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else if (method === 'DELETE') {
       console.log('[DEBUG] Calling handleDelete...');
