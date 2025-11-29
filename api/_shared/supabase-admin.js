@@ -33,13 +33,6 @@ function extractValue(candidate, keys) {
 }
 
 export function readSupabaseAdminConfig(source = {}, overrides = {}) {
-  console.log('[DEBUG] readSupabaseAdminConfig called', {
-    hasSource: !!source,
-    hasOverrides: !!overrides,
-    sourceKeys: source ? Object.keys(source) : [],
-    processEnvKeys: process?.env ? Object.keys(process.env).filter(k => k.includes('SUPABASE') || k.includes('CONTROL_DB')) : []
-  });
-
   const mergedSource = normalizeSource(source);
   const envSource = normalizeSource(process?.env);
   const overrideSource = normalizeSource(overrides);
@@ -56,14 +49,6 @@ export function readSupabaseAdminConfig(source = {}, overrides = {}) {
     extractValue(envSource, ['serviceRoleKey', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_CONTROL_DB_SERVICE_ROLE_KEY', 'APP_SUPABASE_SERVICE_ROLE']) ??
     null;
 
-  console.log('[DEBUG] readSupabaseAdminConfig result', {
-    hasUrl: !!supabaseUrl,
-    urlLength: supabaseUrl?.length || 0,
-    hasKey: !!serviceRoleKey,
-    keyLength: serviceRoleKey?.length || 0,
-    urlPrefix: supabaseUrl?.substring(0, 30) || 'null'
-  });
-
   return { supabaseUrl, serviceRoleKey };
 }
 
@@ -72,18 +57,7 @@ export function isSupabaseAdminConfigValid(config) {
 }
 
 export function createSupabaseAdminClient(config, options = {}) {
-  console.log('[DEBUG] createSupabaseAdminClient called', {
-    hasConfig: !!config,
-    hasUrl: !!config?.supabaseUrl,
-    hasKey: !!config?.serviceRoleKey,
-    urlPrefix: config?.supabaseUrl?.substring(0, 30) || 'null'
-  });
-
   if (!config?.supabaseUrl || !config?.serviceRoleKey) {
-    console.error('[ERROR] createSupabaseAdminClient: Missing credentials', {
-      hasUrl: !!config?.supabaseUrl,
-      hasKey: !!config?.serviceRoleKey
-    });
     throw new Error('Missing Supabase admin credentials.');
   }
 
