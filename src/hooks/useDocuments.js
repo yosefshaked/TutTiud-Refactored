@@ -62,6 +62,8 @@ export function useDocuments(entityType, entityId) {
         status: response.status,
         statusText: response.statusText,
         ok: response.ok,
+        contentType: response.headers.get('content-type'),
+        contentLength: response.headers.get('content-length'),
         headers: Object.fromEntries(response.headers.entries())
       });
 
@@ -81,7 +83,21 @@ export function useDocuments(entityType, entityId) {
       }
 
       console.log('[DEBUG-FRONTEND] Parsing success response...');
-      const data = await response.json();
+      // Read response text first to debug empty body issue
+      const responseText = await response.text();
+      console.log('[DEBUG-FRONTEND] Response text received:', {
+        length: responseText.length,
+        preview: responseText.substring(0, 200),
+        isEmpty: responseText.length === 0
+      });
+
+      if (!responseText || responseText.length === 0) {
+        console.warn('[WARN-FRONTEND] Response body is empty despite 200 status');
+        setDocuments([]);
+        return;
+      }
+
+      const data = JSON.parse(responseText);
       console.log('[DEBUG-FRONTEND] Documents data received:', {
         hasDocuments: !!data.documents,
         documentCount: data.documents?.length || 0,

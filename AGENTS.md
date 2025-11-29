@@ -32,6 +32,35 @@
     - `entity_type` or `organization` - Org documents specific calls
 
 ## Workflow
+- **Azure Functions Response Pattern (CRITICAL)**: All Azure Functions HTTP handlers MUST set `context.res` before returning:
+  ```javascript
+  // ✅ CORRECT (use respond helper):
+  return respond(context, 200, { data: results });
+  
+  // ✅ CORRECT (manual):
+  const response = { status: 200, body: { data: results } };
+  context.res = response;
+  return response;
+  
+  // ❌ WRONG (missing context.res, returns empty body):
+  return { status: 200, body: { data: results } };
+  ```
+  - Without setting `context.res`, Azure returns HTTP 200 with an **empty body**, causing `JSON.parse()` errors in frontend.
+  - Use existing endpoints like `/api/students`, `/api/instructors`, `/api/settings` as reference, NOT `/api/student-files` or document-related endpoints during refactor periods.
+- **Supabase Auth Response Structure (CRITICAL)**: `supabase.auth.getUser(token)` returns `{ data, error }`, access user via `result.data.user`:
+  ```javascript
+  // ✅ CORRECT:
+  const authResult = await supabase.auth.getUser(token);
+  if (authResult.error || !authResult.data?.user?.id) {
+    return respond(context, 401, { message: 'invalid_token' });
+  }
+  const userId = authResult.data.user.id;
+  
+  // ❌ WRONG (incorrect destructuring):
+  const { data: authResult, error } = await supabase.auth.getUser(token);
+  const userId = authResult.user.id; // TypeError: authResult is already .data
+  ```
+  - Always follow the pattern in `/api/students/index.js`, `/api/instructors/index.js`, `/api/settings/index.js` for auth verification.
 - **API Validation**: Before deploying API changes, run validation to catch common issues:
   - `npm run lint:api` - ESLint validation for API endpoints (industry standard, catches import/export issues, undefined variables, etc.)
   - `node scripts/validate-api-endpoints.js` - Azure Functions-specific validation (function.json, scriptFile alignment, JSON validity)

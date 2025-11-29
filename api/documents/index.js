@@ -9,7 +9,7 @@
  */
 
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
-import { ensureMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
+import { ensureMembership, resolveTenantClient, readEnv, respond } from '../_shared/org-bff.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 import parseMultipartDataPkg from 'parse-multipart-data';
 import { createHash } from 'crypto';
@@ -598,7 +598,7 @@ export default async function handler(context, req) {
       };
       console.error('[ERROR] Missing Supabase admin credentials', errorDetails);
       context.log?.error?.('documents missing Supabase admin credentials', errorDetails);
-      return { status: 500, body: { error: 'server_misconfigured', message: 'Missing Supabase credentials', debug: errorDetails } };
+      return respond(context, 500, { error: 'server_misconfigured', message: 'Missing Supabase credentials', debug: errorDetails });
     }
 
     console.log('[DEBUG] Step 3: Creating Supabase admin client...');
@@ -610,19 +610,54 @@ export default async function handler(context, req) {
     const authHeader = req.headers.authorization || req.headers.Authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       console.warn('[WARN] Missing or invalid auth header');
-      return { status: 401, body: { error: 'missing_auth' } };
+      return respond(context, 401, { error: 'missing_auth' });
     }
 
     const token = authHeader.substring(7);
-    console.log('[DEBUG] Step 5: Verifying user token...', { tokenLength: token.length });
-    const { data: authResult, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authResult?.user) {
-      console.error('[ERROR] Token verification failed', { error: authError?.message });
-      return { status: 401, body: { error: 'invalid_token', details: authError?.message } };
+    console.log('[DEBUG] Step 5: Verifying user token...', { 
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20) + '...',
+      supabaseUrl: adminConfig.supabaseUrl?.substring(0, 50)
+    });
+    
+    let authResult;
+    try {
+      authResult = await supabase.auth.getUser(token);
+      
+      console.log('[DEBUG] Token verification response:', {
+        hasResult: !!authResult,
+        hasData: !!authResult?.data,
+        hasUser: !!authResult?.data?.user,
+        userId: authResult?.data?.user?.id,
+        hasError: !!authResult?.error,
+        errorMessage: authResult?.error?.message,
+        errorName: authResult?.error?.name,
+        errorStatus: authResult?.error?.status
+      });
+    } catch (err) {
+      console.error('[ERROR] Token verification threw exception:', {
+        message: err.message,
+        name: err.name,
+        stack: err.stack
+      });
+      return respond(context, 401, { error: 'invalid_token', details: err.message });
+    }
+    
+    if (authResult.error || !authResult?.data?.user?.id) {
+      console.error('[ERROR] Token verification failed', { 
+        hasError: !!authResult.error,
+        errorMessage: authResult.error?.message,
+        errorName: authResult.error?.name,
+        errorStatus: authResult.error?.status,
+        hasData: !!authResult?.data,
+        hasUser: !!authResult?.data?.user,
+        hasUserId: !!authResult?.data?.user?.id
+      });
+      return respond(context, 401, { error: 'invalid_token', details: authResult.error?.message });
     }
 
-    const userId = authResult.user.id;
-    const userEmail = authResult.user.email;
+    const userId = authResult.data.user.id;
+    const userEmail = authResult.data.user.email;
     console.log('[DEBUG] User authenticated successfully', { userId, userEmail });
 
     // Determine org from query or body
@@ -641,7 +676,7 @@ export default async function handler(context, req) {
 
     if (!orgId) {
       console.warn('[WARN] org_id missing from request');
-      return { status: 400, body: { error: 'org_id_required' } };
+      return respond(context, 400, { error: 'org_id_required' });
     }
 
     console.log('[DEBUG] Using org_id:', orgId);
@@ -664,12 +699,12 @@ export default async function handler(context, req) {
         orgId,
         userId,
       });
-      return { status: 500, body: { error: 'failed_to_verify_membership', details: membershipError?.message } };
+      return respond(context, 500, { error: 'failed_to_verify_membership', details: membershipError?.message });
     }
 
     if (!role) {
       console.warn('[WARN] User is not a member of organization', { orgId, userId });
-      return { status: 403, body: { error: 'not_member' } };
+      return respond(context, 403, { error: 'not_member' });
     }
 
     const userRole = role;
@@ -681,7 +716,7 @@ export default async function handler(context, req) {
     const tenantResult = await resolveTenantClient(context, supabase, env, orgId);
     if (tenantResult.error) {
       console.error('[ERROR] Tenant client resolution failed', { error: tenantResult.error });
-      return { status: 424, body: { error: 'tenant_not_configured', details: tenantResult.error } };
+      return respond(context, 424, { error: 'tenant_not_configured', details: tenantResult.error });
     }
     const tenantClient = tenantResult.client;
     console.log('[DEBUG] Tenant client resolved successfully');
@@ -703,7 +738,7 @@ export default async function handler(context, req) {
       result = await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else {
       console.warn('[WARN] Method not allowed:', method);
-      return { status: 405, body: { error: 'method_not_allowed' } };
+      return respond(context, 405, { error: 'method_not_allowed' });
     }
 
     console.log('[DEBUG] Handler completed', { 
@@ -712,6 +747,9 @@ export default async function handler(context, req) {
       bodyKeys: result.body ? Object.keys(result.body) : []
     });
     console.log('[DEBUG] ========== Documents API Request Completed ==========');
+    
+    // CRITICAL: Set context.res for Azure Functions
+    context.res = result;
     return result;
   } catch (error) {
     console.error('[ERROR] ========== Unhandled error in documents API ==========');
@@ -721,13 +759,10 @@ export default async function handler(context, req) {
       stack: error.stack
     });
     context.log?.error?.('Documents API crashed:', error);
-    return { 
-      status: 500, 
-      body: { 
-        error: 'internal_server_error', 
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      } 
-    };
+    return respond(context, 500, { 
+      error: 'internal_server_error', 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
