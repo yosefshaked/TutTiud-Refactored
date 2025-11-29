@@ -799,27 +799,53 @@ export default async function handler(context, req) {
     console.log('[DEBUG] Step 6: Determining org_id...', { 
       queryOrgId: req.query?.org_id, 
       bodyOrgId: req.body?.org_id,
-      method 
+      method,
+      contentType: req.headers['content-type'],
+      hasBody: !!req.body,
+      bodyType: typeof req.body,
+      bodyLength: req.body?.length || 0
     });
-    let orgId = req.query?.org_id || req.body?.org_id;
+    let orgId = req.query?.org_id; // Note: req.body won't have parsed multipart data
     let multipartParts = null; // Store parsed parts to avoid double-parsing
     
     // For POST with multipart data, extract org_id from form data
-    if (!orgId && method === 'POST') {
-      console.log('[DEBUG] POST request, attempting to extract org_id from multipart data...');
+    if (method === 'POST') {
+      console.log('[DEBUG] POST request, parsing multipart data...');
       try {
         const contentType = req.headers['content-type'] || '';
+        console.log('[DEBUG] Content-Type header:', contentType);
         const boundary = contentType.split('boundary=')[1];
+        console.log('[DEBUG] Extracted boundary:', boundary);
+        
         if (boundary) {
+          console.log('[DEBUG] Calling parseMultipartData...');
           multipartParts = parseMultipartData(req.body, boundary);
+          console.log('[DEBUG] Multipart parts parsed:', {
+            partsCount: multipartParts?.length || 0,
+            partNames: multipartParts?.map(p => p.name) || []
+          });
+          
           const orgIdPart = multipartParts.find(p => p.name === 'org_id');
+          console.log('[DEBUG] Looking for org_id part:', {
+            found: !!orgIdPart,
+            partData: orgIdPart?.data?.toString('utf8')
+          });
+          
           if (orgIdPart) {
             orgId = orgIdPart.data.toString('utf8');
             console.log('[DEBUG] Extracted org_id from multipart:', orgId);
+          } else {
+            console.warn('[WARN] org_id part not found in multipart data');
           }
+        } else {
+          console.warn('[WARN] No boundary found in Content-Type header');
         }
       } catch (err) {
-        console.error('[ERROR] Failed to parse multipart data for org_id extraction:', err);
+        console.error('[ERROR] Failed to parse multipart data for org_id extraction:', {
+          error: err.message,
+          stack: err.stack,
+          errorName: err.name
+        });
       }
     }
     
