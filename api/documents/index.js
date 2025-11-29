@@ -98,19 +98,28 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
   
   // Debug: Check if any org documents exist at all
   if (entity_type === 'organization') {
-    const { data: allOrgDocs } = await tenantClient
-      .from('Documents')
-      .select('id, entity_type, entity_id, name')
-      .eq('entity_type', 'organization');
-    console.log('[DEBUG] All organization documents in table:', {
-      count: allOrgDocs?.length || 0,
-      docs: allOrgDocs?.map(d => ({ 
-        id: d.id, 
-        entity_id: d.entity_id,
-        name: d.name,
-        matches: d.entity_id === entity_id 
-      }))
-    });
+    try {
+      const { data: allOrgDocs, error: debugError } = await tenantClient
+        .from('Documents')
+        .select('id, entity_type, entity_id, name')
+        .eq('entity_type', 'organization');
+      
+      if (debugError) {
+        console.warn('[WARN] Debug query failed:', debugError);
+      } else {
+        console.log('[DEBUG] All organization documents in table:', {
+          count: allOrgDocs?.length || 0,
+          docs: allOrgDocs?.map(d => ({ 
+            id: d.id, 
+            entity_id: d.entity_id,
+            name: d.name,
+            matches: d.entity_id === entity_id 
+          })) || []
+        });
+      }
+    } catch (debugErr) {
+      console.warn('[WARN] Debug query exception:', debugErr);
+    }
   }
   
   const { data: documents, error } = await tenantClient
