@@ -5,7 +5,7 @@
  * GET /api/documents-download?document_id={uuid}&org_id={uuid}
  */
 
-import { createSupabaseAdminClient } from '../_shared/supabase-admin.js';
+import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import { ensureMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 
@@ -20,8 +20,17 @@ export default async function handler(context, req) {
     return { status: 400, body: { error: 'document_id and org_id required' } };
   }
 
+  // Read environment and create Supabase admin client
+  const env = readEnv(context);
+  const adminConfig = readSupabaseAdminConfig(env);
+
+  if (!adminConfig?.supabaseUrl || !adminConfig?.serviceRoleKey) {
+    context.log?.error?.('documents-download missing Supabase admin credentials');
+    return { status: 500, body: { error: 'server_misconfigured' } };
+  }
+
   // Auth check
-  const supabase = createSupabaseAdminClient();
+  const supabase = createSupabaseAdminClient(adminConfig);
   const authHeader = req.headers.authorization || req.headers.Authorization;
   if (!authHeader?.startsWith('Bearer ')) {
     return { status: 401, body: { error: 'missing_auth' } };
@@ -56,7 +65,6 @@ export default async function handler(context, req) {
   const isAdmin = ['admin', 'owner'].includes(userRole);
 
   // Get tenant client
-  const env = readEnv(context);
   const tenantResult = await resolveTenantClient(context, supabase, env, org_id);
   if (tenantResult.error) {
     return { status: 424, body: { error: 'tenant_not_configured', details: tenantResult.error } };
