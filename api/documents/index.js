@@ -316,7 +316,13 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   // Initialize storage driver
   let driver;
   try {
-    driver = getStorageDriver(storageProfile);
+    if (storageProfile.mode === 'managed') {
+      driver = getStorageDriver('managed', null, env);
+    } else if (storageProfile.mode === 'byos') {
+      driver = getStorageDriver('byos', storageProfile.byos, env);
+    } else {
+      throw new Error(`Invalid storage mode: ${storageProfile.mode}`);
+    }
   } catch (err) {
     console.error('Storage driver initialization error:', err);
     return { status: 500, body: { error: 'storage_init_failed' } };
@@ -613,7 +619,13 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
   // Initialize storage driver
   let driver;
   try {
-    driver = getStorageDriver(storageProfile);
+    if (storageProfile.mode === 'managed') {
+      driver = getStorageDriver('managed', null, env);
+    } else if (storageProfile.mode === 'byos') {
+      driver = getStorageDriver('byos', storageProfile.byos, env);
+    } else {
+      throw new Error(`Invalid storage mode: ${storageProfile.mode}`);
+    }
   } catch (err) {
     console.error('Storage driver initialization error:', err);
     return { status: 500, body: { error: 'storage_init_failed' } };
