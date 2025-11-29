@@ -12,6 +12,7 @@ import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/s
 import { ensureMembership, resolveTenantClient, readEnv, respond } from '../_shared/org-bff.js';
 import { resolveBearerAuthorization } from '../_shared/http.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
+import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 import multipart from 'parse-multipart-data';
 import { createHash } from 'crypto';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
@@ -302,7 +303,10 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     return { status: 424, body: { error: 'storage_not_configured' } };
   }
 
-  const storageProfile = orgSettings.storage_profile;
+  let storageProfile = orgSettings.storage_profile;
+
+  // Decrypt BYOS credentials if needed
+  storageProfile = decryptStorageProfile(storageProfile, env);
 
   // Check if storage is disconnected
   if (storageProfile.disconnected) {
@@ -547,7 +551,7 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
 /**
  * DELETE - Remove document
  */
-async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin) {
+async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin, env) {
   let documentId = req.params?.id;
   
   // Fallback: extract from URL if params not populated
@@ -601,7 +605,10 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
     return { status: 424, body: { error: 'storage_not_configured' } };
   }
 
-  const storageProfile = orgSettings.storage_profile;
+  let storageProfile = orgSettings.storage_profile;
+
+  // Decrypt BYOS credentials if needed
+  storageProfile = decryptStorageProfile(storageProfile, env);
 
   // Initialize storage driver
   let driver;
@@ -933,7 +940,7 @@ export default async function handler(context, req) {
       result = await handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else if (method === 'DELETE') {
       console.log('[DEBUG] Calling handleDelete...');
-      result = await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+      result = await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin, env);
     } else {
       console.warn('[WARN] Method not allowed:', method);
       return respond(context, 405, { error: 'method_not_allowed' });
