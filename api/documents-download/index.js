@@ -9,7 +9,7 @@ import { createSupabaseAdminClient } from '../_shared/supabase-admin.js';
 import { checkOrgMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../_shared/storage-drivers/index.js';
 
-export default async function handler(req, context) {
+export default async function handler(context, req) {
   if (req.method !== 'GET') {
     return { status: 405, body: { error: 'method_not_allowed' } };
   }

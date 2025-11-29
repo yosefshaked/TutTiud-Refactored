@@ -503,7 +503,7 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
   return { status: 200, body: { message: 'deleted' } };
 }
 
-export default async function handler(req, context) {
+export default async function handler(context, req) {
   const method = req.method;
 
   // Auth check
