@@ -415,11 +415,26 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
  * PUT - Update document metadata
  */
 async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin) {
-  const documentId = req.params?.id;
+  let documentId = req.params?.id;
+  
+  // Fallback: extract from URL if params not populated
+  if (!documentId && req.url) {
+    const match = req.url.match(/\/documents\/([a-f0-9-]+)/i);
+    if (match) {
+      documentId = match[1];
+    }
+  }
+  
   if (!documentId) {
+    console.error('[ERROR] handlePut: document_id missing', {
+      hasParams: !!req.params,
+      paramsId: req.params?.id,
+      url: req.url
+    });
     return { status: 400, body: { error: 'document_id_required' } };
   }
 
+  console.log('[DEBUG] handlePut: Processing update', { documentId });
   const { name, relevant_date, expiration_date, resolved } = req.body;
 
   // Fetch existing document
@@ -503,10 +518,26 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
  * DELETE - Remove document
  */
 async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin) {
-  const documentId = req.params?.id;
+  let documentId = req.params?.id;
+  
+  // Fallback: extract from URL if params not populated
+  if (!documentId && req.url) {
+    const match = req.url.match(/\/documents\/([a-f0-9-]+)/i);
+    if (match) {
+      documentId = match[1];
+    }
+  }
+  
   if (!documentId) {
+    console.error('[ERROR] handleDelete: document_id missing', {
+      hasParams: !!req.params,
+      paramsId: req.params?.id,
+      url: req.url
+    });
     return { status: 400, body: { error: 'document_id_required' } };
   }
+
+  console.log('[DEBUG] handleDelete: Processing deletion', { documentId });
 
   // Fetch existing document
   const { data: existingDoc, error: fetchError } = await tenantClient
@@ -608,13 +639,22 @@ export default async function handler(context, req) {
     // Parse JSON body for PUT/DELETE requests
     if ((method === 'PUT' || method === 'DELETE') && req.body) {
       try {
+        // Only parse if body is a Buffer (not already parsed)
         if (Buffer.isBuffer(req.body)) {
           const bodyText = req.body.toString('utf8');
           req.body = bodyText ? JSON.parse(bodyText) : {};
+        } else if (typeof req.body === 'string') {
+          // Handle case where body is already a string
+          req.body = req.body ? JSON.parse(req.body) : {};
         }
+        // If req.body is already an object, leave it as-is
       } catch (err) {
-        console.error('[ERROR] Failed to parse JSON body:', err);
-        return respond(context, 400, { error: 'invalid_json_body' });
+        console.error('[ERROR] Failed to parse JSON body:', err, {
+          bodyType: typeof req.body,
+          isBuffer: Buffer.isBuffer(req.body),
+          bodyPreview: req.body ? req.body.toString('utf8').substring(0, 100) : 'null'
+        });
+        return respond(context, 400, { error: 'invalid_json_body', details: err.message });
       }
     }
 
