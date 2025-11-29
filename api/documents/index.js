@@ -494,6 +494,17 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
   }
 
   // Audit log
+  console.log('[DEBUG] Preparing audit log for document update', {
+    hasOrgId: !!orgId,
+    hasUserId: !!userId,
+    hasUserEmail: !!userEmail,
+    hasUserRole: !!userRole,
+    orgId,
+    userId,
+    userEmail,
+    userRole
+  });
+  
   await logAuditEvent(supabase, {
     orgId,
     userId,
