@@ -63,18 +63,38 @@ function validateEntityAccess(entityType, userRole, userId, entityId, isAdmin) {
  * GET - List documents for an entity
  */
 async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin) {
+  console.log('[DEBUG] ===== handleGet START =====');
+  console.log('[DEBUG] handleGet params:', { 
+    entity_type: req.query?.entity_type, 
+    entity_id: req.query?.entity_id,
+    orgId,
+    userId,
+    userRole,
+    isAdmin
+  });
+
   const { entity_type, entity_id } = req.query;
 
   if (!entity_type || !entity_id) {
+    console.warn('[WARN] handleGet: Missing required parameters');
     return { status: 400, body: { error: 'entity_type and entity_id required' } };
   }
 
+  console.log('[DEBUG] Validating entity access...', { entity_type, userRole, isAdmin });
   const validation = validateEntityAccess(entity_type, userRole, userId, entity_id, isAdmin);
   if (!validation.valid) {
+    console.warn('[WARN] Entity access validation failed', { error: validation.error, entity_type, userRole });
     return { status: 403, body: { error: validation.error } };
   }
+  console.log('[DEBUG] Entity access validated successfully');
 
   // Fetch documents from Documents table
+  console.log('[DEBUG] Querying Documents table...', { 
+    table: 'Documents',
+    schema: 'tuttiud',
+    filters: { entity_type, entity_id }
+  });
+  
   const { data: documents, error } = await tenantClient
     .from('Documents')
     .select('*')
@@ -82,15 +102,51 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
     .eq('entity_id', entity_id)
     .order('uploaded_at', { ascending: false });
 
+  console.log('[DEBUG] Documents query completed', { 
+    hasError: !!error,
+    errorMessage: error?.message,
+    errorCode: error?.code,
+    errorHint: error?.hint,
+    errorDetails: error?.details,
+    documentCount: documents?.length || 0,
+    documents: documents?.map(d => ({ id: d.id, name: d.name, entity_type: d.entity_type })) || []
+  });
+
   if (error) {
-    console.error('Documents fetch error:', error);
+    console.error('[ERROR] Documents fetch failed');
+    console.error('[ERROR] Full error object:', JSON.stringify(error, null, 2));
+    
     // Check if table doesn't exist
     if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
-      return { status: 424, body: { error: 'documents_table_not_found', message: 'Documents table does not exist. Please run the setup script.' } };
+      console.error('[ERROR] Documents table does not exist in tenant database');
+      return { 
+        status: 424, 
+        body: { 
+          error: 'documents_table_not_found', 
+          message: 'Documents table does not exist. Please run the setup script.', 
+          details: error.message,
+          hint: 'Run setup-sql.js on the tenant database to create the Documents table'
+        } 
+      };
     }
-    return { status: 500, body: { error: 'fetch_failed', details: error.message } };
+    
+    return { 
+      status: 500, 
+      body: { 
+        error: 'fetch_failed', 
+        message: error.message,
+        details: error.details,
+        code: error.code,
+        hint: error.hint
+      } 
+    };
   }
 
+  console.log('[DEBUG] Documents fetched successfully', { 
+    count: documents?.length || 0,
+    documentIds: documents?.map(d => d.id) || []
+  });
+  console.log('[DEBUG] ===== handleGet END =====');
   return { status: 200, body: { documents: documents || [] } };
 }
 
@@ -510,90 +566,160 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
 }
 
 export default async function handler(context, req) {
+  console.log('[DEBUG] ========== Documents API Request Started ==========');
+  console.log('[DEBUG] Request details:', {
+    method: req.method,
+    url: req.url,
+    query: req.query,
+    hasAuth: !!(req.headers?.authorization || req.headers?.Authorization),
+    headers: Object.keys(req.headers || {})
+  });
+
   try {
     const method = req.method;
 
     // Read environment and create Supabase admin client
+    console.log('[DEBUG] Step 1: Reading environment...');
     const env = readEnv(context);
+    console.log('[DEBUG] Environment read complete', {
+      hasEnv: !!env,
+      envKeys: env ? Object.keys(env).filter(k => k.includes('SUPABASE') || k.includes('CONTROL_DB') || k.includes('APP_')) : []
+    });
+
+    console.log('[DEBUG] Step 2: Reading Supabase admin config...');
     const adminConfig = readSupabaseAdminConfig(env);
 
     if (!adminConfig?.supabaseUrl || !adminConfig?.serviceRoleKey) {
-      context.log?.error?.('documents missing Supabase admin credentials', {
+      const errorDetails = {
         hasUrl: !!adminConfig?.supabaseUrl,
-        hasKey: !!adminConfig?.serviceRoleKey
-      });
-      return { status: 500, body: { error: 'server_misconfigured', message: 'Missing Supabase credentials' } };
+        hasKey: !!adminConfig?.serviceRoleKey,
+        urlPrefix: adminConfig?.supabaseUrl?.substring(0, 30) || 'null',
+        keyPrefix: adminConfig?.serviceRoleKey?.substring(0, 10) || 'null'
+      };
+      console.error('[ERROR] Missing Supabase admin credentials', errorDetails);
+      context.log?.error?.('documents missing Supabase admin credentials', errorDetails);
+      return { status: 500, body: { error: 'server_misconfigured', message: 'Missing Supabase credentials', debug: errorDetails } };
     }
 
+    console.log('[DEBUG] Step 3: Creating Supabase admin client...');
     // Auth check
     const supabase = createSupabaseAdminClient(adminConfig);
+    console.log('[DEBUG] Supabase admin client created');
+
+    console.log('[DEBUG] Step 4: Checking authentication header...');
     const authHeader = req.headers.authorization || req.headers.Authorization;
     if (!authHeader?.startsWith('Bearer ')) {
+      console.warn('[WARN] Missing or invalid auth header');
       return { status: 401, body: { error: 'missing_auth' } };
     }
 
     const token = authHeader.substring(7);
+    console.log('[DEBUG] Step 5: Verifying user token...', { tokenLength: token.length });
     const { data: authResult, error: authError } = await supabase.auth.getUser(token);
     if (authError || !authResult?.user) {
-      return { status: 401, body: { error: 'invalid_token' } };
+      console.error('[ERROR] Token verification failed', { error: authError?.message });
+      return { status: 401, body: { error: 'invalid_token', details: authError?.message } };
     }
 
     const userId = authResult.user.id;
     const userEmail = authResult.user.email;
+    console.log('[DEBUG] User authenticated successfully', { userId, userEmail });
 
     // Determine org from query or body
+    console.log('[DEBUG] Step 6: Determining org_id...', { 
+      queryOrgId: req.query?.org_id, 
+      bodyOrgId: req.body?.org_id,
+      method 
+    });
     let orgId = req.query?.org_id || req.body?.org_id;
     
     // For GET with entity_id, infer org from entity ownership
     if (!orgId && method === 'GET' && req.query?.entity_id && req.query?.entity_type) {
+      console.log('[DEBUG] GET request without org_id, will validate in membership check');
       // Will validate in membership check
     }
 
     if (!orgId) {
+      console.warn('[WARN] org_id missing from request');
       return { status: 400, body: { error: 'org_id_required' } };
     }
 
+    console.log('[DEBUG] Using org_id:', orgId);
+
     // Membership check
+    console.log('[DEBUG] Step 7: Verifying organization membership...', { orgId, userId });
     let role;
     try {
       role = await ensureMembership(supabase, orgId, userId);
+      console.log('[DEBUG] Membership verified successfully', { role });
     } catch (membershipError) {
+      console.error('[ERROR] Membership check failed', {
+        error: membershipError?.message,
+        stack: membershipError?.stack,
+        orgId,
+        userId
+      });
       context.log?.error?.('documents failed to verify membership', {
         message: membershipError?.message,
         orgId,
         userId,
       });
-      return { status: 500, body: { error: 'failed_to_verify_membership' } };
+      return { status: 500, body: { error: 'failed_to_verify_membership', details: membershipError?.message } };
     }
 
     if (!role) {
+      console.warn('[WARN] User is not a member of organization', { orgId, userId });
       return { status: 403, body: { error: 'not_member' } };
     }
 
     const userRole = role;
     const isAdmin = ['admin', 'owner'].includes(userRole);
+    console.log('[DEBUG] User role determined', { userRole, isAdmin });
 
     // Get tenant client
+    console.log('[DEBUG] Step 8: Resolving tenant database client...', { orgId });
     const tenantResult = await resolveTenantClient(context, supabase, env, orgId);
     if (tenantResult.error) {
+      console.error('[ERROR] Tenant client resolution failed', { error: tenantResult.error });
       return { status: 424, body: { error: 'tenant_not_configured', details: tenantResult.error } };
     }
     const tenantClient = tenantResult.client;
+    console.log('[DEBUG] Tenant client resolved successfully');
 
     // Route to handler
+    console.log('[DEBUG] Step 9: Routing to method handler...', { method });
+    let result;
     if (method === 'GET') {
-      return await handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin);
+      console.log('[DEBUG] Calling handleGet...');
+      result = await handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin);
     } else if (method === 'POST') {
-      return await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+      console.log('[DEBUG] Calling handlePost...');
+      result = await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else if (method === 'PUT') {
-      return await handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+      console.log('[DEBUG] Calling handlePut...');
+      result = await handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else if (method === 'DELETE') {
-      return await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+      console.log('[DEBUG] Calling handleDelete...');
+      result = await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
     } else {
+      console.warn('[WARN] Method not allowed:', method);
       return { status: 405, body: { error: 'method_not_allowed' } };
     }
+
+    console.log('[DEBUG] Handler completed', { 
+      status: result.status, 
+      hasBody: !!result.body,
+      bodyKeys: result.body ? Object.keys(result.body) : []
+    });
+    console.log('[DEBUG] ========== Documents API Request Completed ==========');
+    return result;
   } catch (error) {
-    console.error('Unhandled error in documents API:', error);
+    console.error('[ERROR] ========== Unhandled error in documents API ==========');
+    console.error('[ERROR] Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
     context.log?.error?.('Documents API crashed:', error);
     return { 
       status: 500, 

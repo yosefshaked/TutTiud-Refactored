@@ -19,7 +19,19 @@ export function useDocuments(entityType, entityId) {
    * Fetch documents for the entity
    */
   const fetchDocuments = useCallback(async () => {
+    console.log('[DEBUG-FRONTEND] useDocuments fetchDocuments called', {
+      entityType,
+      entityId,
+      activeOrgId,
+      hasSession: !!session?.access_token
+    });
+
     if (!session?.access_token || !activeOrgId || !entityId) {
+      console.warn('[WARN-FRONTEND] useDocuments: Missing required context', {
+        hasToken: !!session?.access_token,
+        hasOrgId: !!activeOrgId,
+        hasEntityId: !!entityId
+      });
       setDocuments([]);
       setLoading(false);
       return;
@@ -29,38 +41,64 @@ export function useDocuments(entityType, entityId) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `/api/documents?entity_type=${entityType}&entity_id=${entityId}&org_id=${activeOrgId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'X-Supabase-Authorization': `Bearer ${session.access_token}`,
-            'x-supabase-authorization': `Bearer ${session.access_token}`,
-            'x-supabase-auth': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
+      const url = `/api/documents?entity_type=${entityType}&entity_id=${entityId}&org_id=${activeOrgId}`;
+      console.log('[DEBUG-FRONTEND] Fetching documents from:', url);
+      console.log('[DEBUG-FRONTEND] Request headers:', {
+        hasAuth: !!session?.access_token,
+        tokenLength: session?.access_token?.length || 0
+      });
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+          'x-supabase-authorization': `Bearer ${session.access_token}`,
+          'x-supabase-auth': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
         }
-      );
+      });
+
+      console.log('[DEBUG-FRONTEND] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      });
 
       if (!response.ok) {
+        console.error('[ERROR-FRONTEND] Response not OK, reading error...');
         let errorData;
         try {
           const text = await response.text();
+          console.log('[DEBUG-FRONTEND] Error response text:', text);
           errorData = text ? JSON.parse(text) : {};
-        } catch {
+          console.log('[DEBUG-FRONTEND] Parsed error data:', errorData);
+        } catch (parseError) {
+          console.error('[ERROR-FRONTEND] Failed to parse error response:', parseError);
           errorData = {};
         }
         throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
       }
 
+      console.log('[DEBUG-FRONTEND] Parsing success response...');
       const data = await response.json();
+      console.log('[DEBUG-FRONTEND] Documents data received:', {
+        hasDocuments: !!data.documents,
+        documentCount: data.documents?.length || 0,
+        firstDocument: data.documents?.[0]?.name || 'none'
+      });
+
       setDocuments(data.documents || []);
     } catch (err) {
-      console.error('Documents fetch error:', err);
+      console.error('[ERROR-FRONTEND] Documents fetch error:', {
+        message: err.message,
+        stack: err.stack
+      });
       setError(err.message);
       setDocuments([]);
     } finally {
       setLoading(false);
+      console.log('[DEBUG-FRONTEND] fetchDocuments completed');
     }
   }, [session?.access_token, activeOrgId, entityType, entityId]);
 

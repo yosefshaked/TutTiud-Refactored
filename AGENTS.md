@@ -11,6 +11,25 @@
   - Filter by "Trace Severity level = Information" for general logs
   - Use time range selector (last 24 hours, custom, etc.) to narrow results
   - Search specific function names in the search box (e.g., "student-files-download")
+- **Documents API Debugging** (2025-11): Comprehensive debug logging added to trace complete request flow for organization documents (מסמכי הארגון):
+  - **Backend logging** (`api/documents/index.js`):
+    - Step-by-step flow: Environment read → Admin config → Client creation → Auth → Membership → Tenant client → Handler routing
+    - Each step logs success/failure with detailed context (env vars, credentials presence, user info, org info)
+    - handleGet logs entity validation, table queries, result counts, error details including table existence checks
+    - All logs prefixed with `[DEBUG]`, `[WARN]`, `[ERROR]` for easy filtering in Application Insights
+  - **Shared utilities logging** (`api/_shared/supabase-admin.js`):
+    - `readSupabaseAdminConfig`: Logs available environment variables, credential resolution, result details
+    - `createSupabaseAdminClient`: Logs client creation attempts, credential validation
+  - **Frontend logging** (`src/hooks/useDocuments.js`):
+    - Request preparation: entity context, session validation
+    - HTTP call details: URL, headers presence, response status/headers
+    - Response parsing: success data structure, error text extraction
+    - All logs prefixed with `[DEBUG-FRONTEND]`, `[WARN-FRONTEND]`, `[ERROR-FRONTEND]`
+  - **Log search tips**: In Application Insights, search for:
+    - `[DEBUG] ========== Documents API Request Started ==========` - Beginning of request
+    - `[DEBUG] Step X:` - Specific workflow steps (1-9)
+    - `[ERROR]` - Any error conditions
+    - `entity_type` or `organization` - Org documents specific calls
 
 ## Workflow
 - **API Validation**: Before deploying API changes, run validation to catch common issues:
