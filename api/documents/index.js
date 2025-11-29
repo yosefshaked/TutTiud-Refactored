@@ -605,6 +605,19 @@ export default async function handler(context, req) {
   try {
     const method = req.method;
 
+    // Parse JSON body for PUT/DELETE requests
+    if ((method === 'PUT' || method === 'DELETE') && req.body) {
+      try {
+        if (Buffer.isBuffer(req.body)) {
+          const bodyText = req.body.toString('utf8');
+          req.body = bodyText ? JSON.parse(bodyText) : {};
+        }
+      } catch (err) {
+        console.error('[ERROR] Failed to parse JSON body:', err);
+        return respond(context, 400, { error: 'invalid_json_body' });
+      }
+    }
+
     // Read environment and create Supabase admin client
     console.log('[DEBUG] Step 1: Reading environment...');
     const env = readEnv(context);
@@ -694,6 +707,25 @@ export default async function handler(context, req) {
       method 
     });
     let orgId = req.query?.org_id || req.body?.org_id;
+    
+    // For POST with multipart data, extract org_id from form data
+    if (!orgId && method === 'POST') {
+      console.log('[DEBUG] POST request, attempting to extract org_id from multipart data...');
+      try {
+        const contentType = req.headers['content-type'] || '';
+        const boundary = contentType.split('boundary=')[1];
+        if (boundary) {
+          const parts = parseMultipartData(req.body, boundary);
+          const orgIdPart = parts.find(p => p.name === 'org_id');
+          if (orgIdPart) {
+            orgId = orgIdPart.data.toString('utf8');
+            console.log('[DEBUG] Extracted org_id from multipart:', orgId);
+          }
+        }
+      } catch (err) {
+        console.error('[ERROR] Failed to parse multipart data for org_id extraction:', err);
+      }
+    }
     
     // For GET with entity_id, infer org from entity ownership
     if (!orgId && method === 'GET' && req.query?.entity_id && req.query?.entity_type) {

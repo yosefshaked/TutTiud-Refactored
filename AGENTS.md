@@ -46,7 +46,7 @@
   return { status: 200, body: { data: results } };
   ```
   - Without setting `context.res`, Azure returns HTTP 200 with an **empty body**, causing `JSON.parse()` errors in frontend.
-  - Use existing endpoints like `/api/students`, `/api/instructors`, `/api/settings` as reference, NOT `/api/student-files` or document-related endpoints during refactor periods.
+  - Use existing endpoints like `/api/students`, `/api/instructors`, `/api/settings`, `/api/documents`, `/api/documents-download` as reference for correct patterns.
 - **Bearer Token Extraction (CRITICAL)**: Always use `resolveBearerAuthorization()` helper from `http.js` to extract JWT tokens:
   ```javascript
   // ✅ CORRECT (checks all header variations):
