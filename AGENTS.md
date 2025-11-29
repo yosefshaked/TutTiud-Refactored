@@ -330,6 +330,9 @@
   - API layer (`validateEntityAccess`) enforces org membership and entity-specific permissions
 - **Migration strategy** (non-destructive):
   - Setup script includes `DO $$` block that copies from JSON columns to Documents table
+  - **Organization documents migration**: Requires visiting Settings page first to save org_id to Settings table
+  - Script reads `_system_org_id` from Settings automatically (saved by frontend on Settings page load)
+  - If org_id not found, org documents migration is skipped with a notice (student/instructor files still migrate)
   - Verifies counts match after migration; RAISES EXCEPTION if data integrity check fails
   - Original JSON columns retained for rollback capability and backward compatibility
   - Migration runs idempotently (safe to rerun on existing tenants)

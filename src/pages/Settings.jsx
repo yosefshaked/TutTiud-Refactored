@@ -20,6 +20,7 @@ import DocumentRulesManager from '@/components/settings/DocumentRulesManager.jsx
 import MyInstructorDocuments from '@/components/settings/MyInstructorDocuments.jsx';
 import OrgDocumentsManager from '@/components/settings/OrgDocumentsManager.jsx';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
+import { upsertSetting } from '@/features/settings/api/settings.js';
 import { OnboardingCard } from '@/features/onboarding/components/OnboardingCard.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -190,6 +191,28 @@ export default function Settings() {
 
     loadVisibility();
   }, [session, activeOrgId, activeOrgHasConnection, normalizedRole]);
+
+  // Save org_id to Settings table for migration script
+  useEffect(() => {
+    if (!session || !activeOrgId || !activeOrgHasConnection) return;
+
+    const saveOrgId = async () => {
+      try {
+        await upsertSetting({
+          session,
+          orgId: activeOrgId,
+          key: '_system_org_id',
+          value: activeOrgId,
+        });
+        console.log('[Settings] Org ID saved to Settings table:', activeOrgId);
+      } catch (error) {
+        // Silently fail - this is a helper for migration, not critical for app functionality
+        console.warn('[Settings] Failed to save org_id to Settings:', error);
+      }
+    };
+
+    saveOrgId();
+  }, [session, activeOrgId, activeOrgHasConnection]);
 
   useEffect(() => {
     if (activeOrgHasConnection) {

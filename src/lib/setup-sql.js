@@ -1,4 +1,6 @@
-export const SETUP_SQL_SCRIPT = `-- -- -- =================================================================
+export const SETUP_SQL_SCRIPT = `-- =================================================================
+-- TutTiud Tenant Database Setup Script
+-- =================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "pgjwt" WITH SCHEMA extensions;
@@ -290,11 +292,25 @@ DO $$
 DECLARE
   student_files_count integer := 0;
   instructor_files_count integer := 0;
+  org_docs_count integer := 0;
   total_source_files integer;
   inserted_documents integer := 0;
   rec RECORD;
   file_obj jsonb;
+  org_setting_rec RECORD;
+  org_doc_obj jsonb;
+  system_org_id uuid;
 BEGIN
+  -- Get org_id from Settings (saved by frontend when accessing Settings page)
+  SELECT settings_value::text::uuid INTO system_org_id
+  FROM tuttiud."Settings"
+  WHERE key = '_system_org_id'
+  LIMIT 1;
+
+  IF system_org_id IS NULL THEN
+    RAISE NOTICE 'No org_id found in Settings. Organization documents will not be migrated. Please visit Settings page in the app to save org_id.';
+  END IF;
+
   -- Count existing files in JSON columns
   SELECT COALESCE(SUM(jsonb_array_length(COALESCE("files", '[]'::jsonb))), 0)
   INTO student_files_count
@@ -306,10 +322,16 @@ BEGIN
   FROM tuttiud."Instructors"
   WHERE "files" IS NOT NULL AND jsonb_array_length("files") > 0;
 
-  total_source_files := student_files_count + instructor_files_count;
+  -- Count organization documents from Settings
+  SELECT COALESCE(jsonb_array_length(settings_value), 0)
+  INTO org_docs_count
+  FROM tuttiud."Settings"
+  WHERE key = 'org_documents' AND settings_value IS NOT NULL;
 
-  RAISE NOTICE 'Migration starting: % student files, % instructor files (total: %)',
-    student_files_count, instructor_files_count, total_source_files;
+  total_source_files := student_files_count + instructor_files_count + org_docs_count;
+
+  RAISE NOTICE 'Migration starting: % student files, % instructor files, % org documents (total: %)',
+    student_files_count, instructor_files_count, org_docs_count, total_source_files;
 
   -- Skip migration if no files exist
   IF total_source_files = 0 THEN
@@ -434,6 +456,70 @@ BEGIN
       END IF;
     END LOOP;
   END LOOP;
+
+  -- Migrate organization documents from Settings
+  -- NOTE: Requires system_org_id to be set (saved by frontend when accessing Settings page)
+  IF system_org_id IS NOT NULL THEN
+    FOR org_setting_rec IN
+      SELECT settings_value
+      FROM tuttiud."Settings"
+      WHERE key = 'org_documents' AND settings_value IS NOT NULL
+    LOOP
+      FOR org_doc_obj IN SELECT * FROM jsonb_array_elements(org_setting_rec.settings_value)
+      LOOP
+        -- Only insert if this exact file ID doesn't already exist in Documents
+        IF NOT EXISTS (
+          SELECT 1 FROM tuttiud."Documents"
+          WHERE "id" = (org_doc_obj->>'id')::uuid
+        ) THEN
+          INSERT INTO tuttiud."Documents" (
+            "id",
+            "entity_type",
+            "entity_id",
+            "name",
+            "original_name",
+            "relevant_date",
+            "expiration_date",
+            "resolved",
+            "url",
+            "path",
+            "storage_provider",
+            "uploaded_at",
+            "uploaded_by",
+            "definition_id",
+            "definition_name",
+            "size",
+            "type",
+            "hash",
+            "metadata"
+          ) VALUES (
+            (org_doc_obj->>'id')::uuid,
+            'organization',
+            system_org_id,
+            org_doc_obj->>'name',
+            org_doc_obj->>'original_name',
+            (org_doc_obj->>'relevant_date')::date,
+            (org_doc_obj->>'expiration_date')::date,
+            COALESCE((org_doc_obj->>'resolved')::boolean, false),
+            org_doc_obj->>'url',
+            org_doc_obj->>'path',
+            org_doc_obj->>'storage_provider',
+            COALESCE((org_doc_obj->>'uploaded_at')::timestamptz, now()),
+            (org_doc_obj->>'uploaded_by')::uuid,
+            NULL,  -- org documents don't have definition_id
+            NULL,  -- org documents don't have definition_name
+            (org_doc_obj->>'size')::bigint,
+            org_doc_obj->>'type',
+            org_doc_obj->>'hash',
+            NULL
+          );
+          inserted_documents := inserted_documents + 1;
+        END IF;
+      END LOOP;
+    END LOOP;
+  ELSE
+    RAISE NOTICE 'Skipping organization documents migration: org_id not found. Visit Settings page in the app first.';
+  END IF;
 
   RAISE NOTICE 'Migration completed: Inserted % documents', inserted_documents;
 
