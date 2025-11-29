@@ -19,6 +19,13 @@ import { resolveBearerAuthorization, respond } from '../_shared/http.js';
 import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 
 export default async function handler(context, req) {
+  context.log?.info?.('[DOCUMENTS-DOWNLOAD] Request started', {
+    method: req.method,
+    url: req.url,
+    query: req.query,
+    headers: Object.keys(req.headers || {})
+  });
+
   try {
     if (req.method !== 'GET') {
       return respond(context, 405, { error: 'method_not_allowed' });
@@ -26,6 +33,13 @@ export default async function handler(context, req) {
 
     const { document_id, org_id, preview } = req.query;
     const isPreview = preview === 'true';
+
+    context.log?.info?.('[DOCUMENTS-DOWNLOAD] Parsed parameters', {
+      document_id,
+      org_id,
+      preview,
+      isPreview
+    });
 
     if (!document_id || !org_id) {
       return respond(context, 400, { error: 'document_id and org_id required' });
@@ -98,13 +112,38 @@ export default async function handler(context, req) {
     }
 
     // Fetch document
+    context.log?.info?.('[DOCUMENTS-DOWNLOAD] Fetching document from Documents table', {
+      document_id,
+      table: 'Documents',
+      schema: 'tuttiud'
+    });
+
     const { data: document, error: fetchError } = await tenantClient
       .from('Documents')
       .select('*')
       .eq('id', document_id)
       .single();
 
+    context.log?.info?.('[DOCUMENTS-DOWNLOAD] Document fetch result', {
+      found: !!document,
+      hasError: !!fetchError,
+      errorMessage: fetchError?.message,
+      errorCode: fetchError?.code,
+      documentData: document ? {
+        id: document.id,
+        entity_type: document.entity_type,
+        entity_id: document.entity_id,
+        name: document.name,
+        path: document.path,
+        storage_provider: document.storage_provider
+      } : null
+    });
+
     if (fetchError || !document) {
+      context.log?.error?.('[DOCUMENTS-DOWNLOAD] Document not found', {
+        document_id,
+        fetchError: fetchError?.message
+      });
       return respond(context, 404, { error: 'document_not_found' });
     }
 
@@ -129,12 +168,24 @@ export default async function handler(context, req) {
 
     // Load storage profile
     const storageProfile = orgSettings.storage_profile;
+    context.log?.info?.('[DOCUMENTS-DOWNLOAD] Storage profile loaded', {
+      hasProfile: !!storageProfile,
+      mode: storageProfile?.mode,
+      provider: storageProfile?.byos?.provider,
+      hasCredentials: !!storageProfile?.byos?._encrypted
+    });
+
     if (!storageProfile || !storageProfile.mode) {
+      context.log?.error?.('[DOCUMENTS-DOWNLOAD] Storage not configured');
       return respond(context, 424, { error: 'storage_not_configured' });
     }
 
     // Decrypt BYOS credentials if present
     const decryptedProfile = decryptStorageProfile(storageProfile, env);
+    context.log?.info?.('[DOCUMENTS-DOWNLOAD] Profile decrypted', {
+      mode: decryptedProfile.mode,
+      hasDecryptedCredentials: decryptedProfile.mode === 'byos' && !!decryptedProfile.byos?.access_key_id
+    });
 
     // Prepare display filename
     const downloadFilename = document.name;
@@ -155,8 +206,23 @@ export default async function handler(context, req) {
       }
     }
 
+    context.log?.info?.('[DOCUMENTS-DOWNLOAD] Filename prepared', {
+      originalName: document.name,
+      finalFilename,
+      hasExtension,
+      path: document.path
+    });
+
     // Determine Content-Disposition: inline for preview, attachment for download
     const dispositionType = isPreview ? 'inline' : 'attachment';
+
+    context.log?.info?.('[DOCUMENTS-DOWNLOAD] About to generate URL', {
+      mode: decryptedProfile.mode,
+      path: document.path,
+      filename: finalFilename,
+      dispositionType,
+      expiresIn: 3600
+    });
 
     // Get storage driver and generate download URL
     let downloadUrl;

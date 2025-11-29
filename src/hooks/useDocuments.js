@@ -251,35 +251,73 @@ export function useDocuments(entityType, entityId) {
    * @returns {string} Download URL
    */
   const getDownloadUrl = useCallback(async (documentId, preview = false) => {
+    console.log('[DOCUMENTS-HOOK] getDownloadUrl called', {
+      documentId,
+      preview,
+      hasSession: !!session?.access_token,
+      activeOrgId,
+      tokenLength: session?.access_token?.length || 0
+    });
+
     if (!session?.access_token || !activeOrgId) {
-      throw new Error('Missing authentication or context');
+      const error = 'Missing authentication or context';
+      console.error('[DOCUMENTS-HOOK] Missing auth/context', {
+        hasToken: !!session?.access_token,
+        hasOrgId: !!activeOrgId
+      });
+      throw new Error(error);
     }
 
     const previewParam = preview ? '&preview=true' : '';
-    const response = await fetch(
-      `/api/documents-download?document_id=${documentId}&org_id=${activeOrgId}${previewParam}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'X-Supabase-Authorization': `Bearer ${session.access_token}`,
-          'x-supabase-authorization': `Bearer ${session.access_token}`,
-          'x-supabase-auth': `Bearer ${session.access_token}`
-        }
+    const url = `/api/documents-download?document_id=${documentId}&org_id=${activeOrgId}${previewParam}`;
+    
+    console.log('[DOCUMENTS-HOOK] Fetching download URL', {
+      url,
+      documentId,
+      orgId: activeOrgId,
+      preview,
+      previewParam
+    });
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'X-Supabase-Authorization': `Bearer ${session.access_token}`,
+        'x-supabase-authorization': `Bearer ${session.access_token}`,
+        'x-supabase-auth': `Bearer ${session.access_token}`
       }
-    );
+    });
+
+    console.log('[DOCUMENTS-HOOK] Response received', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      contentType: response.headers.get('content-type')
+    });
 
     if (!response.ok) {
       let errorData;
       try {
         const text = await response.text();
+        console.log('[DOCUMENTS-HOOK] Error response text:', text);
         errorData = text ? JSON.parse(text) : {};
+        console.error('[DOCUMENTS-HOOK] Parsed error data:', errorData);
       } catch {
         errorData = {};
       }
-      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+      const errorMsg = errorData.error || errorData.message || `HTTP ${response.status}`;
+      console.error('[DOCUMENTS-HOOK] Throwing error:', errorMsg);
+      throw new Error(errorMsg);
     }
 
     const data = await response.json();
+    console.log('[DOCUMENTS-HOOK] Success response data:', {
+      hasUrl: !!data.url,
+      urlLength: data.url?.length || 0,
+      urlPreview: data.url?.substring(0, 100),
+      contentType: data.contentType
+    });
+    
     return data.url; // Return just the URL string
   }, [session?.access_token, activeOrgId]);
 
