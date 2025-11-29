@@ -73,11 +73,19 @@ export default async function handler(context, req) {
   const tenantClient = tenantResult.client;
 
   // Get storage profile
-  const { data: orgSettings } = await supabase
+  const { data: orgSettings, error: orgSettingsError } = await supabase
     .from('org_settings')
     .select('storage_profile')
-    .eq('organization_id', org_id)
+    .eq('org_id', org_id)
     .single();
+
+  if (orgSettingsError || !orgSettings) {
+    context.log?.error?.('documents-download failed to fetch org settings', {
+      error: orgSettingsError?.message,
+      org_id
+    });
+    return respond(context, 424, { error: 'org_settings_not_found' });
+  }
 
   // Fetch document
   const { data: document, error: fetchError } = await tenantClient
