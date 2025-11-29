@@ -180,7 +180,7 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
 /**
  * POST - Upload document
  */
-async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin) {
+async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin, context, env, multipartParts = null) {
   const contentType = req.headers['content-type'] || '';
   const boundary = contentType.split('boundary=')[1];
 
@@ -188,46 +188,18 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     return { status: 400, body: { error: 'missing_boundary' } };
   }
 
-  let parts;
-  try {
-    parts = parseMultipartData(req.body, boundary);
-  } catch (err) {
-    console.error('Multipart parsing error:', err);
-    return { status: 400, body: { error: 'parse_failed' } };
-  }
-
-  // Extract org_id from multipart if it wasn't in query
-  if (orgId === 'EXTRACT_FROM_MULTIPART') {
-    const orgIdPart = parts.find(p => p.name === 'org_id');
-    if (!orgIdPart) {
-      return { status: 400, body: { error: 'org_id_required' } };
-    }
-    orgId = orgIdPart.data.toString('utf8');
-    console.log('[DEBUG] Extracted org_id from multipart:', orgId);
-
-    // Now check membership with the extracted orgId
-    console.log('[DEBUG] handlePost: Verifying organization membership...', { orgId, userId });
-    let role;
+  // Use pre-parsed parts if available, otherwise parse now
+  let parts = multipartParts;
+  if (!parts) {
+    console.log('[DEBUG] handlePost: Parsing multipart data...');
     try {
-      role = await ensureMembership(supabase, orgId, userId);
-      console.log('[DEBUG] handlePost: Membership verified successfully', { role });
-    } catch (membershipError) {
-      console.error('[ERROR] handlePost: Membership check failed', {
-        error: membershipError?.message,
-        orgId,
-        userId
-      });
-      return { status: 500, body: { error: 'failed_to_verify_membership', details: membershipError?.message } };
+      parts = parseMultipartData(req.body, boundary);
+    } catch (err) {
+      console.error('Multipart parsing error:', err);
+      return { status: 400, body: { error: 'parse_failed' } };
     }
-
-    if (!role) {
-      console.warn('[WARN] handlePost: User is not a member of organization', { orgId, userId });
-      return { status: 403, body: { error: 'not_member' } };
-    }
-
-    userRole = role;
-    isAdmin = ['admin', 'owner'].includes(userRole);
-    console.log('[DEBUG] handlePost: User role determined', { userRole, isAdmin });
+  } else {
+    console.log('[DEBUG] handlePost: Using pre-parsed multipart parts');
   }
 
   // Extract metadata
@@ -830,16 +802,24 @@ export default async function handler(context, req) {
       method 
     });
     let orgId = req.query?.org_id || req.body?.org_id;
+    let multipartParts = null; // Store parsed parts to avoid double-parsing
     
-    // For POST with multipart data, we'll extract org_id in handlePost to avoid double-parsing
-    // Just check that it exists somewhere
+    // For POST with multipart data, extract org_id from form data
     if (!orgId && method === 'POST') {
-      const contentType = req.headers['content-type'] || '';
-      if (contentType.includes('multipart/form-data')) {
-        console.log('[DEBUG] POST with multipart data detected, org_id will be extracted in handlePost');
-        // Don't parse here - let handlePost do it once
-        // We'll pass a flag to indicate this
-        orgId = 'EXTRACT_FROM_MULTIPART'; // Temporary marker
+      console.log('[DEBUG] POST request, attempting to extract org_id from multipart data...');
+      try {
+        const contentType = req.headers['content-type'] || '';
+        const boundary = contentType.split('boundary=')[1];
+        if (boundary) {
+          multipartParts = parseMultipartData(req.body, boundary);
+          const orgIdPart = multipartParts.find(p => p.name === 'org_id');
+          if (orgIdPart) {
+            orgId = orgIdPart.data.toString('utf8');
+            console.log('[DEBUG] Extracted org_id from multipart:', orgId);
+          }
+        }
+      } catch (err) {
+        console.error('[ERROR] Failed to parse multipart data for org_id extraction:', err);
       }
     }
     
@@ -856,46 +836,42 @@ export default async function handler(context, req) {
 
     console.log('[DEBUG] Using org_id:', orgId);
 
-    // Membership check (skip for POST with multipart - will check after parsing)
-    let role, userRole, isAdmin;
-    if (orgId !== 'EXTRACT_FROM_MULTIPART') {
-      console.log('[DEBUG] Step 7: Verifying organization membership...', { orgId, userId });
-      try {
-        role = await ensureMembership(supabase, orgId, userId);
-        console.log('[DEBUG] Membership verified successfully', { role });
-      } catch (membershipError) {
-        console.error('[ERROR] Membership check failed', {
-          error: membershipError?.message,
-          stack: membershipError?.stack,
-          orgId,
-          userId
-        });
-        context.log?.error?.('documents failed to verify membership', {
-          message: membershipError?.message,
-          orgId,
-          userId,
-        });
-        return respond(context, 500, { error: 'failed_to_verify_membership', details: membershipError?.message });
-      }
-
-      if (!role) {
-        console.warn('[WARN] User is not a member of organization', { orgId, userId });
-        return respond(context, 403, { error: 'not_member' });
-      }
-
-      userRole = role;
-      isAdmin = ['admin', 'owner'].includes(userRole);
-      console.log('[DEBUG] Step 7.1: User role determined', { 
-        userRole, 
-        isAdmin,
-        hasUserRole: !!userRole,
-        userRoleType: typeof userRole
+    // Step 7: Verify membership
+    console.log('[DEBUG] Step 7: Verifying organization membership...', { orgId, userId });
+    let role;
+    try {
+      role = await ensureMembership(supabase, orgId, userId);
+      console.log('[DEBUG] Membership verified successfully', { role });
+    } catch (membershipError) {
+      console.error('[ERROR] Membership check failed', {
+        error: membershipError?.message,
+        stack: membershipError?.stack,
+        orgId,
+        userId
       });
-    } else {
-      console.log('[DEBUG] Step 7: Skipping membership check for multipart POST (will check in handlePost)');
+      context.log?.error?.('documents failed to verify membership', {
+        message: membershipError?.message,
+        orgId,
+        userId,
+      });
+      return respond(context, 500, { error: 'failed_to_verify_membership', details: membershipError?.message });
     }
 
-    // Get tenant client
+    if (!role) {
+      console.warn('[WARN] User is not a member of organization', { orgId, userId });
+      return respond(context, 403, { error: 'not_member' });
+    }
+
+    const userRole = role;
+    const isAdmin = ['admin', 'owner'].includes(userRole);
+    console.log('[DEBUG] Step 7.1: User role determined', { 
+      userRole, 
+      isAdmin,
+      hasUserRole: !!userRole,
+      userRoleType: typeof userRole
+    });
+
+    // Step 8: Get tenant client
     console.log('[DEBUG] Step 8: Resolving tenant database client...', { orgId });
     const tenantResult = await resolveTenantClient(context, supabase, env, orgId);
     if (tenantResult.error) {
@@ -913,7 +889,7 @@ export default async function handler(context, req) {
       result = await handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin);
     } else if (method === 'POST') {
       console.log('[DEBUG] Calling handlePost...');
-      result = await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+      result = await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin, context, env, multipartParts);
     } else if (method === 'PUT') {
       console.log('[DEBUG] Calling handlePut with parameters:', {
         hasReq: !!req,
