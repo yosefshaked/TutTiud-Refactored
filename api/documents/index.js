@@ -295,7 +295,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   const { data: orgSettings } = await supabase
     .from('org_settings')
     .select('storage_profile')
-    .eq('organization_id', orgId)
+    .eq('org_id', orgId)
     .single();
 
   if (!orgSettings?.storage_profile) {
@@ -594,7 +594,7 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
   const { data: orgSettings } = await supabase
     .from('org_settings')
     .select('storage_profile')
-    .eq('organization_id', orgId)
+    .eq('org_id', orgId)
     .single();
 
   if (!orgSettings?.storage_profile) {
