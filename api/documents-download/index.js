@@ -7,7 +7,7 @@
 
 import { createSupabaseAdminClient } from '../_shared/supabase-admin.js';
 import { checkOrgMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
-import { getStorageDriver } from '../_shared/storage-drivers/index.js';
+import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 
 export default async function handler(context, req) {
   if (req.method !== 'GET') {

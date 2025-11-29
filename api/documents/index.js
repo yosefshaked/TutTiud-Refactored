@@ -13,7 +13,7 @@ import { checkOrgMembership, resolveTenantClient, readEnv } from '../_shared/org
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 import { parseMultipartData } from 'parse-multipart-data';
 import { createHash } from 'crypto';
-import { getStorageDriver } from '../_shared/storage-drivers/index.js';
+import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
@@ -82,6 +82,10 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
 
   if (error) {
     console.error('Documents fetch error:', error);
+    // Check if table doesn't exist
+    if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+      return { status: 424, body: { error: 'documents_table_not_found', message: 'Documents table does not exist. Please run the setup script.' } };
+    }
     return { status: 500, body: { error: 'fetch_failed', details: error.message } };
   }
 
@@ -504,63 +508,76 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
 }
 
 export default async function handler(context, req) {
-  const method = req.method;
+  try {
+    const method = req.method;
 
-  // Auth check
-  const supabase = createSupabaseAdminClient();
-  const authHeader = req.headers.authorization || req.headers.Authorization;
-  if (!authHeader?.startsWith('Bearer ')) {
-    return { status: 401, body: { error: 'missing_auth' } };
-  }
+    // Auth check
+    const supabase = createSupabaseAdminClient();
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return { status: 401, body: { error: 'missing_auth' } };
+    }
 
-  const token = authHeader.substring(7);
-  const { data: authResult, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !authResult?.user) {
-    return { status: 401, body: { error: 'invalid_token' } };
-  }
+    const token = authHeader.substring(7);
+    const { data: authResult, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authResult?.user) {
+      return { status: 401, body: { error: 'invalid_token' } };
+    }
 
-  const userId = authResult.user.id;
-  const userEmail = authResult.user.email;
+    const userId = authResult.user.id;
+    const userEmail = authResult.user.email;
 
-  // Determine org from query or body
-  let orgId = req.query?.org_id || req.body?.org_id;
-  
-  // For GET with entity_id, infer org from entity ownership
-  if (!orgId && method === 'GET' && req.query?.entity_id && req.query?.entity_type) {
-    // Will validate in membership check
-  }
+    // Determine org from query or body
+    let orgId = req.query?.org_id || req.body?.org_id;
+    
+    // For GET with entity_id, infer org from entity ownership
+    if (!orgId && method === 'GET' && req.query?.entity_id && req.query?.entity_type) {
+      // Will validate in membership check
+    }
 
-  if (!orgId) {
-    return { status: 400, body: { error: 'org_id_required' } };
-  }
+    if (!orgId) {
+      return { status: 400, body: { error: 'org_id_required' } };
+    }
 
-  // Membership check
-  const membership = await checkOrgMembership(supabase, orgId, userId);
-  if (!membership) {
-    return { status: 403, body: { error: 'not_member' } };
-  }
+    // Membership check
+    const membership = await checkOrgMembership(supabase, orgId, userId);
+    if (!membership) {
+      return { status: 403, body: { error: 'not_member' } };
+    }
 
-  const userRole = membership.role;
-  const isAdmin = ['admin', 'owner'].includes(userRole);
+    const userRole = membership.role;
+    const isAdmin = ['admin', 'owner'].includes(userRole);
 
-  // Get tenant client
-  const env = readEnv(context);
-  const tenantResult = await resolveTenantClient(context, supabase, env, orgId);
-  if (tenantResult.error) {
-    return { status: 424, body: { error: 'tenant_not_configured', details: tenantResult.error } };
-  }
-  const tenantClient = tenantResult.client;
+    // Get tenant client
+    const env = readEnv(context);
+    const tenantResult = await resolveTenantClient(context, supabase, env, orgId);
+    if (tenantResult.error) {
+      return { status: 424, body: { error: 'tenant_not_configured', details: tenantResult.error } };
+    }
+    const tenantClient = tenantResult.client;
 
-  // Route to handler
-  if (method === 'GET') {
-    return await handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin);
-  } else if (method === 'POST') {
-    return await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
-  } else if (method === 'PUT') {
-    return await handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
-  } else if (method === 'DELETE') {
-    return await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
-  } else {
-    return { status: 405, body: { error: 'method_not_allowed' } };
+    // Route to handler
+    if (method === 'GET') {
+      return await handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin);
+    } else if (method === 'POST') {
+      return await handlePost(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+    } else if (method === 'PUT') {
+      return await handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+    } else if (method === 'DELETE') {
+      return await handleDelete(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin);
+    } else {
+      return { status: 405, body: { error: 'method_not_allowed' } };
+    }
+  } catch (error) {
+    console.error('Unhandled error in documents API:', error);
+    context.log?.error?.('Documents API crashed:', error);
+    return { 
+      status: 500, 
+      body: { 
+        error: 'internal_server_error', 
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      } 
+    };
   }
 }
