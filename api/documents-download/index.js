@@ -11,24 +11,25 @@ import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 import { resolveBearerAuthorization, respond } from '../_shared/http.js';
 
 export default async function handler(context, req) {
-  if (req.method !== 'GET') {
-    return respond(context, 405, { error: 'method_not_allowed' });
-  }
+  try {
+    if (req.method !== 'GET') {
+      return respond(context, 405, { error: 'method_not_allowed' });
+    }
 
-  const { document_id, org_id } = req.query;
+    const { document_id, org_id } = req.query;
 
-  if (!document_id || !org_id) {
-    return respond(context, 400, { error: 'document_id and org_id required' });
-  }
+    if (!document_id || !org_id) {
+      return respond(context, 400, { error: 'document_id and org_id required' });
+    }
 
-  // Read environment and create Supabase admin client
-  const env = readEnv(context);
-  const adminConfig = readSupabaseAdminConfig(env);
+    // Read environment and create Supabase admin client
+    const env = readEnv(context);
+    const adminConfig = readSupabaseAdminConfig(env);
 
-  if (!adminConfig?.supabaseUrl || !adminConfig?.serviceRoleKey) {
-    context.log?.error?.('documents-download missing Supabase admin credentials');
-    return respond(context, 500, { error: 'server_misconfigured' });
-  }
+    if (!adminConfig?.supabaseUrl || !adminConfig?.serviceRoleKey) {
+      context.log?.error?.('documents-download missing Supabase admin credentials');
+      return respond(context, 500, { error: 'server_misconfigured' });
+    }
 
   // Auth check
   const supabase = createSupabaseAdminClient(adminConfig);
@@ -159,4 +160,22 @@ export default async function handler(context, req) {
     filename: filenameWithExt,
     content_disposition: `attachment; filename*=UTF-8''${encodedFilenameWithExt}`
   });
+  } catch (error) {
+    console.error('[ERROR] documents-download unhandled exception:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      document_id: req.query?.document_id,
+      org_id: req.query?.org_id
+    });
+    context.log?.error?.('documents-download unhandled exception', {
+      message: error.message,
+      stack: error.stack
+    });
+    return respond(context, 500, { 
+      error: 'internal_error', 
+      details: error.message,
+      type: error.name 
+    });
+  }
 }
