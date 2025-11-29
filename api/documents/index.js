@@ -377,7 +377,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
 
   // Upload to storage
   try {
-    await driver.uploadFile(storagePath, fileBuffer, fileType);
+    await driver.upload(storagePath, fileBuffer, fileType);
   } catch (err) {
     console.error('Storage upload error:', err);
     // Rollback: delete the document record
@@ -395,7 +395,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     console.error('Document path update error:', updateError);
     // Try to clean up storage
     try {
-      await driver.deleteFile(storagePath);
+      await driver.delete(storagePath);
     } catch (cleanupErr) {
       console.error('Cleanup error after failed path update:', cleanupErr);
     }
@@ -633,7 +633,7 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
 
   // Delete from storage
   try {
-    await driver.deleteFile(existingDoc.path);
+    await driver.delete(existingDoc.path);
   } catch (err) {
     console.error('Storage deletion error:', err);
     // Continue with database deletion even if storage fails
