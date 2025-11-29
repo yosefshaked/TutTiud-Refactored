@@ -12,11 +12,9 @@ import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/s
 import { ensureMembership, resolveTenantClient, readEnv, respond } from '../_shared/org-bff.js';
 import { resolveBearerAuthorization } from '../_shared/http.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
-import parseMultipartDataPkg from 'parse-multipart-data';
+import multipart from 'parse-multipart-data';
 import { createHash } from 'crypto';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
-
-const { parseMultipartData } = parseMultipartDataPkg;
 
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
@@ -193,7 +191,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   if (!parts) {
     console.log('[DEBUG] handlePost: Parsing multipart data...');
     try {
-      parts = parseMultipartData(req.body, boundary);
+      parts = multipart.parse(req.body, boundary);
     } catch (err) {
       console.error('Multipart parsing error:', err);
       return { status: 400, body: { error: 'parse_failed' } };
@@ -818,8 +816,8 @@ export default async function handler(context, req) {
         console.log('[DEBUG] Extracted boundary:', boundary);
         
         if (boundary) {
-          console.log('[DEBUG] Calling parseMultipartData...');
-          multipartParts = parseMultipartData(req.body, boundary);
+          console.log('[DEBUG] Calling multipart.parse...');
+          multipartParts = multipart.parse(req.body, boundary);
           console.log('[DEBUG] Multipart parts parsed:', {
             partsCount: multipartParts?.length || 0,
             partNames: multipartParts?.map(p => p.name) || []
