@@ -9,7 +9,7 @@
  */
 
 import { createSupabaseAdminClient } from '../_shared/supabase-admin.js';
-import { checkOrgMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
+import { ensureMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 import { parseMultipartData } from 'parse-multipart-data';
 import { createHash } from 'crypto';
@@ -540,12 +540,23 @@ export default async function handler(context, req) {
     }
 
     // Membership check
-    const membership = await checkOrgMembership(supabase, orgId, userId);
-    if (!membership) {
+    let role;
+    try {
+      role = await ensureMembership(supabase, orgId, userId);
+    } catch (membershipError) {
+      context.log?.error?.('documents failed to verify membership', {
+        message: membershipError?.message,
+        orgId,
+        userId,
+      });
+      return { status: 500, body: { error: 'failed_to_verify_membership' } };
+    }
+
+    if (!role) {
       return { status: 403, body: { error: 'not_member' } };
     }
 
-    const userRole = membership.role;
+    const userRole = role;
     const isAdmin = ['admin', 'owner'].includes(userRole);
 
     // Get tenant client
