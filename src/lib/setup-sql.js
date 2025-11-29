@@ -302,7 +302,8 @@ DECLARE
   system_org_id uuid;
 BEGIN
   -- Get org_id from Settings (saved by frontend when accessing Settings page)
-  SELECT settings_value::text::uuid INTO system_org_id
+  -- settings_value is JSONB storing a string, use #>> '{}' to extract the text value
+  SELECT (settings_value #>> '{}')::uuid INTO system_org_id
   FROM tuttiud."Settings"
   WHERE key = '_system_org_id'
   LIMIT 1;
