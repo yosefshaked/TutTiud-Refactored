@@ -221,8 +221,7 @@ export default function StudentManagementPage() {
     return filterMode; // 'mine' or 'all'
   }, [filterMode, instructorFilterId]);
 
-  const handleCombinedFilterChange = (e) => {
-    const value = e.target.value;
+  const handleCombinedFilterChange = (value) => {
     if (value === 'mine') {
       setFilterMode('mine');
       setInstructorFilterId('');
