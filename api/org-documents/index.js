@@ -503,7 +503,7 @@ async function handleUpload(req, context, env) {
       expiration_date: expirationDate || null,
       url: uploadResult.url,
       path: storagePath,
-      storage_provider: decryptedProfile.mode === 'managed' ? 'cloudflare_r2' : decryptedProfile.provider,
+      storage_provider: decryptedProfile.mode,
       uploaded_at: new Date().toISOString(),
       uploaded_by: userId,
       size: filePart.data.length,

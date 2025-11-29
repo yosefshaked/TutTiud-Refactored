@@ -303,7 +303,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     resolved: false,
     url: null,
     path: 'temp', // Will update after we get the ID
-    storage_provider: storageProfile.mode === 'managed' ? 'managed_r2' : storageProfile.provider,
+    storage_provider: storageProfile.mode,
     uploaded_at: new Date().toISOString(),
     uploaded_by: userId,
     definition_id: definitionId || null,

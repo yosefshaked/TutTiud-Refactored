@@ -454,6 +454,7 @@
   - API client: `src/api/students-export.js` exports `exportStudentPdf()` and `downloadPdfBlob()`
 
 ### Storage Grace Period & File Deletion (2025-11)
+- **Storage provider field consistency**: All file upload endpoints store `storage_provider` as the mode value (`'managed'` or `'byos'`), NOT as specific provider names like `'cloudflare_r2'` or `'managed_r2'`. This allows storage backend changes without breaking file metadata.
 - **Configurable grace period**: `permission_registry.storage_grace_period_days` (default 30) controls how many days users have to download files after storage is disconnected before permanent deletion.
 - **Database schema**: `org_settings.storage_grace_ends_at` (timestamptz) tracks when grace period expires and files should be deleted.
 - **Storage disconnection**: Preserves configuration with `disconnected: true` flag instead of deleting profile.
