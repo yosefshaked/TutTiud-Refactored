@@ -47,6 +47,24 @@
   ```
   - Without setting `context.res`, Azure returns HTTP 200 with an **empty body**, causing `JSON.parse()` errors in frontend.
   - Use existing endpoints like `/api/students`, `/api/instructors`, `/api/settings` as reference, NOT `/api/student-files` or document-related endpoints during refactor periods.
+- **Bearer Token Extraction (CRITICAL)**: Always use `resolveBearerAuthorization()` helper from `http.js` to extract JWT tokens:
+  ```javascript
+  // ✅ CORRECT (checks all header variations):
+  import { resolveBearerAuthorization } from '../_shared/http.js';
+  const authorization = resolveBearerAuthorization(req);
+  if (!authorization?.token) {
+    return respond(context, 401, { error: 'missing_auth' });
+  }
+  const token = authorization.token;
+  
+  // ❌ WRONG (case-sensitive, misses alternative headers):
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  const token = authHeader.substring(7);
+  ```
+  - Frontend sends tokens in multiple headers (`Authorization`, `X-Supabase-Authorization`, `x-supabase-auth`) for compatibility.
+  - `resolveBearerAuthorization()` checks all variations (`'x-supabase-authorization'`, `'x-supabase-auth'`, `'authorization'`) and handles case sensitivity.
+  - Manual header reading causes JWT verification failures when token is sent in alternative headers.
+  - Always follow the pattern in `/api/org-logo/index.js` for token extraction.
 - **Supabase Auth Response Structure (CRITICAL)**: `supabase.auth.getUser(token)` returns `{ data, error }`, access user via `result.data.user`:
   ```javascript
   // ✅ CORRECT:

@@ -10,6 +10,7 @@
 
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import { ensureMembership, resolveTenantClient, readEnv, respond } from '../_shared/org-bff.js';
+import { resolveBearerAuthorization } from '../_shared/http.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 import parseMultipartDataPkg from 'parse-multipart-data';
 import { createHash } from 'crypto';
@@ -607,13 +608,13 @@ export default async function handler(context, req) {
     console.log('[DEBUG] Supabase admin client created');
 
     console.log('[DEBUG] Step 4: Checking authentication header...');
-    const authHeader = req.headers.authorization || req.headers.Authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    const authorization = resolveBearerAuthorization(req);
+    if (!authorization?.token) {
       console.warn('[WARN] Missing or invalid auth header');
       return respond(context, 401, { error: 'missing_auth' });
     }
 
-    const token = authHeader.substring(7);
+    const token = authorization.token;
     console.log('[DEBUG] Step 5: Verifying user token...', { 
       tokenLength: token.length,
       tokenPrefix: token.substring(0, 20) + '...',
