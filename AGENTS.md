@@ -13,14 +13,21 @@
   - Search specific function names in the search box (e.g., "student-files-download")
 
 ## Workflow
-- **API Validation**: Before deploying API changes, run linting to catch common issues:
+- **API Validation**: Before deploying API changes, run validation to catch common issues:
   - `npm run lint:api` - ESLint validation for API endpoints (industry standard, catches import/export issues, undefined variables, etc.)
+  - `node scripts/validate-api-endpoints.js` - Azure Functions-specific validation (function.json, scriptFile alignment, JSON validity)
   - ESLint rules enforce:
     - No importing from deprecated modules (supabase-tenant.js, wrong storage-drivers path)
     - Correct import/export matching with `import/named`, `import/no-unresolved`
     - No undefined variables, unused imports
     - Proper Node.js globals for API files
-  - For specific custom checks beyond ESLint capabilities, see `scripts/validate-api-endpoints.js`
+  - Custom validation script checks:
+    - **function.json existence**: Every endpoint directory must have function.json or Azure ignores it
+    - **scriptFile alignment**: If function.json specifies scriptFile, the file must exist (defaults to index.js)
+    - **Valid JSON**: Detects invalid JSON in function.json (trailing commas, syntax errors)
+    - **HTTP bindings**: Validates httpTrigger and http output bindings are present
+    - Handler signatures, CommonJS/ESM import conflicts, deprecated patterns
+  - Run both tools before deploying: `npm run lint:api && node scripts/validate-api-endpoints.js`
 - For premium features, always check permissions in both frontend (UI) and backend (API) before allowing access.
 - PDF export feature uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment.
 - Lint any changed JavaScript or JSX files with `npx eslint <files>`.

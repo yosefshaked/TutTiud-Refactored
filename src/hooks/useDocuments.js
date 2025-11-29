@@ -43,8 +43,14 @@ export function useDocuments(entityType, entityId) {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'fetch_failed');
+        let errorData;
+        try {
+          const text = await response.text();
+          errorData = text ? JSON.parse(text) : {};
+        } catch {
+          errorData = {};
+        }
+        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
       }
 
       const data = await response.json();
@@ -97,8 +103,14 @@ export function useDocuments(entityType, entityId) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'upload_failed');
+      let errorData;
+      try {
+        const text = await response.text();
+        errorData = text ? JSON.parse(text) : {};
+      } catch {
+        errorData = {};
+      }
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
     }
 
     const data = await response.json();
@@ -130,8 +142,14 @@ export function useDocuments(entityType, entityId) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'update_failed');
+      let errorData;
+      try {
+        const text = await response.text();
+        errorData = text ? JSON.parse(text) : {};
+      } catch {
+        errorData = {};
+      }
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
     }
 
     // Refresh documents list
@@ -158,8 +176,14 @@ export function useDocuments(entityType, entityId) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'delete_failed');
+      let errorData;
+      try {
+        const text = await response.text();
+        errorData = text ? JSON.parse(text) : {};
+      } catch {
+        errorData = {};
+      }
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
     }
 
     // Refresh documents list
@@ -187,8 +211,14 @@ export function useDocuments(entityType, entityId) {
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'download_failed');
+      let errorData;
+      try {
+        const text = await response.text();
+        errorData = text ? JSON.parse(text) : {};
+      } catch {
+        errorData = {};
+      }
+      throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
     }
 
     const data = await response.json();

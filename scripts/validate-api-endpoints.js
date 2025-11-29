@@ -5,9 +5,12 @@
  * - Export name correctness
  * - Handler signature (context, req) for Azure Functions v4
  * - Required dependencies existence
+ * - Azure Functions configuration (function.json)
+ * - scriptFile alignment with actual files
+ * - Valid JSON in function.json
  */
 
-import { readdir, readFile } from 'fs/promises';
+import { readdir, readFile, access } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -211,6 +214,23 @@ async function scanDirectory(dir) {
         continue;
       }
       
+      // Skip special directories that aren't endpoints
+      if (entry.name === '_shared' || entry.name === 'cross-platform' || entry.name === 'config') {
+        // Still scan for shared module validation
+        if (entry.name === '_shared') {
+          const sharedEntries = await readdir(fullPath, { withFileTypes: true });
+          for (const sharedEntry of sharedEntries) {
+            if (sharedEntry.isFile() && sharedEntry.name.endsWith('.js')) {
+              await validateSharedModule(join(fullPath, sharedEntry.name));
+            }
+          }
+        }
+        continue;
+      }
+      
+      // Check if this directory is an Azure Function endpoint
+      await validateAzureFunctionConfig(fullPath, entry.name);
+      
       // Recursively scan subdirectories
       await scanDirectory(fullPath);
     } else if (entry.isFile() && entry.name.endsWith('.js')) {
@@ -226,6 +246,86 @@ async function scanDirectory(dir) {
     }
   }
 }
+
+/**
+ * Validate Azure Functions configuration for an endpoint directory
+ */
+async function validateAzureFunctionConfig(endpointDir, dirName) {
+  const functionJsonPath = join(endpointDir, 'function.json');
+  const relativePath = `api/${dirName}`;
+  
+  // Check if function.json exists
+  try {
+    await access(functionJsonPath);
+  } catch {
+    // function.json doesn't exist - check if this looks like an endpoint directory
+    try {
+      const files = await readdir(endpointDir);
+      const hasIndexJs = files.includes('index.js');
+      const hasJsFiles = files.some(f => f.endsWith('.js'));
+      
+      if (hasIndexJs || hasJsFiles) {
+        errors.push(`${relativePath}/: Missing function.json. Azure will ignore this endpoint.`);
+      }
+    } catch {
+      // Can't read directory, skip
+    }
+    return;
+  }
+  
+  // Validate function.json is valid JSON
+  let functionConfig;
+  try {
+    const content = await readFile(functionJsonPath, 'utf-8');
+    functionConfig = JSON.parse(content);
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      errors.push(`${relativePath}/function.json: Invalid JSON - ${err.message}. Check for trailing commas or syntax errors.`);
+    } else {
+      errors.push(`${relativePath}/function.json: Cannot read file - ${err.message}`);
+    }
+    return;
+  }
+  
+  // Validate scriptFile alignment (default is index.js if not specified)
+  const scriptFile = functionConfig.scriptFile || 'index.js';
+  const scriptPath = join(endpointDir, scriptFile);
+  
+  try {
+    await access(scriptPath);
+  } catch {
+    errors.push(`${relativePath}/function.json: scriptFile "${scriptFile}" not found. Expected file at ${relativePath}/${scriptFile}`);
+  }
+  
+  // Validate bindings structure
+  if (!functionConfig.bindings || !Array.isArray(functionConfig.bindings)) {
+    errors.push(`${relativePath}/function.json: Missing or invalid "bindings" array`);
+    return;
+  }
+  
+  // Check for HTTP trigger
+  const httpTrigger = functionConfig.bindings.find(b => b.type === 'httpTrigger');
+  if (!httpTrigger) {
+    warnings.push(`${relativePath}/function.json: No httpTrigger binding found. Is this intentional?`);
+  } else {
+    // Validate HTTP trigger has methods
+    if (!httpTrigger.methods || !Array.isArray(httpTrigger.methods) || httpTrigger.methods.length === 0) {
+      warnings.push(`${relativePath}/function.json: HTTP trigger has no methods defined`);
+    }
+    
+    // Validate route is defined
+    if (!httpTrigger.route) {
+      warnings.push(`${relativePath}/function.json: HTTP trigger has no route defined (will use default)`);
+    }
+  }
+  
+  // Check for HTTP output binding
+  const httpOutput = functionConfig.bindings.find(b => b.type === 'http' && b.direction === 'out');
+  if (httpTrigger && !httpOutput) {
+    errors.push(`${relativePath}/function.json: Has httpTrigger but missing http output binding`);
+  }
+}
+
 
 async function checkStorageDrivers() {
   const storageDriverPath = join(API_DIR, 'cross-platform/storage-drivers/index.js');
@@ -257,6 +357,13 @@ async function main() {
     
     if (errors.length === 0 && warnings.length === 0) {
       console.log('✅ All checks passed! No issues found.\n');
+      console.log('Validated:');
+      console.log('  ✓ Import paths and exports');
+      console.log('  ✓ Handler signatures');
+      console.log('  ✓ function.json configuration');
+      console.log('  ✓ scriptFile alignment');
+      console.log('  ✓ JSON validity');
+      console.log('  ✓ HTTP bindings\n');
       process.exit(0);
     }
 
@@ -274,6 +381,11 @@ async function main() {
 
     if (errors.length > 0) {
       console.log('❌ Validation failed. Fix errors before deploying.\n');
+      console.log('Common fixes:');
+      console.log('  • Missing function.json: Create function.json with HTTP bindings');
+      console.log('  • Invalid JSON: Remove trailing commas, check syntax');
+      console.log('  • scriptFile mismatch: Rename file or update function.json');
+      console.log('  • Missing bindings: Add httpTrigger and http output bindings\n');
       process.exit(1);
     } else {
       console.log('✅ No critical errors. Warnings should be reviewed.\n');
