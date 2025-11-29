@@ -262,10 +262,10 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   console.log('[DEBUG] Fetching entity name for file naming', { entityType, entityId });
   
   if (entityType === 'student') {
-    const { data: student, error: studentError } = await tenantClient.from('Students').select('full_name').eq('id', entityId).single();
+    const { data: student, error: studentError } = await tenantClient.from('Students').select('name').eq('id', entityId).single();
     console.log('[DEBUG] Student query result', { 
       hasData: !!student, 
-      fullName: student?.full_name,
+      name: student?.name,
       error: studentError?.message,
       errorCode: studentError?.code,
       errorDetails: studentError?.details
@@ -273,12 +273,12 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     if (studentError) {
       console.error('Failed to fetch student name:', { entityId, error: studentError.message, code: studentError.code });
     }
-    entityName = student?.full_name || 'Unknown';
+    entityName = student?.name || 'Unknown';
   } else if (entityType === 'instructor') {
-    const { data: instructor, error: instructorError } = await tenantClient.from('Instructors').select('full_name').eq('id', entityId).single();
+    const { data: instructor, error: instructorError } = await tenantClient.from('Instructors').select('name').eq('id', entityId).single();
     console.log('[DEBUG] Instructor query result', { 
       hasData: !!instructor, 
-      fullName: instructor?.full_name,
+      name: instructor?.name,
       error: instructorError?.message,
       errorCode: instructorError?.code,
       errorDetails: instructorError?.details
@@ -286,7 +286,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     if (instructorError) {
       console.error('Failed to fetch instructor name:', { entityId, error: instructorError.message, code: instructorError.code });
     }
-    entityName = instructor?.full_name || 'Unknown';
+    entityName = instructor?.name || 'Unknown';
   }
   
   console.log('[DEBUG] Entity name resolved to:', entityName);
