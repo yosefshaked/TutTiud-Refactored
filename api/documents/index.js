@@ -847,9 +847,8 @@ export default async function handler(context, req) {
     });
     console.log('[DEBUG] ========== Documents API Request Completed ==========');
     
-    // CRITICAL: Set context.res for Azure Functions
-    context.res = result;
-    return result;
+    // CRITICAL: Use respond() helper to set context.res AND stringify body
+    return respond(context, result.status, result.body);
   } catch (error) {
     console.error('[ERROR] ========== Unhandled error in documents API ==========');
     console.error('[ERROR] Error details:', {
