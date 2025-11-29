@@ -12,7 +12,6 @@ import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
   ensureMembership,
-  parseRequestBody,
   readEnv,
   respond,
   resolveTenantClient,

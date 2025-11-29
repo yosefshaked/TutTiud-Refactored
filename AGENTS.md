@@ -13,6 +13,14 @@
   - Search specific function names in the search box (e.g., "student-files-download")
 
 ## Workflow
+- **API Validation**: Before deploying API changes, run linting to catch common issues:
+  - `npm run lint:api` - ESLint validation for API endpoints (industry standard, catches import/export issues, undefined variables, etc.)
+  - ESLint rules enforce:
+    - No importing from deprecated modules (supabase-tenant.js, wrong storage-drivers path)
+    - Correct import/export matching with `import/named`, `import/no-unresolved`
+    - No undefined variables, unused imports
+    - Proper Node.js globals for API files
+  - For specific custom checks beyond ESLint capabilities, see `scripts/validate-api-endpoints.js`
 - For premium features, always check permissions in both frontend (UI) and backend (API) before allowing access.
 - PDF export feature uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment.
 - Lint any changed JavaScript or JSX files with `npx eslint <files>`.

@@ -1,4 +1,5 @@
 /* eslint-env node */
+/* eslint-disable no-unused-vars */
 /**
  * Organization Documents API
  * 
@@ -35,6 +36,7 @@ import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
   ensureMembership,
+  isValidOrgId,
   parseRequestBody,
   readEnv,
   respond,
@@ -676,7 +678,7 @@ async function handleUpdate(req, context, env) {
     let authResult;
     try {
       authResult = await controlClient.auth.getUser(authorization.token);
-    } catch (error) {
+    } catch (_error) {
       return respond(context, 401, { message: 'invalid_or_expired_token' });
     }
 
@@ -852,7 +854,7 @@ async function handleDelete(req, context, env) {
     let authResult;
     try {
       authResult = await controlClient.auth.getUser(authorization.token);
-    } catch (error) {
+    } catch (_error) {
       return respond(context, 401, { message: 'invalid_or_expired_token' });
     }
 
@@ -1052,7 +1054,7 @@ async function handleList(req, context, env) {
     let authResult;
     try {
       authResult = await controlClient.auth.getUser(authorization.token);
-    } catch (error) {
+    } catch (_error) {
       return respond(context, 401, { message: 'invalid_or_expired_token' });
     }
 

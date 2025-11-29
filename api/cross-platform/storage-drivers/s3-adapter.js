@@ -1,5 +1,4 @@
 /* eslint-env node */
-/* global Buffer */
 /**
  * S3-Compatible Storage Adapter
  * 

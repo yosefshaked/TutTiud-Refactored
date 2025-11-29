@@ -1,5 +1,4 @@
 /* eslint-env node */
-/* global Buffer */
 /**
  * Storage Credentials Encryption
  * 

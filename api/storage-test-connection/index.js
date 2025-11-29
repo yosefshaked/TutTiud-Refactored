@@ -10,7 +10,7 @@ import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
  * Body: { storage_profile: { mode, byos?, managed? } }
  * Returns: { success: true } or error details
  */
-export default async function handler(req, context) {
+export default async function handler(context, req) {
   if (req.method !== 'POST') {
     return respond(context, 405, { error: 'method_not_allowed' });
   }

@@ -11,6 +11,9 @@
     "build": "vite build",
     "dep:check": "madge --circular src --ts-config jsconfig.json",
     "check:schema": "node scripts/checkSchema.js",
+    "lint": "eslint .",
+    "lint:api": "eslint api/",
+    "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "electron:dev": "concurrently -k -s first \"npm run dev\" \"wait-on http://localhost:5173 && set ELECTRON_START_URL=http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && electron-builder"

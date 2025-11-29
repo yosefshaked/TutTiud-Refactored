@@ -11,9 +11,11 @@
 import { createSupabaseAdminClient } from '../_shared/supabase-admin.js';
 import { ensureMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
-import { parseMultipartData } from 'parse-multipart-data';
+import parseMultipartDataPkg from 'parse-multipart-data';
 import { createHash } from 'crypto';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
+
+const { parseMultipartData } = parseMultipartDataPkg;
 
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
