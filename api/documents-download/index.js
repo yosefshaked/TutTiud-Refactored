@@ -2,13 +2,21 @@
  * Unified Documents Download API - Generate download URLs for documents
  * Replaces: /api/student-files-download, /api/instructor-files-download, /api/org-documents-download
  * 
- * GET /api/documents-download?document_id={uuid}&org_id={uuid}
+ * GET /api/documents-download?document_id={uuid}&org_id={uuid}&preview={true|false}
+ * 
+ * Query Parameters:
+ * - document_id: Document ID (required)
+ * - org_id: Organization ID (required)
+ * - preview: If true, returns URL with inline disposition (opens in browser).
+ *            If false, returns URL with attachment disposition (downloads file).
+ *            Default: false
  */
 
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import { ensureMembership, resolveTenantClient, readEnv } from '../_shared/org-bff.js';
 import { getStorageDriver } from '../cross-platform/storage-drivers/index.js';
 import { resolveBearerAuthorization, respond } from '../_shared/http.js';
+import { decryptStorageProfile } from '../_shared/storage-encryption.js';
 
 export default async function handler(context, req) {
   try {
@@ -16,7 +24,8 @@ export default async function handler(context, req) {
       return respond(context, 405, { error: 'method_not_allowed' });
     }
 
-    const { document_id, org_id } = req.query;
+    const { document_id, org_id, preview } = req.query;
+    const isPreview = preview === 'true';
 
     if (!document_id || !org_id) {
       return respond(context, 400, { error: 'document_id and org_id required' });
@@ -120,45 +129,82 @@ export default async function handler(context, req) {
 
   // Load storage profile
   const storageProfile = orgSettings.storage_profile;
-  if (!storageProfile) {
+  if (!storageProfile || !storageProfile.mode) {
     return respond(context, 424, { error: 'storage_not_configured' });
   }
 
-  // Initialize storage driver
-  let driver;
-  try {
-    driver = getStorageDriver(storageProfile);
-  } catch (err) {
-    console.error('Storage driver initialization error:', err);
-    return respond(context, 500, { error: 'storage_init_failed' });
+  // Decrypt BYOS credentials if present
+  const decryptedProfile = decryptStorageProfile(storageProfile, env);
+
+  // Prepare display filename
+  const downloadFilename = document.name;
+  const hasExtension = /\.[^.]+$/.test(downloadFilename);
+  
+  let finalFilename = downloadFilename;
+  if (!hasExtension && document.original_name) {
+    // Extract extension from original filename
+    const extensionMatch = document.original_name.match(/\.[^.]+$/);
+    if (extensionMatch) {
+      finalFilename = downloadFilename + extensionMatch[0];
+    }
+  } else if (!hasExtension && document.path) {
+    // Fallback: extract from storage path
+    const extensionMatch = document.path.match(/\.[^.]+$/);
+    if (extensionMatch) {
+      finalFilename = downloadFilename + extensionMatch[0];
+    }
   }
 
-  // Generate download URL
+  // Determine Content-Disposition: inline for preview, attachment for download
+  const dispositionType = isPreview ? 'inline' : 'attachment';
+
+  // Get storage driver and generate download URL
   let downloadUrl;
   try {
-    // For managed storage, use public URL directly (Cloudflare worker will handle presigned URLs later)
-    // For BYOS, generate presigned URL
-    if (storageProfile.mode === 'managed') {
-      const endpoint = storageProfile.endpoint;
-      const bucket = storageProfile.bucket;
-      downloadUrl = `${endpoint}/${bucket}/${document.path}`;
+    let driver;
+    if (decryptedProfile.mode === 'managed') {
+      driver = getStorageDriver('managed', null, env);
+    } else if (decryptedProfile.mode === 'byos') {
+      if (!decryptedProfile.byos) {
+        return respond(context, 400, { error: 'byos_config_missing' });
+      }
+      driver = getStorageDriver('byos', decryptedProfile.byos, env);
     } else {
-      downloadUrl = await driver.getPublicUrl(document.path);
+      return respond(context, 400, { error: 'invalid_storage_mode' });
     }
-  } catch (err) {
-    console.error('URL generation error:', err);
-    return respond(context, 500, { error: 'url_generation_failed', details: err.message });
+
+    // Driver handles URL generation (public URL if configured, presigned otherwise)
+    downloadUrl = await driver.getDownloadUrl(document.path, 3600, finalFilename, dispositionType);
+    
+    context.log?.info?.('Generated download URL via driver', { 
+      mode: decryptedProfile.mode,
+      dispositionType,
+      expiresIn: 3600 
+    });
+  } catch (driverError) {
+    context.log?.error?.('Failed to generate download URL', { 
+      message: driverError?.message,
+      mode: decryptedProfile.mode
+    });
+    return respond(context, 500, { 
+      error: 'failed_to_generate_download_url', 
+      details: driverError.message 
+    });
   }
 
-  // Encode filename for download header (RFC 5987)
-  const ext = document.original_name.split('.').pop();
-  const filenameWithExt = document.name.endsWith(`.${ext}`) ? document.name : `${document.name}.${ext}`;
-  const encodedFilenameWithExt = encodeURIComponent(filenameWithExt);
+  context.log?.info?.('Document download URL generated', {
+    documentId: document_id,
+    orgId: org_id,
+    entityType: document.entity_type,
+    filename: finalFilename,
+    mode: decryptedProfile.mode,
+    dispositionType,
+    isPreview,
+  });
 
-  return respond(context, 200, {
+  return respond(context, 200, { 
     url: downloadUrl,
-    filename: filenameWithExt,
-    content_disposition: `attachment; filename*=UTF-8''${encodedFilenameWithExt}`
+    contentType: document.type || 'application/octet-stream'
   });
   } catch (error) {
     console.error('[ERROR] documents-download unhandled exception:', {

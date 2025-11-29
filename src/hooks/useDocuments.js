@@ -246,14 +246,18 @@ export function useDocuments(entityType, entityId) {
 
   /**
    * Get download URL for a document
+   * @param {string} documentId - Document ID
+   * @param {boolean} preview - If true, returns URL with inline disposition (preview). If false, attachment (download).
+   * @returns {string} Download URL
    */
-  const getDownloadUrl = useCallback(async (documentId) => {
+  const getDownloadUrl = useCallback(async (documentId, preview = false) => {
     if (!session?.access_token || !activeOrgId) {
       throw new Error('Missing authentication or context');
     }
 
+    const previewParam = preview ? '&preview=true' : '';
     const response = await fetch(
-      `/api/documents-download?document_id=${documentId}&org_id=${activeOrgId}`,
+      `/api/documents-download?document_id=${documentId}&org_id=${activeOrgId}${previewParam}`,
       {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -276,7 +280,7 @@ export function useDocuments(entityType, entityId) {
     }
 
     const data = await response.json();
-    return data;
+    return data.url; // Return just the URL string
   }, [session?.access_token, activeOrgId]);
 
   // Auto-fetch on mount and when dependencies change
