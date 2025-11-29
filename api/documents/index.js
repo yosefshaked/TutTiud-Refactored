@@ -196,6 +196,40 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     return { status: 400, body: { error: 'parse_failed' } };
   }
 
+  // Extract org_id from multipart if it wasn't in query
+  if (orgId === 'EXTRACT_FROM_MULTIPART') {
+    const orgIdPart = parts.find(p => p.name === 'org_id');
+    if (!orgIdPart) {
+      return { status: 400, body: { error: 'org_id_required' } };
+    }
+    orgId = orgIdPart.data.toString('utf8');
+    console.log('[DEBUG] Extracted org_id from multipart:', orgId);
+
+    // Now check membership with the extracted orgId
+    console.log('[DEBUG] handlePost: Verifying organization membership...', { orgId, userId });
+    let role;
+    try {
+      role = await ensureMembership(supabase, orgId, userId);
+      console.log('[DEBUG] handlePost: Membership verified successfully', { role });
+    } catch (membershipError) {
+      console.error('[ERROR] handlePost: Membership check failed', {
+        error: membershipError?.message,
+        orgId,
+        userId
+      });
+      return { status: 500, body: { error: 'failed_to_verify_membership', details: membershipError?.message } };
+    }
+
+    if (!role) {
+      console.warn('[WARN] handlePost: User is not a member of organization', { orgId, userId });
+      return { status: 403, body: { error: 'not_member' } };
+    }
+
+    userRole = role;
+    isAdmin = ['admin', 'owner'].includes(userRole);
+    console.log('[DEBUG] handlePost: User role determined', { userRole, isAdmin });
+  }
+
   // Extract metadata
   const entityTypePart = parts.find(p => p.name === 'entity_type');
   const entityIdPart = parts.find(p => p.name === 'entity_id');
@@ -797,22 +831,15 @@ export default async function handler(context, req) {
     });
     let orgId = req.query?.org_id || req.body?.org_id;
     
-    // For POST with multipart data, extract org_id from form data
+    // For POST with multipart data, we'll extract org_id in handlePost to avoid double-parsing
+    // Just check that it exists somewhere
     if (!orgId && method === 'POST') {
-      console.log('[DEBUG] POST request, attempting to extract org_id from multipart data...');
-      try {
-        const contentType = req.headers['content-type'] || '';
-        const boundary = contentType.split('boundary=')[1];
-        if (boundary) {
-          const parts = parseMultipartData(req.body, boundary);
-          const orgIdPart = parts.find(p => p.name === 'org_id');
-          if (orgIdPart) {
-            orgId = orgIdPart.data.toString('utf8');
-            console.log('[DEBUG] Extracted org_id from multipart:', orgId);
-          }
-        }
-      } catch (err) {
-        console.error('[ERROR] Failed to parse multipart data for org_id extraction:', err);
+      const contentType = req.headers['content-type'] || '';
+      if (contentType.includes('multipart/form-data')) {
+        console.log('[DEBUG] POST with multipart data detected, org_id will be extracted in handlePost');
+        // Don't parse here - let handlePost do it once
+        // We'll pass a flag to indicate this
+        orgId = 'EXTRACT_FROM_MULTIPART'; // Temporary marker
       }
     }
     
@@ -829,40 +856,44 @@ export default async function handler(context, req) {
 
     console.log('[DEBUG] Using org_id:', orgId);
 
-    // Membership check
-    console.log('[DEBUG] Step 7: Verifying organization membership...', { orgId, userId });
-    let role;
-    try {
-      role = await ensureMembership(supabase, orgId, userId);
-      console.log('[DEBUG] Membership verified successfully', { role });
-    } catch (membershipError) {
-      console.error('[ERROR] Membership check failed', {
-        error: membershipError?.message,
-        stack: membershipError?.stack,
-        orgId,
-        userId
-      });
-      context.log?.error?.('documents failed to verify membership', {
-        message: membershipError?.message,
-        orgId,
-        userId,
-      });
-      return respond(context, 500, { error: 'failed_to_verify_membership', details: membershipError?.message });
-    }
+    // Membership check (skip for POST with multipart - will check after parsing)
+    let role, userRole, isAdmin;
+    if (orgId !== 'EXTRACT_FROM_MULTIPART') {
+      console.log('[DEBUG] Step 7: Verifying organization membership...', { orgId, userId });
+      try {
+        role = await ensureMembership(supabase, orgId, userId);
+        console.log('[DEBUG] Membership verified successfully', { role });
+      } catch (membershipError) {
+        console.error('[ERROR] Membership check failed', {
+          error: membershipError?.message,
+          stack: membershipError?.stack,
+          orgId,
+          userId
+        });
+        context.log?.error?.('documents failed to verify membership', {
+          message: membershipError?.message,
+          orgId,
+          userId,
+        });
+        return respond(context, 500, { error: 'failed_to_verify_membership', details: membershipError?.message });
+      }
 
-    if (!role) {
-      console.warn('[WARN] User is not a member of organization', { orgId, userId });
-      return respond(context, 403, { error: 'not_member' });
-    }
+      if (!role) {
+        console.warn('[WARN] User is not a member of organization', { orgId, userId });
+        return respond(context, 403, { error: 'not_member' });
+      }
 
-    const userRole = role;
-    const isAdmin = ['admin', 'owner'].includes(userRole);
-    console.log('[DEBUG] Step 7.1: User role determined', { 
-      userRole, 
-      isAdmin,
-      hasUserRole: !!userRole,
-      userRoleType: typeof userRole
-    });
+      userRole = role;
+      isAdmin = ['admin', 'owner'].includes(userRole);
+      console.log('[DEBUG] Step 7.1: User role determined', { 
+        userRole, 
+        isAdmin,
+        hasUserRole: !!userRole,
+        userRoleType: typeof userRole
+      });
+    } else {
+      console.log('[DEBUG] Step 7: Skipping membership check for multipart POST (will check in handlePost)');
+    }
 
     // Get tenant client
     console.log('[DEBUG] Step 8: Resolving tenant database client...', { orgId });
