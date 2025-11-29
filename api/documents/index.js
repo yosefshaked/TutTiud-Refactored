@@ -518,8 +518,11 @@ export default async function handler(context, req) {
     const adminConfig = readSupabaseAdminConfig(env);
 
     if (!adminConfig?.supabaseUrl || !adminConfig?.serviceRoleKey) {
-      context.log?.error?.('documents missing Supabase admin credentials');
-      return { status: 500, body: { error: 'server_misconfigured' } };
+      context.log?.error?.('documents missing Supabase admin credentials', {
+        hasUrl: !!adminConfig?.supabaseUrl,
+        hasKey: !!adminConfig?.serviceRoleKey
+      });
+      return { status: 500, body: { error: 'server_misconfigured', message: 'Missing Supabase credentials' } };
     }
 
     // Auth check

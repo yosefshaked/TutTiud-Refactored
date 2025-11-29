@@ -254,8 +254,9 @@
 ### Polymorphic Documents Table Architecture (2025-11)
 - **Schema**: Centralized `tuttiud.Documents` table replaces JSON-based file storage in `Students.files`, `Instructors.files`, and `Settings.org_documents`.
 - **Discriminator pattern**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID) identifies which entity owns each document.
-- **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), org_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
-- **Indexes**: Composite index on (org_id, entity_type, entity_id) for fast entity-scoped queries; individual indexes on org_id, entity_type, entity_id.
+- **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
+- **Indexes**: Composite index on (entity_type, entity_id) for fast entity-scoped queries; individual indexes on uploaded_at, expiration_date, hash.
+- **Note**: No `org_id` column needed since Documents table lives in tenant database (one tenant = one organization).
 - **RLS Policies**: Row-level security enabled with policies for SELECT, INSERT, UPDATE, DELETE
   - All authenticated users can view documents (org-level permission checks in API layer)
   - INSERT requires `uploaded_by` matches authenticated user ID
