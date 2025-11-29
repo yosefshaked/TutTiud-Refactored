@@ -40,172 +40,172 @@ export default async function handler(context, req) {
       return respond(context, 500, { error: 'server_misconfigured' });
     }
 
-  // Auth check
-  const supabase = createSupabaseAdminClient(adminConfig);
-  const authorization = resolveBearerAuthorization(req);
-  if (!authorization?.token) {
-    return respond(context, 401, { error: 'missing_auth' });
-  }
+    // Auth check
+    const supabase = createSupabaseAdminClient(adminConfig);
+    const authorization = resolveBearerAuthorization(req);
+    if (!authorization?.token) {
+      return respond(context, 401, { error: 'missing_auth' });
+    }
 
-  const token = authorization.token;
-  const authResult = await supabase.auth.getUser(token);
-  if (authResult.error || !authResult.data?.user?.id) {
-    return respond(context, 401, { error: 'invalid_token' });
-  }
+    const token = authorization.token;
+    const authResult = await supabase.auth.getUser(token);
+    if (authResult.error || !authResult.data?.user?.id) {
+      return respond(context, 401, { error: 'invalid_token' });
+    }
 
-  const userId = authResult.data.user.id;
+    const userId = authResult.data.user.id;
 
-  // Membership check
-  let role;
-  try {
-    role = await ensureMembership(supabase, org_id, userId);
-  } catch (membershipError) {
-    context.log?.error?.('documents-download failed to verify membership', {
-      message: membershipError?.message,
-      org_id,
-      userId,
-    });
-    return respond(context, 500, { error: 'failed_to_verify_membership' });
-  }
+    // Membership check
+    let role;
+    try {
+      role = await ensureMembership(supabase, org_id, userId);
+    } catch (membershipError) {
+      context.log?.error?.('documents-download failed to verify membership', {
+        message: membershipError?.message,
+        org_id,
+        userId,
+      });
+      return respond(context, 500, { error: 'failed_to_verify_membership' });
+    }
 
-  if (!role) {
-    return respond(context, 403, { error: 'not_member' });
-  }
+    if (!role) {
+      return respond(context, 403, { error: 'not_member' });
+    }
 
-  const userRole = role;
-  const isAdmin = ['admin', 'owner'].includes(userRole);
+    const userRole = role;
+    const isAdmin = ['admin', 'owner'].includes(userRole);
 
-  // Get tenant client
-  const tenantResult = await resolveTenantClient(context, supabase, env, org_id);
-  if (tenantResult.error) {
-    return respond(context, 424, { error: 'tenant_not_configured', details: tenantResult.error });
-  }
-  const tenantClient = tenantResult.client;
+    // Get tenant client
+    const tenantResult = await resolveTenantClient(context, supabase, env, org_id);
+    if (tenantResult.error) {
+      return respond(context, 424, { error: 'tenant_not_configured', details: tenantResult.error });
+    }
+    const tenantClient = tenantResult.client;
 
-  // Get storage profile
-  const { data: orgSettings, error: orgSettingsError } = await supabase
-    .from('org_settings')
-    .select('storage_profile')
-    .eq('org_id', org_id)
-    .single();
-
-  if (orgSettingsError || !orgSettings) {
-    context.log?.error?.('documents-download failed to fetch org settings', {
-      error: orgSettingsError?.message,
-      org_id
-    });
-    return respond(context, 424, { error: 'org_settings_not_found' });
-  }
-
-  // Fetch document
-  const { data: document, error: fetchError } = await tenantClient
-    .from('Documents')
-    .select('*')
-    .eq('id', document_id)
-    .single();
-
-  if (fetchError || !document) {
-    return respond(context, 404, { error: 'document_not_found' });
-  }
-
-  // Permission validation
-  if (document.entity_type === 'organization' && !isAdmin) {
-    // Check org_documents_member_visibility setting
-    const { data: visibilitySetting } = await tenantClient
-      .from('Settings')
-      .select('settings_value')
-      .eq('key', 'org_documents_member_visibility')
+    // Get storage profile
+    const { data: orgSettings, error: orgSettingsError } = await supabase
+      .from('org_settings')
+      .select('storage_profile')
+      .eq('org_id', org_id)
       .single();
 
-    const memberVisibility = visibilitySetting?.settings_value?.enabled || false;
-    if (!memberVisibility) {
-      return respond(context, 403, { error: 'members_cannot_view_org_documents' });
+    if (orgSettingsError || !orgSettings) {
+      context.log?.error?.('documents-download failed to fetch org settings', {
+        error: orgSettingsError?.message,
+        org_id
+      });
+      return respond(context, 424, { error: 'org_settings_not_found' });
     }
-  }
 
-  if (document.entity_type === 'instructor' && !isAdmin && userId !== document.entity_id) {
-    return respond(context, 403, { error: 'permission_denied' });
-  }
+    // Fetch document
+    const { data: document, error: fetchError } = await tenantClient
+      .from('Documents')
+      .select('*')
+      .eq('id', document_id)
+      .single();
 
-  // Load storage profile
-  const storageProfile = orgSettings.storage_profile;
-  if (!storageProfile || !storageProfile.mode) {
-    return respond(context, 424, { error: 'storage_not_configured' });
-  }
-
-  // Decrypt BYOS credentials if present
-  const decryptedProfile = decryptStorageProfile(storageProfile, env);
-
-  // Prepare display filename
-  const downloadFilename = document.name;
-  const hasExtension = /\.[^.]+$/.test(downloadFilename);
-  
-  let finalFilename = downloadFilename;
-  if (!hasExtension && document.original_name) {
-    // Extract extension from original filename
-    const extensionMatch = document.original_name.match(/\.[^.]+$/);
-    if (extensionMatch) {
-      finalFilename = downloadFilename + extensionMatch[0];
+    if (fetchError || !document) {
+      return respond(context, 404, { error: 'document_not_found' });
     }
-  } else if (!hasExtension && document.path) {
-    // Fallback: extract from storage path
-    const extensionMatch = document.path.match(/\.[^.]+$/);
-    if (extensionMatch) {
-      finalFilename = downloadFilename + extensionMatch[0];
-    }
-  }
 
-  // Determine Content-Disposition: inline for preview, attachment for download
-  const dispositionType = isPreview ? 'inline' : 'attachment';
+    // Permission validation
+    if (document.entity_type === 'organization' && !isAdmin) {
+      // Check org_documents_member_visibility setting
+      const { data: visibilitySetting } = await tenantClient
+        .from('Settings')
+        .select('settings_value')
+        .eq('key', 'org_documents_member_visibility')
+        .single();
 
-  // Get storage driver and generate download URL
-  let downloadUrl;
-  try {
-    let driver;
-    if (decryptedProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, env);
-    } else if (decryptedProfile.mode === 'byos') {
-      if (!decryptedProfile.byos) {
-        return respond(context, 400, { error: 'byos_config_missing' });
+      const memberVisibility = visibilitySetting?.settings_value?.enabled || false;
+      if (!memberVisibility) {
+        return respond(context, 403, { error: 'members_cannot_view_org_documents' });
       }
-      driver = getStorageDriver('byos', decryptedProfile.byos, env);
-    } else {
-      return respond(context, 400, { error: 'invalid_storage_mode' });
     }
 
-    // Driver handles URL generation (public URL if configured, presigned otherwise)
-    downloadUrl = await driver.getDownloadUrl(document.path, 3600, finalFilename, dispositionType);
+    if (document.entity_type === 'instructor' && !isAdmin && userId !== document.entity_id) {
+      return respond(context, 403, { error: 'permission_denied' });
+    }
+
+    // Load storage profile
+    const storageProfile = orgSettings.storage_profile;
+    if (!storageProfile || !storageProfile.mode) {
+      return respond(context, 424, { error: 'storage_not_configured' });
+    }
+
+    // Decrypt BYOS credentials if present
+    const decryptedProfile = decryptStorageProfile(storageProfile, env);
+
+    // Prepare display filename
+    const downloadFilename = document.name;
+    const hasExtension = /\.[^.]+$/.test(downloadFilename);
     
-    context.log?.info?.('Generated download URL via driver', { 
+    let finalFilename = downloadFilename;
+    if (!hasExtension && document.original_name) {
+      // Extract extension from original filename
+      const extensionMatch = document.original_name.match(/\.[^.]+$/);
+      if (extensionMatch) {
+        finalFilename = downloadFilename + extensionMatch[0];
+      }
+    } else if (!hasExtension && document.path) {
+      // Fallback: extract from storage path
+      const extensionMatch = document.path.match(/\.[^.]+$/);
+      if (extensionMatch) {
+        finalFilename = downloadFilename + extensionMatch[0];
+      }
+    }
+
+    // Determine Content-Disposition: inline for preview, attachment for download
+    const dispositionType = isPreview ? 'inline' : 'attachment';
+
+    // Get storage driver and generate download URL
+    let downloadUrl;
+    try {
+      let driver;
+      if (decryptedProfile.mode === 'managed') {
+        driver = getStorageDriver('managed', null, env);
+      } else if (decryptedProfile.mode === 'byos') {
+        if (!decryptedProfile.byos) {
+          return respond(context, 400, { error: 'byos_config_missing' });
+        }
+        driver = getStorageDriver('byos', decryptedProfile.byos, env);
+      } else {
+        return respond(context, 400, { error: 'invalid_storage_mode' });
+      }
+
+      // Driver handles URL generation (public URL if configured, presigned otherwise)
+      downloadUrl = await driver.getDownloadUrl(document.path, 3600, finalFilename, dispositionType);
+      
+      context.log?.info?.('Generated download URL via driver', { 
+        mode: decryptedProfile.mode,
+        dispositionType,
+        expiresIn: 3600 
+      });
+    } catch (driverError) {
+      context.log?.error?.('Failed to generate download URL', { 
+        message: driverError?.message,
+        mode: decryptedProfile.mode
+      });
+      return respond(context, 500, { 
+        error: 'failed_to_generate_download_url', 
+        details: driverError.message 
+      });
+    }
+
+    context.log?.info?.('Document download URL generated', {
+      documentId: document_id,
+      orgId: org_id,
+      entityType: document.entity_type,
+      filename: finalFilename,
       mode: decryptedProfile.mode,
       dispositionType,
-      expiresIn: 3600 
+      isPreview,
     });
-  } catch (driverError) {
-    context.log?.error?.('Failed to generate download URL', { 
-      message: driverError?.message,
-      mode: decryptedProfile.mode
-    });
-    return respond(context, 500, { 
-      error: 'failed_to_generate_download_url', 
-      details: driverError.message 
-    });
-  }
 
-  context.log?.info?.('Document download URL generated', {
-    documentId: document_id,
-    orgId: org_id,
-    entityType: document.entity_type,
-    filename: finalFilename,
-    mode: decryptedProfile.mode,
-    dispositionType,
-    isPreview,
-  });
-
-  return respond(context, 200, { 
-    url: downloadUrl,
-    contentType: document.type || 'application/octet-stream'
-  });
+    return respond(context, 200, { 
+      url: downloadUrl,
+      contentType: document.type || 'application/octet-stream'
+    });
   } catch (error) {
     console.error('[ERROR] documents-download unhandled exception:', {
       message: error.message,
