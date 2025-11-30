@@ -842,7 +842,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
   const handleFilePreview = useCallback(
     async (fileId) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
 
       const token = session.access_token;
       if (!token) {
@@ -851,9 +851,9 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       }
 
       try {
-        // Get presigned preview URL (same endpoint, but we'll open differently)
+        // Get presigned preview URL from polymorphic documents endpoint
         const response = await fetch(
-          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}&preview=true`,
+          `/api/documents-download?document_id=${encodeURIComponent(fileId)}&org_id=${encodeURIComponent(orgId)}&preview=true`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -866,7 +866,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to get preview URL');
+          throw new Error(errorData.error || errorData.message || 'Failed to get preview URL');
         }
 
         const { url, contentType } = await response.json();
@@ -895,7 +895,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         toast.error(`תצוגה מקדימה נכשלה: ${error?.message || 'שגיאה לא ידועה'}`);
       }
     },
-    [session, orgId, student?.id]
+    [session, orgId]
   );
 
   const handleFileInputChange = useCallback(

@@ -359,7 +359,9 @@
   - `StudentDocumentsSection.jsx`: Uses `useDocuments('student', student.id)`
   - `InstructorDocumentsSection.jsx`: Uses `useDocuments('instructor', instructor.id)` with trust boundary validation (enforces userId === instructor.id for non-admin self-service via `isOwnDocuments` prop)
   - `OrgDocumentsManager.jsx`: Uses `useDocuments('organization', orgId)`
+  - `MyInstructorDocuments.jsx`: Uses `useDocuments('instructor', instructor.id)` for instructor self-service document portal
   - All components updated to use unified /api/documents endpoints, replacing old entity-specific endpoints
+  - **Note (2025-11)**: Legacy endpoints (`/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*`) still exist for backward compatibility but are no longer used by frontend components. The duplicate check endpoints (`/api/student-files-check`, `/api/instructor-files-check`) remain in use until a polymorphic `/api/documents-check` endpoint is implemented.
 - **Audit logging**: All document operations (upload/update/delete) logged via `logAuditEvent()` with:
   - Action types: FILE_UPLOADED, FILE_METADATA_UPDATED, FILE_DELETED
   - Category: FILES
