@@ -17,7 +17,7 @@ import {
   respond,
   resolveOrgId,
 } from '../_shared/org-bff.js';
-import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
+import { AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 export default async function (context, req) {
   context.log('storage-start-grace-period: function started');

@@ -11,8 +11,89 @@
   - Filter by "Trace Severity level = Information" for general logs
   - Use time range selector (last 24 hours, custom, etc.) to narrow results
   - Search specific function names in the search box (e.g., "student-files-download")
+- **Documents API Debugging** (2025-11): Comprehensive debug logging added to trace complete request flow for organization documents (מסמכי הארגון):
+  - **Backend logging** (`api/documents/index.js`):
+    - Step-by-step flow: Environment read → Admin config → Client creation → Auth → Membership → Tenant client → Handler routing
+    - Each step logs success/failure with detailed context (env vars, credentials presence, user info, org info)
+    - handleGet logs entity validation, table queries, result counts, error details including table existence checks
+    - All logs prefixed with `[DEBUG]`, `[WARN]`, `[ERROR]` for easy filtering in Application Insights
+  - **Shared utilities logging** (`api/_shared/supabase-admin.js`):
+    - `readSupabaseAdminConfig`: Logs available environment variables, credential resolution, result details
+    - `createSupabaseAdminClient`: Logs client creation attempts, credential validation
+  - **Frontend logging** (`src/hooks/useDocuments.js`):
+    - Request preparation: entity context, session validation
+    - HTTP call details: URL, headers presence, response status/headers
+    - Response parsing: success data structure, error text extraction
+    - All logs prefixed with `[DEBUG-FRONTEND]`, `[WARN-FRONTEND]`, `[ERROR-FRONTEND]`
+  - **Log search tips**: In Application Insights, search for:
+    - `[DEBUG] ========== Documents API Request Started ==========` - Beginning of request
+    - `[DEBUG] Step X:` - Specific workflow steps (1-9)
+    - `[ERROR]` - Any error conditions
+    - `entity_type` or `organization` - Org documents specific calls
 
 ## Workflow
+- **Azure Functions Response Pattern (CRITICAL)**: All Azure Functions HTTP handlers MUST set `context.res` before returning:
+  ```javascript
+  // ✅ CORRECT (use respond helper):
+  return respond(context, 200, { data: results });
+  
+  // ✅ CORRECT (manual):
+  const response = { status: 200, body: { data: results } };
+  context.res = response;
+  return response;
+  
+  // ❌ WRONG (missing context.res, returns empty body):
+  return { status: 200, body: { data: results } };
+  ```
+  - Without setting `context.res`, Azure returns HTTP 200 with an **empty body**, causing `JSON.parse()` errors in frontend.
+  - Use existing endpoints like `/api/students`, `/api/instructors`, `/api/settings`, `/api/documents`, `/api/documents-download` as reference for correct patterns.
+- **Bearer Token Extraction (CRITICAL)**: Always use `resolveBearerAuthorization()` helper from `http.js` to extract JWT tokens:
+  ```javascript
+  // ✅ CORRECT (checks all header variations):
+  import { resolveBearerAuthorization } from '../_shared/http.js';
+  const authorization = resolveBearerAuthorization(req);
+  if (!authorization?.token) {
+    return respond(context, 401, { error: 'missing_auth' });
+  }
+  const token = authorization.token;
+  
+  // ❌ WRONG (case-sensitive, misses alternative headers):
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  const token = authHeader.substring(7);
+  ```
+  - Frontend sends tokens in multiple headers (`Authorization`, `X-Supabase-Authorization`, `x-supabase-auth`) for compatibility.
+  - `resolveBearerAuthorization()` checks all variations (`'x-supabase-authorization'`, `'x-supabase-auth'`, `'authorization'`) and handles case sensitivity.
+  - Manual header reading causes JWT verification failures when token is sent in alternative headers.
+  - Always follow the pattern in `/api/org-logo/index.js` for token extraction.
+- **Supabase Auth Response Structure (CRITICAL)**: `supabase.auth.getUser(token)` returns `{ data, error }`, access user via `result.data.user`:
+  ```javascript
+  // ✅ CORRECT:
+  const authResult = await supabase.auth.getUser(token);
+  if (authResult.error || !authResult.data?.user?.id) {
+    return respond(context, 401, { message: 'invalid_token' });
+  }
+  const userId = authResult.data.user.id;
+  
+  // ❌ WRONG (incorrect destructuring):
+  const { data: authResult, error } = await supabase.auth.getUser(token);
+  const userId = authResult.user.id; // TypeError: authResult is already .data
+  ```
+  - Always follow the pattern in `/api/students/index.js`, `/api/instructors/index.js`, `/api/settings/index.js` for auth verification.
+- **API Validation**: Before deploying API changes, run validation to catch common issues:
+  - `npm run lint:api` - ESLint validation for API endpoints (industry standard, catches import/export issues, undefined variables, etc.)
+  - `node scripts/validate-api-endpoints.js` - Azure Functions-specific validation (function.json, scriptFile alignment, JSON validity)
+  - ESLint rules enforce:
+    - No importing from deprecated modules (supabase-tenant.js, wrong storage-drivers path)
+    - Correct import/export matching with `import/named`, `import/no-unresolved`
+    - No undefined variables, unused imports
+    - Proper Node.js globals for API files
+  - Custom validation script checks:
+    - **function.json existence**: Every endpoint directory must have function.json or Azure ignores it
+    - **scriptFile alignment**: If function.json specifies scriptFile, the file must exist (defaults to index.js)
+    - **Valid JSON**: Detects invalid JSON in function.json (trailing commas, syntax errors)
+    - **HTTP bindings**: Validates httpTrigger and http output bindings are present
+    - Handler signatures, CommonJS/ESM import conflicts, deprecated patterns
+  - Run both tools before deploying: `npm run lint:api && node scripts/validate-api-endpoints.js`
 - For premium features, always check permissions in both frontend (UI) and backend (API) before allowing access.
 - PDF export feature uses Puppeteer with `@sparticuz/chromium` for serverless Azure Functions deployment.
 - Lint any changed JavaScript or JSX files with `npx eslint <files>`.
@@ -179,15 +260,34 @@
 - See `api/cross-platform/README.md` for architectural principles and usage guidelines
 
 ### File Upload and Document Management (2025-11)
-- `/api/student-files` (POST/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
+- `/api/student-files` (POST/PUT/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
   - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
-  - **File metadata**: Each file record includes `{id, name, original_name, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **File metadata**: Each file record includes `{id, name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **PUT endpoint**: Updates file metadata (name, relevant_date, expiration_date, resolved) post-upload
+    - Admin/owner only
+    - Logs audit event with updated fields
   - **Hebrew filename encoding**: Properly decodes UTF-8 filenames from multipart data by detecting latin1 mis-encoding and converting back to UTF-8
+  - **Bulk upload support (2025-11)**: File inputs accept `multiple` attribute, allowing users to select and upload multiple files at once
+  - **Sorting functionality (2025-11)**: Additional files section includes sort controls for name (alphabetical) and date (chronological), with ascending/descending toggle
   - **Progress tracking**: Frontend uses XMLHttpRequest with upload progress events for real-time feedback
   - **Background uploads**: Uploads continue in background with toast notifications; users can navigate away while files upload
   - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures
   - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Student Name}" (e.g., "אישור רפואי - יוסי כהן")
   - **Definition name preservation**: Stores `definition_name` in file metadata so orphaned files (deleted definitions) maintain proper display name
+  - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant_date, and add expiration_date
+    - Name auto-populated from filename (without extension) or definition name
+    - Name locked for required documents (uses admin-configured definition name)
+    - Both dates optional
+    - Confirmation triggers upload with metadata via multipart/form-data
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
+    - Edit name, relevant_date, expiration_date
+    - Admin/owner only
+    - Edit button next to each file (required and adhoc)
+  - **Resolved status for expired documents**: Files with expiration dates can be marked as "taken care of"
+    - Green "טופל" badge for resolved files vs red "פג תוקף" for expired unresolved
+    - Resolved files excluded from expired document counts on student list pages
+    - Toggle button appears for files with expiration_date
+    - Allows marking files as resolved when: new version uploaded, expiration no longer relevant, or issue addressed
   - **Configuration changes handling**: When admins modify document definitions after files are uploaded:
     - **Rename definition**: Files automatically show the NEW definition name (fetched dynamically from current definitions); `definition_name` metadata only used as fallback if definition is deleted
     - **Change target_tags**: Files remain associated with `definition_id`; display uses current definition regardless of tag changes, so file stays in "Required Documents" section with updated tags
@@ -217,6 +317,127 @@
   - **Orphaned files display**: Files from deleted definitions show with amber background, "הגדרה ישנה" badge, and reconstructed name from stored `definition_name`
 - File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
 
+### Polymorphic Documents Table Architecture (2025-11)
+- **Schema**: Centralized `tuttiud.Documents` table replaces JSON-based file storage in `Students.files`, `Instructors.files`, and `Settings.org_documents`.
+- **Discriminator pattern**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID) identifies which entity owns each document.
+- **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
+- **Indexes**: Composite index on (entity_type, entity_id) for fast entity-scoped queries; individual indexes on uploaded_at, expiration_date, hash.
+- **Note**: No `org_id` column needed since Documents table lives in tenant database (one tenant = one organization).
+- **RLS Policies**: Row-level security enabled with policies for SELECT, INSERT, UPDATE, DELETE
+  - All authenticated users can view documents (org-level permission checks in API layer)
+  - INSERT requires `uploaded_by` matches authenticated user ID
+  - UPDATE/DELETE allowed for authenticated users (entity-level permission checks in API layer)
+  - API layer (`validateEntityAccess`) enforces org membership and entity-specific permissions
+- **Migration strategy** (non-destructive):
+  - Setup script includes `DO $$` block that copies from JSON columns to Documents table
+  - **Organization documents migration**: Requires visiting Settings page first to save org_id to Settings table
+  - Script reads `_system_org_id` from Settings automatically (saved by frontend on Settings page load)
+  - If org_id not found, org documents migration is skipped with a notice (student/instructor files still migrate)
+  - Verifies counts match after migration; RAISES EXCEPTION if data integrity check fails
+  - Original JSON columns retained for rollback capability and backward compatibility
+  - Migration runs idempotently (safe to rerun on existing tenants)
+- **API Endpoints**:
+  - **`/api/documents`** (GET/POST/PUT/DELETE): Unified polymorphic endpoint for all document types
+    - GET: `?entity_type=student&entity_id=<uuid>` returns all documents for that entity
+    - POST: Multipart upload with `entity_type`/`entity_id` in query params or body; validates permissions via `validateEntityAccess()`
+    - PUT: Update metadata (name, relevant_date, expiration_date, resolved) by document ID
+    - DELETE: Remove document by ID after permission validation
+  - **`/api/documents-download`** (GET): Unified download URL generation
+    - Query params: `entity_type`, `entity_id`, `document_id`, `preview` (boolean)
+    - Returns presigned URL (1-hour expiration) with proper Content-Disposition
+    - Permission validation enforced before URL generation
+- **Permission model** (enforced in `validateEntityAccess` function):
+  - **Students**: All org members can view/upload documents for any student
+  - **Instructors**: Admin/owner can access all; non-admin instructors only their own (userId === entityId check)
+  - **Organizations**: Admin/owner only (member visibility controlled separately via settings)
+- **React Hook**: `useDocuments(entityType, entityId)` provides entity-agnostic document management
+  - Auto-fetching on mount with loading/error states
+  - Functions: `fetchDocuments()`, `uploadDocument(file, metadata)`, `updateDocument(id, updates)`, `deleteDocument(id)`, `getDownloadUrl(id, preview)`
+  - Uses AuthContext for session, OrgContext for orgId
+  - Handles all API calls with proper error handling and toast notifications
+- **Frontend components refactored**:
+  - `StudentDocumentsSection.jsx`: Uses `useDocuments('student', student.id)`
+  - `InstructorDocumentsSection.jsx`: Uses `useDocuments('instructor', instructor.id)` with trust boundary validation (enforces userId === instructor.id for non-admin self-service via `isOwnDocuments` prop)
+  - `OrgDocumentsManager.jsx`: Uses `useDocuments('organization', orgId)`
+  - `MyInstructorDocuments.jsx`: Uses `useDocuments('instructor', instructor.id)` for instructor self-service document portal
+  - All components updated to use unified /api/documents endpoints, replacing old entity-specific endpoints
+  - **Note (2025-11)**: Legacy endpoints (`/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*`) still exist for backward compatibility but are no longer used by frontend components. The duplicate check endpoints (`/api/student-files-check`, `/api/instructor-files-check`) remain in use until a polymorphic `/api/documents-check` endpoint is implemented.
+- **Audit logging**: All document operations (upload/update/delete) logged via `logAuditEvent()` with:
+  - Action types: FILE_UPLOADED, FILE_METADATA_UPDATED, FILE_DELETED
+  - Category: FILES
+  - Resource type: `{entity_type}_file` (e.g., "student_file", "instructor_file", "organization_file")
+  - Details include: entity_type, entity_id, file_name, file_size, storage_mode, updated_fields
+- **Benefits of polymorphic approach**:
+  - Single source of truth for all document storage
+  - Consistent permission validation across entity types
+  - Unified audit trail for compliance
+  - Simplified code maintenance (one endpoint vs many)
+  - Easy to extend to new entity types without duplicating logic
+- **Backward compatibility**: JSON columns in Students/Instructors/Settings remain intact; migration copies data without deletion, allowing gradual transition and rollback if needed.
+
+### Organizational Documents (2025-11)
+- `/api/org-documents` (POST/PUT/DELETE/GET) manages organization-level documents (licenses, approvals, certificates) not tied to specific students or instructors.
+  - **Storage paths**:
+    - Managed R2: `managed/{org_id}/general-docs/{file_id}.{ext}`
+    - BYOS: `general-docs/{org_id}/{file_id}.{ext}`
+  - **Metadata storage**: Stored in `tuttiud.Settings` table with key `'org_documents'` as JSONB array
+  - **Metadata schema**: `{id, name, original_name, relevant_date, expiration_date, url, path, storage_provider, uploaded_at, uploaded_by, size, type, hash}`
+  - **Member visibility control**: Setting `org_documents_member_visibility` (boolean, default false) controls whether non-admin members can view org documents
+    - Admin/owner can always view and manage documents
+    - Non-admin members require the setting to be enabled to view documents
+    - GET endpoint checks this setting and returns 403 `members_cannot_view_org_documents` error when disabled
+    - Frontend hides the org documents card from non-admin members when visibility is disabled
+    - Backend enforces restriction as security layer in case of UI bugs
+  - **POST (upload)**: Multipart form data with file + optional metadata (name, relevant_date, expiration_date)
+    - Validates file size (10MB max) and MIME types (PDF, images, Word, Excel)
+    - Decodes Hebrew filenames properly (UTF-8/latin1 encoding)
+    - Generates MD5 hash for duplicate detection
+    - Uploads to storage and saves metadata to Settings
+    - Requires admin/owner role
+    - Logs FILE_UPLOADED audit event
+  - **PUT (update metadata)**: Update name, relevant_date, or expiration_date for existing document
+    - Admin/owner only
+    - Logs org_document_updated audit event
+  - **DELETE**: Remove file from storage and metadata from Settings
+    - Admin/owner only
+    - Logs FILE_DELETED audit event
+  - **GET (list)**: Returns all org documents for the organization
+    - Available to members when visibility setting is enabled
+    - Admin/owner can always access
+- `/api/org-documents-download` (GET) returns public URLs for org documents.
+  - Query params: `org_id` and `file_id`
+  - Verifies membership (any org member can download if visibility enabled)
+  - Uses public URLs directly (same approach as student/instructor files)
+  - Future: Cloudflare worker will handle custom domain presigned URLs
+- Frontend (`OrgDocumentsManager.jsx`):
+  - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant date, and add expiration date
+    - Name auto-populated from filename (without extension)
+    - Both dates optional
+    - Confirmation triggers upload with metadata via multipart/form-data
+    - Fresh session token obtained before upload to prevent silent failures
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
+    - Edit name, relevant_date, expiration_date
+    - Admin/owner only
+  - **Document separation**: Expired documents (expiration_date < today) displayed in separate section with red badges and CalendarX icon
+  - **Sorting**: Three-way sort by upload date, name, or expiration date with asc/desc toggle
+  - **Download**: Fetches public URL and triggers browser download with proper Hebrew filename
+  - **Delete**: Admin/owner only, confirmation dialog before deletion
+  - **Upload guidelines**: Info box explaining 10MB limit, allowed file types, Hebrew filename support
+  - **Visibility toggle (admin-only)**: Checkbox inside card to enable/disable member access
+    - Stored in tenant DB setting `org_documents_member_visibility`
+    - When disabled: Only admin/owner can view documents
+    - When enabled: All org members can view and download (but not upload/delete)
+  - **Visibility restriction handling**: Non-admin members see amber warning message when visibility is disabled
+- Settings page integration:
+  - Card: "מסמכי הארגון" (Organization Documents) with Briefcase icon
+  - Positioned after Document Rules Manager card (admin section)
+  - Visibility logic:
+    - Admins/owners: Always see the card when storage is enabled
+    - Non-admin members: Card only visible when `org_documents_member_visibility = true` AND storage is enabled
+  - Opens dialog with `OrgDocumentsManager` component
+  - Backend enforces visibility restriction as security layer
+- **Use cases**: Organization licenses, veterinary approvals, business permits, insurance certificates, general documentation not tied to specific students or instructors
+
 ### PDF Export Feature (2025-11)
 - `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
   - Validates admin/owner role and permission before processing
@@ -235,6 +456,7 @@
   - API client: `src/api/students-export.js` exports `exportStudentPdf()` and `downloadPdfBlob()`
 
 ### Storage Grace Period & File Deletion (2025-11)
+- **Storage provider field consistency**: All file upload endpoints store `storage_provider` as the mode value (`'managed'` or `'byos'`), NOT as specific provider names like `'cloudflare_r2'` or `'managed_r2'`. This allows storage backend changes without breaking file metadata.
 - **Configurable grace period**: `permission_registry.storage_grace_period_days` (default 30) controls how many days users have to download files after storage is disconnected before permanent deletion.
 - **Database schema**: `org_settings.storage_grace_ends_at` (timestamptz) tracks when grace period expires and files should be deleted.
 - **Storage disconnection**: Preserves configuration with `disconnected: true` flag instead of deleting profile.
@@ -277,7 +499,7 @@
 - **Shared utilities**: `api/_shared/audit-log.js` provides `logAuditEvent()` and action type constants (`AUDIT_ACTIONS`, `AUDIT_CATEGORIES`).
 - **CRITICAL**: `logAuditEvent()` requires a **control DB Supabase client**, NOT a tenant client. Always pass the control DB admin client (typically named `supabase` in `/api/*` endpoints that use `createSupabaseAdminClient()`). Passing a tenant client will write to the wrong database and fail silently.
 - **Implementation status**:
-  - ✅ **Implemented**: Storage operations, Membership operations, Invitations, Backup (create/restore), Students (create/update), Instructors (create/update/delete), Settings (upsert/delete), Logo (upload/delete), Files (student/instructor upload/delete)
+  - ✅ **Implemented**: Storage operations, Membership operations, Invitations, Backup (create/restore), Students (create/update), Instructors (create/update/delete), Settings (upsert/delete), Logo (upload/delete), Files (student/instructor upload/delete/metadata_update)
   - ❌ **Not yet implemented**: Permissions changes (no dedicated endpoint yet)
   - When adding audit logging to new endpoints, ensure you pass the control DB client and follow the pattern in `api/backup/index.js`, `api/students/index.js`, or `api/org-memberships/index.js`.
 - **Logged actions**:
@@ -289,7 +511,7 @@
   - **Instructors**: created, updated, deleted (with instructor_name, instructor_email, soft_delete flag)
   - **Settings**: updated (with operation type, keys array, count)
   - **Logo**: updated (with action: upload/delete, logo_url)
-  - **Files**: uploaded, deleted (with resource_type: student_file/instructor_file, file_name, file_size, storage_mode)
+  - **Files**: uploaded, deleted, metadata_updated (with resource_type: student_file/instructor_file, file_name, file_size, storage_mode, updated_fields)
 - **Usage pattern**:
   ```javascript
   await logAuditEvent(supabase, { // ← MUST be control DB client
@@ -534,8 +756,12 @@
   - If no tags/types specified, document applies to all students/instructors
   - UI shows appropriate badges and icons (Tag for students, Briefcase for instructors)
 - **File Upload for Instructors**:
-  - Backend endpoints: `/api/instructor-files` (POST/DELETE) and `/api/instructor-files-download` (GET)
+  - Backend endpoints: `/api/instructor-files` (POST/PUT/DELETE) and `/api/instructor-files-download` (GET)
   - Storage path: `instructors/{org_id}/{instructor_id}/{file_id}.{ext}`
+  - **File metadata**: Each file record includes `{id, name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
+  - **PUT endpoint**: Updates file metadata (name, relevant_date, expiration_date, resolved) post-upload
+    - Admin/owner only (instructors can update their own files)
+    - Logs audit event with updated fields
   - **Admin UI**: `InstructorDocumentsSection` component integrated into `InstructorManager` via tabs (Details/Documents)
   - **Instructor Self-Service**: `MyInstructorDocuments` component in Settings page modal
     - Modal trigger: "המסמכים שלי" card appears for instructor role (non-admin users)
@@ -543,7 +769,18 @@
     - No delete capability: Instructors cannot delete files to preserve important documentation
   - Document validation: Filters by `instructor_type` matching `target_instructor_types` in definitions
   - Upload features: Background progress tracking, duplicate detection (MD5 hash), Hebrew filename support
-  - File management: Upload, download (presigned URLs), delete (admin-only)
+  - File management: Upload, download (presigned URLs), delete (admin-only), edit metadata (admin or own files)
+  - **Pre-upload metadata editor**: Dialog opens before upload (same pattern as student files)
+    - Name auto-populated from filename or definition name
+    - Name locked for required documents
+    - Both dates optional
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
+    - Edit name, relevant_date, expiration_date
+    - Admin/owner or instructor (own files only)
+    - Edit button next to each file
+  - **Resolved status for expired documents**: Same pattern as student files
+    - Green "טופל" badge for resolved, red "פג תוקף" for expired unresolved
+    - Toggle button for files with expiration_date
   - Orphaned files: Files from deleted definitions display with amber badge "הגדרה ישנה"
   - Storage integration: Works with both managed R2 and BYOS storage profiles
   - **Permission model** (enforced in backend):
@@ -552,9 +789,11 @@
     - Instructor (non-admin): Can only upload/download their own files
       - Upload: ✅ Own files only
       - Download: ✅ Own files only
+      - Edit metadata: ✅ Own files only
       - Delete: ❌ Blocked (admin-only for data integrity)
     - `GET /api/instructors`: Non-admin users can only fetch their own instructor record (`builder.eq('id', userId)`)
     - `POST /api/instructor-files`: Validates `instructorId !== user.id` for non-admins, blocks cross-instructor uploads
+    - `PUT /api/instructor-files`: Validates `instructorId !== user.id` for non-admins, blocks cross-instructor edits
     - `DELETE /api/instructor-files`: Blocked for all non-admin users regardless of file ownership
     - `GET /api/instructor-files-download`: Validates `instructorId !== userId` for non-admins, blocks cross-instructor downloads
   - **Data isolation**: Instructors cannot see other instructors' files, names, or technical information; only admins have roster visibility
@@ -597,6 +836,38 @@
     3. If version is null/missing, falls back to current form configuration
   - This gracefully handles legacy records (no version) while supporting future versioned forms when history tracking is implemented.
   - Database structure: `session_form_config` is stored as `{"current": {"version": N, "saved_at": "...", "questions": [...]}, "history": [...]}`
+
+### Session Report Success Flow (2025-11)
+- **Success state UX**: After successfully saving a session report, the modal stays open and shows a success state instead of closing immediately.
+- **Implementation** (`NewSessionModal.jsx` + `NewSessionForm.jsx`):
+  - Modal tracks success state: `{ studentId, studentName, date }`
+  - Toast displayed with enhanced configuration for mobile: `toast.success('...', { duration: 2500, position: 'top-center' })`
+  - Success footer (`SuccessFooter` component) replaces standard form footer with three action buttons:
+    1. **סגור** (Close) - Closes modal, returns to parent view
+    2. **דיווח נוסף - תלמיד אחר** (New report - another student) - Resets entire form, allows selecting different student
+    3. **דיווח נוסף - [Student Name]** (New report - same student) - Resets form but keeps student selected for quick consecutive reports
+  - Form reset via `formResetRef` using `useImperativeHandle`:
+    - Resets all fields: answers, date, service, filters
+    - Optionally preserves student selection (for same-student workflow)
+    - Called from parent via ref: `formResetRef.current({ keepStudent: true, studentId })`
+  - Visual feedback: Green success banner appears at top of form showing student name and prompting user to choose action
+- **Mobile optimization**:
+  - Toast duration increased to 2500ms (from default) for better visibility
+  - Toast positioned `top-center` on mobile for maximum visibility
+  - Success state prevents race condition where modal closes before toast renders on mobile browsers
+- **User benefits**:
+  - No confusion about whether report was saved (success state stays visible)
+  - Faster bulk documentation: instructors can create multiple reports without reopening modal
+  - Flexible workflow: choose to document same student multiple times or switch students
+  - Eliminates mobile Android issue where toasts disappeared due to rapid modal closure
+- **Advanced Filters Pattern (2025-11)**:
+  - Filter section now separates basic search (always visible) from advanced filters (collapsible)
+  - Advanced filters section includes: instructor scope selector (admin only), day-of-week filter, and active/inactive status filter
+  - Toggle button shows/hides advanced filters with "סינון מתקדם" label and chevron icons (up when expanded, down when collapsed)
+  - Visual indicator (blue dot) appears on toggle button when advanced filters are collapsed but active
+  - State persistence: Advanced filter visibility persists when creating additional reports from success window, but resets when modal is closed/reopened
+  - Controlled state pattern: `showAdvancedFilters` state managed in `NewSessionModal` and passed to `NewSessionForm` via props
+  - Implementation uses `animate-in fade-in slide-in-from-top-2` classes for smooth expansion animation
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.

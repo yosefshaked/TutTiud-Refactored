@@ -1,11 +1,12 @@
 /* eslint-env node */
 /**
- * Student Files Check API
+ * Organization Documents Check API
  * 
- * Pre-upload duplicate check endpoint.
- * Calculates file hash and checks for duplicates across all students.
+ * Pre-upload duplicate check endpoint for organizational documents.
+ * Calculates file hash and checks for duplicates in polymorphic Documents table.
+ * Queries: entity_type='organization' AND entity_id=orgId
  * 
- * POST /api/student-files-check - Check for duplicate files
+ * POST /api/org-documents-check - Check for duplicate files
  */
 
 import { resolveBearerAuthorization } from '../_shared/http.js';
@@ -64,18 +65,18 @@ export default async function (context, req) {
     return respond(context, 405, { message: 'method_not_allowed' });
   }
 
-  context.log?.info?.('student-files-check: request received');
+  context.log?.info?.('org-documents-check: request received');
 
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
   if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
-    context.log?.error?.('student-files-check missing Supabase admin credentials');
+    context.log?.error?.('org-documents-check missing Supabase admin credentials');
     return respond(context, 500, { message: 'server_misconfigured' });
   }
 
   const authorization = resolveBearerAuthorization(req);
   if (!authorization?.token) {
-    context.log?.warn?.('student-files-check missing bearer token', { 
+    context.log?.warn?.('org-documents-check missing bearer token', { 
       hasAuthHeader: !!req.headers?.authorization,
       authHeader: req.headers?.authorization?.substring(0, 20) + '...',
     });
@@ -89,12 +90,12 @@ export default async function (context, req) {
   try {
     authResult = await controlClient.auth.getUser(authorization.token);
   } catch (error) {
-    context.log?.error?.('student-files-check failed to validate token', { message: error?.message });
+    context.log?.error?.('org-documents-check failed to validate token', { message: error?.message });
     return respond(context, 401, { message: 'invalid_or_expired_token' });
   }
 
   if (authResult.error || !authResult.data?.user?.id) {
-    context.log?.warn?.('student-files-check token validation failed', {
+    context.log?.warn?.('org-documents-check token validation failed', {
       hasError: !!authResult.error,
       errorMessage: authResult.error?.message,
       hasUser: !!authResult.data?.user,
@@ -141,12 +142,12 @@ export default async function (context, req) {
 
   const orgId = orgIdPart.data.toString('utf8').trim();
 
-  // Verify membership
+  // Verify membership and admin/owner role
   let role;
   try {
     role = await ensureMembership(controlClient, orgId, userId);
   } catch (membershipError) {
-    context.log?.error?.('student-files-check failed to verify membership', {
+    context.log?.error?.('org-documents-check failed to verify membership', {
       message: membershipError?.message,
       orgId,
       userId,
@@ -158,6 +159,12 @@ export default async function (context, req) {
     return respond(context, 403, { message: 'not_a_member' });
   }
 
+  // Only admin/owner can upload org documents
+  const isAdmin = role === 'admin' || role === 'owner';
+  if (!isAdmin) {
+    return respond(context, 403, { message: 'admin_only' });
+  }
+
   // Calculate file hash
   const fileHash = calculateFileHash(filePart.data);
 
@@ -167,39 +174,36 @@ export default async function (context, req) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
-  // Check for duplicate files across ALL students
-  const { data: allStudents, error: studentsError } = await tenantClient
-    .from('Students')
-    .select('id, name, files');
+  // Fetch organization documents from polymorphic Documents table
+  const { data: orgDocuments, error: documentsError } = await tenantClient
+    .from('Documents')
+    .select('id, name, uploaded_at, hash')
+    .eq('entity_type', 'organization')
+    .eq('entity_id', orgId);
 
-  if (studentsError) {
-    context.log?.error?.('Failed to fetch students for duplicate check', { 
-      message: studentsError.message,
-      code: studentsError.code,
-      details: studentsError.details,
-      hint: studentsError.hint,
+  if (documentsError) {
+    context.log?.error?.('Failed to fetch organization documents', { 
+      message: documentsError.message,
+      code: documentsError.code,
+      details: documentsError.details,
+      hint: documentsError.hint,
       orgId,
     });
     return respond(context, 500, { 
       message: 'failed_to_check_duplicates',
-      error: studentsError.message,
+      error: documentsError.message,
     });
   }
 
   // Find duplicates by hash
   const duplicates = [];
-  for (const student of allStudents || []) {
-    const studentFiles = Array.isArray(student.files) ? student.files : [];
-    for (const file of studentFiles) {
-      if (file.hash === fileHash) {
-        duplicates.push({
-          file_id: file.id,
-          file_name: file.name,
-          uploaded_at: file.uploaded_at,
-          student_id: student.id,
-          student_name: student.name,
-        });
-      }
+  for (const doc of orgDocuments || []) {
+    if (doc.hash === fileHash) {
+      duplicates.push({
+        file_id: doc.id,
+        file_name: doc.name,
+        uploaded_at: doc.uploaded_at,
+      });
     }
   }
 

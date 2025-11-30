@@ -1,5 +1,4 @@
 /* eslint-env node */
-/* global Buffer */
 /**
  * Bulk File Download API
  * 

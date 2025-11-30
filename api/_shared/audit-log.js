@@ -97,6 +97,7 @@ export const AUDIT_ACTIONS = {
   // Files
   FILE_UPLOADED: 'file.uploaded',
   FILE_DELETED: 'file.deleted',
+  DOCUMENT_UPDATED: 'document.updated',
   FILES_BULK_DOWNLOADED: 'files.bulk_downloaded',
   
   // Students

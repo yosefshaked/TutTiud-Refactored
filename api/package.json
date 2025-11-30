@@ -1,7 +1,7 @@
 {
   "name": "tuttiud-api",
   "type": "module",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "engines": {
     "node": ">=18 <20"
@@ -12,6 +12,7 @@
     "@azure/storage-blob": "^12.27.0",
     "@sparticuz/chromium": "^141.0.0",
     "@supabase/supabase-js": "^2.45.0",
+    "archiver": "^7.0.1",
     "date-fns": "^4.1.0",
     "parse-multipart-data": "^1.5.0",
     "puppeteer-core": "^24.29.0"

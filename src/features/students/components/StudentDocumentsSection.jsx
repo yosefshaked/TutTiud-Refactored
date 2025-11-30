@@ -1,14 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
-import { FileText, Upload, Download, Trash2, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, Eye } from 'lucide-react';
+import { FileText, Upload, Download, Trash2, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle2, Eye, ArrowUpDown, ArrowUp, ArrowDown, Calendar, CalendarX, CheckCircle, Edit } from 'lucide-react';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { useOrg } from '@/org/OrgContext.jsx';
+import { getAuthClient } from '@/lib/supabase-manager.js';
+import { useDocuments } from '@/hooks/useDocuments';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 const REQUEST_STATE = {
   idle: 'idle',
@@ -35,8 +46,367 @@ function formatFileSize(bytes) {
   return `${size} ${sizes[i]}`;
 }
 
+/**
+ * Check if a document is expired
+ */
+function isExpired(expirationDate) {
+  if (!expirationDate) return false;
+  try {
+    const expDate = parseISO(expirationDate);
+    const today = startOfDay(new Date());
+    return isBefore(expDate, today);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Post-upload dialog for editing file metadata after upload
+ */
+function EditFileDialog({ file, onConfirm, onCancel }) {
+  const [name, setName] = useState('');
+  const [relevantDate, setRelevantDate] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
+
+  useEffect(() => {
+    if (file) {
+      setName(file.name || '');
+      setRelevantDate(file.relevant_date || '');
+      setExpirationDate(file.expiration_date || '');
+    }
+  }, [file]);
+
+  const handleConfirm = () => {
+    onConfirm({
+      fileId: file.id,
+      name: name.trim(),
+      relevantDate: relevantDate || null,
+      expirationDate: expirationDate || null,
+    });
+  };
+
+  if (!file) return null;
+
+  return (
+    <Dialog open={!!file} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-[500px]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">עריכת מסמך</DialogTitle>
+          <DialogDescription className="text-right">
+            ערוך את פרטי המסמך
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-doc-name" className="text-right block">
+              שם המסמך <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="edit-doc-name"
+              dir="rtl"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="שם המסמך"
+              className="text-right"
+            />
+            {file.original_name && (
+              <p className="text-xs text-muted-foreground text-right">
+                קובץ מקורי: {file.original_name}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-relevant-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך רלוונטי</span>
+              <Calendar className="h-4 w-4" />
+            </Label>
+            <Input
+              id="edit-relevant-date"
+              type="date"
+              dir="ltr"
+              value={relevantDate}
+              onChange={(e) => setRelevantDate(e.target.value)}
+              className="text-right"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-expiration-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך תפוגה</span>
+              <CalendarX className="h-4 w-4" />
+            </Label>
+            <Input
+              id="edit-expiration-date"
+              type="date"
+              dir="ltr"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              className="text-right"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 flex-row-reverse">
+          <Button onClick={handleConfirm} disabled={!name.trim()}>
+            שמור שינויים
+          </Button>
+          <Button onClick={onCancel} variant="outline">
+            ביטול
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Pre-upload dialog for editing file metadata before uploading
+ */
+/**
+ * Multi-file pre-upload dialog - allows reviewing and configuring multiple files before upload
+ */
+function BulkPreUploadDialog({ files, definitionName, onConfirm, onCancel }) {
+  const [filesData, setFilesData] = useState([]);
+
+  useEffect(() => {
+    if (files && files.length > 0) {
+      setFilesData(files.map(fileData => ({
+        ...fileData,
+        id: crypto.randomUUID()
+      })));
+    }
+  }, [files]);
+
+  const handleFileChange = (id, field, value) => {
+    setFilesData(prev => prev.map(f => 
+      f.id === id ? { ...f, [field]: value } : f
+    ));
+  };
+
+  const handleConfirm = () => {
+    onConfirm(filesData);
+  };
+
+  if (!files || files.length === 0) return null;
+
+  const allNamesValid = filesData.every(f => f.name && f.name.trim());
+
+  return (
+    <Dialog open={files.length > 0} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">
+            הגדרות {filesData.length} קבצים
+          </DialogTitle>
+          <DialogDescription className="text-right">
+            ערוך את פרטי המסמכים לפני ההעלאה. שדות שאינם מסומנים ב-* הם אופציונליים
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4 overflow-y-auto max-h-[50vh]">
+          {filesData.map((fileData, index) => (
+            <Card key={fileData.id} className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                  <FileText className="h-4 w-4" />
+                  <span>קובץ {index + 1}</span>
+                  <Badge variant="outline" className="mr-auto">
+                    {fileData.file.name}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`name-${fileData.id}`} className="text-right block">
+                    שם המסמך <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id={`name-${fileData.id}`}
+                    dir="rtl"
+                    value={fileData.name}
+                    onChange={(e) => handleFileChange(fileData.id, 'name', e.target.value)}
+                    placeholder="לדוגמה: אישור רפואי"
+                    className="text-right"
+                    disabled={!!definitionName}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor={`relevant-${fileData.id}`} className="text-right flex items-center gap-1 justify-end text-xs">
+                      <span>תאריך רלוונטי</span>
+                      <Calendar className="h-3 w-3" />
+                    </Label>
+                    <Input
+                      id={`relevant-${fileData.id}`}
+                      type="date"
+                      dir="ltr"
+                      value={fileData.relevantDate}
+                      onChange={(e) => handleFileChange(fileData.id, 'relevantDate', e.target.value)}
+                      className="text-right text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`expiration-${fileData.id}`} className="text-right flex items-center gap-1 justify-end text-xs">
+                      <span>תאריך תפוגה</span>
+                      <CalendarX className="h-3 w-3" />
+                    </Label>
+                    <Input
+                      id={`expiration-${fileData.id}`}
+                      type="date"
+                      dir="ltr"
+                      value={fileData.expirationDate}
+                      onChange={(e) => handleFileChange(fileData.id, 'expirationDate', e.target.value)}
+                      className="text-right text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <div className="flex gap-2 flex-row-reverse border-t pt-4">
+          <Button onClick={handleConfirm} disabled={!allNamesValid}>
+            <Upload className="h-4 w-4 ml-2" />
+            העלה {filesData.length} קבצים
+          </Button>
+          <Button onClick={onCancel} variant="outline">
+            ביטול
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Single-file pre-upload dialog (kept for backward compatibility)
+ */
+function PreUploadDialog({ file, definitionName, onConfirm, onCancel }) {
+  const [name, setName] = useState(file?.name || '');
+  const [relevantDate, setRelevantDate] = useState('');
+  const [expirationDate, setExpirationDate] = useState('');
+
+  useEffect(() => {
+    if (file) {
+      // For files with definition, use definition name; otherwise remove extension
+      if (definitionName) {
+        setName(definitionName);
+      } else {
+        const nameParts = file.name.split('.');
+        if (nameParts.length > 1) {
+          nameParts.pop();
+        }
+        setName(nameParts.join('.'));
+      }
+    }
+  }, [file, definitionName]);
+
+  const handleConfirm = () => {
+    onConfirm({
+      file: file,
+      name: name.trim() || file.name,
+      relevantDate: relevantDate || null,
+      expirationDate: expirationDate || null,
+    });
+  };
+
+  if (!file) return null;
+
+  return (
+    <Dialog open={!!file} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-[500px]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">הגדרות מסמך</DialogTitle>
+          <DialogDescription className="text-right">
+            ערוך את פרטי המסמך לפני ההעלאה
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="doc-name" className="text-right block">
+              שם המסמך <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="doc-name"
+              dir="rtl"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="לדוגמה: אישור רפואי"
+              className="text-right"
+              disabled={!!definitionName}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {definitionName ? `שם מוגדר מראש: ${definitionName}` : `קובץ מקורי: ${file.name}`}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="relevant-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך רלוונטי</span>
+              <Calendar className="h-4 w-4" />
+            </Label>
+            <Input
+              id="relevant-date"
+              type="date"
+              dir="ltr"
+              value={relevantDate}
+              onChange={(e) => setRelevantDate(e.target.value)}
+              className="text-right"
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              תאריך הנפקה, אישור וכדומה
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="expiration-date" className="text-right flex items-center gap-2 justify-end">
+              <span>תאריך תפוגה</span>
+              <CalendarX className="h-4 w-4" />
+            </Label>
+            <Input
+              id="expiration-date"
+              type="date"
+              dir="ltr"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              className="text-right"
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              המסמך יסומן כפג תוקף לאחר תאריך זה
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 flex-row-reverse">
+          <Button onClick={handleConfirm} disabled={!name.trim()}>
+            <Upload className="h-4 w-4 ml-2" />
+            העלה
+          </Button>
+          <Button onClick={onCancel} variant="outline">
+            ביטול
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function StudentDocumentsSection({ student, session, orgId, onRefresh }) {
   const { activeOrg } = useOrg();
+  
+  // Use polymorphic Documents table hook for fetching documents
+  const {
+    documents,
+    loading: _documentsLoading,
+    error: _documentsError,
+    fetchDocuments
+  } = useDocuments('student', student?.id);
+  
   const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
   const [definitions, setDefinitions] = useState([]);
@@ -44,8 +414,14 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   const [uploadingDefId, setUploadingDefId] = useState(null);
   const [uploadingAdhoc, setUploadingAdhoc] = useState(false);
   const [backgroundUploads, setBackgroundUploads] = useState([]); // Active background uploads
+  const [sortBy, setSortBy] = useState('date'); // 'date' | 'name'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
+  const [pendingFiles, setPendingFiles] = useState([]); // Files awaiting metadata input
+  const [pendingDefinitionId, setPendingDefinitionId] = useState(null); // Associated definition for pending files
+  const [editingFile, setEditingFile] = useState(null); // File being edited post-upload
 
-  const studentFiles = Array.isArray(student?.files) ? student.files : [];
+  // Use documents from hook instead of student.files prop
+  const studentFiles = documents;
   const studentTags = Array.isArray(student?.tags) ? student.tags : [];
   
   // Permission check: member role can only preview files (no download/delete)
@@ -170,14 +546,41 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     [session, orgId]
   );
 
+  // DEPRECATED: handleFileUpload - replaced by handleBulkFileUpload for efficiency
+  // Kept commented out for reference during migration
+  /*
   const handleFileUpload = useCallback(
-    async (file, definitionId = null, customName = null) => {
-      if (!session || !orgId || !student?.id) return;
+    async (file, definitionId = null, customName = null, relevantDate = null, expirationDate = null) => {
+      if (!orgId || !student?.id) return;
 
-      const token = session.access_token;
-      if (!token) {
-        console.error('Session missing access_token');
-        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+      // Get fresh session token right before upload
+      let token;
+      try {
+        const authClient = getAuthClient();
+        const { data, error } = await authClient.auth.getSession();
+        
+        if (error || !data?.session?.access_token) {
+          console.error('Failed to get fresh session:', error);
+          toast.error('ההרשאה פגה. נא לרענן את הדף ולהתחבר מחדש', {
+            duration: 5000,
+            action: {
+              label: 'רענן',
+              onClick: () => window.location.reload(),
+            },
+          });
+          return;
+        }
+        
+        token = data.session.access_token;
+      } catch (error) {
+        console.error('Session refresh error:', error);
+        toast.error('שגיאה בקבלת הרשאה. נא לרענן את הדף', {
+          duration: 5000,
+          action: {
+            label: 'רענן',
+            onClick: () => window.location.reload(),
+          },
+        });
         return;
       }
 
@@ -236,13 +639,20 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       return new Promise((resolve) => {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('student_id', student.id);
+        formData.append('entity_type', 'student');
+        formData.append('entity_id', student.id);
         formData.append('org_id', orgId);
         if (definitionId) {
           formData.append('definition_id', definitionId);
         }
         if (customName) {
           formData.append('custom_name', customName);
+        }
+        if (relevantDate) {
+          formData.append('relevant_date', relevantDate);
+        }
+        if (expirationDate) {
+          formData.append('expiration_date', expirationDate);
         }
 
         const xhr = new XMLHttpRequest();
@@ -267,12 +677,17 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
           setUploadingAdhoc(false);
           setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
 
-          if (xhr.status === 200) {
+          if (xhr.status >= 200 && xhr.status < 300) {
             toast.success(`הקובץ ${file.name} הועלה בהצלחה!`, {
               id: toastId,
             });
 
-            // Refresh student data
+            // Refresh documents from hook only if student still exists
+            if (student?.id) {
+              await fetchDocuments();
+            }
+            
+            // Also refresh parent if callback provided
             if (onRefresh) {
               await onRefresh();
             }
@@ -282,17 +697,41 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
               const errorData = JSON.parse(xhr.responseText);
               let errorMsg = 'העלאת הקובץ נכשלה';
               
-              if (errorData.message === 'file_too_large') {
+              if (xhr.status === 401 || errorData.message === 'invalid_or_expired_token' || errorData.message === 'missing_bearer') {
+                errorMsg = 'ההרשאה פגה במהלך ההעלאה';
+                toast.error(errorMsg, { 
+                  id: toastId,
+                  duration: 5000,
+                  action: {
+                    label: 'רענן',
+                    onClick: () => window.location.reload(),
+                  },
+                });
+              } else if (errorData.message === 'file_too_large') {
                 errorMsg = 'הקובץ גדול מדי (מקסימום 10MB)';
+                toast.error(errorMsg, { id: toastId });
               } else if (errorData.message === 'invalid_file_type') {
                 errorMsg = 'סוג קובץ לא נתמך';
+                toast.error(errorMsg, { id: toastId });
               } else if (errorData.details) {
                 errorMsg = errorData.details;
+                toast.error(errorMsg, { id: toastId });
+              } else {
+                toast.error(errorMsg, { id: toastId });
               }
-              
-              toast.error(errorMsg, { id: toastId });
             } catch {
-              toast.error(`העלאת הקובץ נכשלה (שגיאה ${xhr.status})`, { id: toastId });
+              if (xhr.status === 401) {
+                toast.error('ההרשאה פגה במהלך ההעלאה', { 
+                  id: toastId,
+                  duration: 5000,
+                  action: {
+                    label: 'רענן',
+                    onClick: () => window.location.reload(),
+                  },
+                });
+              } else {
+                toast.error(`העלאת הקובץ נכשלה (שגיאה ${xhr.status})`, { id: toastId });
+              }
             }
             resolve(false);
           }
@@ -317,7 +756,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         });
 
         // Send request
-        xhr.open('POST', '/api/student-files');
+        xhr.open('POST', '/api/documents');
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
         xhr.setRequestHeader('x-supabase-authorization', `Bearer ${token}`);
@@ -325,12 +764,164 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         xhr.send(formData);
       });
     },
-    [session, orgId, student?.id, onRefresh, checkForDuplicates, ALLOWED_TYPES, MAX_FILE_SIZE]
+    [orgId, student?.id, onRefresh, checkForDuplicates, ALLOWED_TYPES, MAX_FILE_SIZE, fetchDocuments]
+  );
+  */
+
+  /**
+   * Bulk upload multiple files in a single HTTP request
+   */
+  const handleBulkFileUpload = useCallback(
+    async (filesData, definitionId = null) => {
+      if (!orgId || !student?.id || !filesData || filesData.length === 0) return;
+
+      // Get fresh session token
+      let token = session?.access_token;
+      if (!token) {
+        const authClient = getAuthClient();
+        const { data, error } = await authClient.auth.getSession();
+        if (error || !data?.session?.access_token) {
+          toast.error('ההרשאה פגה. נא לרענן את הדף');
+          return;
+        }
+        token = data.session.access_token;
+      }
+
+      // Generate upload ID for tracking
+      const uploadId = crypto.randomUUID();
+      const uploadInfo = {
+        id: uploadId,
+        fileName: `${filesData.length} קבצים`,
+        definitionId,
+        progress: 0,
+        status: 'uploading',
+      };
+
+      setBackgroundUploads(prev => [...prev, uploadInfo]);
+
+      const toastId = toast.loading(`מעלה ${filesData.length} קבצים...`, {
+        description: '0%',
+      });
+
+      if (definitionId) {
+        setUploadingDefId(definitionId);
+      } else {
+        setUploadingAdhoc(true);
+      }
+
+      return new Promise((resolve) => {
+        const formData = new FormData();
+
+        // Append all files and their metadata
+        filesData.forEach(fileData => {
+          formData.append('file', fileData.file);
+          formData.append('custom_name', fileData.name);
+          if (fileData.relevantDate) {
+            formData.append('relevant_date', fileData.relevantDate);
+          }
+          if (fileData.expirationDate) {
+            formData.append('expiration_date', fileData.expirationDate);
+          }
+        });
+
+        // Append common metadata
+        formData.append('entity_type', 'student');
+        formData.append('entity_id', student.id);
+        formData.append('org_id', orgId);
+        if (definitionId) {
+          formData.append('definition_id', definitionId);
+        }
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            setBackgroundUploads(prev =>
+              prev.map(u => u.id === uploadId ? { ...u, progress: percentComplete } : u)
+            );
+            toast.loading(`מעלה ${filesData.length} קבצים...`, {
+              id: toastId,
+              description: `${percentComplete}%`,
+            });
+          }
+        });
+
+        xhr.addEventListener('load', async () => {
+          setUploadingDefId(null);
+          setUploadingAdhoc(false);
+          setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              const summary = result.summary || { uploaded: result.file ? 1 : 0, failed: 0, total: 1 };
+
+              if (summary.failed > 0) {
+                toast.warning(`הועלו ${summary.uploaded} מתוך ${summary.total} קבצים`, {
+                  id: toastId,
+                  duration: 5000,
+                  description: `${summary.failed} קבצים נכשלו`
+                });
+              } else {
+                toast.success(`${summary.uploaded} קבצים הועלו בהצלחה!`, {
+                  id: toastId,
+                });
+              }
+            } catch {
+              toast.success(`${filesData.length} קבצים הועלו בהצלחה!`, {
+                id: toastId,
+              });
+            }
+
+            if (student?.id) {
+              await fetchDocuments();
+            }
+            if (onRefresh) {
+              await onRefresh();
+            }
+            resolve(true);
+          } else {
+            try {
+              const errorData = JSON.parse(xhr.responseText);
+              toast.error(errorData.error || 'העלאת הקבצים נכשלה', { id: toastId });
+            } catch {
+              toast.error(`העלאת הקבצים נכשלה (שגיאה ${xhr.status})`, { id: toastId });
+            }
+            resolve(false);
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          setUploadingDefId(null);
+          setUploadingAdhoc(false);
+          setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+          toast.error('שגיאת רשת בהעלאת הקבצים', { id: toastId });
+          resolve(false);
+        });
+
+        xhr.addEventListener('abort', () => {
+          setUploadingDefId(null);
+          setUploadingAdhoc(false);
+          setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+          toast.info('העלאת הקבצים בוטלה', { id: toastId });
+          resolve(false);
+        });
+
+        xhr.open('POST', '/api/documents');
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('x-supabase-authorization', `Bearer ${token}`);
+        xhr.setRequestHeader('x-supabase-auth', `Bearer ${token}`);
+        xhr.send(formData);
+      });
+    },
+    [orgId, student?.id, session, onRefresh, fetchDocuments]
   );
 
   const handleFileDelete = useCallback(
     async (fileId) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
       if (!confirm('האם למחוק קובץ זה? פעולה זו אינה ניתנת לביטול.')) return;
 
       const token = session.access_token;
@@ -343,7 +934,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       setDeleteState(REQUEST_STATE.loading);
 
       try {
-        const response = await fetch('/api/student-files', {
+        const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -352,22 +943,20 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
             'x-supabase-auth': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            org_id: orgId,
-            student_id: student.id,
-            file_id: fileId,
-          }),
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: 'Delete failed' }));
-          throw new Error(errorData.message || 'Delete failed');
+          const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));
+          throw new Error(errorData.error || 'Delete failed');
         }
 
         toast.success('הקובץ נמחק בהצלחה!');
         setDeleteState(REQUEST_STATE.idle);
         
-        // Refresh student data
+        // Refresh documents from hook
+        await fetchDocuments();
+        
+        // Also refresh parent if callback provided
         if (onRefresh) {
           await onRefresh();
         }
@@ -377,12 +966,116 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         setDeleteState(REQUEST_STATE.error);
       }
     },
-    [session, orgId, student?.id, onRefresh]
+    [session, orgId, onRefresh, fetchDocuments]
+  );
+
+  const handleToggleResolved = useCallback(
+    async (fileId, currentResolved) => {
+      if (!session || !orgId) return;
+
+      const token = session.access_token;
+      if (!token) {
+        console.error('Session missing access_token');
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return;
+      }
+
+      const newResolved = !currentResolved;
+      const toastId = toast.loading(newResolved ? 'מסמן כטופל...' : 'מבטל סימון...');
+
+      try {
+        const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            resolved: newResolved,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Update failed' }));
+          throw new Error(errorData.error || 'Update failed');
+        }
+
+        toast.success(newResolved ? 'המסמך סומן כטופל!' : 'הסימון בוטל!', { id: toastId });
+        
+        // Refresh documents from hook
+        await fetchDocuments();
+        
+        // Also refresh parent if callback provided
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } catch (error) {
+        console.error('Toggle resolved failed', error);
+        toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
+      }
+    },
+    [session, orgId, onRefresh, fetchDocuments]
+  );
+
+  const handleEditFile = useCallback(
+    async ({ fileId, name, relevantDate, expirationDate }) => {
+      if (!session || !orgId) return;
+
+      const token = session.access_token;
+      if (!token) {
+        console.error('Session missing access_token');
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return;
+      }
+
+      const toastId = toast.loading('מעדכן מסמך...');
+
+      try {
+        const response = await fetch(`/api/documents/${fileId}?org_id=${orgId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: name,
+            relevant_date: relevantDate,
+            expiration_date: expirationDate,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Update failed' }));
+          throw new Error(errorData.error || 'Update failed');
+        }
+
+        toast.success('המסמך עודכן בהצלחה!', { id: toastId });
+        setEditingFile(null);
+        
+        // Refresh documents from hook
+        await fetchDocuments();
+        
+        // Also refresh parent if callback provided
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } catch (error) {
+        console.error('Edit file failed', error);
+        toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
+      }
+    },
+    [session, orgId, onRefresh, fetchDocuments]
   );
 
   const handleFileDownload = useCallback(
     async (fileId) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
 
       const token = session.access_token;
       if (!token) {
@@ -390,10 +1083,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         return;
       }
 
+      const toastId = toast.loading('מכין להורדה...');
+
       try {
-        // Get presigned download URL
+        // Get download URL
         const response = await fetch(
-          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}`,
+          `/api/documents-download?document_id=${encodeURIComponent(fileId)}&org_id=${encodeURIComponent(orgId)}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -406,22 +1101,24 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to get download URL');
+          throw new Error(errorData.error || 'Failed to get download URL');
         }
 
         const { url } = await response.json();
-        window.open(url, '_blank');
+        window.location.href = url; // Navigate to URL to trigger download
+        
+        toast.success('קובץ הורד בהצלחה', { id: toastId });
       } catch (error) {
         console.error('File download failed', error);
-        toast.error(`הורדת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`);
+        toast.error(`הורדת הקובץ נכשלה: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
       }
     },
-    [session, orgId, student?.id]
+    [session, orgId]
   );
 
   const handleFilePreview = useCallback(
     async (fileId) => {
-      if (!session || !orgId || !student?.id) return;
+      if (!session || !orgId) return;
 
       const token = session.access_token;
       if (!token) {
@@ -430,9 +1127,9 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       }
 
       try {
-        // Get presigned preview URL (same endpoint, but we'll open differently)
+        // Get presigned preview URL from polymorphic documents endpoint
         const response = await fetch(
-          `/api/student-files-download?org_id=${encodeURIComponent(orgId)}&student_id=${encodeURIComponent(student.id)}&file_id=${encodeURIComponent(fileId)}&preview=true`,
+          `/api/documents-download?document_id=${encodeURIComponent(fileId)}&org_id=${encodeURIComponent(orgId)}&preview=true`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -445,7 +1142,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to get preview URL');
+          throw new Error(errorData.error || errorData.message || 'Failed to get preview URL');
         }
 
         const { url, contentType } = await response.json();
@@ -474,25 +1171,118 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         toast.error(`תצוגה מקדימה נכשלה: ${error?.message || 'שגיאה לא ידועה'}`);
       }
     },
-    [session, orgId, student?.id]
+    [session, orgId]
   );
 
   const handleFileInputChange = useCallback(
-    (event, definitionId = null) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+    async (event, definitionId = null) => {
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
 
-      if (definitionId) {
-        handleFileUpload(file, definitionId);
-      } else {
-        handleFileUpload(file, null, file.name);
+      // Validate all files
+      for (const file of files) {
+        if (file.size > MAX_FILE_SIZE) {
+          toast.error(`הקובץ "${file.name}" גדול מדי. גודל מקסימלי: 10MB`);
+          event.target.value = '';
+          return;
+        }
+        if (!ALLOWED_TYPES.includes(file.type)) {
+          toast.error(`סוג הקובץ "${file.name}" לא נתמך. קבצים מותרים: PDF, תמונות, Word, Excel`);
+          event.target.value = '';
+          return;
+        }
       }
+
+      // Check each file for duplicates
+      const duplicateResults = await Promise.all(
+        files.map(async (file) => {
+          const result = await checkForDuplicates(file);
+          return {
+            file,
+            hasDuplicates: result.has_duplicates,
+            duplicates: result.duplicates || []
+          };
+        })
+      );
+
+      // Find files with duplicates
+      const filesWithDuplicates = duplicateResults.filter(r => r.hasDuplicates);
+
+      // If any files have duplicates, show confirmation
+      if (filesWithDuplicates.length > 0) {
+        const duplicateInfo = filesWithDuplicates.map(r => {
+          const studentNames = r.duplicates
+            .map(d => `${d.student_name} (${new Date(d.uploaded_at).toLocaleDateString('he-IL')})`)
+            .join(', ');
+          return `${r.file.name}: ${studentNames}`;
+        }).join('\n');
+
+        const confirmed = await new Promise((resolve) => {
+          toast.warning(
+            `${filesWithDuplicates.length} קבצים כבר קיימים במערכת`,
+            {
+              description: duplicateInfo,
+              action: {
+                label: 'כן, העלה בכל זאת',
+                onClick: () => resolve(true),
+              },
+              cancel: {
+                label: 'ביטול',
+                onClick: () => resolve(false),
+              },
+              duration: 15000,
+            }
+          );
+        });
+
+        if (!confirmed) {
+          event.target.value = '';
+          return;
+        }
+      }
+
+      // Show pre-upload dialog with all files
+      const filesWithMetadata = files.map(file => ({
+        file,
+        name: definitionId ? file.name.replace(/\.[^.]+$/, '') : file.name.replace(/\.[^.]+$/, ''),
+        relevantDate: '',
+        expirationDate: ''
+      }));
+      setPendingFiles(filesWithMetadata);
+      setPendingDefinitionId(definitionId);
 
       // Reset input
       event.target.value = '';
     },
-    [handleFileUpload]
+    [MAX_FILE_SIZE, ALLOWED_TYPES, checkForDuplicates]
   );
+
+  // Handle upload confirmation from pre-upload dialog
+  const handleUploadConfirm = useCallback(
+    async (filesData) => {
+      if (!filesData || filesData.length === 0) return;
+
+      setPendingFiles([]);
+      setPendingDefinitionId(null);
+
+      // Upload all files in a single request
+      await handleBulkFileUpload(filesData, pendingDefinitionId);
+    },
+    [handleBulkFileUpload, pendingDefinitionId]
+  );
+
+  // Handle dialog cancel
+  const handleUploadCancel = useCallback(() => {
+    setPendingFiles([]);
+    setPendingDefinitionId(null);
+  }, []);
+
+  // Get definition name for pending file
+  const pendingDefinitionName = useMemo(() => {
+    if (!pendingDefinitionId) return null;
+    const def = definitions.find(d => d.id === pendingDefinitionId);
+    return def?.name || null;
+  }, [pendingDefinitionId, definitions]);
 
   // Get file for definition
   const getFileForDef = (defId) => {
@@ -505,6 +1295,50 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     // Include files whose definition no longer exists in ANY definitions list (truly deleted)
     return !definitions.find(def => def.id === f.definition_id);
   });
+
+  // Sort adhoc files based on current sort settings
+  const sortedAdhocFiles = useMemo(() => {
+    const sorted = [...adhocFiles];
+    
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'date') {
+        // Sort by uploaded_at date
+        const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
+        const dateB = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
+        comparison = dateA - dateB;
+      } else if (sortBy === 'name') {
+        // Sort by file name (handle orphaned files with definition_name)
+        const nameA = (a.definition_name && !definitions.find(def => def.id === a.definition_id))
+          ? `${a.definition_name} - ${student?.name || ''}`
+          : (a.name || '');
+        const nameB = (b.definition_name && !definitions.find(def => def.id === b.definition_id))
+          ? `${b.definition_name} - ${student?.name || ''}`
+          : (b.name || '');
+        comparison = nameA.localeCompare(nameB, 'he');
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return sorted;
+  }, [adhocFiles, sortBy, sortOrder, definitions, student?.name]);
+
+  // Toggle sort order
+  const toggleSortOrder = useCallback(() => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  }, []);
+
+  // Change sort field
+  const changeSortBy = useCallback((newSortBy) => {
+    if (newSortBy === sortBy) {
+      toggleSortOrder();
+    } else {
+      setSortBy(newSortBy);
+      setSortOrder('desc'); // Default to descending when changing sort field
+    }
+  }, [sortBy, toggleSortOrder]);
 
   // Helper to check if a file is orphaned (definition was truly deleted)
   const isOrphanedFile = (file) => {
@@ -520,7 +1354,21 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   void _getDefinitionNameForFile; // Mark as intentionally unused
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <>
+      <BulkPreUploadDialog
+        files={pendingFiles}
+        definitionName={pendingDefinitionName}
+        onConfirm={handleUploadConfirm}
+        onCancel={handleUploadCancel}
+      />
+
+      <EditFileDialog
+        file={editingFile}
+        onConfirm={handleEditFile}
+        onCancel={() => setEditingFile(null)}
+      />
+
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card dir="rtl" className="border-slate-200">
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-slate-50 transition-colors">
@@ -628,6 +1476,37 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                 {file && (
                                   <div className="text-sm text-slate-600">
                                     הועלה: {formatFileDate(file.uploaded_at)} • <span dir="ltr">{formatFileSize(file.size)}</span>
+                                    {file.relevant_date && (
+                                      <>
+                                        {' • '}
+                                        <span className="inline-flex items-center gap-1">
+                                          <Calendar className="h-3 w-3" />
+                                          {format(parseISO(file.relevant_date), 'dd/MM/yyyy')}
+                                        </span>
+                                      </>
+                                    )}
+                                    {file.expiration_date && (
+                                      <>
+                                        {' • '}
+                                        <span className={`inline-flex items-center gap-1 ${
+                                          file.resolved ? 'text-green-600 font-medium' : 
+                                          isExpired(file.expiration_date) ? 'text-red-600 font-medium' : ''
+                                        }`}>
+                                          <CalendarX className="h-3 w-3" />
+                                          {format(parseISO(file.expiration_date), 'dd/MM/yyyy')}
+                                          {file.resolved ? (
+                                            <Badge variant="outline" className="text-xs mr-1 bg-green-50 text-green-700 border-green-300">
+                                              <CheckCircle className="h-3 w-3 ml-1" />
+                                              טופל
+                                            </Badge>
+                                          ) : isExpired(file.expiration_date) ? (
+                                            <Badge variant="destructive" className="text-xs mr-1">
+                                              פג תוקף
+                                            </Badge>
+                                          ) : null}
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -653,15 +1532,45 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                         תצוגה מקדימה
                                       </Button>
                                     )}
-                                    {canDeleteFiles && (
+                                    {file.expiration_date && (
                                       <Button
                                         size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleFileDelete(file.id)}
-                                        disabled={deleteState === REQUEST_STATE.loading}
+                                        variant={file.resolved ? "outline" : "default"}
+                                        onClick={() => handleToggleResolved(file.id, file.resolved)}
+                                        className={file.resolved ? "" : "bg-green-600 hover:bg-green-700 text-white"}
                                       >
-                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                        {file.resolved ? (
+                                          <>
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            בטל סימון
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle2 className="h-4 w-4" />
+                                            סמן כטופל
+                                          </>
+                                        )}
                                       </Button>
+                                    )}
+                                    {canDeleteFiles && (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => setEditingFile(file)}
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                          ערוך
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleFileDelete(file.id)}
+                                          disabled={deleteState === REQUEST_STATE.loading}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                      </>
                                     )}
                                   </>
                                 ) : (
@@ -670,6 +1579,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                       type="file"
                                       id={`upload-${def.id}`}
                                       className="sr-only"
+                                      multiple
                                       onChange={(e) => handleFileInputChange(e, def.id)}
                                       disabled={isUploading}
                                     />
@@ -704,12 +1614,40 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
                 {/* Adhoc Files */}
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-slate-900">קבצים נוספים</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-slate-900">קבצים נוספים</h3>
+                    {adhocFiles.length > 0 && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={sortBy === 'name' ? 'default' : 'outline'}
+                          onClick={() => changeSortBy('name')}
+                          className="gap-1"
+                        >
+                          {sortBy === 'name' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                          {sortBy === 'name' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                          {sortBy !== 'name' && <ArrowUpDown className="h-3 w-3" />}
+                          שם
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={sortBy === 'date' ? 'default' : 'outline'}
+                          onClick={() => changeSortBy('date')}
+                          className="gap-1"
+                        >
+                          {sortBy === 'date' && sortOrder === 'asc' && <ArrowUp className="h-3 w-3" />}
+                          {sortBy === 'date' && sortOrder === 'desc' && <ArrowDown className="h-3 w-3" />}
+                          {sortBy !== 'date' && <ArrowUpDown className="h-3 w-3" />}
+                          תאריך
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   {adhocFiles.length === 0 ? (
                     <p className="text-sm text-slate-500 py-4 text-center">אין קבצים נוספים</p>
                   ) : (
                     <div className="space-y-2">
-                      {adhocFiles.map((file) => {
+                      {sortedAdhocFiles.map((file) => {
                         const isOrphaned = isOrphanedFile(file);
                         // For orphaned files, use stored definition_name; otherwise use current file name
                         const displayName = isOrphaned && file.definition_name 
@@ -744,6 +1682,37 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                 )}
                                 <div className="text-sm text-slate-600">
                                   הועלה: {formatFileDate(file.uploaded_at)} • <span dir="ltr">{formatFileSize(file.size)}</span>
+                                  {file.relevant_date && (
+                                    <>
+                                      {' • '}
+                                      <span className="inline-flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" />
+                                        {format(parseISO(file.relevant_date), 'dd/MM/yyyy')}
+                                      </span>
+                                    </>
+                                  )}
+                                  {file.expiration_date && (
+                                    <>
+                                      {' • '}
+                                      <span className={`inline-flex items-center gap-1 ${
+                                        file.resolved ? 'text-green-600 font-medium' : 
+                                        isExpired(file.expiration_date) ? 'text-red-600 font-medium' : ''
+                                      }`}>
+                                        <CalendarX className="h-3 w-3" />
+                                        {format(parseISO(file.expiration_date), 'dd/MM/yyyy')}
+                                        {file.resolved ? (
+                                          <Badge variant="outline" className="text-xs mr-1 bg-green-50 text-green-700 border-green-300">
+                                            <CheckCircle className="h-3 w-3 ml-1" />
+                                            טופל
+                                          </Badge>
+                                        ) : isExpired(file.expiration_date) ? (
+                                          <Badge variant="destructive" className="text-xs mr-1">
+                                            פג תוקף
+                                          </Badge>
+                                        ) : null}
+                                      </span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             <div className="flex gap-2">
@@ -766,15 +1735,45 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                   תצוגה מקדימה
                                 </Button>
                               )}
-                              {canDeleteFiles && (
+                              {file.expiration_date && (
                                 <Button
                                   size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleFileDelete(file.id)}
-                                  disabled={deleteState === REQUEST_STATE.loading}
+                                  variant={file.resolved ? "outline" : "default"}
+                                  onClick={() => handleToggleResolved(file.id, file.resolved)}
+                                  className={file.resolved ? "" : "bg-green-600 hover:bg-green-700 text-white"}
                                 >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                  {file.resolved ? (
+                                    <>
+                                      <CheckCircle2 className="h-4 w-4" />
+                                      בטל סימון
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="h-4 w-4" />
+                                      סמן כטופל
+                                    </>
+                                  )}
                                 </Button>
+                              )}
+                              {canDeleteFiles && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setEditingFile(file)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                    ערוך
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleFileDelete(file.id)}
+                                    disabled={deleteState === REQUEST_STATE.loading}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </>
                               )}
                             </div>
                             </div>
@@ -784,13 +1783,14 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                     </div>
                   )}
 
-                  {/* Upload Adhoc File */}
+                  {/* Upload Adhoc Files */}
                   <div className="pt-2">
                     <div className="relative">
                       <input
                         type="file"
                         id="upload-adhoc"
                         className="sr-only"
+                        multiple
                         onChange={(e) => handleFileInputChange(e)}
                         disabled={uploadingAdhoc}
                       />
@@ -803,12 +1803,12 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                         {uploadingAdhoc ? (
                           <>
                             <Loader2 className="h-4 w-4 animate-spin" />
-                            מעלה קובץ...
+                            מעלה קבצים...
                           </>
                         ) : (
                           <>
                             <Upload className="h-4 w-4" />
-                            העלאת קובץ נוסף
+                            העלאת קבצים נוספים
                           </>
                         )}
                       </Button>
@@ -821,5 +1821,6 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         </CollapsibleContent>
       </Card>
     </Collapsible>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
@@ -14,6 +15,34 @@ const REQUEST_STATE = Object.freeze({
   loading: 'loading',
   error: 'error',
 });
+
+function SuccessFooter({ studentName, onClose, onNewReport, onNewReportSameStudent }) {
+  return (
+    <div className="flex flex-col gap-sm items-center">
+      <div className="flex flex-col sm:flex-row gap-sm w-full sm:w-auto sm:justify-center">
+        <Button 
+          onClick={onNewReportSameStudent}
+          className="gap-xs shadow-md hover:shadow-lg transition-shadow"
+        >
+          דיווח נוסף - {studentName}
+        </Button>
+        <Button 
+          onClick={onNewReport}
+          className="gap-xs shadow-md hover:shadow-lg transition-shadow"
+        >
+          דיווח נוסף - תלמיד אחר
+        </Button>
+      </div>
+      <Button 
+        onClick={onClose}
+        variant="outline"
+        className="hover:shadow-sm w-full sm:w-auto"
+      >
+        סגור
+      </Button>
+    </div>
+  );
+}
 
 export default function NewSessionModal({
   open,
@@ -41,6 +70,9 @@ export default function NewSessionModal({
   const [canViewInactive, setCanViewInactive] = useState(false);
   const [visibilityLoaded, setVisibilityLoaded] = useState(false);
   const [initialStatusApplied, setInitialStatusApplied] = useState(false);
+  const [successState, setSuccessState] = useState(null); // { studentId, studentName, date }
+  const formResetRef = useRef(null); // Will hold the form's reset function
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false); // Track advanced filter visibility
 
   // Fix for mobile: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
@@ -136,6 +168,8 @@ export default function NewSessionModal({
     if (!open) {
       setSubmitState(REQUEST_STATE.idle);
       setSubmitError('');
+      setSuccessState(null);
+      setShowAdvancedFilters(false); // Reset advanced filters visibility when modal closes
     }
   }, [open]);
 
@@ -342,13 +376,24 @@ export default function NewSessionModal({
         method: 'POST',
         body,
       });
-      toast.success('המפגש נשמר בהצלחה.');
-      // Wait for the onCreated callback to complete before closing
+      
+      // Enhanced toast with longer duration for mobile visibility
+      toast.success('המפגש נשמר בהצלחה.', { 
+        duration: 2500,
+        position: 'top-center',
+      });
+      
+      // Wait for the onCreated callback to complete
       // This ensures any data refresh in the parent component completes
       await Promise.resolve(onCreated?.(record));
-      // Set idle state only after callback completes to prevent duplicate submissions
+      
+      // Find student name for success message
+      const student = students.find(s => s.id === studentId);
+      const studentName = student?.name || 'תלמיד';
+      
+      // Show success state instead of closing
+      setSuccessState({ studentId, studentName, date });
       setSubmitState(REQUEST_STATE.idle);
-      onClose?.();
     } catch (error) {
       console.error('Failed to save session record', error);
       setSubmitState(REQUEST_STATE.error);
@@ -364,6 +409,28 @@ export default function NewSessionModal({
     }
   };
 
+  const handleCloseAfterSuccess = useCallback(() => {
+    setSuccessState(null);
+    onClose?.();
+  }, [onClose]);
+
+  const handleNewReport = useCallback(() => {
+    setSuccessState(null);
+    // Reset form using the ref
+    if (formResetRef.current) {
+      formResetRef.current();
+    }
+  }, []);
+
+  const handleNewReportSameStudent = useCallback(() => {
+    if (!successState) return;
+    setSuccessState(null);
+    // Reset form but keep the same student
+    if (formResetRef.current) {
+      formResetRef.current({ keepStudent: true, studentId: successState.studentId });
+    }
+  }, [successState]);
+
   const dialogTitle = canFetchStudents
     ? 'רישום מפגש חדש'
     : 'לא ניתן ליצור מפגש חדש';
@@ -375,15 +442,24 @@ export default function NewSessionModal({
   const [isFormValid, setIsFormValid] = useState(false);
 
   const footer = canFetchStudents && !showLoading && studentsState !== REQUEST_STATE.error ? (
-    <NewSessionFormFooter
-      onSubmit={() => {
-        // Trigger form submission via form id
-        document.getElementById('new-session-form')?.requestSubmit();
-      }}
-      onCancel={onClose}
-      isSubmitting={submitState === REQUEST_STATE.loading}
-      isFormValid={isFormValid}
-    />
+    successState ? (
+      <SuccessFooter
+        studentName={successState.studentName}
+        onClose={handleCloseAfterSuccess}
+        onNewReport={handleNewReport}
+        onNewReportSameStudent={handleNewReportSameStudent}
+      />
+    ) : (
+      <NewSessionFormFooter
+        onSubmit={() => {
+          // Trigger form submission via form id
+          document.getElementById('new-session-form')?.requestSubmit();
+        }}
+        onCancel={onClose}
+        isSubmitting={submitState === REQUEST_STATE.loading}
+        isFormValid={isFormValid}
+      />
+    )
   ) : null;
 
   return (
@@ -434,6 +510,10 @@ export default function NewSessionModal({
             renderFooterOutside={true}
             onFormValidityChange={setIsFormValid}
             onSelectOpenChange={handleSelectOpenChange}
+            formResetRef={formResetRef}
+            successState={successState}
+            showAdvancedFilters={showAdvancedFilters}
+            onShowAdvancedFiltersChange={setShowAdvancedFilters}
           />
         )}
       </DialogContent>

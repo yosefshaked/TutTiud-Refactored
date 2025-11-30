@@ -8,6 +8,7 @@ import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { authenticatedFetch } from '@/lib/api-client';
+import { useDocuments } from '@/hooks/useDocuments';
 import {
   Dialog,
   DialogContent,
@@ -51,7 +52,14 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
   const [loading, setLoading] = useState(true);
   const [duplicateDialog, setDuplicateDialog] = useState(null); // { file, definitionId, definitionName, duplicates }
 
-  const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
+  // Use polymorphic documents hook
+  const {
+    documents: instructorFiles,
+    uploadDocument,
+    getDownloadUrl,
+    fetchDocuments,
+  } = useDocuments('instructor', instructor?.id);
+
   const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
   
   // Filter definitions to show only those relevant to this instructor's types
@@ -89,16 +97,13 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
         }
 
         setInstructor(myInstructor);
-        console.log('[MyInstructorDocuments] Loaded instructor:', myInstructor);
 
         // Load document definitions
-        console.log('[MyInstructorDocuments] Loading document definitions');
         const { value } = await fetchSettingsValue({
           session,
           orgId,
           key: 'instructor_document_definitions',
         });
-        console.log('[MyInstructorDocuments] Document definitions loaded:', value);
 
         const parsed = Array.isArray(value) ? value : [];
         setDefinitions(parsed);
@@ -113,35 +118,9 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
     loadData();
   }, [session, orgId, userId]);
 
-  const refreshInstructor = useCallback(async () => {
-    if (!session || !orgId) return;
-
-    try {
-      const instructors = await authenticatedFetch(
-        `instructors?org_id=${orgId}`,
-        {
-          session,
-          method: 'GET',
-        }
-      );
-
-      const myInstructor = Array.isArray(instructors) && instructors.length > 0 ? instructors[0] : null;
-      
-      if (myInstructor) {
-        setInstructor(myInstructor);
-      }
-    } catch (error) {
-      console.error('Failed to refresh instructor:', error);
-    }
-  }, [session, orgId]);
-
-  const performUpload = useCallback((file, definitionId = null, definitionName = null) => {
-    console.log('🔵 [UPLOAD] performUpload called', { fileName: file?.name, definitionId, definitionName });
-
+  const performUpload = useCallback(async (file, definitionId = null, definitionName = null) => {
     const uploadId = crypto.randomUUID();
     const displayName = definitionName || file.name;
-
-    console.log('🔵 [UPLOAD] Creating upload tracking', { uploadId, displayName, instructorId: instructor.id, orgId });
 
     // Add to background uploads tracking
     setBackgroundUploads(prev => [...prev, {
@@ -151,113 +130,49 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
       progress: 0,
     }]);
 
-    // Create form data
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('org_id', orgId);
-    formData.append('instructor_id', instructor.id);
-    if (definitionId) {
-      formData.append('definition_id', definitionId);
-      formData.append('definition_name', definitionName || '');
-    }
-    
-    console.log('🔵 [UPLOAD] FormData created', { 
-      hasFile: formData.has('file'),
-      orgId: formData.get('org_id'),
-      instructorId: formData.get('instructor_id'),
-      definitionId: formData.get('definition_id')
-    });
-
-    // Use XMLHttpRequest for progress tracking
-    const xhr = new XMLHttpRequest();
-    
-    console.log('🔵 [UPLOAD] XHR created, setting up listeners');
-
-    xhr.upload.addEventListener('progress', (e) => {
-      console.log('🔵 [UPLOAD] Progress event', { loaded: e.loaded, total: e.total, computable: e.lengthComputable });
-      if (e.lengthComputable) {
-        const percentComplete = Math.round((e.loaded / e.total) * 100);
-        setBackgroundUploads(prev => 
-          prev.map(upload => 
-            upload.id === uploadId 
-              ? { ...upload, progress: percentComplete }
-              : upload
-          )
-        );
+    try {
+      // Prepare metadata
+      const metadata = {
+        name: displayName,
+      };
+      if (definitionId) {
+        metadata.definition_id = definitionId;
+        metadata.definition_name = definitionName || '';
       }
-    });
 
-    xhr.addEventListener('load', () => {
-      console.log('🔵 [UPLOAD] Load event', { status: xhr.status, statusText: xhr.statusText, responseLength: xhr.responseText?.length });
+      // Update progress to show starting
+      setBackgroundUploads(prev => 
+        prev.map(upload => 
+          upload.id === uploadId 
+            ? { ...upload, progress: 50 }
+            : upload
+        )
+      );
+
+      // Upload using hook
+      await uploadDocument(file, metadata);
+
+      // Remove from background uploads
       setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
       
-      if (xhr.status === 200) {
-        console.log('✅ [UPLOAD] Upload successful', xhr.responseText);
-        toast.success('הקובץ הועלה בהצלחה');
-        refreshInstructor();
-      } else {
-        console.log('❌ [UPLOAD] Upload failed', { status: xhr.status, response: xhr.responseText });
-        let errorMsg = 'העלאת הקובץ נכשלה';
-        try {
-          const response = JSON.parse(xhr.responseText);
-          if (response.message) {
-            errorMsg = response.message;
-          }
-        } catch {
-          // Use default error message
-        }
-        toast.error(errorMsg);
-      }
-
+      toast.success('הקובץ הועלה בהצלחה');
+      
+      // Refresh documents
+      await fetchDocuments();
+    } catch (error) {
+      setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
+      toast.error(error.message || 'העלאת הקובץ נכשלה');
+    } finally {
       if (definitionId) {
         setUploadingDefId(null);
       } else {
         setUploadingAdhoc(false);
       }
-    });
-
-    xhr.addEventListener('error', () => {
-      console.log('❌ [UPLOAD] Error event - network error or CORS');
-      setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
-      toast.error('העלאת הקובץ נכשלה');
-      
-      if (definitionId) {
-        setUploadingDefId(null);
-      } else {
-        setUploadingAdhoc(false);
-      }
-    });
-
-    const uploadUrl = `/api/instructor-files?org_id=${orgId}`;
-    console.log('🔵 [UPLOAD] Opening XHR', { method: 'POST', url: uploadUrl });
-    xhr.open('POST', uploadUrl);
-    
-    // Add auth headers
-    const token = session?.access_token;
-    console.log('🔵 [UPLOAD] Adding headers', { hasToken: !!token, tokenLength: token?.length });
-    if (token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('x-supabase-authorization', `Bearer ${token}`);
-      xhr.setRequestHeader('x-supabase-auth', `Bearer ${token}`);
     }
-
-    console.log('🔵 [UPLOAD] Sending XHR request...');
-    xhr.send(formData);
-    console.log('🔵 [UPLOAD] XHR.send() called');
-
-    if (definitionId) {
-      setUploadingDefId(definitionId);
-    } else {
-      setUploadingAdhoc(true);
-    }
-  }, [instructor, orgId, session, refreshInstructor]);
+  }, [uploadDocument, fetchDocuments]);
 
   const handleFileUpload = useCallback(async (file, definitionId = null, definitionName = null) => {
-    console.log('🔵 [UPLOAD] handleFileUpload called', { fileName: file?.name, definitionId, definitionName, hasInstructor: !!instructor });
-    
     if (!file || !instructor) {
-      console.log('❌ [UPLOAD] Missing file or instructor', { hasFile: !!file, hasInstructor: !!instructor });
       return;
     }
 
@@ -370,32 +285,23 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
   const handleDownloadFile = useCallback(async (fileId) => {
     if (!instructor) return;
 
-    try {
-      const params = new URLSearchParams({
-        org_id: orgId,
-        instructor_id: instructor.id,
-        file_id: fileId,
-      });
+    const toastId = toast.loading('מכין קובץ להורדה...');
 
-      const data = await authenticatedFetch(
-        `instructor-files-download?${params.toString()}`,
-        {
-          session,
-          method: 'GET',
-        }
-      );
+    try {
+      const url = await getDownloadUrl(fileId, false);
       
-      if (data?.url) {
-        window.open(data.url, '_blank');
+      if (url) {
+        window.location.href = url; // Navigate to presigned URL to trigger download
+        toast.success('קובץ הורד בהצלחה', { id: toastId });
       } else {
         throw new Error('No download URL in response');
       }
     } catch (error) {
       console.error('Download error:', error);
       console.error('Error details:', error.message, error.data);
-      toast.error(`הורדת הקובץ נכשלה: ${error.message || 'שגיאה לא ידועה'}`);
+      toast.error(`הורדת הקובץ נכשלה: ${error.message || 'שגיאה לא ידועה'}`, { id: toastId });
     }
-  }, [instructor, orgId, session]);
+  }, [instructor, getDownloadUrl]);
 
   if (loading) {
     return (

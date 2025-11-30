@@ -41,7 +41,7 @@ export function createSupabaseDriver(config) {
      * @returns {Promise<Object>} Upload result with url
      */
     async upload(path, buffer, contentType) {
-      const { data, error } = await supabase.storage
+      const { data: _data, error } = await supabase.storage
         .from(bucket)
         .upload(path, buffer, {
           contentType: contentType || 'application/octet-stream',

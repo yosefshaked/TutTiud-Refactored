@@ -39,14 +39,14 @@ export function readSupabaseAdminConfig(source = {}, overrides = {}) {
 
   const supabaseUrl =
     extractValue(overrideSource, ['supabaseUrl', 'SUPABASE_URL']) ??
-    extractValue(mergedSource, ['supabaseUrl', 'SUPABASE_URL', 'APP_SUPABASE_URL', 'VITE_APP_SUPABASE_URL']) ??
-    extractValue(envSource, ['supabaseUrl', 'SUPABASE_URL', 'APP_SUPABASE_URL', 'VITE_APP_SUPABASE_URL']) ??
+    extractValue(mergedSource, ['supabaseUrl', 'SUPABASE_URL', 'APP_CONTROL_DB_URL', 'APP_SUPABASE_URL', 'VITE_APP_SUPABASE_URL']) ??
+    extractValue(envSource, ['supabaseUrl', 'SUPABASE_URL', 'APP_CONTROL_DB_URL', 'APP_SUPABASE_URL', 'VITE_APP_SUPABASE_URL']) ??
     null;
 
   const serviceRoleKey =
-    extractValue(overrideSource, ['serviceRoleKey', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_SUPABASE_SERVICE_ROLE']) ??
-    extractValue(mergedSource, ['serviceRoleKey', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_SUPABASE_SERVICE_ROLE']) ??
-    extractValue(envSource, ['serviceRoleKey', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_SUPABASE_SERVICE_ROLE']) ??
+    extractValue(overrideSource, ['serviceRoleKey', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_CONTROL_DB_SERVICE_ROLE_KEY']) ??
+    extractValue(mergedSource, ['serviceRoleKey', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_CONTROL_DB_SERVICE_ROLE_KEY', 'APP_SUPABASE_SERVICE_ROLE']) ??
+    extractValue(envSource, ['serviceRoleKey', 'SUPABASE_SERVICE_ROLE_KEY', 'APP_CONTROL_DB_SERVICE_ROLE_KEY', 'APP_SUPABASE_SERVICE_ROLE']) ??
     null;
 
   return { supabaseUrl, serviceRoleKey };

@@ -148,6 +148,7 @@ export default async function (context, req) {
   }
 
   const userId = authResult.data.user.id;
+  const userEmail = authResult.data.user.email;
 
   // POST: Upload file
   if (req.method === 'POST') {
@@ -165,6 +166,9 @@ export default async function (context, req) {
     const orgIdPart = parts.find(p => p.name === 'org_id');
     const defIdPart = parts.find(p => p.name === 'definition_id');
     const defNamePart = parts.find(p => p.name === 'definition_name');
+    const fileNamePart = parts.find(p => p.name === 'custom_name');
+    const relevantDatePart = parts.find(p => p.name === 'relevant_date');
+    const expirationDatePart = parts.find(p => p.name === 'expiration_date');
 
     if (!filePart) {
       return respond(context, 400, { message: 'no_file_provided' });
@@ -178,6 +182,9 @@ export default async function (context, req) {
     const orgId = orgIdPart.data.toString('utf8').trim();
     const definitionId = defIdPart ? defIdPart.data.toString('utf8').trim() : null;
     const definitionName = defNamePart ? defNamePart.data.toString('utf8').trim() : null;
+    const customName = fileNamePart ? fileNamePart.data.toString('utf8').trim() : null;
+    const relevantDate = relevantDatePart ? relevantDatePart.data.toString('utf8').trim() : null;
+    const expirationDate = expirationDatePart ? expirationDatePart.data.toString('utf8').trim() : null;
 
     // Decode filename properly to handle Hebrew and other UTF-8 characters
     let decodedFilename = filePart.filename;
@@ -370,18 +377,36 @@ export default async function (context, req) {
     }
 
     // Build proper display name based on definition and instructor
-    let displayName = decodedFilename;
+    let baseName = customName || decodedFilename;
+    const instructorName = currentInstructor?.name || 'מדריך';
     
-    if (definitionId && definitionName) {
-      const instructorName = currentInstructor?.name || 'מדריך';
-      displayName = `${definitionName} - ${instructorName}`;
+    if (definitionId && customName) {
+      // Custom name provided (from PreUploadDialog)
+      // For required documents, this is the locked admin-configured name
+      // For adhoc assigned to definition, this is the user-edited name
+      baseName = customName;
+      context.log?.info?.('Using custom name as base for instructor file', {
+        customName,
+        baseName,
+      });
+    } else if (definitionId && definitionName) {
+      // Legacy path: use definition name as base
+      baseName = definitionName;
       
-      context.log?.info?.('Built display name for instructor file', {
+      context.log?.info?.('Using definition name as base for instructor file', {
         definitionName,
-        instructorName,
-        displayName,
+        baseName,
       });
     }
+
+    // Always append instructor name to base name
+    const displayName = `${baseName} - ${instructorName}`;
+    
+    context.log?.info?.('Built final display name for instructor file', {
+      baseName,
+      instructorName,
+      displayName,
+    });
 
     // Build complete file metadata object
     const completeFileMetadata = {
@@ -394,6 +419,8 @@ export default async function (context, req) {
       uploaded_at: new Date().toISOString(),
       uploaded_by: userId,
       definition_id: definitionId || null,
+      relevant_date: relevantDate || null,
+      expiration_date: expirationDate || null,
       ...(definitionName && { definition_name: definitionName }),
       size: filePart.data.length,
       type: contentType,
@@ -437,6 +464,131 @@ export default async function (context, req) {
 
     return respond(context, 200, {
       file: completeFileMetadata,
+    });
+  }
+
+  // PUT: Update file metadata (name, relevant_date, expiration_date, resolved)
+  if (req.method === 'PUT') {
+    const body = parseRequestBody(req);
+    const orgId = resolveOrgId(req, body);
+    const { instructor_id: instructorId, file_id: fileId, name, relevant_date, expiration_date, resolved } = body;
+
+    if (!orgId || !instructorId || !fileId) {
+      return respond(context, 400, { message: 'missing_required_fields' });
+    }
+
+    // Verify membership
+    let role;
+    try {
+      role = await ensureMembership(controlClient, orgId, userId);
+    } catch (membershipError) {
+      context.log?.error?.('instructor-files PUT failed to verify membership', {
+        message: membershipError?.message,
+        orgId,
+        userId,
+      });
+      return respond(context, 500, { message: 'failed_to_verify_membership' });
+    }
+
+    if (!role) {
+      return respond(context, 403, { message: 'not_a_member' });
+    }
+
+    const isAdmin = isAdminRole(role);
+
+    // Non-admin instructors can only update their own files
+    if (!isAdmin) {
+      // Verify the instructor record belongs to this user
+      const { client: checkClient, error: checkTenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+      if (checkTenantError) {
+        return respond(context, checkTenantError.status, checkTenantError.body);
+      }
+
+      const { data: instructorRecord, error: instructorError } = await checkClient
+        .from('Instructors')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (instructorError || !instructorRecord || instructorRecord.id !== instructorId) {
+        return respond(context, 403, { 
+          message: 'forbidden',
+          details: 'Non-admin users can only update their own files'
+        });
+      }
+    }
+
+    // Get tenant client
+    const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, controlClient, env, orgId);
+    if (tenantError) {
+      return respond(context, tenantError.status, tenantError.body);
+    }
+
+    // Fetch instructor record
+    const { data: currentInstructor, error: fetchError } = await tenantClient
+      .from('Instructors')
+      .select('id, name, files')
+      .eq('id', instructorId)
+      .single();
+
+    if (fetchError || !currentInstructor) {
+      context.log?.error?.('Instructor not found', { message: fetchError?.message, instructorId });
+      return respond(context, 404, { message: 'instructor_not_found' });
+    }
+
+    // Find and update the file in the array
+    const currentFiles = Array.isArray(currentInstructor?.files) ? currentInstructor.files : [];
+    const fileIndex = currentFiles.findIndex(f => f.id === fileId);
+
+    if (fileIndex === -1) {
+      return respond(context, 404, { message: 'file_not_found' });
+    }
+
+    const existingFile = currentFiles[fileIndex];
+    const updatedFile = {
+      ...existingFile,
+      ...(name !== undefined && { name }),
+      ...(relevant_date !== undefined && { relevant_date }),
+      ...(expiration_date !== undefined && { expiration_date }),
+      ...(resolved !== undefined && { resolved }),
+    };
+
+    const updatedFiles = [...currentFiles];
+    updatedFiles[fileIndex] = updatedFile;
+
+    // Update instructor record
+    const { error: updateError } = await tenantClient
+      .from('Instructors')
+      .update({ files: updatedFiles })
+      .eq('id', instructorId);
+
+    if (updateError) {
+      context.log?.error?.('Failed to update instructor file metadata', { message: updateError.message });
+      return respond(context, 500, { message: 'failed_to_update_file_metadata' });
+    }
+
+    // Log audit event
+    await logAuditEvent(controlClient, {
+      orgId,
+      userId,
+      userEmail: userEmail || 'unknown',
+      userRole: role,
+      actionType: 'file_metadata_updated',
+      actionCategory: AUDIT_CATEGORIES.FILES,
+      resourceType: 'instructor_file',
+      resourceId: fileId,
+      details: {
+        instructor_id: instructorId,
+        instructor_name: currentInstructor.name,
+        file_name: updatedFile.name,
+        updated_fields: Object.keys(body).filter(k => k !== 'instructor_id' && k !== 'file_id' && k !== 'org_id'),
+      },
+    });
+
+    context.log?.info?.('File metadata updated successfully', { fileId, instructorId, updates: Object.keys(body).filter(k => k !== 'instructor_id' && k !== 'file_id' && k !== 'org_id') });
+
+    return respond(context, 200, {
+      file: updatedFile,
     });
   }
 
