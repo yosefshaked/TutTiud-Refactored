@@ -1535,6 +1535,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                                       type="file"
                                       id={`upload-${def.id}`}
                                       className="sr-only"
+                                      multiple
                                       onChange={(e) => handleFileInputChange(e, def.id)}
                                       disabled={isUploading}
                                     />
@@ -1745,6 +1746,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
                         type="file"
                         id="upload-adhoc"
                         className="sr-only"
+                        multiple
                         onChange={(e) => handleFileInputChange(e)}
                         disabled={uploadingAdhoc}
                       />
