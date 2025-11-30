@@ -787,3 +787,14 @@ export default async function (context, req) {
 
   return respond(context, 200, data);
 }
+
+export {
+  coerceBooleanFlag,
+  coerceDayOfWeek,
+  coerceNationalId,
+  coerceOptionalText,
+  coerceSessionTime,
+  coerceTags,
+  validateAssignedInstructor,
+  validateIsraeliPhone,
+};

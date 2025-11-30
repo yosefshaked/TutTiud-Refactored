@@ -17,6 +17,7 @@ import { authenticatedFetch } from '@/lib/api-client.js';
 import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentForm.jsx';
 // Removed legacy instructor assignment modal; instructor is edited inside EditStudent now
 import EditStudentModal from '../components/EditStudentModal.jsx';
+import DataMaintenanceModal from '../components/DataMaintenanceModal.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 import { includesDayQuery, DAY_NAMES, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
@@ -65,6 +66,7 @@ export default function StudentManagementPage() {
   const [studentForEdit, setStudentForEdit] = useState(null);
   const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
   const [updateError, setUpdateError] = useState('');
+  const [isMaintenanceOpen, setIsMaintenanceOpen] = useState(false);
   const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
   const [searchQuery, setSearchQuery] = useState('');
   const [dayFilter, setDayFilter] = useState(null);
@@ -147,6 +149,10 @@ export default function StudentManagementPage() {
       await fetchInstructors();
     }
   }, [fetchStudents, fetchInstructors]);
+
+  const handleMaintenanceCompleted = useCallback(async () => {
+    await refreshRoster(true);
+  }, [refreshRoster]);
 
   // Load saved filter state on mount
   useEffect(() => {
@@ -269,6 +275,14 @@ export default function StudentManagementPage() {
       setIsAddDialogOpen(false);
       setCreateError('');
     }
+  };
+
+  const handleOpenMaintenance = () => {
+    setIsMaintenanceOpen(true);
+  };
+
+  const handleCloseMaintenance = () => {
+    setIsMaintenanceOpen(false);
   };
 
   // Mobile fix: Track Select open/close state to prevent Dialog from closing
@@ -479,7 +493,7 @@ export default function StudentManagementPage() {
   const isEmpty = !isLoadingStudents && students.length === 0 && !studentsError;
 
   return (
-    <PageLayout
+      <PageLayout
       title="ניהול תלמידים"
       actions={(
         <div className="flex items-center gap-3 self-start">
@@ -499,6 +513,10 @@ export default function StudentManagementPage() {
               </SelectContent>
             </Select>
           </div>
+          <Button type="button" variant="outline" className="gap-sm" onClick={handleOpenMaintenance}>
+            <FileWarning className="h-4 w-4" aria-hidden="true" />
+            תחזוקת נתונים
+          </Button>
           <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             תלמיד חדש
@@ -765,8 +783,15 @@ export default function StudentManagementPage() {
         </CardContent>
       </Card>
 
+      <DataMaintenanceModal
+        open={isMaintenanceOpen}
+        onClose={handleCloseMaintenance}
+        orgId={activeOrgId}
+        onRefresh={handleMaintenanceCompleted}
+      />
+
       <Dialog open={isAddDialogOpen} onOpenChange={(open) => { if (!open) handleCloseAddDialog(); }}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-xl"
           onInteractOutside={handleDialogInteractOutside}
           footer={

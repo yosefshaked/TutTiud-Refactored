@@ -913,3 +913,8 @@
 - New API helpers: `/api/students/check-id` enforces national ID uniqueness (supports `exclude_id`), and `/api/students-search` surfaces fuzzy name matches with `id`, `national_id`, and `is_active`.
 - Admin student forms now require checking these endpoints for duplicate alerts; national ID conflicts must block submission with a profile shortcut.
 - The roster surfaces a red badge when `national_id` is missing so admins can prioritize cleanup.
+
+### Student data maintenance CSV (2025-02)
+- `/api/students/maintenance-export` returns a CSV including `system_uuid`, name, national ID, contact info, instructor assignment, schedule defaults, tags, notes, and activity flags for bulk cleanup.
+- `/api/students/maintenance-import` ingests edited CSV text keyed by `system_uuid`, updates only changed fields, enforces national ID uniqueness per row and against the database, and returns per-row failure details for UI summaries.
+- StudentManagementPage exposes a "תחזוקת נתונים" modal to download/upload the maintenance CSV and refresh the roster + instructor list after imports.
