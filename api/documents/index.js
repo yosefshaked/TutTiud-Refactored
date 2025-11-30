@@ -34,17 +34,22 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 /**
  * Validate entity type and permissions
+ * @param {string} operation - 'GET' | 'POST' | 'PUT' | 'DELETE'
  */
-function validateEntityAccess(entityType, userRole, userId, entityId, isAdmin) {
+function validateEntityAccess(entityType, userRole, userId, entityId, isAdmin, operation = null) {
   if (!['student', 'instructor', 'organization'].includes(entityType)) {
     return { valid: false, error: 'invalid_entity_type' };
   }
 
-  // Organization documents: admin/owner only
+  // Organization documents: admin/owner for upload/delete, members can view if visibility enabled
   if (entityType === 'organization') {
-    if (!isAdmin) {
-      return { valid: false, error: 'admin_required' };
+    // For POST/PUT/DELETE operations, require admin
+    if (operation && ['POST', 'PUT', 'DELETE'].includes(operation)) {
+      if (!isAdmin) {
+        return { valid: false, error: 'admin_required' };
+      }
     }
+    // For GET, allow non-admins (visibility check happens in handler)
   }
 
   // Instructor documents: admin/owner can manage all, instructors only their own
@@ -81,11 +86,28 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
   }
 
   console.log('[DEBUG] Validating entity access...', { entity_type, userRole, isAdmin });
-  const validation = validateEntityAccess(entity_type, userRole, userId, entity_id, isAdmin);
+  const validation = validateEntityAccess(entity_type, userRole, userId, entity_id, isAdmin, 'GET');
   if (!validation.valid) {
-    console.warn('[WARN] Entity access validation failed', { error: validation.error, entity_type, userRole });
+    console.error('[ERROR] Entity access validation failed:', validation.error);
     return { status: 403, body: { error: validation.error } };
   }
+
+  // For organization documents, check member visibility setting if user is not admin
+  if (entity_type === 'organization' && !isAdmin) {
+    const { data: visibilitySetting } = await tenantClient
+      .from('Settings')
+      .select('settings_value')
+      .eq('key', 'org_documents_member_visibility')
+      .single();
+
+    const memberVisibility = visibilitySetting?.settings_value === true;
+    if (!memberVisibility) {
+      console.log('[DEBUG] Member visibility disabled for org documents');
+      return { status: 403, body: { error: 'members_cannot_view_org_documents' } };
+    }
+    console.log('[DEBUG] Member visibility enabled, allowing access');
+  }
+  
   console.log('[DEBUG] Entity access validated successfully');
 
   // Fetch documents from Documents table
@@ -218,7 +240,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   const entityId = entityIdPart.data.toString('utf8');
 
   // Validate permissions once (applies to all files)
-  const validation = validateEntityAccess(entityType, userRole, userId, entityId, isAdmin);
+  const validation = validateEntityAccess(entityType, userRole, userId, entityId, isAdmin, 'POST');
   if (!validation.valid) {
     return { status: 403, body: { error: validation.error } };
   }
@@ -562,7 +584,7 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
   }
 
   // Validate permissions
-  const validation = validateEntityAccess(existingDoc.entity_type, userRole, userId, existingDoc.entity_id, isAdmin);
+  const validation = validateEntityAccess(existingDoc.entity_type, userRole, userId, existingDoc.entity_id, isAdmin, 'DELETE');
   if (!validation.valid) {
     return { status: 403, body: { error: validation.error } };
   }

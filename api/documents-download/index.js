@@ -149,14 +149,14 @@ export default async function handler(context, req) {
 
     // Permission validation
     if (document.entity_type === 'organization' && !isAdmin) {
-      // Check org_documents_member_visibility setting
+      // Check org_documents_member_visibility setting (stored as bare boolean)
       const { data: visibilitySetting } = await tenantClient
         .from('Settings')
         .select('settings_value')
         .eq('key', 'org_documents_member_visibility')
         .single();
 
-      const memberVisibility = visibilitySetting?.settings_value?.enabled || false;
+      const memberVisibility = visibilitySetting?.settings_value === true;
       if (!memberVisibility) {
         return respond(context, 403, { error: 'members_cannot_view_org_documents' });
       }
