@@ -38,7 +38,7 @@ Key characteristics:
 | Table | Purpose | Key Columns |
 | :---- | :------ | :---------- |
 | `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` (`instructor_color` stores the permanent palette assignment) |
-| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
+| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `national_id` (optional, uniqueness enforced in app), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
 | `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, `is_legacy` (marks imported historical rows), timestamps, `metadata` |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
 
@@ -75,6 +75,8 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/students` | GET | Admin/Owner | Returns active students by default (`status=active`), with `status=inactive` and `status=all` options plus `include_inactive=true` for legacy callers. Responses echo the `is_active` flag so the UI can render lifecycle state. |
 | `/api/students` | POST | Admin/Owner | Inserts a student (name + optional contact data, scheduling defaults, instructor assignment) and echoes the created row. |
 | `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor, `is_active`) and returns the refreshed row or 404. |
+| `/api/students/check-id` | GET | Admin/Owner | Validates a national ID for uniqueness, optionally excluding a student ID during edits. Returns `{ exists, student }` so the UI can block duplicates and deep-link to the profile. |
+| `/api/students-search` | GET | Admin/Owner | Fuzzy name search that surfaces `{ id, name, national_id, is_active }` for quick deduplication hints beneath the name input. |
 | `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.id` (Supabase auth UUID) and hides inactive students unless the organization enables instructor visibility; supports optional `status` query parity with the admin endpoint. |
 | `/api/weekly-compliance` | GET | Member/Admin/Owner | Returns the aggregated “Weekly Compliance View” data set with instructor color identifiers, weekly schedule chips, dynamic time window metadata, and per-session documentation status (✔ complete / ✖ missing). |
 | `/api/sessions` | POST | Member/Admin/Owner | Inserts a `SessionRecords` entry (JSON answer payload + optional service context) after confirming members only write for students assigned to them. |

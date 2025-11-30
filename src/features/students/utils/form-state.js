@@ -53,6 +53,7 @@ function normalizeTimeValue(time) {
 export function createStudentFormState(student) {
   return {
     name: student?.name || '',
+    nationalId: student?.national_id || '',
     contactName: student?.contact_name || '',
     contactPhone: student?.contact_phone || '',
     assignedInstructorId: student?.assigned_instructor_id || '',

@@ -908,3 +908,8 @@
 
 ## Future Implementation: Organization Switching
 - The legacy AppShell sub-header (removed in the cleanup that consolidated the global header) previously hosted the organization-switching dropdown. When it rendered, it embedded the logic now housed in `src/org/OrgSwitcher.jsx` (see the git history for the pre-removal `AppShell.jsx` block) to list orgs, handle focus, and persist selection. When reintroducing org switching into the refreshed header, reuse that approach instead of recreating it from scratch.
+
+### Student deduplication (2025-02)
+- New API helpers: `/api/students/check-id` enforces national ID uniqueness (supports `exclude_id`), and `/api/students-search` surfaces fuzzy name matches with `id`, `national_id`, and `is_active`.
+- Admin student forms now require checking these endpoints for duplicate alerts; national ID conflicts must block submission with a profile shortcut.
+- The roster surfaces a red badge when `national_id` is missing so admins can prioritize cleanup.

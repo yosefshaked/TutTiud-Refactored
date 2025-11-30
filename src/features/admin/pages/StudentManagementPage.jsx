@@ -296,6 +296,7 @@ export default function StudentManagementPage() {
 
   const handleCreateStudent = async ({
     name,
+    nationalId,
     contactName,
     contactPhone,
     assignedInstructorId,
@@ -318,6 +319,7 @@ export default function StudentManagementPage() {
       const body = {
         org_id: activeOrgId,
         name,
+        national_id: nationalId || null,
         contact_name: contactName,
         contact_phone: contactPhone,
         assigned_instructor_id: assignedInstructorId,
@@ -367,6 +369,7 @@ export default function StudentManagementPage() {
       const body = {
         org_id: activeOrgId,
         name: payload.name,
+        national_id: payload.nationalId || null,
         contact_name: payload.contactName,
         contact_phone: payload.contactPhone,
         assigned_instructor_id: payload.assignedInstructorId,
@@ -640,7 +643,8 @@ export default function StudentManagementPage() {
                   const dayLabel = DAY_NAMES[student.default_day_of_week] || '—';
                   const timeLabel = formatDefaultTime(student.default_session_time) || '—';
                   const expiredCount = countExpiredDocuments(student);
-                  
+                  const missingNationalId = !student.national_id;
+
                   return (
                     <TableRow key={student.id}>
                       <TableCell className="text-sm font-semibold text-foreground">
@@ -657,6 +661,12 @@ export default function StudentManagementPage() {
                               {student.is_active === false ? (
                                 <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
                                   לא פעיל
+                                </Badge>
+                              ) : null}
+                              {missingNationalId ? (
+                                <Badge variant="destructive" className="gap-1 text-xs">
+                                  <FileWarning className="h-3 w-3" />
+                                  חסר מספר זהות
                                 </Badge>
                               ) : null}
                               {expiredCount > 0 && (
