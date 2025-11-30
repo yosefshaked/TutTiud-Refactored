@@ -27,8 +27,14 @@ export function useKeyboardSubmit({ onSave, isEnabled = true } = {}) {
         return;
       }
 
-      event.preventDefault();
-      toast.info(KEYBOARD_SAVE_TIP, { id: toastIdRef.current });
+      const target = event.target;
+      const isClickIntent = target?.closest?.(
+        'button, [role="button"], a[href], input[type="checkbox"], input[type="radio"], select',
+      );
+
+      if (!isClickIntent) {
+        toast.info(KEYBOARD_SAVE_TIP, { id: toastIdRef.current });
+      }
     },
     [isEnabled, onSave],
   );
