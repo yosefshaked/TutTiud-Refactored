@@ -204,253 +204,309 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   // Extract metadata
   const entityTypePart = parts.find(p => p.name === 'entity_type');
   const entityIdPart = parts.find(p => p.name === 'entity_id');
-  const filePart = parts.find(p => p.name === 'file' && p.filename);
-  const customNamePart = parts.find(p => p.name === 'custom_name');
-  const relevantDatePart = parts.find(p => p.name === 'relevant_date');
-  const expirationDatePart = parts.find(p => p.name === 'expiration_date');
-  const definitionIdPart = parts.find(p => p.name === 'definition_id');
+  const fileParts = parts.filter(p => p.name === 'file' && p.filename); // Get ALL files
+  const customNameParts = parts.filter(p => p.name === 'custom_name');
+  const relevantDateParts = parts.filter(p => p.name === 'relevant_date');
+  const expirationDateParts = parts.filter(p => p.name === 'expiration_date');
+  const definitionIdParts = parts.filter(p => p.name === 'definition_id');
 
-  if (!entityTypePart || !entityIdPart || !filePart) {
+  if (!entityTypePart || !entityIdPart || fileParts.length === 0) {
     return { status: 400, body: { error: 'missing_required_fields' } };
   }
 
   const entityType = entityTypePart.data.toString('utf8');
   const entityId = entityIdPart.data.toString('utf8');
 
-  // Validate permissions
+  // Validate permissions once (applies to all files)
   const validation = validateEntityAccess(entityType, userRole, userId, entityId, isAdmin);
   if (!validation.valid) {
     return { status: 403, body: { error: validation.error } };
   }
 
-  // Validate file
-  const fileBuffer = filePart.data;
-  const fileName = filePart.filename;
-  const fileType = filePart.type;
+  // Arrays to collect results
+  const uploadedFiles = [];
+  const errors = [];
 
-  if (fileBuffer.length > MAX_FILE_SIZE) {
-    return { status: 413, body: { error: 'file_too_large', max_size: MAX_FILE_SIZE } };
-  }
+  // Cache these lookups (fetch once, reuse for all files)
+  let entityName = null;
+  let storageProfile = null;
+  let driver = null;
 
-  if (!ALLOWED_MIME_TYPES.includes(fileType)) {
-    return { status: 415, body: { error: 'unsupported_file_type', allowed_types: ALLOWED_MIME_TYPES } };
-  }
+  // Process each file
+  for (let i = 0; i < fileParts.length; i++) {
+    const filePart = fileParts[i];
+    const fileName = filePart.filename;
+    
+    try {
+      // Validate file
+      const fileBuffer = filePart.data;
+      const fileType = filePart.type;
 
-  // Decode Hebrew filename
-  let decodedFileName = fileName;
-  try {
-    // eslint-disable-next-line no-control-regex
-    if (fileName.match(/[^\x00-\x7F]/)) {
-      const latinBuffer = Buffer.from(fileName, 'latin1');
-      decodedFileName = latinBuffer.toString('utf8');
+      if (fileBuffer.length > MAX_FILE_SIZE) {
+        errors.push({ fileName, error: 'file_too_large', max_size: MAX_FILE_SIZE });
+        continue;
+      }
+
+      if (!ALLOWED_MIME_TYPES.includes(fileType)) {
+        errors.push({ fileName, error: 'unsupported_file_type', allowed_types: ALLOWED_MIME_TYPES });
+        continue;
+      }
+
+      // Decode Hebrew filename
+      let decodedFileName = fileName;
+      try {
+        // eslint-disable-next-line no-control-regex
+        if (fileName.match(/[^\x00-\x7F]/)) {
+          const latinBuffer = Buffer.from(fileName, 'latin1');
+          decodedFileName = latinBuffer.toString('utf8');
+        }
+      } catch (err) {
+        console.warn('Filename decoding failed, using original:', err);
+      }
+
+      // Extract per-file metadata (indexed to match file order)
+      const customName = customNameParts[i] ? customNameParts[i].data.toString('utf8') : null;
+      const relevantDate = relevantDateParts[i] ? relevantDateParts[i].data.toString('utf8') : null;
+      const expirationDate = expirationDateParts[i] ? expirationDateParts[i].data.toString('utf8') : null;
+      const definitionId = definitionIdParts[i] ? definitionIdParts[i].data.toString('utf8') : null;
+
+      // Generate file hash
+      const hash = createHash('md5').update(fileBuffer).digest('hex');
+
+      // Get entity name for file naming (cache after first lookup)
+      if (entityName === null) {
+        console.log('[DEBUG] Fetching entity name for file naming', { entityType, entityId });
+        
+        if (entityType === 'student') {
+          const { data: student, error: studentError } = await tenantClient.from('Students').select('name').eq('id', entityId).single();
+          console.log('[DEBUG] Student query result', { 
+            hasData: !!student, 
+            name: student?.name,
+            error: studentError?.message
+          });
+          if (studentError) {
+            console.error('Failed to fetch student name:', { entityId, error: studentError.message });
+          }
+          entityName = student?.name || 'Unknown';
+        } else if (entityType === 'instructor') {
+          const { data: instructor, error: instructorError } = await tenantClient.from('Instructors').select('name').eq('id', entityId).single();
+          console.log('[DEBUG] Instructor query result', { 
+            hasData: !!instructor, 
+            name: instructor?.name,
+            error: instructorError?.message
+          });
+          if (instructorError) {
+            console.error('Failed to fetch instructor name:', { entityId, error: instructorError.message });
+          }
+          entityName = instructor?.name || 'Unknown';
+        } else {
+          entityName = '';
+        }
+        
+        console.log('[DEBUG] Entity name resolved to:', entityName);
+      }
+
+      // Build final file name
+      const ext = decodedFileName.split('.').pop();
+      const baseNameWithoutExt = decodedFileName.substring(0, decodedFileName.lastIndexOf('.'));
+      const baseName = customName || baseNameWithoutExt;
+      const finalName = entityName ? `${baseName} - ${entityName}` : baseName;
+
+      // Get definition name if applicable
+      let definitionName = null;
+      if (definitionId) {
+        const settingsKey = entityType === 'instructor' ? 'instructor_document_definitions' : 'document_definitions';
+        const { data: settingsRow } = await tenantClient
+          .from('Settings')
+          .select('settings_value')
+          .eq('key', settingsKey)
+          .single();
+
+        if (settingsRow?.settings_value) {
+          const definitions = Array.isArray(settingsRow.settings_value) ? settingsRow.settings_value : [];
+          const definition = definitions.find(d => d.id === definitionId);
+          if (definition) {
+            definitionName = definition.name;
+          }
+        }
+      }
+
+      // Load storage profile (cache after first lookup)
+      if (storageProfile === null) {
+        const { data: orgSettings } = await supabase
+          .from('org_settings')
+          .select('storage_profile')
+          .eq('org_id', orgId)
+          .single();
+
+        if (!orgSettings?.storage_profile) {
+          errors.push({ fileName, error: 'storage_not_configured' });
+          continue;
+        }
+
+        storageProfile = orgSettings.storage_profile;
+
+        // Decrypt BYOS credentials if needed
+        storageProfile = decryptStorageProfile(storageProfile, env);
+
+        // Check if storage is disconnected
+        if (storageProfile.disconnected) {
+          errors.push({ fileName, error: 'storage_disconnected' });
+          continue;
+        }
+
+        // Initialize storage driver
+        try {
+          if (storageProfile.mode === 'managed') {
+            driver = getStorageDriver('managed', null, env);
+          } else if (storageProfile.mode === 'byos') {
+            driver = getStorageDriver('byos', storageProfile.byos, env);
+          } else {
+            throw new Error(`Invalid storage mode: ${storageProfile.mode}`);
+          }
+        } catch (err) {
+          console.error('Storage driver initialization error:', err);
+          errors.push({ fileName, error: 'storage_init_failed' });
+          continue;
+        }
+      }
+
+      // Build storage path (temporary for now, will update after DB insert)
+      const tempDocRecord = {
+        entity_type: entityType,
+        entity_id: entityId,
+        name: finalName,
+        original_name: decodedFileName,
+        relevant_date: relevantDate || null,
+        expiration_date: expirationDate || null,
+        resolved: false,
+        url: null,
+        path: 'temp', // Will update after we get the ID
+        storage_provider: storageProfile.mode,
+        uploaded_at: new Date().toISOString(),
+        uploaded_by: userId,
+        definition_id: definitionId || null,
+        definition_name: definitionName,
+        size: fileBuffer.length,
+        type: fileType,
+        hash,
+        metadata: null
+      };
+
+      // Insert into Documents table first to get auto-generated UUID
+      const { data: insertedDoc, error: insertError } = await tenantClient
+        .from('Documents')
+        .insert([tempDocRecord])
+        .select()
+        .single();
+
+      if (insertError || !insertedDoc) {
+        console.error('Document insert error:', insertError);
+        errors.push({ fileName, error: 'insert_failed', details: insertError?.message });
+        continue;
+      }
+
+      const fileId = insertedDoc.id;
+
+      // Now build the correct storage path with the real ID
+      let storagePath;
+      if (storageProfile.mode === 'managed') {
+        storagePath = `managed/${orgId}/${entityType}s/${entityId}/${fileId}.${ext}`;
+      } else {
+        storagePath = `${entityType}s/${orgId}/${entityId}/${fileId}.${ext}`;
+      }
+
+      // Upload to storage
+      let uploadResult;
+      try {
+        uploadResult = await driver.upload(storagePath, fileBuffer, fileType);
+      } catch (err) {
+        console.error('Storage upload error:', err);
+        // Rollback: delete the document record
+        await tenantClient.from('Documents').delete().eq('id', fileId);
+        errors.push({ fileName, error: 'upload_failed', details: err.message });
+        continue;
+      }
+
+      // Update the document with the correct path and URL
+      const { error: updateError } = await tenantClient
+        .from('Documents')
+        .update({ 
+          path: storagePath,
+          url: uploadResult.url 
+        })
+        .eq('id', fileId);
+
+      if (updateError) {
+        console.error('Document path update error:', updateError);
+        // Try to clean up storage
+        try {
+          await driver.delete(storagePath);
+        } catch (cleanupErr) {
+          console.error('Cleanup error after failed path update:', cleanupErr);
+        }
+        await tenantClient.from('Documents').delete().eq('id', fileId);
+        errors.push({ fileName, error: 'path_update_failed', details: updateError.message });
+        continue;
+      }
+
+      // Audit log
+      await logAuditEvent(supabase, {
+        orgId,
+        userId,
+        userEmail,
+        userRole,
+        actionType: AUDIT_ACTIONS.FILE_UPLOADED,
+        actionCategory: AUDIT_CATEGORIES.FILES,
+        resourceType: `${entityType}_file`,
+        resourceId: fileId,
+        details: {
+          entity_type: entityType,
+          entity_id: entityId,
+          file_name: finalName,
+          file_size: fileBuffer.length,
+          storage_mode: storageProfile.mode
+        }
+      });
+
+      // Add to successful uploads
+      uploadedFiles.push({
+        id: fileId,
+        name: finalName,
+        original_name: decodedFileName,
+        relevant_date: relevantDate,
+        expiration_date: expirationDate,
+        url: uploadResult.url,
+        path: storagePath,
+        storage_provider: storageProfile.mode,
+        uploaded_at: tempDocRecord.uploaded_at,
+        uploaded_by: userId,
+        definition_id: definitionId,
+        definition_name: definitionName,
+        size: fileBuffer.length,
+        type: fileType,
+        hash
+      });
+
+    } catch (err) {
+      console.error(`Error processing file ${fileName}:`, err);
+      errors.push({ fileName, error: 'processing_failed', details: err.message });
     }
-  } catch (err) {
-    console.warn('Filename decoding failed, using original:', err);
   }
 
-  // Extract metadata
-  const customName = customNamePart ? customNamePart.data.toString('utf8') : null;
-  const relevantDate = relevantDatePart ? relevantDatePart.data.toString('utf8') : null;
-  const expirationDate = expirationDatePart ? expirationDatePart.data.toString('utf8') : null;
-  const definitionId = definitionIdPart ? definitionIdPart.data.toString('utf8') : null;
-
-  // Generate file hash
-  const hash = createHash('md5').update(fileBuffer).digest('hex');
-
-  // Get entity name for file naming
-  let entityName = '';
-  console.log('[DEBUG] Fetching entity name for file naming', { entityType, entityId });
-  
-  if (entityType === 'student') {
-    const { data: student, error: studentError } = await tenantClient.from('Students').select('name').eq('id', entityId).single();
-    console.log('[DEBUG] Student query result', { 
-      hasData: !!student, 
-      name: student?.name,
-      error: studentError?.message,
-      errorCode: studentError?.code,
-      errorDetails: studentError?.details
-    });
-    if (studentError) {
-      console.error('Failed to fetch student name:', { entityId, error: studentError.message, code: studentError.code });
-    }
-    entityName = student?.name || 'Unknown';
-  } else if (entityType === 'instructor') {
-    const { data: instructor, error: instructorError } = await tenantClient.from('Instructors').select('name').eq('id', entityId).single();
-    console.log('[DEBUG] Instructor query result', { 
-      hasData: !!instructor, 
-      name: instructor?.name,
-      error: instructorError?.message,
-      errorCode: instructorError?.code,
-      errorDetails: instructorError?.details
-    });
-    if (instructorError) {
-      console.error('Failed to fetch instructor name:', { entityId, error: instructorError.message, code: instructorError.code });
-    }
-    entityName = instructor?.name || 'Unknown';
-  }
-  
-  console.log('[DEBUG] Entity name resolved to:', entityName);
-
-  // Build final file name
-  const ext = decodedFileName.split('.').pop();
-  const baseNameWithoutExt = decodedFileName.substring(0, decodedFileName.lastIndexOf('.'));
-  const baseName = customName || baseNameWithoutExt;
-  const finalName = entityName ? `${baseName} - ${entityName}` : baseName;
-
-  // Get definition name if applicable
-  let definitionName = null;
-  if (definitionId) {
-    const settingsKey = entityType === 'instructor' ? 'instructor_document_definitions' : 'document_definitions';
-    const { data: settingsRow } = await tenantClient
-      .from('Settings')
-      .select('settings_value')
-      .eq('key', settingsKey)
-      .single();
-
-    if (settingsRow?.settings_value) {
-      const definitions = Array.isArray(settingsRow.settings_value) ? settingsRow.settings_value : [];
-      const definition = definitions.find(d => d.id === definitionId);
-      if (definition) {
-        definitionName = definition.name;
+  // Return multi-status response with summary
+  return {
+    status: 207, // Multi-Status
+    body: {
+      files: uploadedFiles,
+      errors,
+      summary: {
+        total: fileParts.length,
+        uploaded: uploadedFiles.length,
+        failed: errors.length
       }
     }
-  }
-
-  // Load storage profile
-  const { data: orgSettings } = await supabase
-    .from('org_settings')
-    .select('storage_profile')
-    .eq('org_id', orgId)
-    .single();
-
-  if (!orgSettings?.storage_profile) {
-    return { status: 424, body: { error: 'storage_not_configured' } };
-  }
-
-  let storageProfile = orgSettings.storage_profile;
-
-  // Decrypt BYOS credentials if needed
-  storageProfile = decryptStorageProfile(storageProfile, env);
-
-  // Check if storage is disconnected
-  if (storageProfile.disconnected) {
-    return { status: 403, body: { error: 'storage_disconnected' } };
-  }
-
-  // Initialize storage driver
-  let driver;
-  try {
-    if (storageProfile.mode === 'managed') {
-      driver = getStorageDriver('managed', null, env);
-    } else if (storageProfile.mode === 'byos') {
-      driver = getStorageDriver('byos', storageProfile.byos, env);
-    } else {
-      throw new Error(`Invalid storage mode: ${storageProfile.mode}`);
-    }
-  } catch (err) {
-    console.error('Storage driver initialization error:', err);
-    return { status: 500, body: { error: 'storage_init_failed' } };
-  }
-
-  // Build storage path
-  let storagePath;
-  
-  // For managed storage, we'll use a temporary ID; for BYOS, we'll generate the path after insert
-  // We need the document ID from DB to build the final path
-  const tempDocRecord = {
-    entity_type: entityType,
-    entity_id: entityId,
-    name: finalName,
-    original_name: decodedFileName,
-    relevant_date: relevantDate || null,
-    expiration_date: expirationDate || null,
-    resolved: false,
-    url: null,
-    path: 'temp', // Will update after we get the ID
-    storage_provider: storageProfile.mode,
-    uploaded_at: new Date().toISOString(),
-    uploaded_by: userId,
-    definition_id: definitionId || null,
-    definition_name: definitionName,
-    size: fileBuffer.length,
-    type: fileType,
-    hash,
-    metadata: null
   };
-
-  // Insert into Documents table first to get auto-generated UUID
-  const { data: insertedDoc, error: insertError } = await tenantClient
-    .from('Documents')
-    .insert([tempDocRecord])
-    .select()
-    .single();
-
-  if (insertError || !insertedDoc) {
-    console.error('Document insert error:', insertError);
-    return { status: 500, body: { error: 'insert_failed', details: insertError?.message } };
-  }
-
-  const fileId = insertedDoc.id;
-
-  // Now build the correct storage path with the real ID
-  if (storageProfile.mode === 'managed') {
-    storagePath = `managed/${orgId}/${entityType}s/${entityId}/${fileId}.${ext}`;
-  } else {
-    storagePath = `${entityType}s/${orgId}/${entityId}/${fileId}.${ext}`;
-  }
-
-  // Upload to storage
-  let uploadResult;
-  try {
-    uploadResult = await driver.upload(storagePath, fileBuffer, fileType);
-  } catch (err) {
-    console.error('Storage upload error:', err);
-    // Rollback: delete the document record
-    await tenantClient.from('Documents').delete().eq('id', fileId);
-    return { status: 500, body: { error: 'upload_failed', details: err.message } };
-  }
-
-  // Update the document with the correct path and URL
-  const { error: updateError } = await tenantClient
-    .from('Documents')
-    .update({ 
-      path: storagePath,
-      url: uploadResult.url 
-    })
-    .eq('id', fileId);
-
-  if (updateError) {
-    console.error('Document path update error:', updateError);
-    // Try to clean up storage
-    try {
-      await driver.delete(storagePath);
-    } catch (cleanupErr) {
-      console.error('Cleanup error after failed path update:', cleanupErr);
-    }
-    await tenantClient.from('Documents').delete().eq('id', fileId);
-    return { status: 500, body: { error: 'path_update_failed', details: updateError.message } };
-  }
-
-  // Audit log
-  await logAuditEvent(supabase, {
-    orgId,
-    userId,
-    userEmail,
-    userRole,
-    actionType: AUDIT_ACTIONS.FILE_UPLOADED,
-    actionCategory: AUDIT_CATEGORIES.FILES,
-    resourceType: `${entityType}_file`,
-    resourceId: fileId,
-    details: {
-      entity_type: entityType,
-      entity_id: entityId,
-      file_name: finalName,
-      file_size: fileBuffer.length,
-      storage_mode: storageProfile.mode
-    }
-  });
-
-  return { status: 201, body: { file: { ...insertedDoc, path: storagePath, url: uploadResult.url } } };
 }
 
 /**

@@ -19,13 +19,6 @@ export function useDocuments(entityType, entityId) {
    * Fetch documents for the entity
    */
   const fetchDocuments = useCallback(async () => {
-    console.log('[DEBUG-FRONTEND] useDocuments fetchDocuments called', {
-      entityType,
-      entityId,
-      activeOrgId,
-      hasSession: !!session?.access_token
-    });
-
     if (!session?.access_token || !activeOrgId || !entityId) {
       console.warn('[WARN-FRONTEND] useDocuments: Missing required context', {
         hasToken: !!session?.access_token,
@@ -42,11 +35,6 @@ export function useDocuments(entityType, entityId) {
       setError(null);
 
       const url = `/api/documents?entity_type=${entityType}&entity_id=${entityId}&org_id=${activeOrgId}`;
-      console.log('[DEBUG-FRONTEND] Fetching documents from:', url);
-      console.log('[DEBUG-FRONTEND] Request headers:', {
-        hasAuth: !!session?.access_token,
-        tokenLength: session?.access_token?.length || 0
-      });
 
       const response = await fetch(url, {
         headers: {
@@ -58,23 +46,12 @@ export function useDocuments(entityType, entityId) {
         }
       });
 
-      console.log('[DEBUG-FRONTEND] Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        contentType: response.headers.get('content-type'),
-        contentLength: response.headers.get('content-length'),
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
       if (!response.ok) {
         console.error('[ERROR-FRONTEND] Response not OK, reading error...');
         let errorData;
         try {
           const text = await response.text();
-          console.log('[DEBUG-FRONTEND] Error response text:', text);
           errorData = text ? JSON.parse(text) : {};
-          console.log('[DEBUG-FRONTEND] Parsed error data:', errorData);
         } catch (parseError) {
           console.error('[ERROR-FRONTEND] Failed to parse error response:', parseError);
           errorData = {};
@@ -82,14 +59,8 @@ export function useDocuments(entityType, entityId) {
         throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
       }
 
-      console.log('[DEBUG-FRONTEND] Parsing success response...');
       // Read response text first to debug empty body issue
       const responseText = await response.text();
-      console.log('[DEBUG-FRONTEND] Response text received:', {
-        length: responseText.length,
-        preview: responseText.substring(0, 200),
-        isEmpty: responseText.length === 0
-      });
 
       if (!responseText || responseText.length === 0) {
         console.warn('[WARN-FRONTEND] Response body is empty despite 200 status');
@@ -98,11 +69,6 @@ export function useDocuments(entityType, entityId) {
       }
 
       const data = JSON.parse(responseText);
-      console.log('[DEBUG-FRONTEND] Documents data received:', {
-        hasDocuments: !!data.documents,
-        documentCount: data.documents?.length || 0,
-        firstDocument: data.documents?.[0]?.name || 'none'
-      });
 
       setDocuments(data.documents || []);
     } catch (err) {
@@ -114,7 +80,6 @@ export function useDocuments(entityType, entityId) {
       setDocuments([]);
     } finally {
       setLoading(false);
-      console.log('[DEBUG-FRONTEND] fetchDocuments completed');
     }
   }, [session?.access_token, activeOrgId, entityType, entityId]);
 
@@ -251,34 +216,14 @@ export function useDocuments(entityType, entityId) {
    * @returns {string} Download URL
    */
   const getDownloadUrl = useCallback(async (documentId, preview = false) => {
-    console.log('[DOCUMENTS-HOOK] getDownloadUrl called', {
-      documentId,
-      preview,
-      hasSession: !!session?.access_token,
-      activeOrgId,
-      tokenLength: session?.access_token?.length || 0
-    });
-
     if (!session?.access_token || !activeOrgId) {
       const error = 'Missing authentication or context';
-      console.error('[DOCUMENTS-HOOK] Missing auth/context', {
-        hasToken: !!session?.access_token,
-        hasOrgId: !!activeOrgId
-      });
       throw new Error(error);
     }
 
     const previewParam = preview ? '&preview=true' : '';
     const url = `/api/documents-download?document_id=${documentId}&org_id=${activeOrgId}${previewParam}`;
     
-    console.log('[DOCUMENTS-HOOK] Fetching download URL', {
-      url,
-      documentId,
-      orgId: activeOrgId,
-      preview,
-      previewParam
-    });
-
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
@@ -288,35 +233,19 @@ export function useDocuments(entityType, entityId) {
       }
     });
 
-    console.log('[DOCUMENTS-HOOK] Response received', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      contentType: response.headers.get('content-type')
-    });
-
     if (!response.ok) {
       let errorData;
       try {
         const text = await response.text();
-        console.log('[DOCUMENTS-HOOK] Error response text:', text);
         errorData = text ? JSON.parse(text) : {};
-        console.error('[DOCUMENTS-HOOK] Parsed error data:', errorData);
       } catch {
         errorData = {};
       }
       const errorMsg = errorData.error || errorData.message || `HTTP ${response.status}`;
-      console.error('[DOCUMENTS-HOOK] Throwing error:', errorMsg);
       throw new Error(errorMsg);
     }
 
     const data = await response.json();
-    console.log('[DOCUMENTS-HOOK] Success response data:', {
-      hasUrl: !!data.url,
-      urlLength: data.url?.length || 0,
-      urlPreview: data.url?.substring(0, 100),
-      contentType: data.contentType
-    });
     
     return data.url; // Return just the URL string
   }, [session?.access_token, activeOrgId]);
