@@ -53,6 +53,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "name" text NOT NULL,
+  "national_id" text,
   "contact_info" text,
   "contact_name" text,
   "contact_phone" text,
@@ -123,13 +124,13 @@ $$;
 ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "tags" uuid[];
 ALTER TABLE tuttiud."Students"
+  ADD COLUMN IF NOT EXISTS "national_id" text,
   ADD COLUMN IF NOT EXISTS "contact_name" text,
   ADD COLUMN IF NOT EXISTS "contact_phone" text,
   ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
   ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
   ADD COLUMN IF NOT EXISTS "default_service" text,
-  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true,
-  ADD COLUMN IF NOT EXISTS "files" jsonb DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true;
 
 UPDATE tuttiud."Students"
 SET "is_active" = true

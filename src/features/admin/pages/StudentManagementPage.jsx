@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Loader2, Pencil, Search, X, User, RotateCcw, FileWarning } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseISO, isBefore, startOfDay } from 'date-fns';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
@@ -31,32 +30,13 @@ const REQUEST_STATES = {
   error: 'error',
 };
 
-/**
- * Count expired documents for a student
- */
-function countExpiredDocuments(student) {
-  if (!student?.files || !Array.isArray(student.files)) return 0;
-  
-  const today = startOfDay(new Date());
-  
-  return student.files.filter(file => {
-    if (!file.expiration_date) return false;
-    if (file.resolved === true) return false; // Exclude resolved files
-    try {
-      const expDate = parseISO(file.expiration_date);
-      return isBefore(expDate, today);
-    } catch {
-      return false;
-    }
-  }).length;
-}
-
 export default function StudentManagementPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
   const [students, setStudents] = useState([]);
   const [studentsState, setStudentsState] = useState(REQUEST_STATES.idle);
   const [studentsError, setStudentsError] = useState('');
+  const [complianceSummary, setComplianceSummary] = useState({}); // Map of student_id -> { expiredDocuments: number }
   const [instructors, setInstructors] = useState([]);
   const [instructorsState, setInstructorsState] = useState(REQUEST_STATES.idle);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -93,6 +73,22 @@ export default function StudentManagementPage() {
       tenantClientReady &&
       activeOrgHasConnection,
   );
+
+  const fetchComplianceSummary = useCallback(async () => {
+    if (!canFetch) {
+      return;
+    }
+
+    try {
+      const searchParams = new URLSearchParams({ org_id: activeOrgId });
+      const payload = await authenticatedFetch(`students/compliance-summary?${searchParams.toString()}`, { session });
+      setComplianceSummary(payload || {});
+    } catch (error) {
+      console.error('Failed to load compliance summary', error);
+      // Don't show error toast - this is supplementary data
+      setComplianceSummary({});
+    }
+  }, [canFetch, activeOrgId, session]);
 
   const fetchStudents = useCallback(async () => {
     if (!canFetch) {
@@ -144,11 +140,12 @@ export default function StudentManagementPage() {
   }, [canFetch, activeOrgId, session]);
 
   const refreshRoster = useCallback(async (includeInstructors = false) => {
-    await fetchStudents();
-    if (includeInstructors) {
-      await fetchInstructors();
-    }
-  }, [fetchStudents, fetchInstructors]);
+    await Promise.all([
+      fetchStudents(),
+      fetchComplianceSummary(),
+      includeInstructors ? fetchInstructors() : Promise.resolve(),
+    ]);
+  }, [fetchStudents, fetchComplianceSummary, fetchInstructors]);
 
   const handleMaintenanceCompleted = useCallback(async () => {
     await refreshRoster(true);
@@ -660,7 +657,7 @@ export default function StudentManagementPage() {
                   const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ') || '—';
                   const dayLabel = DAY_NAMES[student.default_day_of_week] || '—';
                   const timeLabel = formatDefaultTime(student.default_session_time) || '—';
-                  const expiredCount = countExpiredDocuments(student);
+                  const expiredCount = complianceSummary[student.id]?.expiredDocuments || 0;
                   const missingNationalId = !student.national_id;
 
                   return (

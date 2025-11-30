@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Loader2, Users, Search, X, User, RotateCcw, FileWarning } from "lucide-react"
-import { parseISO, isBefore, startOfDay } from 'date-fns'
 
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
@@ -26,31 +25,12 @@ const REQUEST_STATUS = Object.freeze({
   error: "error",
 })
 
-/**
- * Count expired documents for a student
- */
-function countExpiredDocuments(student) {
-  if (!student?.files || !Array.isArray(student.files)) return 0;
-  
-  const today = startOfDay(new Date());
-  
-  return student.files.filter(file => {
-    if (!file.expiration_date) return false;
-    if (file.resolved === true) return false; // Exclude resolved files
-    try {
-      const expDate = parseISO(file.expiration_date);
-      return isBefore(expDate, today);
-    } catch {
-      return false;
-    }
-  }).length;
-}
-
 export default function MyStudentsPage() {
   const { loading: supabaseLoading } = useSupabase()
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg()
 
   const [students, setStudents] = useState([])
+  const [complianceSummary, setComplianceSummary] = useState({}) // Map of student_id -> { expiredDocuments: number }
   const [status, setStatus] = useState(REQUEST_STATUS.idle)
   const [errorMessage, setErrorMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
@@ -156,6 +136,7 @@ export default function MyStudentsPage() {
       setStatus(REQUEST_STATUS.idle)
       setErrorMessage("")
       setStudents([])
+      setComplianceSummary({})
       return
     }
 
@@ -170,15 +151,23 @@ export default function MyStudentsPage() {
         const endpoint = buildStudentsEndpoint(activeOrgId, normalizedRole, {
           status: canViewInactive ? statusFilter : 'active',
         })
-        const payload = await authenticatedFetch(endpoint, {
-          signal: abortController.signal,
-        })
+        
+        // Fetch students and compliance summary in parallel
+        const [studentsPayload, compliancePayload] = await Promise.all([
+          authenticatedFetch(endpoint, { signal: abortController.signal }),
+          authenticatedFetch(`students/compliance-summary?org_id=${activeOrgId}`, { signal: abortController.signal })
+            .catch(err => {
+              console.error('Failed to load compliance summary', err)
+              return {} // Don't fail if compliance summary fails
+            })
+        ])
 
         if (!isMounted) {
           return
         }
 
-        setStudents(Array.isArray(payload) ? payload : [])
+        setStudents(Array.isArray(studentsPayload) ? studentsPayload : [])
+        setComplianceSummary(compliancePayload || {})
         setStatus(REQUEST_STATUS.success)
       } catch (error) {
         if (error?.name === "AbortError") {
@@ -193,6 +182,7 @@ export default function MyStudentsPage() {
 
         setErrorMessage(error?.message || "טעינת רשימת התלמידים נכשלה.")
         setStudents([])
+        setComplianceSummary({})
         setStatus(REQUEST_STATUS.error)
       }
     }
@@ -393,7 +383,7 @@ export default function MyStudentsPage() {
             const legacyContactInfo = student?.contact_info?.trim?.()
             const finalContactDisplay = contactDisplay || legacyContactInfo || "לא סופק מידע ליצירת קשר"
             const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time)
-            const expiredCount = countExpiredDocuments(student)
+            const expiredCount = complianceSummary[student.id]?.expiredDocuments || 0
 
             return (
               <Card key={student.id || student.name}>

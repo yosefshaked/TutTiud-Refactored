@@ -32,6 +32,13 @@
     - `entity_type` or `organization` - Org documents specific calls
 
 ## Workflow
+- **Database Schema Backwards Compatibility (CRITICAL)**: When adding new columns or features that require schema changes:
+  - Always use `ADD COLUMN IF NOT EXISTS` in the setup script for idempotent migrations
+  - API endpoints must gracefully handle missing columns without throwing 500 errors
+  - Return clear error messages (e.g., `schema_upgrade_required`) instead of database errors
+  - Consider using `setup_assistant_diagnostics()` to detect missing columns before queries
+  - Document required schema versions in AGENTS.md and update setup script version
+  - Example: The `national_id` column for Students was added in setup script v2.5 - older databases without it should receive a clear upgrade prompt, not a 500 error
 - **Azure Functions Response Pattern (CRITICAL)**: All Azure Functions HTTP handlers MUST set `context.res` before returning:
   ```javascript
   // ✅ CORRECT (use respond helper):
