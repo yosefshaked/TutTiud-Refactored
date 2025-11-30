@@ -400,8 +400,9 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   }
 
   // Upload to storage
+  let uploadResult;
   try {
-    await driver.upload(storagePath, fileBuffer, fileType);
+    uploadResult = await driver.upload(storagePath, fileBuffer, fileType);
   } catch (err) {
     console.error('Storage upload error:', err);
     // Rollback: delete the document record
@@ -409,10 +410,13 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     return { status: 500, body: { error: 'upload_failed', details: err.message } };
   }
 
-  // Update the document with the correct path
+  // Update the document with the correct path and URL
   const { error: updateError } = await tenantClient
     .from('Documents')
-    .update({ path: storagePath })
+    .update({ 
+      path: storagePath,
+      url: uploadResult.url 
+    })
     .eq('id', fileId);
 
   if (updateError) {
@@ -446,7 +450,7 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
     }
   });
 
-  return { status: 201, body: { file: { ...insertedDoc, path: storagePath } } };
+  return { status: 201, body: { file: { ...insertedDoc, path: storagePath, url: uploadResult.url } } };
 }
 
 /**
