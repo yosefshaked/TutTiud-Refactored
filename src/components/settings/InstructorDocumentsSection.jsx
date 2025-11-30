@@ -162,7 +162,125 @@ function EditFileDialog({ file, onConfirm, onCancel }) {
 }
 
 /**
- * Pre-upload dialog for editing file metadata before uploading
+ * Multi-file pre-upload dialog - allows reviewing and configuring multiple files before upload
+ */
+function BulkPreUploadDialog({ files, definitionName, onConfirm, onCancel }) {
+  const [filesData, setFilesData] = useState([]);
+
+  useEffect(() => {
+    if (files && files.length > 0) {
+      setFilesData(files.map(fileData => ({
+        ...fileData,
+        id: crypto.randomUUID()
+      })));
+    }
+  }, [files]);
+
+  const handleFileChange = (id, field, value) => {
+    setFilesData(prev => prev.map(f => 
+      f.id === id ? { ...f, [field]: value } : f
+    ));
+  };
+
+  const handleConfirm = () => {
+    onConfirm(filesData);
+  };
+
+  if (!files || files.length === 0) return null;
+
+  const allNamesValid = filesData.every(f => f.name && f.name.trim());
+
+  return (
+    <Dialog open={files.length > 0} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">
+            הגדרות {filesData.length} קבצים
+          </DialogTitle>
+          <DialogDescription className="text-right">
+            ערוך את פרטי המסמכים לפני ההעלאה. שדות שאינם מסומנים ב-* הם אופציונליים
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4 overflow-y-auto max-h-[50vh]">
+          {filesData.map((fileData, index) => (
+            <Card key={fileData.id} className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                  <FileText className="h-4 w-4" />
+                  <span>קובץ {index + 1}</span>
+                  <Badge variant="outline" className="mr-auto">
+                    {fileData.file.name}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`name-${fileData.id}`} className="text-right block">
+                    שם המסמך <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id={`name-${fileData.id}`}
+                    dir="rtl"
+                    value={fileData.name}
+                    onChange={(e) => handleFileChange(fileData.id, 'name', e.target.value)}
+                    placeholder="לדוגמה: אישור רפואי"
+                    className="text-right"
+                    disabled={!!definitionName}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor={`relevant-${fileData.id}`} className="text-right flex items-center gap-1 justify-end text-xs">
+                      <span>תאריך רלוונטי</span>
+                      <Calendar className="h-3 w-3" />
+                    </Label>
+                    <Input
+                      id={`relevant-${fileData.id}`}
+                      type="date"
+                      dir="ltr"
+                      value={fileData.relevantDate}
+                      onChange={(e) => handleFileChange(fileData.id, 'relevantDate', e.target.value)}
+                      className="text-right text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`expiration-${fileData.id}`} className="text-right flex items-center gap-1 justify-end text-xs">
+                      <span>תאריך תפוגה</span>
+                      <CalendarX className="h-3 w-3" />
+                    </Label>
+                    <Input
+                      id={`expiration-${fileData.id}`}
+                      type="date"
+                      dir="ltr"
+                      value={fileData.expirationDate}
+                      onChange={(e) => handleFileChange(fileData.id, 'expirationDate', e.target.value)}
+                      className="text-right text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <div className="flex gap-2 flex-row-reverse border-t pt-4">
+          <Button onClick={handleConfirm} disabled={!allNamesValid}>
+            <Upload className="h-4 w-4 ml-2" />
+            העלה {filesData.length} קבצים
+          </Button>
+          <Button onClick={onCancel} variant="outline">
+            ביטול
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Single-file pre-upload dialog (kept for backward compatibility)
  */
 function PreUploadDialog({ file, definitionName, onConfirm, onCancel }) {
   const [name, setName] = useState(file?.name || '');
@@ -303,7 +421,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
   const [backgroundUploads, setBackgroundUploads] = useState([]);
   const [sortBy, setSortBy] = useState('date'); // 'date' | 'name'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
-  const [pendingFile, setPendingFile] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]); // Changed to array for bulk upload
   const [pendingDefinitionId, setPendingDefinitionId] = useState(null)
   const [editingFile, setEditingFile] = useState(null); // File being edited post-upload
 
@@ -359,6 +477,57 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
 
     loadDefinitions();
   }, [session, orgId]);
+
+  const checkForDuplicates = useCallback(
+    async (file) => {
+      if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
+
+      const token = session.access_token;
+      if (!token) {
+        console.error('Session missing access_token', session);
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return { has_duplicates: false, duplicates: [] };
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('org_id', orgId);
+
+        const response = await fetch('/api/instructor-files-check', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Duplicate check failed', response.status, response.statusText, errorData);
+          
+          if (response.status === 401) {
+            toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+          } else if (errorData.message === 'storage_not_configured') {
+            toast.error('אחסון לא מוגדר. נא להגדיר אחסון בהגדרות המערכת');
+          } else if (response.status >= 500) {
+            toast.error(`שגיאת שרת: ${errorData.message || 'שגיאה לא ידועה'}`);
+          }
+          return { has_duplicates: false, duplicates: [] };
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Duplicate check error:', error);
+        return { has_duplicates: false, duplicates: [] };
+      }
+    },
+    [session, orgId]
+  );
 
   const handleFileUpload = useCallback(async (file, definitionId = null, customName = null, relevantDate = null, expirationDate = null) => {
     if (!file) return;
@@ -789,39 +958,95 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
   };
 
   // Handler for file input change - shows dialog before uploading
-  const handleFileInputChange = useCallback((files, definitionId = null) => {
+  const handleFileInputChange = useCallback(async (files, definitionId = null) => {
     if (!files || files.length === 0) return;
     
-    const file = files[0]; // Take single file
-    
-    // Validate file upfront
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error(`הקובץ גדול מדי. גודל מקסימלי: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
-      return;
+    // Validate all files
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`הקובץ "${file.name}" גדול מדי. גודל מקסימלי: ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+        return;
+      }
+      
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        toast.error(`סוג הקובץ "${file.name}" לא נתמך. קבצים מותרים: PDF, תמונות, Word, Excel`);
+        return;
+      }
     }
     
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error('סוג קובץ לא נתמך. קבצים מותרים: PDF, תמונות, Word, Excel');
-      return;
+    // Check each file for duplicates
+    const duplicateResults = await Promise.all(
+      files.map(async (file) => {
+        const result = await checkForDuplicates(file);
+        return {
+          file,
+          hasDuplicates: result.has_duplicates,
+          duplicates: result.duplicates || []
+        };
+      })
+    );
+
+    // Find files with duplicates
+    const filesWithDuplicates = duplicateResults.filter(r => r.hasDuplicates);
+
+    // If any files have duplicates, show confirmation
+    if (filesWithDuplicates.length > 0) {
+      const duplicateInfo = filesWithDuplicates.map(r => {
+        const instructorNames = r.duplicates
+          .map(d => `${d.instructor_name} (${new Date(d.uploaded_at).toLocaleDateString('he-IL')})`)
+          .join(', ');
+        return `${r.file.name}: ${instructorNames}`;
+      }).join('\n');
+
+      const confirmed = await new Promise((resolve) => {
+        toast.warning(
+          `${filesWithDuplicates.length} קבצים כבר קיימים במערכת`,
+          {
+            description: duplicateInfo,
+            action: {
+              label: 'כן, העלה בכל זאת',
+              onClick: () => resolve(true),
+            },
+            cancel: {
+              label: 'ביטול',
+              onClick: () => resolve(false),
+            },
+            duration: 15000,
+          }
+        );
+      });
+
+      if (!confirmed) {
+        return;
+      }
     }
     
     // Show dialog for metadata input
-    setPendingFile(file);
+    const filesWithMetadata = files.map(file => ({
+      file,
+      name: definitionId ? file.name.replace(/\.[^.]+$/, '') : file.name.replace(/\.[^.]+$/, ''),
+      relevantDate: '',
+      expirationDate: ''
+    }));
+    setPendingFiles(filesWithMetadata);
     setPendingDefinitionId(definitionId);
-  }, [MAX_FILE_SIZE, ALLOWED_TYPES]);
+  }, [MAX_FILE_SIZE, ALLOWED_TYPES, checkForDuplicates]);
 
   // Handler for upload confirmation from dialog
-  const handleUploadConfirm = useCallback(async ({ file, name, relevantDate, expirationDate }) => {
+  const handleUploadConfirm = useCallback(async (filesData) => {
     const definitionId = pendingDefinitionId;
-    setPendingFile(null);
+    setPendingFiles([]);
     setPendingDefinitionId(null);
     
-    await handleFileUpload(file, definitionId, name, relevantDate, expirationDate);
+    // Upload each file sequentially (can be parallelized if needed)
+    for (const fileData of filesData) {
+      await handleFileUpload(fileData.file, definitionId, fileData.name, fileData.relevantDate, fileData.expirationDate);
+    }
   }, [pendingDefinitionId, handleFileUpload]);
 
   // Handler for upload cancellation
   const handleUploadCancel = useCallback(() => {
-    setPendingFile(null);
+    setPendingFiles([]);
     setPendingDefinitionId(null);
   }, []);
 
@@ -834,8 +1059,8 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
 
   return (
     <>
-      <PreUploadDialog
-        file={pendingFile}
+      <BulkPreUploadDialog
+        files={pendingFiles}
         definitionName={pendingDefinitionName}
         onConfirm={handleUploadConfirm}
         onCancel={handleUploadCancel}
@@ -928,6 +1153,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
                           onClick={() => {
                             const input = document.createElement('input');
                             input.type = 'file';
+                            input.multiple = true;
                             input.accept = ALLOWED_TYPES.join(',');
                             input.onchange = (e) => {
                               const files = Array.from(e.target.files || []);
@@ -1090,6 +1316,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
               onClick={() => {
                 const input = document.createElement('input');
                 input.type = 'file';
+                input.multiple = true;
                 input.accept = ALLOWED_TYPES.join(',');
                 input.onchange = (e) => {
                   const files = Array.from(e.target.files || []);

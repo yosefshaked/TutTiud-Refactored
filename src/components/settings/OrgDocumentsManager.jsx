@@ -303,6 +303,132 @@ function EditMetadataDialog({ document, onSave, onCancel }) {
 }
 
 /**
+ * Multi-file pre-upload dialog - allows reviewing and configuring multiple files before upload
+ */
+function BulkPreUploadDialog({ files, onConfirm, onCancel }) {
+  const [fileMetadata, setFileMetadata] = useState([]);
+
+  useEffect(() => {
+    if (files && files.length > 0) {
+      // Initialize metadata for each file
+      const initialMetadata = files.map(file => {
+        const nameParts = file.name.split('.');
+        if (nameParts.length > 1) {
+          nameParts.pop();
+        }
+        return {
+          file,
+          name: nameParts.join('.'),
+          relevantDate: '',
+          expirationDate: '',
+        };
+      });
+      setFileMetadata(initialMetadata);
+    }
+  }, [files]);
+
+  const updateMetadata = (index, field, value) => {
+    setFileMetadata(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleConfirm = () => {
+    const validFiles = fileMetadata.filter(meta => meta.name.trim());
+    onConfirm(validFiles);
+  };
+
+  const allValid = fileMetadata.every(meta => meta.name.trim());
+
+  if (!files || files.length === 0) return null;
+
+  return (
+    <Dialog open={files.length > 0} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh]" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">הגדרות מסמכים ({files.length})</DialogTitle>
+          <DialogDescription className="text-right">
+            ערוך את פרטי המסמכים לפני ההעלאה
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="overflow-y-auto max-h-[50vh] space-y-3 py-2">
+          {fileMetadata.map((meta, idx) => (
+            <Card key={idx} className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <FileText className="h-4 w-4" />
+                  <span>קובץ {idx + 1} מתוך {files.length}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`bulk-name-${idx}`} className="text-right block">
+                    שם המסמך <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id={`bulk-name-${idx}`}
+                    dir="rtl"
+                    value={meta.name}
+                    onChange={(e) => updateMetadata(idx, 'name', e.target.value)}
+                    placeholder="לדוגמה: רישיון עסק"
+                    className="text-right"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    קובץ מקורי: {meta.file.name}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor={`bulk-relevant-${idx}`} className="text-right block text-xs">
+                      תאריך רלוונטי
+                    </Label>
+                    <Input
+                      id={`bulk-relevant-${idx}`}
+                      type="date"
+                      dir="ltr"
+                      value={meta.relevantDate}
+                      onChange={(e) => updateMetadata(idx, 'relevantDate', e.target.value)}
+                      className="text-right text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`bulk-expiration-${idx}`} className="text-right block text-xs">
+                      תאריך תפוגה
+                    </Label>
+                    <Input
+                      id={`bulk-expiration-${idx}`}
+                      type="date"
+                      dir="ltr"
+                      value={meta.expirationDate}
+                      onChange={(e) => updateMetadata(idx, 'expirationDate', e.target.value)}
+                      className="text-right text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <div className="flex gap-2 flex-row-reverse border-t pt-4">
+          <Button onClick={handleConfirm} disabled={!allValid}>
+            <Upload className="h-4 w-4 ml-2" />
+            העלה {files.length} קבצים
+          </Button>
+          <Button onClick={onCancel} variant="outline">
+            ביטול
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * Main component
  */
 export default function OrgDocumentsManager({ session, orgId, membershipRole }) {
@@ -320,7 +446,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
   
   const [uploadState, setUploadState] = useState(REQUEST_STATE.idle);
   const [deleteState, setDeleteState] = useState(REQUEST_STATE.idle);
-  const [pendingFile, setPendingFile] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]); // Changed to array for bulk upload
   const [editingDocument, setEditingDocument] = useState(null);
   const [sortBy, setSortBy] = useState('uploaded_at'); // 'uploaded_at' | 'name' | 'expiration_date'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' | 'desc'
@@ -348,6 +474,57 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ], []);
+
+  const checkForDuplicates = useCallback(
+    async (file) => {
+      if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
+
+      const token = session.access_token;
+      if (!token) {
+        console.error('Session missing access_token', session);
+        toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        return { has_duplicates: false, duplicates: [] };
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('org_id', orgId);
+
+        const response = await fetch('/api/org-documents-check', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Supabase-Authorization': `Bearer ${token}`,
+            'x-supabase-authorization': `Bearer ${token}`,
+            'x-supabase-auth': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Duplicate check failed', response.status, response.statusText, errorData);
+          
+          if (response.status === 401) {
+            toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+          } else if (errorData.message === 'storage_not_configured') {
+            toast.error('אחסון לא מוגדר. נא להגדיר אחסון בהגדרות המערכת');
+          } else if (response.status >= 500) {
+            toast.error(`שגיאת שרת: ${errorData.message || 'שגיאה לא ידועה'}`);
+          }
+          return { has_duplicates: false, duplicates: [] };
+        }
+
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('Duplicate check error:', error);
+        return { has_duplicates: false, duplicates: [] };
+      }
+    },
+    [session, orgId]
+  );
 
   // Load member visibility setting
   const loadVisibilitySetting = useCallback(async () => {
@@ -395,39 +572,70 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
     loadVisibilitySetting();
   }, [loadVisibilitySetting]);
 
-  // Handle file selection
-  const handleFileSelect = useCallback((event) => {
-    const file = event.target.files?.[0];
-    console.log('[ORG-DOCS-UI] File selected', { fileName: file?.name, fileSize: file?.size });
-    if (!file) return;
+  // Handle file selection (bulk upload with duplicate detection)
+  const handleFileSelect = useCallback(async (event) => {
+    const selectedFiles = Array.from(event.target.files || []);
+    console.log('[ORG-DOCS-UI] Files selected', { count: selectedFiles.length });
+    if (selectedFiles.length === 0) return;
 
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      console.log('[ORG-DOCS-UI] File too large', { size: file.size, max: MAX_FILE_SIZE });
-      toast.error('הקובץ גדול מדי. גודל מקסימלי: 10MB');
+    // Validate all files
+    const validFiles = [];
+    for (const file of selectedFiles) {
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name}: גדול מדי (מקסימום 10MB)`);
+        continue;
+      }
+
+      // Validate file type
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        toast.error(`${file.name}: סוג קובץ לא נתמך`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      event.target.value = '';
       return;
     }
 
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      console.log('[ORG-DOCS-UI] Invalid file type', { type: file.type, allowed: ALLOWED_TYPES });
-      toast.error('סוג קובץ לא נתמך. קבצים מותרים: PDF, תמונות, Word, Excel');
-      return;
+    console.log('[ORG-DOCS-UI] Valid files:', validFiles.length);
+
+    // Check for duplicates
+    const duplicateResults = await Promise.all(
+      validFiles.map(file => checkForDuplicates(file))
+    );
+
+    const filesWithDuplicates = duplicateResults.filter(r => r.has_duplicates);
+    if (filesWithDuplicates.length > 0) {
+      const totalDuplicates = filesWithDuplicates.reduce((sum, r) => sum + r.duplicates.length, 0);
+      const duplicateFileNames = filesWithDuplicates
+        .flatMap(r => r.duplicates.map(d => d.file_name))
+        .slice(0, 3)
+        .join(', ');
+      
+      const message = `נמצאו ${totalDuplicates} כפילויות קיימות (${duplicateFileNames}${totalDuplicates > 3 ? '...' : ''}). להמשיך בהעלאה?`;
+      
+      const confirmed = window.confirm(message);
+      if (!confirmed) {
+        event.target.value = '';
+        return;
+      }
     }
 
-    console.log('[ORG-DOCS-UI] File validated, showing pre-upload dialog');
-    // Show pre-upload dialog
-    setPendingFile(file);
+    console.log('[ORG-DOCS-UI] Files validated, showing bulk pre-upload dialog');
+    setPendingFiles(validFiles);
 
     // Reset input
     event.target.value = '';
-  }, [MAX_FILE_SIZE, ALLOWED_TYPES]);
+  }, [MAX_FILE_SIZE, ALLOWED_TYPES, checkForDuplicates]);
 
-  // Handle upload with metadata
-  const handleUploadConfirm = useCallback(async (fileData) => {
+  // Handle upload with metadata (bulk upload support)
+  const handleUploadConfirm = useCallback(async (filesData) => {
     console.log('[ORG-DOCS-UI] Upload confirm called', { 
-      fileName: fileData.name, 
-      hasFile: !!fileData.file,
+      fileCount: filesData.length,
       hasSession: !!session,
       orgId 
     });
@@ -437,33 +645,56 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
       return;
     }
 
-    setPendingFile(null);
+    setPendingFiles([]);
     setUploadState(REQUEST_STATE.loading);
 
-    const toastId = toast.loading(`מעלה: ${fileData.name}...`);
+    let successCount = 0;
+    let failCount = 0;
 
-    try {
-      console.log('[ORG-DOCS-UI] Starting polymorphic upload via useDocuments hook');
-      
-      // Use the uploadDocument function from useDocuments hook
-      await uploadDocument(fileData.file, {
-        name: fileData.name,
-        relevant_date: fileData.relevantDate || null,
-        expiration_date: fileData.expirationDate || null,
-      });
-      
-      console.log('[ORG-DOCS-UI] Upload successful');
-      toast.success('המסמך הועלה בהצלחה!', { id: toastId });
-      setUploadState(REQUEST_STATE.idle);
-      
-      // Refresh documents list
-      await fetchDocuments();
-    } catch (error) {
-      console.error('[ORG-DOCS-UI] Upload failed:', error);
-      toast.error(`העלאה נכשלה: ${error.message}`, { id: toastId });
-      setUploadState(REQUEST_STATE.error);
+    for (const fileData of filesData) {
+      const toastId = toast.loading(`מעלה: ${fileData.name}...`);
+
+      try {
+        console.log('[ORG-DOCS-UI] Starting polymorphic upload via useDocuments hook', { fileName: fileData.name });
+        
+        // Use the uploadDocument function from useDocuments hook
+        await uploadDocument(fileData.file, {
+          name: fileData.name,
+          relevant_date: fileData.relevantDate || null,
+          expiration_date: fileData.expirationDate || null,
+        });
+
+        console.log('[ORG-DOCS-UI] Upload successful', { fileName: fileData.name });
+        toast.success(`${fileData.name} הועלה בהצלחה`, { id: toastId });
+        successCount++;
+      } catch (error) {
+        console.error('[ORG-DOCS-UI] Upload failed', { fileName: fileData.name, error });
+        toast.error(`${fileData.name}: ${error.message}`, { id: toastId });
+        failCount++;
+      }
+    }
+
+    setUploadState(REQUEST_STATE.idle);
+
+    // Refresh documents list after all uploads
+    await fetchDocuments();
+
+    // Summary toast for bulk uploads
+    if (filesData.length > 1) {
+      if (failCount === 0) {
+        toast.success(`כל ${successCount} הקבצים הועלו בהצלחה`);
+      } else if (successCount === 0) {
+        toast.error(`כל ${failCount} הקבצים נכשלו`);
+      } else {
+        toast.info(`הועלו ${successCount} קבצים, ${failCount} נכשלו`);
+      }
     }
   }, [session, orgId, uploadDocument, fetchDocuments]);
+
+  // Handle upload cancel
+  const handleUploadCancel = useCallback(() => {
+    setPendingFiles([]);
+  }, []);
 
   // Handle metadata update
   const handleUpdateMetadata = useCallback(async (updateData) => {
@@ -708,6 +939,7 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
                 onChange={handleFileSelect}
                 accept={ALLOWED_TYPES.join(',')}
                 disabled={uploadState === REQUEST_STATE.loading}
+                multiple
               />
               <Button
                 onClick={() => document.getElementById('org-doc-upload')?.click()}
@@ -795,14 +1027,12 @@ export default function OrgDocumentsManager({ session, orgId, membershipRole }) 
         </CardContent>
       </Card>
 
-      {/* Pre-upload Dialog */}
-      {pendingFile && (
-        <PreUploadDialog
-          file={pendingFile}
-          onConfirm={handleUploadConfirm}
-          onCancel={() => setPendingFile(null)}
-        />
-      )}
+      {/* Pre-upload Dialog (Bulk) */}
+      <BulkPreUploadDialog
+        files={pendingFiles}
+        onConfirm={handleUploadConfirm}
+        onCancel={handleUploadCancel}
+      />
 
       {/* Edit Metadata Dialog */}
       {editingDocument && (

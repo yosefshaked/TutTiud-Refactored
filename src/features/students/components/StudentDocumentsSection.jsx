@@ -495,9 +495,6 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     }
   }, [hasMissingMandatory]);
 
-  // DEPRECATED: checkForDuplicates - was used by old single-file upload
-  // TODO: Consider adding duplicate detection to bulk upload flow
-  /*
   const checkForDuplicates = useCallback(
     async (file) => {
       if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
@@ -548,7 +545,6 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
     },
     [session, orgId]
   );
-  */
 
   // DEPRECATED: handleFileUpload - replaced by handleBulkFileUpload for efficiency
   // Kept commented out for reference during migration
@@ -1179,7 +1175,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
   );
 
   const handleFileInputChange = useCallback(
-    (event, definitionId = null) => {
+    async (event, definitionId = null) => {
       const files = Array.from(event.target.files || []);
       if (files.length === 0) return;
 
@@ -1192,6 +1188,54 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
         }
         if (!ALLOWED_TYPES.includes(file.type)) {
           toast.error(`סוג הקובץ "${file.name}" לא נתמך. קבצים מותרים: PDF, תמונות, Word, Excel`);
+          event.target.value = '';
+          return;
+        }
+      }
+
+      // Check each file for duplicates
+      const duplicateResults = await Promise.all(
+        files.map(async (file) => {
+          const result = await checkForDuplicates(file);
+          return {
+            file,
+            hasDuplicates: result.has_duplicates,
+            duplicates: result.duplicates || []
+          };
+        })
+      );
+
+      // Find files with duplicates
+      const filesWithDuplicates = duplicateResults.filter(r => r.hasDuplicates);
+
+      // If any files have duplicates, show confirmation
+      if (filesWithDuplicates.length > 0) {
+        const duplicateInfo = filesWithDuplicates.map(r => {
+          const studentNames = r.duplicates
+            .map(d => `${d.student_name} (${new Date(d.uploaded_at).toLocaleDateString('he-IL')})`)
+            .join(', ');
+          return `${r.file.name}: ${studentNames}`;
+        }).join('\n');
+
+        const confirmed = await new Promise((resolve) => {
+          toast.warning(
+            `${filesWithDuplicates.length} קבצים כבר קיימים במערכת`,
+            {
+              description: duplicateInfo,
+              action: {
+                label: 'כן, העלה בכל זאת',
+                onClick: () => resolve(true),
+              },
+              cancel: {
+                label: 'ביטול',
+                onClick: () => resolve(false),
+              },
+              duration: 15000,
+            }
+          );
+        });
+
+        if (!confirmed) {
           event.target.value = '';
           return;
         }
@@ -1210,7 +1254,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       // Reset input
       event.target.value = '';
     },
-    [MAX_FILE_SIZE, ALLOWED_TYPES]
+    [MAX_FILE_SIZE, ALLOWED_TYPES, checkForDuplicates]
   );
 
   // Handle upload confirmation from pre-upload dialog
