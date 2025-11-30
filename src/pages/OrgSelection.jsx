@@ -11,6 +11,7 @@ import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { mapSupabaseError } from '@/org/errors.js';
 import { buildInvitationSearch } from '@/lib/invite-tokens.js';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 function LoadingState() {
   return (
@@ -123,7 +124,7 @@ function CreateOrgDialog({ open, onClose, onCreate }) {
   const [error, setError] = useState('');
 
   const handleSubmit = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     if (isSubmitting) return;
     setError('');
     const trimmedName = name.trim();
@@ -146,6 +147,11 @@ function CreateOrgDialog({ open, onClose, onCreate }) {
     }
   };
 
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleSubmit,
+    isEnabled: !isSubmitting,
+  });
+
   if (!open) return null;
 
   return (
@@ -157,7 +163,7 @@ function CreateOrgDialog({ open, onClose, onCreate }) {
             ניתן להגדיר את חיבור ה-Supabase וההגדרות הנוספות לאחר הכניסה למערכת.
           </p>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyboardSubmit} className="px-6 py-5 space-y-4">
           <div className="space-y-2 text-right">
             <Label htmlFor="org-name">שם הארגון</Label>
             <Input

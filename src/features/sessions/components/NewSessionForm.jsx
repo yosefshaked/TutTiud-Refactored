@@ -11,6 +11,7 @@ import { sortStudentsBySchedule } from '@/features/students/utils/sorting.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 export default function NewSessionForm({
   students = [],
@@ -225,7 +226,7 @@ export default function NewSessionForm({
   }, [updateAnswer]);
 
   const handleSubmit = (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
 
     const form = event.currentTarget;
     if (!form.checkValidity()) {
@@ -312,12 +313,18 @@ export default function NewSessionForm({
     onFormValidityChange?.(nextIsValid);
   }, [selectedStudentId, sessionDate, answers, questions, onFormValidityChange, isFormValid]);
 
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleSubmit,
+    isEnabled: !isSubmitting && !successState,
+  });
+
   return (
     <form
       id="new-session-form"
       ref={formRef}
       className="space-y-lg"
       onSubmit={handleSubmit}
+      onKeyDown={handleKeyboardSubmit}
       dir="rtl"
     >
       {successState && (

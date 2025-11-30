@@ -5,6 +5,7 @@ import { useSupabase } from '@/context/SupabaseContext.jsx';
 import AuthLayout from '@/components/layouts/AuthLayout.jsx';
 import { buildInvitationSearch, extractRegistrationTokens } from '@/lib/invite-tokens.js';
 import { getInvitationByToken } from '@/api/invitations.js';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 export default function CompleteRegistrationPage() {
   const location = useLocation();
@@ -83,7 +84,7 @@ export default function CompleteRegistrationPage() {
   }, [tokenHash, invitationTokenValue]);
 
   const handleSubmit = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     if (inviteStatus !== 'ready') {
       return;
     }
@@ -165,6 +166,11 @@ export default function CompleteRegistrationPage() {
     }
   };
 
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleSubmit,
+    isEnabled: inviteStatus === 'ready' && !isSubmitting,
+  });
+
   const renderContent = () => {
     if (inviteStatus === 'loading') {
       return (
@@ -206,7 +212,7 @@ export default function CompleteRegistrationPage() {
     }
 
     return (
-      <form dir="rtl" className="p-8 space-y-6 text-right" onSubmit={handleSubmit}>
+      <form dir="rtl" className="p-8 space-y-6 text-right" onSubmit={handleSubmit} onKeyDown={handleKeyboardSubmit}>
         <div className="space-y-2">
           <label htmlFor="invite-email" className="block text-sm font-medium text-slate-600">
             ההזמנה נשלחה ל

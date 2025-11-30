@@ -9,6 +9,7 @@ import AuthLayout from '@/components/layouts/AuthLayout.jsx';
 import Button from '@/components/ui/CustomButton.jsx';
 import Input from '@/components/ui/CustomInput.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 const REQUEST_STATUS = Object.freeze({
   idle: 'idle',
@@ -97,7 +98,7 @@ export default function UpdatePassword() {
   const isError = requestStatus === REQUEST_STATUS.error;
 
   const handleSubmit = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
 
     if (!isVerificationReady) {
       setErrorMessage('קישור האיפוס אינו תקף עוד.');
@@ -140,6 +141,11 @@ export default function UpdatePassword() {
       setRequestStatus(REQUEST_STATUS.error);
     }
   };
+
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleSubmit,
+    isEnabled: isVerificationReady && !isLoading,
+  });
 
   return (
     <AuthLayout>
@@ -191,7 +197,7 @@ export default function UpdatePassword() {
         ) : null}
 
         {isVerificationReady ? (
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <form onSubmit={handleSubmit} onKeyDown={handleKeyboardSubmit} className="space-y-5" noValidate>
             <Input
               type="password"
               label="סיסמה חדשה"

@@ -17,6 +17,7 @@ import { authenticatedFetch } from '@/lib/api-client';
 import StudentTagsField from './StudentTagsField.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { createStudentFormState } from '@/features/students/utils/form-state.js';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 export default function AddStudentForm({ 
   onSubmit, 
@@ -115,7 +116,7 @@ export default function AddStudentForm({
   }, []);
 
   const handleSubmit = (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
 
     const newTouched = {
       name: true,
@@ -161,8 +162,19 @@ export default function AddStudentForm({
   const showDayError = touched.defaultDayOfWeek && !values.defaultDayOfWeek;
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
 
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleSubmit,
+    isEnabled: !isSubmitting,
+  });
+
   return (
-    <form id="add-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
+    <form
+      id="add-student-form"
+      onSubmit={handleSubmit}
+      onKeyDown={handleKeyboardSubmit}
+      className="space-y-5"
+      dir="rtl"
+    >
       <div className="space-y-5 divide-y divide-border">
         <div className="space-y-5 py-1">
           <TextField

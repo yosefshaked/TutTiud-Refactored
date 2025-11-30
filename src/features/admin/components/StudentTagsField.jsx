@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { SelectField, TextField } from '@/components/ui/forms-ui';
 import { Loader2, Plus } from 'lucide-react';
 import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 const NONE_VALUE = '__none__';
 
@@ -31,6 +32,11 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
     }
   }, [value, tagOptions, loadingTags]);
 
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleCreateTag,
+    isEnabled: isDialogOpen && !isSavingTag,
+  });
+
   const handleSelectChange = useCallback((nextValue) => {
     onChange(nextValue === NONE_VALUE ? '' : nextValue);
   }, [onChange]);
@@ -51,7 +57,7 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
   }, [dialogError]);
 
   const handleCreateTag = useCallback(async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     const trimmed = newTagName.trim();
     if (!trimmed) {
       setDialogError('יש להזין שם תגית.');
@@ -166,7 +172,13 @@ export default function StudentTagsField({ value, onChange, disabled = false, de
                 צרו תגית לשימוש חוזר עבור תלמידים בארגון.
               </DialogDescription>
             </DialogHeader>
-            <form id="student-tag-create-form" onSubmit={handleCreateTag} className="space-y-4" dir="rtl">
+            <form
+              id="student-tag-create-form"
+              onSubmit={handleCreateTag}
+              onKeyDown={handleKeyboardSubmit}
+              className="space-y-4"
+              dir="rtl"
+            >
               <TextField
                 id="new-student-tag-name"
                 name="newTagName"

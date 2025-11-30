@@ -10,6 +10,7 @@ import { useOrg } from '@/org/OrgContext.jsx';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { createInvitation, listPendingInvitations, revokeInvitation as revokeInvitationRequest } from '@/api/invitations.js';
 import { checkAuthByEmail } from '@/api/check-auth.js';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 function formatDate(isoString) {
   if (!isoString) return '';
@@ -111,8 +112,13 @@ export default function OrgMembersCard() {
     return pendingInvites.filter((invite) => isInvitationExpired(invite.expiresAt || invite.expires_at)).length;
   }, [pendingInvites]);
 
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleInvite,
+    isEnabled: canManageOrgMembers && !isInviting,
+  });
+
   const handleInvite = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     if (!canManageOrgMembers || !email.trim()) return;
     if (!session) {
       toast.error('נדרש חיבור לחשבון כדי לשלוח הזמנה.');
@@ -458,7 +464,7 @@ export default function OrgMembersCard() {
         {canManageOrgMembers ? (
           <section className="space-y-3">
             <h3 className="text-sm font-semibold text-slate-700">הזמן חבר חדש</h3>
-            <form className="flex flex-col md:flex-row gap-3" onSubmit={handleInvite}>
+            <form className="flex flex-col md:flex-row gap-3" onSubmit={handleInvite} onKeyDown={handleKeyboardSubmit}>
               <div className="flex-1">
                 <label htmlFor="invite-email" className="sr-only">אימייל להזמנה</label>
                 <Input

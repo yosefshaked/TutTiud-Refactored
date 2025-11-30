@@ -11,6 +11,7 @@ import {
 } from '@/auth/bootstrapSupabaseCallback.js';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import AuthLayout from '@/components/layouts/AuthLayout.jsx';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 export default function Login() {
   const { status, session, signInWithEmail, signInWithOAuth } = useAuth();
@@ -112,12 +113,8 @@ export default function Login() {
     clearStoredSupabaseOAuthError();
   }, []);
 
-  if (status === 'ready' && session) {
-    return <Navigate to={redirectPath} replace />;
-  }
-
   const handleEmailSignIn = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     setLoginError(null);
     setIsSubmitting(true);
     try {
@@ -145,6 +142,15 @@ export default function Login() {
       setOauthInFlight(null);
     }
   };
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleEmailSignIn,
+    isEnabled: !isSubmitting && oauthInFlight === null,
+  });
+
+  if (status === 'ready' && session) {
+    return <Navigate to={redirectPath} replace />;
+  }
+
   return (
     <AuthLayout cardClassName="max-w-xl ">
       <div className="bg-gradient-to-l from-blue-500 to-indigo-500 p-6 text-white">
@@ -199,7 +205,7 @@ export default function Login() {
             <span className="flex-1 h-px bg-slate-200" aria-hidden="true" />
           </div>
 
-          <form onSubmit={handleEmailSignIn} className="space-y-4">
+          <form onSubmit={handleEmailSignIn} onKeyDown={handleKeyboardSubmit} className="space-y-4">
             <label className="block text-right">
               <span className="text-sm font-medium text-slate-600">דוא"ל</span>
               <div className="relative mt-1">

@@ -7,6 +7,7 @@ import AuthLayout from '@/components/layouts/AuthLayout.jsx';
 import Button from '@/components/ui/CustomButton.jsx';
 import Input from '@/components/ui/CustomInput.jsx';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert.jsx';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 const REQUEST_STATUS = Object.freeze({
   idle: 'idle',
@@ -25,8 +26,13 @@ export default function ForgotPassword() {
   const isSuccess = status === REQUEST_STATUS.success;
   const isError = status === REQUEST_STATUS.error;
 
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleSubmit,
+    isEnabled: !isLoading && !isSuccess,
+  });
+
   const handleSubmit = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     const trimmedEmail = email.trim();
 
     if (!trimmedEmail) {
@@ -76,7 +82,7 @@ export default function ForgotPassword() {
             </Alert>
           ) : null}
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <form onSubmit={handleSubmit} onKeyDown={handleKeyboardSubmit} className="space-y-5" noValidate>
             <Input
               type="email"
               label={'דוא"ל ארגוני'}

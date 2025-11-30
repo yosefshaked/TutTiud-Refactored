@@ -26,6 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useKeyboardSubmit } from '@/hooks/useKeyboardSubmit.js';
 
 export default function TagsManager() {
   const { session } = useAuth();
@@ -110,8 +111,8 @@ export default function TagsManager() {
     }
   }, [isDialogOpen]);
 
-  const handleSaveTag = async (e) => {
-    e.preventDefault();
+  const handleSaveTag = async (event) => {
+    event?.preventDefault?.();
     const trimmedName = tagName.trim();
     if (!trimmedName) {
       setActionError(mode === 'tags' ? 'יש להזין שם תגית.' : 'יש להזין שם סוג.');
@@ -185,6 +186,11 @@ export default function TagsManager() {
       setActionLoading(false);
     }
   };
+
+  const handleKeyboardSubmit = useKeyboardSubmit({
+    onSave: handleSaveTag,
+    isEnabled: isDialogOpen && !actionLoading,
+  });
 
   const openDeleteDialog = (tag) => {
     setTagToDelete(tag);
@@ -384,7 +390,7 @@ export default function TagsManager() {
                 : `צור ${entityLabel} חדש${mode === 'tags' ? 'ה' : ''} לסיווג ${entityContext}.`}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSaveTag} className="space-y-4" dir="rtl">
+          <form onSubmit={handleSaveTag} onKeyDown={handleKeyboardSubmit} className="space-y-4" dir="rtl">
             <div className="space-y-2">
               <Label htmlFor="tag-name" className="text-right block">
                 שם {entityLabel}
@@ -399,12 +405,6 @@ export default function TagsManager() {
                 disabled={actionLoading}
                 dir="rtl"
                 className="text-right"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSaveTag(e);
-                  }
-                }}
               />
               <p className="text-xs text-muted-foreground text-right">השם יוצג בתפריטים ושדות בחירת {entityLabelPlural}.</p>
             </div>

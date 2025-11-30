@@ -3,6 +3,7 @@
 ## Code Style
 - Use 2 spaces for indentation.
 - Prefer ES module syntax.
+- Forms should wire `useKeyboardSubmit` (`src/hooks/useKeyboardSubmit.js`) so plain Enter is blocked with the Hebrew tip toast and only Ctrl/Cmd + Enter triggers the save handler; keep Tab navigation untouched.
 
 ## Azure Logging and Diagnostics
 - **Finding Azure Function logs**: Navigate to Azure Portal → Application Insights → Investigate → Search.
