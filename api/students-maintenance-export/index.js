@@ -1,4 +1,5 @@
 /* eslint-env node */
+import Papa from 'papaparse';
 import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
@@ -43,31 +44,6 @@ const HEBREW_HEADERS = {
   'tags': 'תגיות',
   'is_active': 'פעיל',
 };
-
-function toCsvValue(value) {
-  const normalized = value === null || value === undefined ? '' : String(value);
-  if (/["\n,\r]/.test(normalized)) {
-    return `"${normalized.replace(/"/g, '""')}"`;
-  }
-  return normalized;
-}
-
-function buildCsv(rows) {
-  const lines = [];
-  
-  // Add header row
-  const header = EXPORT_COLUMNS.map(col => toCsvValue(HEBREW_HEADERS[col] || col)).join(',');
-  lines.push(header);
-  
-  // Add data rows
-  for (const row of rows) {
-    const line = EXPORT_COLUMNS.map((column) => toCsvValue(row[column] ?? '')).join(',');
-    lines.push(line);
-  }
-  
-  // Join with actual line breaks (not escape sequences)
-  return lines.join('\r\n');
-}
 
 export default async function handler(context, req) {
   const env = readEnv(context);
@@ -165,11 +141,23 @@ export default async function handler(context, req) {
       })
     : [];
 
-  const csvContent = buildCsv(rows);
+  // Use papaparse to generate CSV with proper escaping and encoding
+  const csvContent = Papa.unparse(rows, {
+    columns: EXPORT_COLUMNS,
+    header: true,
+    newline: '\r\n', // Windows line endings for Excel
+    quotes: true, // Quote fields that need it
+  });
+  
+  // Replace English headers with Hebrew
+  const lines = csvContent.split('\r\n');
+  const hebrewHeader = EXPORT_COLUMNS.map(col => HEBREW_HEADERS[col] || col).join(',');
+  lines[0] = hebrewHeader;
+  const csvWithHebrewHeaders = lines.join('\r\n');
   
   // Add UTF-8 BOM for proper Excel encoding of Hebrew characters
   const utf8Bom = '\uFEFF';
-  const csvWithBom = utf8Bom + csvContent;
+  const csvWithBom = utf8Bom + csvWithHebrewHeaders;
   
   // Convert to Buffer to ensure proper UTF-8 encoding
   const buffer = Buffer.from(csvWithBom, 'utf8');
