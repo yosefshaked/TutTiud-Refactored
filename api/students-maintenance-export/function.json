@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["get"],
-      "route": "students/maintenance-export"
+      "route": "students-maintenance-export"
     },
     {
       "type": "http",

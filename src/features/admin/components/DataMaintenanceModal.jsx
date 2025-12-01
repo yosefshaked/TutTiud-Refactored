@@ -44,7 +44,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
     if (!orgId) return;
     setIsDownloading(true);
     try {
-      const blob = await authenticatedFetchBlob(`students/maintenance-export?org_id=${orgId}`);
+      const blob = await authenticatedFetchBlob(`students-maintenance-export?org_id=${orgId}`);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -77,7 +77,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
 
     try {
       const csvText = await selectedFile.text();
-      const payload = await authenticatedFetch('students/maintenance-import', {
+      const payload = await authenticatedFetch('students-maintenance-import', {
         method: 'POST',
         body: {
           org_id: orgId,

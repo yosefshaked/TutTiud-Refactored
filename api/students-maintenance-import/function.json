@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["post"],
-      "route": "students/maintenance-import"
+      "route": "students-maintenance-import"
     },
     {
       "type": "http",
