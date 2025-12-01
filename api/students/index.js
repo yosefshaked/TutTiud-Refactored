@@ -521,6 +521,14 @@ export default async function (context, req) {
     return respond(context, 400, { message: 'invalid student id' });
   }
 
+  context.log?.info?.('[DEBUG] PUT /api/students received', {
+    studentId,
+    bodyKeys: Object.keys(body || {}),
+    nationalId: body?.national_id,
+    nationalIdCamel: body?.nationalId,
+    rawBody: JSON.stringify(body).substring(0, 200),
+  });
+
   const normalizedUpdates = buildStudentUpdates(body);
   if (normalizedUpdates.error) {
     const updateMessage =

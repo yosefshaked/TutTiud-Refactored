@@ -164,7 +164,7 @@ export default function EditStudentForm({
     onSubmit({
       id: student?.id,
       name: trimmedName,
-      national_id: trimmedNationalId,
+      nationalId: trimmedNationalId,
       contactName: trimmedContactName,
       contactPhone: trimmedContactPhone,
       assignedInstructorId: values.assignedInstructorId,
