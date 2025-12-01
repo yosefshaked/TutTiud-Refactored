@@ -101,6 +101,13 @@ export default async function handler(context, req) {
     return respond(context, 500, { message: 'failed_to_fetch_students' });
   }
 
+  context.log?.info?.('Fetched students', {
+    orgId,
+    count: students?.length,
+    isArray: Array.isArray(students),
+    firstStudent: students?.[0] ? Object.keys(students[0]) : null,
+  });
+
   const { data: instructors, error: instructorsError } = await tenantClient
     .from('Instructors')
     .select('id, name, email');
@@ -141,6 +148,11 @@ export default async function handler(context, req) {
       })
     : [];
 
+  context.log?.info?.('Processed rows', {
+    rowsCount: rows.length,
+    firstRow: rows[0],
+  });
+
   // Map to Hebrew headers BEFORE unparsing to ensure consistency
   const hebrewRows = rows.map(row => {
     const newRow = {};
@@ -152,12 +164,23 @@ export default async function handler(context, req) {
     return newRow;
   });
 
+  context.log?.info?.('Mapped to Hebrew headers', {
+    hebrewRowsCount: hebrewRows.length,
+    firstHebrewRow: hebrewRows[0],
+    firstHebrewRowKeys: hebrewRows[0] ? Object.keys(hebrewRows[0]) : null,
+  });
+
   // Use papaparse to generate CSV
   // quotes: true forces quoting all fields, which helps Excel parse correctly
   const csvContent = Papa.unparse(hebrewRows, {
     header: true,
     newline: '\r\n', // Windows line endings for Excel
     quotes: true,
+  });
+
+  context.log?.info?.('Generated CSV content', {
+    csvLength: csvContent.length,
+    firstChars: csvContent.substring(0, 200),
   });
   
   // Add UTF-8 BOM for proper Excel encoding of Hebrew characters
