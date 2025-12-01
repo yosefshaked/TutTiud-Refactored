@@ -44,7 +44,9 @@ export default function EditStudentForm({
   const currentStudentIdRef = useRef(student?.id);
   const excludeStudentId = student?.id; // Use stable reference for hook dependency
 
-  const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
+  const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name, {
+    excludeStudentId,
+  });
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId, {
     excludeStudentId,
   });

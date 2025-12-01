@@ -16,7 +16,7 @@ function buildQueryParams(orgId, params) {
   return searchParams;
 }
 
-export function useStudentNameSuggestions(nameInput) {
+export function useStudentNameSuggestions(nameInput, { excludeStudentId } = {}) {
   const { session } = useAuth();
   const { activeOrgId } = useOrg();
   const [suggestions, setSuggestions] = useState([]);
@@ -43,7 +43,14 @@ export function useStudentNameSuggestions(nameInput) {
       try {
         const searchParams = buildQueryParams(activeOrgId, { query: trimmed });
         const results = await authenticatedFetch(`students-search?${searchParams.toString()}`, { session });
-        setSuggestions(Array.isArray(results) ? results : []);
+        const allResults = Array.isArray(results) ? results : [];
+        
+        // Filter out the current student being edited
+        const filtered = excludeStudentId 
+          ? allResults.filter(student => student.id !== excludeStudentId)
+          : allResults;
+        
+        setSuggestions(filtered);
       } catch (err) {
         setSuggestions([]);
         setError(err?.message || 'חיפוש התלמידים נכשל.');
@@ -57,7 +64,7 @@ export function useStudentNameSuggestions(nameInput) {
         window.clearTimeout(debounceRef.current);
       }
     };
-  }, [nameInput, session, activeOrgId]);
+  }, [nameInput, session, activeOrgId, excludeStudentId]);
 
   return { suggestions, loading, error };
 }
