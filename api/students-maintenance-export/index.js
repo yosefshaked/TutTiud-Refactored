@@ -53,11 +53,20 @@ function toCsvValue(value) {
 }
 
 function buildCsv(rows) {
+  const lines = [];
+  
+  // Add header row
   const header = EXPORT_COLUMNS.map(col => toCsvValue(HEBREW_HEADERS[col] || col)).join(',');
-  const body = rows
-    .map((row) => EXPORT_COLUMNS.map((column) => toCsvValue(row[column] ?? '')).join(','))
-    .join('\r\n'); // Use Windows line endings for Excel compatibility
-  return `${header}\r\n${body}`;
+  lines.push(header);
+  
+  // Add data rows
+  for (const row of rows) {
+    const line = EXPORT_COLUMNS.map((column) => toCsvValue(row[column] ?? '')).join(',');
+    lines.push(line);
+  }
+  
+  // Join with actual line breaks (not escape sequences)
+  return lines.join('\r\n');
 }
 
 export default async function handler(context, req) {
@@ -165,7 +174,7 @@ export default async function handler(context, req) {
   // Convert to Buffer to ensure proper UTF-8 encoding
   const buffer = Buffer.from(csvWithBom, 'utf8');
 
-  context.res = {
+  const response = {
     status: 200,
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
@@ -174,4 +183,7 @@ export default async function handler(context, req) {
     body: buffer,
     isRaw: true,
   };
+  
+  context.res = response;
+  return response;
 }
