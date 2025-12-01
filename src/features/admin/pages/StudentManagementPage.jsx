@@ -140,11 +140,17 @@ export default function StudentManagementPage() {
   }, [canFetch, activeOrgId, session]);
 
   const refreshRoster = useCallback(async (includeInstructors = false) => {
-    await Promise.all([
+    const promises = [
       fetchStudents(),
-      fetchComplianceSummary(),
-      includeInstructors ? fetchInstructors() : Promise.resolve(),
-    ]);
+      // Compliance summary is optional - don't let it block the main data load
+      fetchComplianceSummary().catch(() => {}),
+    ];
+    
+    if (includeInstructors) {
+      promises.push(fetchInstructors());
+    }
+    
+    await Promise.all(promises);
   }, [fetchStudents, fetchComplianceSummary, fetchInstructors]);
 
   const handleMaintenanceCompleted = useCallback(async () => {

@@ -93,26 +93,44 @@ export default async function (context, req) {
   try {
     // Query Documents table for all expired documents
     // This is a single optimized query instead of N queries
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    context.log?.('students-compliance-summary query details', {
+      orgId,
+      todayString,
+      studentIdsFilter: studentIdsFilter || 'all students',
+      filterCount: studentIdsFilter?.length || 0,
+    });
+    
     let query = tenantClient
       .from('Documents')
       .select('entity_id, expiration_date, resolved')
       .eq('entity_type', 'student')
       .not('expiration_date', 'is', null)
-      .lt('expiration_date', new Date().toISOString().split('T')[0]); // Today's date in YYYY-MM-DD
+      .lt('expiration_date', todayString);
 
     // Apply student_ids filter if provided
     if (studentIdsFilter && studentIdsFilter.length > 0) {
       query = query.in('entity_id', studentIdsFilter);
     }
 
-    const { data: documents, error: documentsError } = await query;
+    const { data: documents, error: documentsError} = await query;
 
     if (documentsError) {
       context.log?.error?.('students-compliance-summary failed to fetch documents', {
         message: documentsError.message,
+        code: documentsError.code,
+        details: documentsError.details,
+        hint: documentsError.hint,
         orgId,
       });
-      return respond(context, 500, { message: 'failed_to_fetch_documents' });
+      return respond(context, 500, { 
+        message: 'failed_to_fetch_documents',
+        error: documentsError.message,
+        code: documentsError.code
+      });
     }
 
     // Build summary map: student_id -> { expiredDocuments: count }
