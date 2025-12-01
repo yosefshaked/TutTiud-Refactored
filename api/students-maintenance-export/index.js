@@ -141,23 +141,28 @@ export default async function handler(context, req) {
       })
     : [];
 
-  // Use papaparse to generate CSV with proper escaping and encoding
-  const csvContent = Papa.unparse(rows, {
-    columns: EXPORT_COLUMNS,
+  // Map to Hebrew headers BEFORE unparsing to ensure consistency
+  const hebrewRows = rows.map(row => {
+    const newRow = {};
+    EXPORT_COLUMNS.forEach(col => {
+      // Use mapped Hebrew header or fallback to English key
+      const header = HEBREW_HEADERS[col] || col;
+      newRow[header] = row[col];
+    });
+    return newRow;
+  });
+
+  // Use papaparse to generate CSV
+  // quotes: true forces quoting all fields, which helps Excel parse correctly
+  const csvContent = Papa.unparse(hebrewRows, {
     header: true,
     newline: '\r\n', // Windows line endings for Excel
-    quotes: true, // Quote fields that need it
+    quotes: true,
   });
-  
-  // Replace English headers with Hebrew
-  const lines = csvContent.split('\r\n');
-  const hebrewHeader = EXPORT_COLUMNS.map(col => HEBREW_HEADERS[col] || col).join(',');
-  lines[0] = hebrewHeader;
-  const csvWithHebrewHeaders = lines.join('\r\n');
   
   // Add UTF-8 BOM for proper Excel encoding of Hebrew characters
   const utf8Bom = '\uFEFF';
-  const csvWithBom = utf8Bom + csvWithHebrewHeaders;
+  const csvWithBom = utf8Bom + csvContent;
   
   // Convert to Buffer to ensure proper UTF-8 encoding
   const buffer = Buffer.from(csvWithBom, 'utf8');
