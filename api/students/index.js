@@ -13,32 +13,16 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
-
-const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?(?:Z|[+-](?:0\d|1\d|2[0-3]):[0-5]\d)?$/;
-const ISRAELI_PHONE_PATTERN = /^(?:0(?:5[0-9]|[2-4|8-9][0-9])-?\d{7}|(?:\+?972-?)?5[0-9]-?\d{7})$/;
-const NATIONAL_ID_PATTERN = /^\d{5,12}$/;
-
-function validateIsraeliPhone(value) {
-  if (value === null || value === undefined) {
-    return { value: null, valid: true };
-  }
-  
-  if (typeof value !== 'string') {
-    return { value: null, valid: false };
-  }
-  
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { value: null, valid: true };
-  }
-  
-  const normalized = trimmed.replace(/[\s-]/g, '');
-  if (ISRAELI_PHONE_PATTERN.test(normalized)) {
-    return { value: trimmed, valid: true };
-  }
-  
-  return { value: null, valid: false };
-}
+import {
+  coerceBooleanFlag,
+  coerceDayOfWeek,
+  coerceNationalId,
+  coerceOptionalText,
+  coerceSessionTime,
+  coerceTags,
+  validateAssignedInstructor,
+  validateIsraeliPhone,
+} from '../_shared/student-validation.js';
 
 function extractStudentId(context, req, body) {
   const candidate =
@@ -50,86 +34,6 @@ function extractStudentId(context, req, body) {
     return candidate;
   }
   return '';
-}
-
-function validateAssignedInstructor(candidate) {
-  if (candidate === null) {
-    return { value: null, valid: true };
-  }
-  if (typeof candidate === 'string') {
-    const trimmed = candidate.trim();
-    if (!trimmed) {
-      return { value: null, valid: true };
-    }
-    if (UUID_PATTERN.test(trimmed)) {
-      return { value: trimmed, valid: true };
-    }
-  }
-  return { value: null, valid: false };
-}
-
-function coerceOptionalText(value) {
-  if (value === null || value === undefined) {
-    return { value: null, valid: true };
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return { value: trimmed || null, valid: true };
-  }
-  return { value: null, valid: false };
-}
-
-function coerceNationalId(raw) {
-  if (raw === null || raw === undefined) {
-    return { value: null, valid: true, provided: false };
-  }
-
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (!trimmed) {
-      return { value: null, valid: true, provided: true };
-    }
-    if (NATIONAL_ID_PATTERN.test(trimmed)) {
-      return { value: trimmed, valid: true, provided: true };
-    }
-  }
-
-  return { value: null, valid: false, provided: true };
-}
-
-function coerceDayOfWeek(value) {
-  if (value === null || value === undefined || value === '') {
-    return { value: null, valid: true };
-  }
-
-  const numeric = typeof value === 'number' ? value : Number.parseInt(String(value).trim(), 10);
-
-  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 7) {
-    return { value: numeric, valid: true };
-  }
-
-  return { value: null, valid: false };
-}
-
-function coerceSessionTime(value) {
-  if (value === null || value === undefined || value === '') {
-    return { value: null, valid: true };
-  }
-
-  if (typeof value !== 'string') {
-    return { value: null, valid: false };
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { value: null, valid: true };
-  }
-
-  if (TIME_PATTERN.test(trimmed)) {
-    return { value: trimmed, valid: true };
-  }
-
-  return { value: null, valid: false };
 }
 
 async function findStudentByNationalId(tenantClient, nationalId, { excludeId } = {}) {
@@ -145,68 +49,6 @@ async function findStudentByNationalId(tenantClient, nationalId, { excludeId } =
 
   const { data, error } = await query.maybeSingle();
   return { data, error };
-}
-
-function coerceTags(value) {
-  if (value === null || value === undefined) {
-    return { value: null, valid: true };
-  }
-
-  if (Array.isArray(value)) {
-    const normalized = value
-      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-      .filter(Boolean);
-    return { value: normalized.length ? normalized : null, valid: true };
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-    return { value: normalized.length ? normalized : null, valid: true };
-  }
-
-  return { value: null, valid: false };
-}
-
-function coerceBooleanFlag(raw, { defaultValue = null, allowUndefined = true } = {}) {
-  if (raw === undefined) {
-    return { value: defaultValue, valid: allowUndefined, provided: false };
-  }
-
-  if (raw === null) {
-    return { value: defaultValue, valid: false, provided: true };
-  }
-
-  if (typeof raw === 'boolean') {
-    return { value: raw, valid: true, provided: true };
-  }
-
-  if (typeof raw === 'string') {
-    const normalized = raw.trim().toLowerCase();
-    if (!normalized) {
-      return { value: defaultValue, valid: false, provided: true };
-    }
-    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on') {
-      return { value: true, valid: true, provided: true };
-    }
-    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'n' || normalized === 'off') {
-      return { value: false, valid: true, provided: true };
-    }
-    return { value: defaultValue, valid: false, provided: true };
-  }
-
-  if (typeof raw === 'number') {
-    if (raw === 1) {
-      return { value: true, valid: true, provided: true };
-    }
-    if (raw === 0) {
-      return { value: false, valid: true, provided: true };
-    }
-  }
-
-  return { value: defaultValue, valid: false, provided: true };
 }
 
 function buildStudentPayload(body) {
@@ -787,14 +629,3 @@ export default async function (context, req) {
 
   return respond(context, 200, data);
 }
-
-export {
-  coerceBooleanFlag,
-  coerceDayOfWeek,
-  coerceNationalId,
-  coerceOptionalText,
-  coerceSessionTime,
-  coerceTags,
-  validateAssignedInstructor,
-  validateIsraeliPhone,
-};

@@ -21,7 +21,7 @@ import {
   coerceTags,
   validateAssignedInstructor,
   validateIsraeliPhone,
-} from '../students/index.js';
+} from '../_shared/student-validation.js';
 import { parseCsv } from '../_shared/csv.js';
 
 const ID_COLUMN_CANDIDATES = ['system_uuid', 'student_id', 'id'];
