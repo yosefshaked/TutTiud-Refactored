@@ -225,7 +225,7 @@ export default function AddStudentForm({
           <TextField
             id="national-id"
             name="nationalId"
-            label="מספר זהות *"
+            label="מספר זהות"
             value={values.nationalId}
             onChange={handleChange}
             onBlur={handleBlur}

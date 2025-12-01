@@ -42,10 +42,11 @@ export default function EditStudentForm({
   
   // Track the ID of the student currently being edited
   const currentStudentIdRef = useRef(student?.id);
+  const excludeStudentId = student?.id; // Use stable reference for hook dependency
 
   const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId, {
-    excludeStudentId: student?.id,
+    excludeStudentId,
   });
 
   const preventSubmitReason = useMemo(() => {
@@ -231,7 +232,7 @@ export default function EditStudentForm({
           <TextField
             id="national-id"
             name="nationalId"
-            label="מספר זהות *"
+            label="מספר זהות"
             value={values.nationalId}
             onChange={handleChange}
             onBlur={handleBlur}

@@ -102,8 +102,14 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
         lastCheckedRef.current = trimmed;
 
         if (payload?.exists && payload.student) {
-          setDuplicate(payload.student);
-          lastDuplicateIdRef.current = payload.student.id || trimmed;
+          // Extra safety check: ensure the duplicate is not the student being excluded
+          if (excludeStudentId && payload.student.id === excludeStudentId) {
+            setDuplicate(null);
+            lastDuplicateIdRef.current = '';
+          } else {
+            setDuplicate(payload.student);
+            lastDuplicateIdRef.current = payload.student.id || trimmed;
+          }
         } else {
           setDuplicate(null);
           lastDuplicateIdRef.current = '';
