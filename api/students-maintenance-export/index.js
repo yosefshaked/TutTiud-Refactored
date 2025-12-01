@@ -28,16 +28,32 @@ const EXPORT_COLUMNS = [
   'is_active',
 ];
 
+const HEBREW_HEADERS = {
+  'system_uuid': 'מזהה מערכת (UUID)',
+  'name': 'שם התלמיד',
+  'national_id': 'מספר זהות',
+  'contact_name': 'שם איש קשר',
+  'contact_phone': 'טלפון',
+  'assigned_instructor_id': 'מזהה מדריך',
+  'assigned_instructor_name': 'שם מדריך',
+  'default_service': 'שירות ברירת מחדל',
+  'default_day_of_week': 'יום ברירת מחדל',
+  'default_session_time': 'שעת מפגש ברירת מחדל',
+  'notes': 'הערות',
+  'tags': 'תגיות',
+  'is_active': 'פעיל',
+};
+
 function toCsvValue(value) {
   const normalized = value === null || value === undefined ? '' : String(value);
-  if (/["\n,]/.test(normalized)) {
+  if (/["\n,\r]/.test(normalized)) {
     return `"${normalized.replace(/"/g, '""')}"`;
   }
   return normalized;
 }
 
 function buildCsv(rows) {
-  const header = EXPORT_COLUMNS.join(',');
+  const header = EXPORT_COLUMNS.map(col => toCsvValue(HEBREW_HEADERS[col] || col)).join(',');
   const body = rows
     .map((row) => EXPORT_COLUMNS.map((column) => toCsvValue(row[column] ?? '')).join(','))
     .join('\r\n'); // Use Windows line endings for Excel compatibility
@@ -145,6 +161,9 @@ export default async function handler(context, req) {
   // Add UTF-8 BOM for proper Excel encoding of Hebrew characters
   const utf8Bom = '\uFEFF';
   const csvWithBom = utf8Bom + csvContent;
+  
+  // Convert to Buffer to ensure proper UTF-8 encoding
+  const buffer = Buffer.from(csvWithBom, 'utf8');
 
   context.res = {
     status: 200,
@@ -152,6 +171,7 @@ export default async function handler(context, req) {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': 'attachment; filename="student-data-maintenance.csv"',
     },
-    body: csvWithBom,
+    body: buffer,
+    isRaw: true,
   };
 }
