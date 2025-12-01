@@ -116,6 +116,11 @@ function buildStudentPayload(body) {
   if (!nationalIdResult.valid) {
     return { error: 'invalid_national_id' };
   }
+  
+  // National ID is required
+  if (!nationalIdResult.value) {
+    return { error: 'missing_national_id' };
+  }
 
   return {
     payload: {
@@ -409,6 +414,8 @@ export default async function (context, req) {
       const message =
         normalized.error === 'missing_name'
           ? 'missing student name'
+          : normalized.error === 'missing_national_id'
+            ? 'missing national id'
           : normalized.error === 'invalid_national_id'
             ? 'invalid national id'
           : normalized.error === 'invalid_assigned_instructor'

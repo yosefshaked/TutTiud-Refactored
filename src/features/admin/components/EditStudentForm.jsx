@@ -152,7 +152,7 @@ export default function EditStudentForm({
       return;
     }
 
-    if (!trimmedName || !trimmedContactName || !trimmedContactPhone || 
+    if (!trimmedName || !trimmedNationalId || !trimmedContactName || !trimmedContactPhone || 
         !values.assignedInstructorId || !values.defaultDayOfWeek || !values.defaultSessionTime) {
       return;
     }
@@ -164,9 +164,9 @@ export default function EditStudentForm({
     onSubmit({
       id: student?.id,
       name: trimmedName,
+      national_id: trimmedNationalId,
       contactName: trimmedContactName,
       contactPhone: trimmedContactPhone,
-      nationalId: trimmedNationalId || null,
       assignedInstructorId: values.assignedInstructorId,
       defaultService: values.defaultService || null,
       defaultDayOfWeek: values.defaultDayOfWeek,
@@ -178,7 +178,7 @@ export default function EditStudentForm({
   };
 
   const showNameError = touched.name && !values.name.trim();
-  const showNationalIdError = touched.nationalId && Boolean(values.nationalId.trim() && (duplicate || nationalIdError));
+  const showNationalIdError = touched.nationalId && (!values.nationalId.trim() || Boolean(values.nationalId.trim() && (duplicate || nationalIdError)));
   const showContactNameError = touched.contactName && !values.contactName.trim();
   const showContactPhoneError = touched.contactPhone && (!values.contactPhone.trim() || !validateIsraeliPhone(values.contactPhone));
   const showInstructorError = touched.assignedInstructorId && !values.assignedInstructorId;
@@ -231,12 +231,13 @@ export default function EditStudentForm({
           <TextField
             id="national-id"
             name="nationalId"
-            label="מספר זהות (לא חובה)"
+            label="מספר זהות *"
             value={values.nationalId}
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder="הקלד מספר זהות למניעת כפילויות"
             disabled={isSubmitting}
+            required
             error={showNationalIdError ? 'מספר זהות זה כבר קיים במערכת.' : ''}
             description={checkingNationalId ? 'בודק כפילויות...' : duplicate ? `התלמיד קיים: ${duplicate.name}` : ''}
           />
