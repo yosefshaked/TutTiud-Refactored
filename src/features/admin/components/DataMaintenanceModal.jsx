@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { authenticatedFetch, authenticatedFetchText } from '@/lib/api-client.js';
+import { authenticatedFetch, authenticatedFetchBlob } from '@/lib/api-client.js';
 
 function buildErrorLabel(entry) {
   const lineLabel = entry.line_number ? `שורה ${entry.line_number}: ` : '';
@@ -44,8 +44,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
     if (!orgId) return;
     setIsDownloading(true);
     try {
-      const csvContent = await authenticatedFetchText(`students/maintenance-export?org_id=${orgId}`);
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blob = await authenticatedFetchBlob(`students/maintenance-export?org_id=${orgId}`);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

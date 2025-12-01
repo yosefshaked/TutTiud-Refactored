@@ -75,6 +75,39 @@ export async function authenticatedFetch(path, { session: _session, accessToken:
   return payload;
 }
 
+export async function authenticatedFetchBlob(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
+  void _session; void _accessToken;
+  const token = await resolveBearerToken();
+  const bearer = `Bearer ${token}`;
+
+  const { headers: customHeaders = {}, ...rest } = options;
+  const headers = createAuthorizationHeaders(customHeaders, bearer, { includeJsonContentType: false });
+
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  const response = await fetch(`/api/${normalizedPath}`, {
+    ...rest,
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = 'An API error occurred';
+    try {
+      const text = await response.text();
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+        message = parsed.message;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return response.blob();
+}
+
 export async function authenticatedFetchText(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
   void _session; void _accessToken;
   const token = await resolveBearerToken();
