@@ -423,6 +423,12 @@ function generatePdfHtml(student, sessions, formConfig, logoUrl, customLogoUrl) 
         <div class="info-label">שם התלמיד</div>
         <div class="info-value">${escapeHtml(student.name)}</div>
       </div>
+      ${student.national_id ? `
+        <div class="info-item">
+          <div class="info-label">מספר זהות</div>
+          <div class="info-value">${escapeHtml(student.national_id)}</div>
+        </div>
+      ` : ''}
       ${student.default_service ? `
         <div class="info-item">
           <div class="info-label">שירות ברירת מחדל</div>
