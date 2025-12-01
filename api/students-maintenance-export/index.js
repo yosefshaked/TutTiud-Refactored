@@ -50,12 +50,12 @@ export default async function handler(context, req) {
   const supabaseAdminConfig = readSupabaseAdminConfig(env);
   const supabase = createSupabaseAdminClient(supabaseAdminConfig);
 
-  const token = resolveBearerAuthorization(req);
-  if (!token) {
+  const authorization = resolveBearerAuthorization(req);
+  if (!authorization?.token) {
     return respond(context, 401, { message: 'missing bearer token' });
   }
 
-  const authResult = await supabase.auth.getUser(token);
+  const authResult = await supabase.auth.getUser(authorization.token);
   if (authResult.error || !authResult.data?.user?.id) {
     return respond(context, 401, { message: 'invalid or expired token' });
   }
@@ -166,6 +166,13 @@ export default async function handler(context, req) {
   
   // Convert to Buffer to ensure proper UTF-8 encoding
   const buffer = Buffer.from(csvWithBom, 'utf8');
+
+  context.log?.info?.('Generated CSV export', {
+    orgId,
+    rowCount: hebrewRows.length,
+    bufferLength: buffer.length,
+    contentType: 'text/csv; charset=utf-8',
+  });
 
   const response = {
     status: 200,
