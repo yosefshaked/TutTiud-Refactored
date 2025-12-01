@@ -40,8 +40,8 @@ function buildCsv(rows) {
   const header = EXPORT_COLUMNS.join(',');
   const body = rows
     .map((row) => EXPORT_COLUMNS.map((column) => toCsvValue(row[column] ?? '')).join(','))
-    .join('\n');
-  return `${header}\n${body}`;
+    .join('\r\n'); // Use Windows line endings for Excel compatibility
+  return `${header}\r\n${body}`;
 }
 
 export default async function handler(context, req) {
@@ -141,6 +141,10 @@ export default async function handler(context, req) {
     : [];
 
   const csvContent = buildCsv(rows);
+  
+  // Add UTF-8 BOM for proper Excel encoding of Hebrew characters
+  const utf8Bom = '\uFEFF';
+  const csvWithBom = utf8Bom + csvContent;
 
   context.res = {
     status: 200,
@@ -148,6 +152,6 @@ export default async function handler(context, req) {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': 'attachment; filename="student-data-maintenance.csv"',
     },
-    body: csvContent,
+    body: csvWithBom,
   };
 }

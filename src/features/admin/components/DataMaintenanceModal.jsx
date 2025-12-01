@@ -107,26 +107,18 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
           <DialogTitle>תחזוקת נתונים (CSV)</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm text-neutral-700">
+        <div className="space-y-4 text-sm text-neutral-700 text-right" dir="rtl">
           <p className="text-neutral-600">
             הורידו את קובץ התחזוקה כדי למלא שדות חסרים (תעודת זהות, טלפון, מדריך, תוויות ועוד) ואז העלו את הקובץ המעודכן.
             מזהה המערכת (UUID) משמש להשוואת השורות, ולכן אין למחוק או לערוך אותו.
           </p>
 
-          <div className="grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <p className="font-semibold text-neutral-900">1. הורדת CSV</p>
-              <p className="text-neutral-600">כולל כל התלמידים והעמודות הניתנות לעריכה.</p>
-              <Button type="button" onClick={handleDownload} disabled={isDownloading} className="gap-2">
-                <Download className="h-4 w-4" />
-                {isDownloading ? 'מוריד...' : 'הורד קובץ תחזוקה'}
-              </Button>
-            </div>
-            <div className="space-y-2">
+          <div className="grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 sm:grid-cols-2 sm:grid-flow-col sm:auto-cols-fr">
+            <div className="space-y-2 sm:order-2">
               <p className="font-semibold text-neutral-900">2. העלאת CSV מעודכן</p>
               <form className="space-y-2" onSubmit={handleImport}>
                 <div className="space-y-1">
-                  <Label htmlFor="maintenance-upload">בחרו קובץ CSV</Label>
+                  <Label htmlFor="maintenance-upload" className="block text-right">בחרו קובץ CSV</Label>
                   <Input
                     id="maintenance-upload"
                     type="file"
@@ -146,6 +138,14 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
                   {isImporting ? 'מייבא...' : 'ייבוא עדכונים'}
                 </Button>
               </form>
+            </div>
+            <div className="space-y-2 sm:order-1">
+              <p className="font-semibold text-neutral-900">1. הורדת CSV</p>
+              <p className="text-neutral-600">כולל כל התלמידים והעמודות הניתנות לעריכה.</p>
+              <Button type="button" onClick={handleDownload} disabled={isDownloading} className="gap-2">
+                <Download className="h-4 w-4" />
+                {isDownloading ? 'מוריד...' : 'הורד קובץ תחזוקה'}
+              </Button>
             </div>
           </div>
 
