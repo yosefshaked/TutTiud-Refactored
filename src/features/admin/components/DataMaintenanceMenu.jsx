@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, FileText, AlertTriangle, Filter, Upload } from 'lucide-react';
+import { Download, FileText, AlertTriangle, Filter, Upload, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button.jsx';
 import {
   DropdownMenu,
@@ -13,10 +13,12 @@ import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetchBlob } from '@/lib/api-client.js';
 import { toast } from 'sonner';
 import { FilteredExportDialog } from './FilteredExportDialog';
+import { DataMaintenanceHelpDialog } from './DataMaintenanceHelpDialog';
 
 export function DataMaintenanceMenu({ onImportClick, instructors = [], tags = [] }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [showFilteredDialog, setShowFilteredDialog] = useState(false);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
   const { activeOrgId } = useOrg();
 
   const handleExportAll = async () => {
@@ -71,6 +73,10 @@ export function DataMaintenanceMenu({ onImportClick, instructors = [], tags = []
         instructors={instructors}
         tags={tags}
       />
+      <DataMaintenanceHelpDialog
+        open={showHelpDialog}
+        onClose={() => setShowHelpDialog(false)}
+      />
       <DropdownMenu dir="rtl">
       <DropdownMenuTrigger asChild>
         <Button
@@ -84,6 +90,15 @@ export function DataMaintenanceMenu({ onImportClick, instructors = [], tags = []
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuItem onClick={() => setShowHelpDialog(true)} className="gap-2 cursor-pointer bg-blue-50 hover:bg-blue-100">
+          <Info className="h-4 w-4 text-blue-600" />
+          <div className="flex flex-col items-start">
+            <span className="font-medium text-blue-900">מדריך לתחזוקת נתונים</span>
+            <span className="text-xs text-blue-700">הסבר מפורט על התכונה</span>
+          </div>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
         <DropdownMenuLabel>ייצוא נתונים</DropdownMenuLabel>
         <DropdownMenuSeparator />
         

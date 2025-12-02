@@ -28,13 +28,28 @@ export function validateIsraeliPhone(value) {
   }
   
   // Handle Excel text formula format: ="0546341150"
+  // Strip the formula wrapper before validation AND storage
   if (trimmed.startsWith('="') && trimmed.endsWith('"')) {
     trimmed = trimmed.slice(2, -1);
   }
   
   const normalized = trimmed.replace(/[\s-]/g, '');
-  if (ISRAELI_PHONE_PATTERN.test(normalized)) {
-    return { value: trimmed, valid: true };
+  
+  // Auto-add leading 0 if missing (Excel often strips it)
+  // Israeli phone numbers are 9-10 digits
+  // Mobile: 05X-XXXXXXX (10 digits, starts with 05)
+  // Landline: 0[2-4,8-9]-XXXXXXX (9-10 digits, starts with 02/03/04/08/09)
+  // If we get 9 digits without leading 0, prepend it
+  let finalValue = trimmed;
+  if (/^[2-5|8-9]\d{7,8}$/.test(normalized)) {
+    finalValue = '0' + trimmed;
+  }
+  
+  // Re-normalize after potential 0 addition
+  const finalNormalized = finalValue.replace(/[\s-]/g, '');
+  if (ISRAELI_PHONE_PATTERN.test(finalNormalized)) {
+    // Return the corrected value (with leading 0, without Excel formula)
+    return { value: finalValue, valid: true };
   }
   
   return { value: null, valid: false };
