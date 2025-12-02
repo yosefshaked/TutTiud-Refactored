@@ -24,6 +24,7 @@ import {
 import { parseCsv } from '../_shared/csv.js';
 
 const ID_COLUMN_CANDIDATES = ['system_uuid', 'student_id', 'id'];
+const IGNORED_COLUMNS = ['extraction_reason', 'סיבת ייצוא']; // Columns to skip during import
 const MAX_ROWS = 2000;
 
 function normalizeTagsForCsv(raw) {

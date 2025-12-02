@@ -14,6 +14,7 @@ import {
 } from '../_shared/org-bff.js';
 
 const EXPORT_COLUMNS = [
+  'extraction_reason',
   'name',
   'national_id',
   'contact_name',
@@ -29,6 +30,7 @@ const EXPORT_COLUMNS = [
 ];
 
 const HEBREW_HEADERS = {
+  'extraction_reason': 'סיבת ייצוא',
   'system_uuid': 'מזהה מערכת (UUID)',
   'name': 'שם התלמיד',
   'national_id': 'מספר זהות',
@@ -182,6 +184,7 @@ export default async function handler(context, req) {
     
     // Find students with schedule conflicts (same instructor, day, and time)
     const studentsWithConflicts = new Set();
+    const conflictReasons = new Map(); // student_id -> reason
     for (const instructorSchedule of scheduleMap.values()) {
       for (const daySchedule of instructorSchedule.values()) {
         for (const studentIds of daySchedule.values()) {
@@ -189,33 +192,65 @@ export default async function handler(context, req) {
             // Multiple students scheduled at same time with same instructor
             for (const studentId of studentIds) {
               studentsWithConflicts.add(studentId);
+              conflictReasons.set(studentId, 'התנגשות בלוח זמנים');
             }
           }
         }
       }
     }
     
+    // Build reasons map for all problematic students
+    const problemReasons = new Map();
+    
     filteredStudents = students.filter(student => {
+      const reasons = [];
+      
       // Missing national ID
-      if (!student.national_id) return true;
+      if (!student.national_id) {
+        reasons.push('חסר תעודת זהות');
+      }
       
       // Inactive or missing instructor
-      if (!student.assigned_instructor_id || !activeInstructorIds.has(student.assigned_instructor_id)) {
-        return true;
+      if (!student.assigned_instructor_id) {
+        reasons.push('חסר מדריך');
+      } else if (!activeInstructorIds.has(student.assigned_instructor_id)) {
+        reasons.push('מדריך לא פעיל');
       }
       
       // Schedule conflict with another student
       if (studentsWithConflicts.has(student.id)) {
+        reasons.push('התנגשות בלוח זמנים');
+      }
+      
+      if (reasons.length > 0) {
+        problemReasons.set(student.id, reasons.join(', '));
         return true;
       }
       
       return false;
     });
+    
+    // Store problem reasons for later use in row mapping
+    filteredStudents.problemReasons = problemReasons;
+    
+    consolr.log?.info?.('Problem reasons map created', {
+      filter: 'problematic',
+      reasonsMapSize: problemReasons.size,
+      firstFewReasons: Array.from(problemReasons.entries()).slice(0, 3),
+    });
   } else if (filter === 'custom' && Array.isArray(students)) {
+    const filterReasons = new Map();
+    
     filteredStudents = students.filter(student => {
+      const reasons = [];
+      
       // Filter by instructor
       if (instructorIds.length > 0 && !instructorIds.includes(student.assigned_instructor_id)) {
         return false;
+      }
+      if (instructorIds.length > 0) {
+        const instructorName = instructorLookup.get(student.assigned_instructor_id) || 'מדריך לא ידוע';
+        reasons.push(`מדריך: ${instructorName}`);
       }
       
       // Filter by tags (student must have at least one matching tag)
@@ -223,20 +258,66 @@ export default async function handler(context, req) {
         const studentTags = Array.isArray(student.tags) ? student.tags : [];
         const hasMatchingTag = tagIds.some(tagId => studentTags.includes(tagId));
         if (!hasMatchingTag) return false;
+        reasons.push('תגית תואמת');
       }
       
       // Filter by day
       if (dayFilter != null && student.default_day_of_week !== dayFilter) {
         return false;
       }
+      if (dayFilter != null) {
+        const dayName = DAYS_OF_WEEK_HEBREW[dayFilter] || dayFilter;
+        reasons.push(`יום: ${dayName}`);
+      }
+      
+      if (reasons.length > 0) {
+        filterReasons.set(student.id, reasons.join(', '));
+      }
       
       return true;
     });
+    
+    // Store filter reasons for later use in row mapping
+    filteredStudents.filterReasons = filterReasons;
+    
+    console.log?.info?.('Filter reasons map created', {
+      filter: 'custom',
+      reasonsMapSize: filterReasons.size,
+      firstFewReasons: Array.from(filterReasons.entries()).slice(0, 3),
+    });
   }
+
+  context.log?.info?.('About to create rows', {
+    filter,
+    filteredStudentsLength: filteredStudents?.length,
+    hasProblemReasons: !!filteredStudents?.problemReasons,
+    hasFilterReasons: !!filteredStudents?.filterReasons,
+    problemReasonsSize: filteredStudents?.problemReasons?.size,
+    filterReasonsSize: filteredStudents?.filterReasons?.size,
+  });
 
   const rows = Array.isArray(filteredStudents)
     ? filteredStudents.map((student) => {
         const tags = Array.isArray(student?.tags) ? student.tags.filter(Boolean) : [];
+        
+        // Determine extraction reason based on filter type
+        let extractionReason = '';
+        if (filter === 'problematic' && filteredStudents.problemReasons) {
+          extractionReason = filteredStudents.problemReasons.get(student.id) || '';
+        } else if (filter === 'custom' && filteredStudents.filterReasons) {
+          extractionReason = filteredStudents.filterReasons.get(student.id) || '';
+        }
+        // For 'all' exports, leave extraction_reason empty
+        
+        // Log first student's extraction reason for debugging
+        if (student === filteredStudents[0]) {
+          console.log?.info?.('First student extraction reason', {
+            studentId: student.id,
+            studentName: student.name,
+            extractionReason,
+            filter,
+          });
+        }
         
         // Format phone number with leading zero
         // Prefix with = to force Excel to treat as text and preserve leading zero
@@ -262,6 +343,7 @@ export default async function handler(context, req) {
           : '';
         
         return {
+          extraction_reason: extractionReason,
           system_uuid: student.id || '',
           name: student.name || '',
           national_id: student.national_id || '',
