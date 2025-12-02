@@ -135,6 +135,23 @@ export default async function handler(context, req) {
     return respond(context, 500, { message: 'failed_to_fetch_instructors' });
   }
 
+  // Fetch student tags for name lookup
+  const { data: tagsSettings } = await tenantClient
+    .from('Settings')
+    .select('settings_value')
+    .eq('key', 'student_tags')
+    .maybeSingle();
+
+  const tagLookup = new Map();
+  if (tagsSettings?.settings_value) {
+    const tags = Array.isArray(tagsSettings.settings_value) ? tagsSettings.settings_value : [];
+    for (const tag of tags) {
+      if (tag?.id && tag?.name) {
+        tagLookup.set(tag.id, tag.name);
+      }
+    }
+  }
+
   const instructorLookup = new Map();
   if (Array.isArray(instructors)) {
     for (const instructor of instructors) {
@@ -156,7 +173,9 @@ export default async function handler(context, req) {
     // Build schedule conflict detection map: instructor_id -> day_of_week -> time -> [student_ids]
     const scheduleMap = new Map();
     for (const student of students) {
-      if (!student.assigned_instructor_id || 
+      // Only count active students for schedule conflicts
+      if (student.is_active === false ||
+          !student.assigned_instructor_id || 
           student.default_day_of_week == null || 
           !student.default_session_time) {
         continue;
@@ -232,12 +251,6 @@ export default async function handler(context, req) {
     
     // Store problem reasons for later use in row mapping
     filteredStudents.problemReasons = problemReasons;
-    
-    console.log?.info?.('Problem reasons map created', {
-      filter: 'problematic',
-      reasonsMapSize: problemReasons.size,
-      firstFewReasons: Array.from(problemReasons.entries()).slice(0, 3),
-    });
   } else if (filter === 'custom' && Array.isArray(students)) {
     const filterReasons = new Map();
     
@@ -256,9 +269,11 @@ export default async function handler(context, req) {
       // Filter by tags (student must have at least one matching tag)
       if (tagIds.length > 0) {
         const studentTags = Array.isArray(student.tags) ? student.tags : [];
-        const hasMatchingTag = tagIds.some(tagId => studentTags.includes(tagId));
-        if (!hasMatchingTag) return false;
-        reasons.push('תגית תואמת');
+        const matchingTags = tagIds.filter(tagId => studentTags.includes(tagId));
+        if (matchingTags.length === 0) return false;
+        
+        const tagNames = matchingTags.map(tagId => tagLookup.get(tagId) || tagId).join(', ');
+        reasons.push(`תגית: ${tagNames}`);
       }
       
       // Filter by day
@@ -279,22 +294,7 @@ export default async function handler(context, req) {
     
     // Store filter reasons for later use in row mapping
     filteredStudents.filterReasons = filterReasons;
-    
-    console.log?.info?.('Filter reasons map created', {
-      filter: 'custom',
-      reasonsMapSize: filterReasons.size,
-      firstFewReasons: Array.from(filterReasons.entries()).slice(0, 3),
-    });
   }
-
-  context.log?.info?.('About to create rows', {
-    filter,
-    filteredStudentsLength: filteredStudents?.length,
-    hasProblemReasons: !!filteredStudents?.problemReasons,
-    hasFilterReasons: !!filteredStudents?.filterReasons,
-    problemReasonsSize: filteredStudents?.problemReasons?.size,
-    filterReasonsSize: filteredStudents?.filterReasons?.size,
-  });
 
   const rows = Array.isArray(filteredStudents)
     ? filteredStudents.map((student) => {
@@ -308,16 +308,6 @@ export default async function handler(context, req) {
           extractionReason = filteredStudents.filterReasons.get(student.id) || '';
         }
         // For 'all' exports, leave extraction_reason empty
-        
-        // Log first student's extraction reason for debugging
-        if (student === filteredStudents[0]) {
-          console.log?.info?.('First student extraction reason', {
-            studentId: student.id,
-            studentName: student.name,
-            extractionReason,
-            filter,
-          });
-        }
         
         // Format phone number with leading zero
         // Prefix with = to force Excel to treat as text and preserve leading zero
