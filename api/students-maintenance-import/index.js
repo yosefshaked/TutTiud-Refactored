@@ -19,7 +19,6 @@ import {
   coerceOptionalText,
   coerceSessionTime,
   coerceTags,
-  validateAssignedInstructor,
   validateIsraeliPhone,
 } from '../_shared/student-validation.js';
 import { parseCsv } from '../_shared/csv.js';
@@ -125,6 +124,34 @@ export default async function handler(context, req) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
+  // Fetch all instructors for name matching
+  const { data: instructors, error: instructorsError } = await tenantClient
+    .from('Instructors')
+    .select('id, name, email, is_active');
+
+  if (instructorsError) {
+    context.log?.error?.('students-maintenance-import failed to fetch instructors', { message: instructorsError.message, orgId });
+    return respond(context, 500, { message: 'failed_to_fetch_instructors' });
+  }
+
+  // Create instructor lookup maps (by name and by ID)
+  const instructorByName = new Map();
+  const instructorById = new Map();
+  const activeInstructorNames = [];
+
+  for (const instructor of instructors || []) {
+    if (!instructor?.id) continue;
+    instructorById.set(instructor.id, instructor);
+    
+    const name = normalizeString(instructor.name) || normalizeString(instructor.email);
+    if (name) {
+      instructorByName.set(name.toLowerCase(), instructor);
+      if (instructor.is_active !== false) {
+        activeInstructorNames.push(name);
+      }
+    }
+  }
+
   let existingStudents = [];
   if (validIds.length > 0) {
     const { data, error: fetchError } = await tenantClient
@@ -218,19 +245,59 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'contact_phone', phoneCheck.value, existing.contact_phone);
     }
 
-    const instructorCheck = validateAssignedInstructor(raw?.assigned_instructor_id ?? raw?.instructor_id ?? raw?.assignedInstructorId);
-    if (!instructorCheck.valid) {
-      failures.push(formatFailure({
-        lineNumber,
-        studentId,
-        name: displayName,
-        code: 'invalid_assigned_instructor',
-        message: 'מזהה המדריך אינו חוקי.',
-      }));
-      continue;
-    }
-    if (instructorCheck.value !== undefined) {
-      addIfChanged(updates, 'assigned_instructor_id', instructorCheck.value, existing.assigned_instructor_id);
+    // Support both instructor UUID and instructor name
+    const instructorInput = normalizeString(raw?.assigned_instructor_name ?? raw?.assigned_instructor_id ?? raw?.instructor_id ?? raw?.assignedInstructorId ?? raw?.instructor_name ?? raw?.instructorName);
+    
+    if (instructorInput) {
+      let instructorId = null;
+      
+      // Try UUID first
+      if (UUID_PATTERN.test(instructorInput)) {
+        const instructor = instructorById.get(instructorInput);
+        if (instructor) {
+          instructorId = instructorInput;
+        } else {
+          failures.push(formatFailure({
+            lineNumber,
+            studentId,
+            name: displayName,
+            code: 'instructor_not_found',
+            message: `מדריך עם מזהה "${instructorInput}" לא נמצא במערכת.`,
+          }));
+          continue;
+        }
+      } else {
+        // Try name matching
+        const instructor = instructorByName.get(instructorInput.toLowerCase());
+        if (instructor) {
+          instructorId = instructor.id;
+          if (instructor.is_active === false) {
+            failures.push(formatFailure({
+              lineNumber,
+              studentId,
+              name: displayName,
+              code: 'instructor_inactive',
+              message: `המדריך "${instructorInput}" אינו פעיל. מדריכים פעילים: ${activeInstructorNames.slice(0, 5).join(', ')}${activeInstructorNames.length > 5 ? '...' : ''}`,
+            }));
+            continue;
+          }
+        } else {
+          // Name not found - provide helpful error with available names
+          const availableNames = activeInstructorNames.slice(0, 5).join(', ');
+          failures.push(formatFailure({
+            lineNumber,
+            studentId,
+            name: displayName,
+            code: 'instructor_name_not_found',
+            message: `מדריך בשם "${instructorInput}" לא נמצא. מדריכים זמינים: ${availableNames}${activeInstructorNames.length > 5 ? ' ועוד...' : ''}`,
+          }));
+          continue;
+        }
+      }
+      
+      if (instructorId !== undefined) {
+        addIfChanged(updates, 'assigned_instructor_id', instructorId, existing.assigned_instructor_id);
+      }
     }
 
     const defaultService = coerceOptionalText(raw?.default_service ?? raw?.service);

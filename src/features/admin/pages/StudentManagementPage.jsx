@@ -17,10 +17,12 @@ import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentFo
 // Removed legacy instructor assignment modal; instructor is edited inside EditStudent now
 import EditStudentModal from '../components/EditStudentModal.jsx';
 import DataMaintenanceModal from '../components/DataMaintenanceModal.jsx';
+import { DataMaintenanceMenu } from '../components/DataMaintenanceMenu.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 import { includesDayQuery, DAY_NAMES, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
+import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
 import { getStudentComparator, STUDENT_SORT_OPTIONS } from '@/features/students/utils/sorting.js';
 import { saveFilterState, loadFilterState } from '@/features/students/utils/filter-state.js';
 
@@ -33,6 +35,7 @@ const REQUEST_STATES = {
 export default function StudentManagementPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
+  const { tagOptions, loadTags } = useStudentTags();
   const [students, setStudents] = useState([]);
   const [studentsState, setStudentsState] = useState(REQUEST_STATES.idle);
   const [studentsError, setStudentsError] = useState('');
@@ -175,11 +178,12 @@ export default function StudentManagementPage() {
   useEffect(() => {
     if (canFetch) {
       refreshRoster(true);
+      void loadTags();
     } else {
       setStudents([]);
       setInstructors([]);
     }
-  }, [canFetch, refreshRoster]);
+  }, [canFetch, refreshRoster, loadTags]);
 
   // Default the view for admins/owners who are also instructors to "mine"
   useEffect(() => {
@@ -516,10 +520,11 @@ export default function StudentManagementPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="button" variant="outline" className="gap-sm" onClick={handleOpenMaintenance}>
-            <FileWarning className="h-4 w-4" aria-hidden="true" />
-            תחזוקת נתונים
-          </Button>
+          <DataMaintenanceMenu 
+            onImportClick={handleOpenMaintenance}
+            instructors={instructors}
+            tags={tagOptions}
+          />
           <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             תלמיד חדש

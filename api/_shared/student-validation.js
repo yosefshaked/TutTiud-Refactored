@@ -22,9 +22,14 @@ export function validateIsraeliPhone(value) {
     return { value: null, valid: false };
   }
   
-  const trimmed = value.trim();
+  let trimmed = value.trim();
   if (!trimmed) {
     return { value: null, valid: true };
+  }
+  
+  // Handle Excel text formula format: ="0546341150"
+  if (trimmed.startsWith('="') && trimmed.endsWith('"')) {
+    trimmed = trimmed.slice(2, -1);
   }
   
   const normalized = trimmed.replace(/[\s-]/g, '');
@@ -82,10 +87,10 @@ export function coerceBooleanFlag(raw, { defaultValue = null, allowUndefined = t
     if (!normalized) {
       return { value: defaultValue, valid: false, provided: true };
     }
-    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on') {
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on' || normalized === 'כן') {
       return { value: true, valid: true, provided: true };
     }
-    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'n' || normalized === 'off') {
+    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'n' || normalized === 'off' || normalized === 'לא') {
       return { value: false, valid: true, provided: true };
     }
     return { value: defaultValue, valid: false, provided: true };
@@ -108,10 +113,33 @@ export function coerceDayOfWeek(value) {
     return { value: null, valid: true };
   }
 
-  const numeric = typeof value === 'number' ? value : Number.parseInt(String(value).trim(), 10);
+  // Hebrew day name mapping
+  const hebrewDays = {
+    'ראשון': 0,
+    'שני': 1,
+    'שלישי': 2,
+    'רביעי': 3,
+    'חמישי': 4,
+    'שישי': 5,
+    'שבת': 6,
+  };
 
-  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 7) {
+  const str = String(value).trim();
+  
+  // Try Hebrew day name first
+  if (hebrewDays[str] !== undefined) {
+    return { value: hebrewDays[str], valid: true };
+  }
+
+  // Try numeric (1-7 or 0-6)
+  const numeric = typeof value === 'number' ? value : Number.parseInt(str, 10);
+
+  if (Number.isInteger(numeric) && numeric >= 0 && numeric <= 6) {
     return { value: numeric, valid: true };
+  }
+  
+  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 7) {
+    return { value: numeric - 1, valid: true }; // Convert 1-7 to 0-6
   }
 
   return { value: null, valid: false };

@@ -921,7 +921,42 @@
 - Admin student forms now require checking these endpoints for duplicate alerts; national ID conflicts must block submission with a profile shortcut.
 - The roster surfaces a red badge when `national_id` is missing so admins can prioritize cleanup.
 
-### Student data maintenance CSV (2025-02)
-- `/api/students/maintenance-export` returns a CSV including `system_uuid`, name, national ID, contact info, instructor assignment, schedule defaults, tags, notes, and activity flags for bulk cleanup.
-- `/api/students/maintenance-import` ingests edited CSV text keyed by `system_uuid`, updates only changed fields, enforces national ID uniqueness per row and against the database, and returns per-row failure details for UI summaries.
-- StudentManagementPage exposes a "תחזוקת נתונים" modal to download/upload the maintenance CSV and refresh the roster + instructor list after imports.
+### Student data maintenance CSV (2025-02, Enhanced 2025-12)
+- **Export API** (`/api/students-maintenance-export`):
+  - Returns user-friendly CSV with Hebrew headers, preserving Excel compatibility
+  - **Route pattern**: Uses `students-maintenance-export` (not `students/maintenance-export`) to avoid conflict with `students/{id}` route
+  - **CSV formatting for Excel**:
+    - UTF-8 BOM (`\uFEFF`) ensures Hebrew text displays correctly
+    - Phone numbers use `="0546341150"` Excel formula to preserve leading zeros
+    - Day of week shows Hebrew names (ראשון, שני, etc.) instead of numbers
+    - Active status shows כן/לא instead of TRUE/FALSE
+    - Times display as HH:MM without timezone (strips +00)
+    - UUID column appears last for user convenience
+  - **Three export modes** accessed via dropdown menu:
+    1. **Export All** (`?filter=none`): All students, downloads as `student-data-maintenance.csv`
+    2. **Export Problematic** (`?filter=problematic`): Students with missing national_id, inactive/missing instructor, or schedule conflicts (same instructor + day + time), downloads as `students-problematic.csv`
+    3. **Export Filtered** (`?filter=custom&instructors=X,Y&tags=A,B&day=3`): Filter by instructor IDs, tag IDs, and/or day of week (0-6), downloads as `students-filtered.csv`
+  - **Instructor column**: Exports instructor NAME (not UUID) for user-friendly editing
+  - Uses `papaparse` library for reliable CSV generation with proper escaping
+- **Import API** (`/api/students-maintenance-import`):
+  - Ingests edited CSV text keyed by `system_uuid` (required for all rows)
+  - **Instructor name matching** (2025-12): Accepts both UUID and instructor name in `assigned_instructor_name` column
+    - Name matching is case-insensitive and uses exact match against `Instructors.name` or `Instructors.email`
+    - Helpful errors when name not found: "מדריך בשם 'X' לא נמצא. מדריכים זמינים: [list of 5 active names]..."
+    - Blocks assignment to inactive instructors with error listing active alternatives
+    - Falls back to UUID matching if cell contains valid UUID format
+  - **Hebrew input validation** (`api/_shared/student-validation.js`):
+    - `coerceDayOfWeek`: Accepts Hebrew day names (ראשון→0, שני→1, etc.), 0-6, or 1-7 numbers
+    - `validateIsraeliPhone`: Strips Excel formula wrapper `="..."` before validation
+    - `coerceBooleanFlag`: Accepts כן→true, לא→false, in addition to TRUE/FALSE/1/0
+  - Updates only changed fields, enforces national ID uniqueness per row and against database
+  - Returns per-row failure details with line numbers, student names, error codes, and Hebrew messages
+  - **Max limit**: 2000 rows per import to prevent timeout
+- **Frontend components**:
+  - `DataMaintenanceMenu.jsx`: Dropdown menu with 4 options (export all, export problematic, export filtered, import)
+  - `FilteredExportDialog.jsx`: Dialog with day/instructor/tag filter controls, requires at least one filter selection
+  - `DataMaintenanceModal.jsx`: Import modal with CSV upload, validation, and error display
+  - `StudentManagementPage.jsx`: Integrates menu, passes instructors and tags data, refreshes roster after import
+- **Radix UI dependencies**: Uses `@radix-ui/react-dropdown-menu` for menu and `@radix-ui/react-checkbox` for filter selection
+- **API client helper**: `authenticatedFetchBlob()` in `lib/api-client.js` preserves UTF-8 BOM and binary encoding for CSV downloads
+- **Comprehensive QA documentation**: See `docs/student-data-maintenance-qa.md` for full test plan covering all scenarios, edge cases, and validation rules

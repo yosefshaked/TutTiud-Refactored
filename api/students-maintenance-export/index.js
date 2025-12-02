@@ -14,12 +14,10 @@ import {
 } from '../_shared/org-bff.js';
 
 const EXPORT_COLUMNS = [
-  'system_uuid',
   'name',
   'national_id',
   'contact_name',
   'contact_phone',
-  'assigned_instructor_id',
   'assigned_instructor_name',
   'default_service',
   'default_day_of_week',
@@ -27,6 +25,7 @@ const EXPORT_COLUMNS = [
   'notes',
   'tags',
   'is_active',
+  'system_uuid',
 ];
 
 const HEBREW_HEADERS = {
@@ -35,7 +34,6 @@ const HEBREW_HEADERS = {
   'national_id': 'מספר זהות',
   'contact_name': 'שם איש קשר',
   'contact_phone': 'טלפון',
-  'assigned_instructor_id': 'מזהה מדריך',
   'assigned_instructor_name': 'שם מדריך',
   'default_service': 'שירות ברירת מחדל',
   'default_day_of_week': 'יום ברירת מחדל',
@@ -43,6 +41,16 @@ const HEBREW_HEADERS = {
   'notes': 'הערות',
   'tags': 'תגיות',
   'is_active': 'פעיל',
+};
+
+const DAYS_OF_WEEK_HEBREW = {
+  0: 'ראשון',
+  1: 'שני',
+  2: 'שלישי',
+  3: 'רביעי',
+  4: 'חמישי',
+  5: 'שישי',
+  6: 'שבת',
 };
 
 export default async function handler(context, req) {
@@ -67,6 +75,14 @@ export default async function handler(context, req) {
   if (!orgId) {
     return respond(context, 400, { message: 'invalid org id' });
   }
+
+  // Get filter parameter
+  const filter = req.query?.filter || null;
+  
+  // Get custom filter parameters
+  const instructorIds = req.query?.instructors?.split(',').filter(Boolean) || [];
+  const tagIds = req.query?.tags?.split(',').filter(Boolean) || [];
+  const dayFilter = req.query?.day != null ? parseInt(req.query.day, 10) : null;
 
   let role;
   try {
@@ -127,23 +143,137 @@ export default async function handler(context, req) {
     }
   }
 
-  const rows = Array.isArray(students)
-    ? students.map((student) => {
+  let filteredStudents = students;
+
+  // Apply filter if specified
+  if (filter === 'problematic' && Array.isArray(students)) {
+    const activeInstructorIds = new Set(
+      instructors.filter(i => i.is_active !== false).map(i => i.id)
+    );
+    
+    // Build schedule conflict detection map: instructor_id -> day_of_week -> time -> [student_ids]
+    const scheduleMap = new Map();
+    for (const student of students) {
+      if (!student.assigned_instructor_id || 
+          student.default_day_of_week == null || 
+          !student.default_session_time) {
+        continue;
+      }
+      
+      const instructorId = student.assigned_instructor_id;
+      const day = student.default_day_of_week;
+      const time = student.default_session_time;
+      
+      if (!scheduleMap.has(instructorId)) {
+        scheduleMap.set(instructorId, new Map());
+      }
+      const instructorSchedule = scheduleMap.get(instructorId);
+      
+      if (!instructorSchedule.has(day)) {
+        instructorSchedule.set(day, new Map());
+      }
+      const daySchedule = instructorSchedule.get(day);
+      
+      if (!daySchedule.has(time)) {
+        daySchedule.set(time, []);
+      }
+      daySchedule.get(time).push(student.id);
+    }
+    
+    // Find students with schedule conflicts (same instructor, day, and time)
+    const studentsWithConflicts = new Set();
+    for (const instructorSchedule of scheduleMap.values()) {
+      for (const daySchedule of instructorSchedule.values()) {
+        for (const studentIds of daySchedule.values()) {
+          if (studentIds.length > 1) {
+            // Multiple students scheduled at same time with same instructor
+            for (const studentId of studentIds) {
+              studentsWithConflicts.add(studentId);
+            }
+          }
+        }
+      }
+    }
+    
+    filteredStudents = students.filter(student => {
+      // Missing national ID
+      if (!student.national_id) return true;
+      
+      // Inactive or missing instructor
+      if (!student.assigned_instructor_id || !activeInstructorIds.has(student.assigned_instructor_id)) {
+        return true;
+      }
+      
+      // Schedule conflict with another student
+      if (studentsWithConflicts.has(student.id)) {
+        return true;
+      }
+      
+      return false;
+    });
+  } else if (filter === 'custom' && Array.isArray(students)) {
+    filteredStudents = students.filter(student => {
+      // Filter by instructor
+      if (instructorIds.length > 0 && !instructorIds.includes(student.assigned_instructor_id)) {
+        return false;
+      }
+      
+      // Filter by tags (student must have at least one matching tag)
+      if (tagIds.length > 0) {
+        const studentTags = Array.isArray(student.tags) ? student.tags : [];
+        const hasMatchingTag = tagIds.some(tagId => studentTags.includes(tagId));
+        if (!hasMatchingTag) return false;
+      }
+      
+      // Filter by day
+      if (dayFilter != null && student.default_day_of_week !== dayFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  }
+
+  const rows = Array.isArray(filteredStudents)
+    ? filteredStudents.map((student) => {
         const tags = Array.isArray(student?.tags) ? student.tags.filter(Boolean) : [];
+        
+        // Format phone number with leading zero
+        // Prefix with = to force Excel to treat as text and preserve leading zero
+        let phoneNumber = student.contact_phone || '';
+        if (phoneNumber && !phoneNumber.startsWith('0') && phoneNumber.length === 9) {
+          phoneNumber = '0' + phoneNumber;
+        }
+        // Add ="..." to force text format in Excel
+        if (phoneNumber) {
+          phoneNumber = `="${phoneNumber}"`;
+        }
+        
+        // Format time (remove timezone, show HH:MM)
+        let sessionTime = student.default_session_time || '';
+        if (sessionTime) {
+          // Handle formats like "16:00:00+00" or "16:00:00"
+          sessionTime = sessionTime.split('+')[0].split(':').slice(0, 2).join(':');
+        }
+        
+        // Convert day number to Hebrew day name
+        const dayOfWeek = student.default_day_of_week != null
+          ? DAYS_OF_WEEK_HEBREW[student.default_day_of_week] || ''
+          : '';
+        
         return {
           system_uuid: student.id || '',
           name: student.name || '',
           national_id: student.national_id || '',
           contact_name: student.contact_name || '',
-          contact_phone: student.contact_phone || '',
-          assigned_instructor_id: student.assigned_instructor_id || '',
+          contact_phone: phoneNumber,
           assigned_instructor_name: instructorLookup.get(student.assigned_instructor_id) || '',
           default_service: student.default_service || '',
-          default_day_of_week: student.default_day_of_week ?? '',
-          default_session_time: student.default_session_time || '',
+          default_day_of_week: dayOfWeek,
+          default_session_time: sessionTime,
           notes: student.notes || '',
           tags: tags.join('; '),
-          is_active: student.is_active === false ? 'false' : 'true',
+          is_active: student.is_active === false ? 'לא' : 'כן',
         };
       })
     : [];
