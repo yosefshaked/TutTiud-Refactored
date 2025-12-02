@@ -233,7 +233,7 @@ export default async function handler(context, req) {
     // Store problem reasons for later use in row mapping
     filteredStudents.problemReasons = problemReasons;
     
-    consolr.log?.info?.('Problem reasons map created', {
+    console.log?.info?.('Problem reasons map created', {
       filter: 'problematic',
       reasonsMapSize: problemReasons.size,
       firstFewReasons: Array.from(problemReasons.entries()).slice(0, 3),
