@@ -97,12 +97,14 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
               <ul className="list-disc list-inside space-y-1.5 text-sm pr-4 text-blue-900">
                 <li>
                   <strong className="text-green-700">מספרי טלפון מתוקנים אוטומטית!</strong>
-                  {' '}אם אקסל מחק את ה-0, המערכת מוסיפה אותו (546341150 → 0546341150)
+                  {' '}אפשר למחוק את הנוסחה {' '}<code className="bg-white px-1 rounded">="0546341150"</code> ולהקליד את המספר רגיל.
+                  עם 0 או בלי 0 - המערכת מוסיפה אותו אוטומטית (546341150 → 0546341150).
                 </li>
                 <li><strong>אל תשנו את עמודת UUID</strong> - זה המזהה שמחבר לתלמיד במערכת</li>
-                <li><strong>שמרו תמיד כ-CSV</strong> (לא XLSX) עם קידוד UTF-8</li>
-                <li>שמות מדריכים עובדים - לא צריך UUID, פשוט שם המדריך</li>
-                <li>ימים: ראשון/שני/שלישי | סטטוס: כן/לא</li>
+                <li><strong>שמרו תמיד כ-CSV</strong>, לא XLSX! File → Save As → CSV (UTF-8)</li>
+                <li><strong>שמות מדריכים עובדים</strong> - לא צריך UUID, פשוט שם המדריך. <span className="text-amber-700">מדריכים לא פעילים יידחו.</span></li>
+                <li><strong>ימים בשבוע:</strong> השתמשו בשמות העבריים (ראשון, שני, שלישי וכו')</li>
+                <li><strong>סטטוס פעיל:</strong> השתמשו ב"כן" או "לא" (לא TRUE/FALSE)</li>
               </ul>
             </CardContent>
           </Card>
@@ -120,6 +122,8 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
                 <li><strong>מקסימום 2000 שורות</strong> בייבוא אחד</li>
                 <li><strong>שינויים מיידיים</strong> - אין אפשרות לבטל</li>
                 <li><strong>מספרי זהות ייחודיים</strong> - כפילויות נחסמות</li>
+                <li><strong>מדריכים לא פעילים</strong> - לא ניתן לשבץ מדריך שהושבת במערכת</li>
+                <li><strong>רק קובצי CSV</strong> - קובצי XLSX לא נתמכים, שמרו כ-CSV בלבד</li>
               </ul>
             </CardContent>
           </Card>
