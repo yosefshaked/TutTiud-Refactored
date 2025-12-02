@@ -102,7 +102,7 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
                 <li><strong>אל תשנו את עמודת UUID</strong> - זה המזהה שמחבר לתלמיד במערכת</li>
                 <li><strong>שמרו תמיד כ-CSV</strong> (לא XLSX) עם קידוד UTF-8</li>
                 <li>שמות מדריכים עובדים - לא צריך UUID, פשוט שם המדריך</li>
-                <li>ימים: ראשון/שני/שלישי או 0-6 | סטטוס: כן/לא</li>
+                <li>ימים: ראשון/שני/שלישי | סטטוס: כן/לא</li>
               </ul>
             </CardContent>
           </Card>
