@@ -205,7 +205,7 @@ export default function StudentManagementPage() {
     
     // Only set default if no saved 'admin' filter exists for this org
     const savedFilters = loadFilterState(activeOrgId, 'admin');
-    const hasExistingPreference = savedFilters && savedFilters.instructorFilterId !== undefined;
+    const hasExistingPreference = savedFilters && savedFilters.instructorFilterId !== undefined && savedFilters.instructorFilterId !== '';
     
     if (!hasExistingPreference) {
       setInstructorFilterId(user.id);
