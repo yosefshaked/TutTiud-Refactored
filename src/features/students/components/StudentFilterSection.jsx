@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, Search, RotateCcw, Dot } from 'lucide-react';
+import { ChevronDown, Search, RotateCcw } from 'lucide-react';
+import { cn } from '@/lib/utils.js';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,45 +27,51 @@ export function StudentFilterSection({
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const hasAdvancedFilters = useMemo(() => {
-    return dayFilter !== null || (showInstructorFilter && instructorFilterId !== '') || statusFilter !== 'active';
+    return dayFilter !== null || (showInstructorFilter && instructorFilterId !== null && instructorFilterId !== '') || statusFilter !== 'active';
   }, [dayFilter, instructorFilterId, statusFilter, showInstructorFilter]);
 
   return (
     <div className="space-y-sm">
-      {/* Basic search - always visible */}
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-        <Input
-          type="text"
-          placeholder="חיפוש לפי שם, טלפון, תעודת זהות..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pr-9 text-right"
-          dir="rtl"
-        />
-      </div>
+      {/* Search Box with Collapsible Advanced Filters - matching NewSessionForm design */}
+      <div className="space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-xs font-medium text-neutral-600 text-right">🔍 חיפוש</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="gap-2 text-sm"
+          >
+            <span>סינון מתקדם</span>
+            <ChevronDown 
+              className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                showAdvancedFilters && "rotate-180"
+              )}
+            />
+            {hasAdvancedFilters && !showAdvancedFilters && (
+              <span className="inline-flex h-2 w-2 rounded-full bg-primary" title="יש מסננים פעילים" />
+            )}
+          </Button>
+        </div>
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+          <Input
+            type="text"
+            placeholder="חיפוש לפי שם, טלפון, תעודת זהות..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pr-9 text-right"
+            dir="rtl"
+          />
+        </div>
 
-      {/* Advanced filters toggle */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-        className="w-full gap-2 justify-center relative"
-      >
-        <span>סינון מתקדם</span>
-        {showAdvancedFilters ? (
-          <ChevronUp className="h-4 w-4" />
-        ) : (
-          <ChevronDown className="h-4 w-4" />
-        )}
-        {hasAdvancedFilters && !showAdvancedFilters && (
-          <Dot className="absolute left-2 h-3 w-3 bg-primary rounded-full fill-primary text-primary" />
-        )}
-      </Button>
-
-      {/* Advanced filters - collapsible */}
-      {showAdvancedFilters && (
-        <div className="animate-in fade-in slide-in-from-top-2 space-y-sm grid sm:grid-cols-2 lg:grid-cols-4 gap-sm">
+        {/* Advanced Filters - Collapsible within search box */}
+        {showAdvancedFilters && (
+          <div className="pt-2 border-t border-neutral-200 animate-in fade-in slide-in-from-top-2 duration-200">
+            <p className="text-xs font-medium text-neutral-600 text-right mb-2">⚙️ מסננים מתקדמים</p>
+            <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-4">
           {/* Status filter */}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-neutral-600 text-right">
@@ -101,12 +108,12 @@ export function StudentFilterSection({
               <label className="block text-xs font-medium text-neutral-600 text-right">
                 מדריך
               </label>
-              <Select value={instructorFilterId} onValueChange={onInstructorFilterChange}>
+              <Select value={instructorFilterId || 'all-instructors'} onValueChange={(v) => onInstructorFilterChange(v === 'all-instructors' ? '' : v)}>
                 <SelectTrigger className="text-right">
                   <SelectValue placeholder="כל המדריכים" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">כל המדריכים</SelectItem>
+                  <SelectItem value="all-instructors">כל המדריכים</SelectItem>
                   {instructors.map((inst) => (
                     <SelectItem key={inst.id} value={inst.id}>
                       {inst.name || inst.email}
@@ -115,7 +122,7 @@ export function StudentFilterSection({
                 </SelectContent>
               </Select>
             </div>
-          )}
+          )}  
 
           {/* Sort option */}
           <div className="space-y-1">
@@ -147,8 +154,10 @@ export function StudentFilterSection({
               </Button>
             </div>
           )}
-        </div>
-      )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -14,7 +14,6 @@ import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentForm.jsx';
-// Removed legacy instructor assignment modal; instructor is edited inside EditStudent now
 import EditStudentModal from '../components/EditStudentModal.jsx';
 import DataMaintenanceModal from '../components/DataMaintenanceModal.jsx';
 import { DataMaintenanceMenu } from '../components/DataMaintenanceMenu.jsx';
