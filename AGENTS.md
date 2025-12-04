@@ -846,27 +846,42 @@
 
 ### Session Report Success Flow (2025-11)
 - **Success state UX**: After successfully saving a session report, the modal stays open and shows a success state instead of closing immediately.
+- **Date Selection Enhancement (2025-12)**: After completing a report, users choose their next action through a **two-step workflow**:
+  1. **Action selection**: Choose between "דיווח נוסף - [Student Name]" (same student, displays actual student name) or "דיווח נוסף - תלמיד אחר" (different student)
+  2. **Date selection**: Once action is chosen, three date options are displayed:
+     - **אותו התאריך** (Same date) - Uses the date from the just-completed report (only shown if different from today)
+     - **היום** (Today) - Current date, shown with DD/MM/YYYY format
+     - **תאריך אחר** (Other date) - Opens form with empty date field for manual selection
+  - Each date button displays both the Hebrew label and the actual date that will be used (e.g., "03/12/2025")
+  - User can navigate back from date selection to action selection using "חזור" button
+  - Benefits: **Universal date selection** for both same-student and different-student workflows, prevents date entry errors, speeds up bulk documentation
 - **Implementation** (`NewSessionModal.jsx` + `NewSessionForm.jsx`):
   - Modal tracks success state: `{ studentId, studentName, date }`
   - Toast displayed with enhanced configuration for mobile: `toast.success('...', { duration: 2500, position: 'top-center' })`
-  - Success footer (`SuccessFooter` component) replaces standard form footer with three action buttons:
-    1. **סגור** (Close) - Closes modal, returns to parent view
-    2. **דיווח נוסף - תלמיד אחר** (New report - another student) - Resets entire form, allows selecting different student
-    3. **דיווח נוסף - [Student Name]** (New report - same student) - Resets form but keeps student selected for quick consecutive reports
+  - Date choice footer (`DateChoiceFooter` component) manages two-step workflow with internal state:
+    - Mode state: `'choose'` (action selection) → `'same-student'` or `'other-student'` (date selection)
+    - Uses `formatDateForDisplay()` helper to show dates in DD/MM/YYYY format
+    - `getTodayDate()` helper provides current date in YYYY-MM-DD format
+    - Each date option button shows icon (CalendarCheck, CalendarClock, Calendar) + label + formatted date
+    - Navigation: Initial screen has two action buttons + close; date screen has continue + back + close buttons
   - Form reset via `formResetRef` using `useImperativeHandle`:
-    - Resets all fields: answers, date, service, filters
-    - Optionally preserves student selection (for same-student workflow)
-    - Called from parent via ref: `formResetRef.current({ keepStudent: true, studentId })`
-  - Visual feedback: Green success banner appears at top of form showing student name and prompting user to choose action
+    - Resets all fields: answers, service, filters
+    - Accepts `date` parameter: if provided, pre-fills the date field; if null, leaves empty for user selection
+    - Accepts `keepStudent` parameter: if true, preserves student selection (for same-student workflow)
+    - Called from parent: `formResetRef.current({ keepStudent: true, studentId, date: '2025-12-03' })`
+  - Both `handleNewReport` and `handleNewReportSameStudent` accept `{ date }` parameter
 - **Mobile optimization**:
   - Toast duration increased to 2500ms (from default) for better visibility
   - Toast positioned `top-center` on mobile for maximum visibility
   - Success state prevents race condition where modal closes before toast renders on mobile browsers
+  - All buttons use proper RTL layout with `dir="rtl"` and right-aligned text
 - **User benefits**:
-  - No confusion about whether report was saved (success state stays visible)
-  - Faster bulk documentation: instructors can create multiple reports without reopening modal
-  - Flexible workflow: choose to document same student multiple times or switch students
-  - Eliminates mobile Android issue where toasts disappeared due to rapid modal closure
+  - **Consistent workflow**: Same date selection experience whether documenting same student or switching students
+  - **No confusion**: Success state stays visible, clear two-step process
+  - **Speed**: Quick date selection in 1-2 clicks instead of manual date entry
+  - **Flexibility**: Can still choose custom date or navigate back to change action
+  - **Error prevention**: Visual date display prevents date entry mistakes
+  - **Bulk documentation**: Optimized for instructors documenting multiple sessions in sequence
 - **Advanced Filters Pattern (2025-11)**:
   - Filter section now separates basic search (always visible) from advanced filters (collapsible)
   - Advanced filters section includes: instructor scope selector (admin only), day-of-week filter, and active/inactive status filter
