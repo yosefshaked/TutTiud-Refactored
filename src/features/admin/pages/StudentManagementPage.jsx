@@ -172,17 +172,17 @@ export default function StudentManagementPage() {
 
   // Load saved filter state on mount
   useEffect(() => {
-    if (activeOrgId) {
-      const savedFilters = loadFilterState(activeOrgId, 'admin');
-      if (savedFilters) {
-        if (savedFilters.filterMode !== undefined) setFilterMode(savedFilters.filterMode);
-        if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery);
-        if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter);
-        if (savedFilters.instructorFilterId !== undefined) setInstructorFilterId(savedFilters.instructorFilterId);
-        if (savedFilters.tagFilter !== undefined) setTagFilter(savedFilters.tagFilter);
-        if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy);
-        if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter);
-      }
+    if (!activeOrgId) return;
+    
+    const savedFilters = loadFilterState(activeOrgId, 'admin');
+    if (savedFilters) {
+      if (savedFilters.filterMode !== undefined) setFilterMode(savedFilters.filterMode);
+      if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery);
+      if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter);
+      if (savedFilters.instructorFilterId !== undefined) setInstructorFilterId(savedFilters.instructorFilterId);
+      if (savedFilters.tagFilter !== undefined) setTagFilter(savedFilters.tagFilter);
+      if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy);
+      if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter);
     }
   }, [activeOrgId]);
 
@@ -197,14 +197,22 @@ export default function StudentManagementPage() {
     }
   }, [canFetch, refreshRoster, loadTags]);
 
-  // Default the view for admins/owners who are also instructors to "mine"
+  // Default the view for admins/owners who are also instructors to "mine" on first visit
   useEffect(() => {
-    if (!user || !Array.isArray(instructors) || instructors.length === 0) return;
+    if (!user || !Array.isArray(instructors) || instructors.length === 0 || !activeOrgId) return;
+    
+    // Check if this admin is also an instructor
     const isInstructor = instructors.some((i) => i?.id === user.id);
-    if (isInstructor) {
-      setFilterMode((prev) => (prev === 'all' ? 'mine' : prev));
+    if (!isInstructor) return;
+    
+    // Only set default if no saved 'admin' filter exists for this org
+    const savedFilters = loadFilterState(activeOrgId, 'admin');
+    const hasExistingPreference = savedFilters && savedFilters.filterMode !== undefined;
+    
+    if (!hasExistingPreference) {
+      setFilterMode('mine');
     }
-  }, [user, instructors]);
+  }, [user, instructors, activeOrgId]);
 
   // Refetch students when statusFilter changes
   useEffect(() => {
