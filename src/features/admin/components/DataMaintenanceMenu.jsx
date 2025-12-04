@@ -89,9 +89,6 @@ export function DataMaintenanceMenu({ onImportClick, instructors = [], tags = []
           <span className="hidden sm:inline">
             {isDownloading ? 'מוריד...' : 'תחזוקת נתונים'}
           </span>
-          <span className="sm:hidden">
-            {isDownloading ? 'מוריד...' : 'תחזוקה'}
-          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
