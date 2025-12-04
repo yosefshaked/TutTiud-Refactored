@@ -105,6 +105,16 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'too_many_rows', limit: MAX_ROWS });
   }
 
+  // Optional tag mappings: { "unmatched_tag_name": "target_tag_id" }
+  const tagMappings = new Map();
+  if (body?.tag_mappings && typeof body.tag_mappings === 'object') {
+    for (const [unmatchedName, targetTagId] of Object.entries(body.tag_mappings)) {
+      if (typeof targetTagId === 'string' && UUID_PATTERN.test(targetTagId)) {
+        tagMappings.set(normalizeString(unmatchedName).toLowerCase(), targetTagId);
+      }
+    }
+  }
+
   const idColumn = parsed.columns.find((col) => ID_COLUMN_CANDIDATES.includes(col.toLowerCase()));
   if (!idColumn) {
     return respond(context, 400, { message: 'missing_id_column' });
@@ -153,6 +163,25 @@ export default async function handler(context, req) {
     }
   }
 
+  // Fetch student tags for name-to-ID lookup
+  const { data: tagsSettings } = await tenantClient
+    .from('Settings')
+    .select('settings_value')
+    .eq('key', 'student_tags')
+    .maybeSingle();
+
+  const tagByName = new Map();
+  const tagById = new Map();
+  if (tagsSettings?.settings_value) {
+    const tags = Array.isArray(tagsSettings.settings_value) ? tagsSettings.settings_value : [];
+    for (const tag of tags) {
+      if (tag?.id && tag?.name) {
+        tagById.set(tag.id, tag);
+        tagByName.set(normalizeString(tag.name).toLowerCase(), tag.id);
+      }
+    }
+  }
+
   let existingStudents = [];
   if (validIds.length > 0) {
     const { data, error: fetchError } = await tenantClient
@@ -173,6 +202,32 @@ export default async function handler(context, req) {
     if (student?.id) {
       existingMap.set(student.id, student);
     }
+  }
+
+  // First pass: collect all unmatched tag names across all rows
+  const unmatchedTags = new Set();
+  for (const entry of stagedRows) {
+    const { raw } = entry;
+    const tagsInput = normalizeTagsForCsv(raw?.tags ?? raw?.Tags);
+    const tags = coerceTags(tagsInput);
+    if (tags.valid && tags.value) {
+      for (const tagName of tags.value) {
+        const tagId = tagByName.get(normalizeString(tagName).toLowerCase());
+        if (!tagId) {
+          unmatchedTags.add(tagName);
+        }
+      }
+    }
+  }
+
+  // If there are unmatched tags, return them for user mapping
+  if (unmatchedTags.size > 0) {
+    return respond(context, 400, {
+      code: 'unmatched_tags',
+      message: 'חלק מהתוויות בקובץ CSV לא נמצאו בקטלוג. אנא מפה אותן לתוויות קיימות.',
+      unmatched_tags: Array.from(unmatchedTags),
+      available_tags: Array.from(tagById.values()).map(tag => ({ id: tag.id, name: tag.name })),
+    });
   }
 
   const failures = [];
@@ -353,8 +408,27 @@ export default async function handler(context, req) {
       }));
       continue;
     }
-    if (tags.value !== undefined) {
-      addIfChanged(updates, 'tags', tags.value, existing.tags);
+    // Convert tag names to IDs using lookup map, with fallback to user mappings
+    if (tags.value !== undefined && tags.value !== null) {
+      const tagIds = tags.value
+        .map((tagName) => {
+          const normalizedName = normalizeString(tagName).toLowerCase();
+          // Try direct lookup first
+          return tagByName.get(normalizedName) || tagMappings.get(normalizedName) || null;
+        })
+        .filter(Boolean); // Filter out null values for unmatched tags
+      if (tags.value.length > 0 && tagIds.length === 0) {
+        // All provided tags were invalid
+        failures.push(formatFailure({
+          lineNumber,
+          studentId,
+          name: displayName,
+          code: 'invalid_tags',
+          message: 'אף תווית מסופקת לא נמצאה בקטלוג התוויות.',
+        }));
+        continue;
+      }
+      addIfChanged(updates, 'tags', tagIds.length ? tagIds : null, existing.tags);
     }
 
     const isActive = coerceBooleanFlag(raw?.is_active ?? raw?.active ?? raw?.status, { defaultValue: existing.is_active, allowUndefined: true });

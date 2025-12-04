@@ -298,7 +298,9 @@ export default async function handler(context, req) {
 
   const rows = Array.isArray(filteredStudents)
     ? filteredStudents.map((student) => {
-        const tags = Array.isArray(student?.tags) ? student.tags.filter(Boolean) : [];
+        const tagIds = Array.isArray(student?.tags) ? student.tags.filter(Boolean) : [];
+        // Convert tag IDs to tag names using lookup map
+        const tags = tagIds.map(tagId => tagLookup.get(tagId) || tagId);
         
         // Determine extraction reason based on filter type
         let extractionReason = '';

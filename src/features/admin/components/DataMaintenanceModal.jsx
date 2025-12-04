@@ -25,6 +25,9 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
   const [importError, setImportError] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [unmatchedTags, setUnmatchedTags] = useState([]);
+  const [availableTags, setAvailableTags] = useState([]);
+  const [tagMappings, setTagMappings] = useState({});
 
   useEffect(() => {
     if (!open) {
@@ -33,6 +36,9 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
       setImportError('');
       setSelectedFile(null);
       setSummary(null);
+      setUnmatchedTags([]);
+      setAvailableTags([]);
+      setTagMappings({});
     }
   }, [open]);
 
@@ -65,7 +71,35 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
     setSelectedFile(file);
   };
 
-  const handleImport = async (event) => {
+  const handleTagMapping = (unmatchedTagName, targetTagId) => {
+    setTagMappings(prev => ({
+      ...prev,
+      [unmatchedTagName]: targetTagId,
+    }));
+  };
+
+  const handleRetryImportWithMappings = (event) => {
+    event.preventDefault();
+    
+    // Check if all unmatched tags are mapped
+    const unmapped = unmatchedTags.filter(tag => !tagMappings[tag]);
+    if (unmapped.length > 0) {
+      toast.error('נא למפות את כל התוויות שלא נמצאו.');
+      return;
+    }
+
+    // Create a fake event object for handleImport
+    const fakeEvent = { preventDefault: () => {} };
+    handleImport(fakeEvent, tagMappings);
+  };
+
+  const handleCancelTagMapping = () => {
+    setUnmatchedTags([]);
+    setAvailableTags([]);
+    setTagMappings({});
+  };
+
+  const handleImport = async (event, retryMappings = null) => {
     event.preventDefault();
     if (!orgId || !selectedFile) {
       setImportError('נא לבחור קובץ CSV לעדכון.');
@@ -76,14 +110,24 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
     setImportError('');
 
     try {
-      const csvText = await selectedFile.text();
+      const text = await selectedFile.text();
+      
       const payload = await authenticatedFetch('students-maintenance-import', {
         method: 'POST',
         body: {
           org_id: orgId,
-          csv_text: csvText,
+          csv_text: text,
+          tag_mappings: retryMappings,
         },
       });
+
+      // If unmatched tags, show mapping dialog
+      if (payload.code === 'unmatched_tags') {
+        setUnmatchedTags(payload.unmatched_tags || []);
+        setAvailableTags(payload.available_tags || []);
+        setTagMappings({});
+        return;
+      }
 
       setSummary(payload);
       toast.success('ייבוא העדכונים הושלם.');
@@ -103,21 +147,80 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose?.(); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>תחזוקת נתונים (CSV)</DialogTitle>
+          <DialogTitle>{unmatchedTags.length > 0 ? 'מיפוי תוויות' : 'תחזוקת נתונים (CSV)'}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 text-sm text-neutral-700 text-right" dir="rtl">
-          <p className="text-neutral-600">
-            הורידו את קובץ התחזוקה כדי למלא שדות חסרים (תעודת זהות, טלפון, מדריך, תוויות ועוד) ואז העלו את הקובץ המעודכן.
-            מזהה המערכת (UUID) משמש להשוואת השורות, ולכן אין למחוק או לערוך אותו.
-          </p>
+        {unmatchedTags.length > 0 ? (
+          // Tag Mapping UI
+          <div className="space-y-4 text-sm text-neutral-700 text-right" dir="rtl">
+            <p className="text-neutral-600">
+              התוויות הבאות בקובץ CSV לא נמצאו בקטלוג. אנא מפו אותן לתוויות קיימות:
+            </p>
 
-          <div className="grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 sm:grid-cols-2 sm:grid-flow-col sm:auto-cols-fr">
-            <div className="space-y-2 sm:order-2">
-              <p className="font-semibold text-neutral-900">2. העלאת CSV מעודכן</p>
-              <form className="space-y-2" onSubmit={handleImport}>
-                <div className="space-y-1">
-                  <Label htmlFor="maintenance-upload" className="block text-right">בחרו קובץ CSV</Label>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {unmatchedTags.map((unmatchedTag) => (
+                <div key={unmatchedTag} className="space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="font-semibold text-neutral-900">תווית לא מצאה:</p>
+                      <p className="text-neutral-700 break-words">{unmatchedTag}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-sm text-neutral-600">בחרו תווית קיימת:</p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {availableTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleTagMapping(unmatchedTag, tag.id)}
+                          className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                            tagMappings[unmatchedTag] === tag.id
+                              ? 'bg-primary text-white'
+                              : 'bg-white border border-neutral-300 text-neutral-900 hover:bg-neutral-50'
+                          }`}
+                        >
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancelTagMapping}
+                disabled={isImporting}
+              >
+                ביטול
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRetryImportWithMappings}
+                disabled={isImporting || unmatchedTags.some(tag => !tagMappings[tag])}
+              >
+                {isImporting ? 'מייבא...' : 'המשך עם המיפוי'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 text-sm text-neutral-700 text-right" dir="rtl">
+            <p className="text-neutral-600">
+              הורידו את קובץ התחזוקה כדי למלא שדות חסרים (תעודת זהות, טלפון, מדריך, תוויות ועוד) ואז העלו את הקובץ המעודכן.
+              מזהה המערכת (UUID) משמש להשוואת השורות, ולכן אין למחוק או לערוך אותו.
+            </p>
+
+            <div className="grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-4 sm:grid-cols-2 sm:grid-flow-col sm:auto-cols-fr">
+              <div className="space-y-2 sm:order-2">
+                <p className="font-semibold text-neutral-900">2. העלאת CSV מעודכן</p>
+                <form className="space-y-2" onSubmit={handleImport}>
+                  <div className="space-y-1">
+                    <Label htmlFor="maintenance-upload" className="block text-right">בחרו קובץ CSV</Label>
                   <Input
                     id="maintenance-upload"
                     type="file"
@@ -184,7 +287,8 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
               ) : null}
             </div>
           ) : null}
-        </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
