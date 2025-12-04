@@ -51,14 +51,14 @@ export default function MyStudentsPage() {
     )
   }, [activeOrgId, tenantClientReady, activeOrgHasConnection, supabaseLoading, isAdminMember])
 
-  // Load saved filter state on mount
+  // Load saved filter state on mount (except statusFilter which depends on permissions)
   useEffect(() => {
     if (activeOrgId) {
       const savedFilters = loadFilterState(activeOrgId, 'instructor')
       if (savedFilters) {
         if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery)
         if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter)
-        if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter)
+        // Don't restore statusFilter yet - wait for permission check
         if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy)
       }
     }
@@ -76,12 +76,11 @@ export default function MyStudentsPage() {
     }
   }, [activeOrgId, searchQuery, dayFilter, statusFilter, sortBy])
 
+  // Load visibility setting and handle statusFilter restoration/reset
   useEffect(() => {
     if (!activeOrgId || !activeOrgHasConnection || !tenantClientReady) {
       setCanViewInactive(false)
-      if (statusFilter !== 'active') {
-        setStatusFilter('active')
-      }
+      setStatusFilter('active') // Always reset when org changes
       return
     }
 
@@ -101,8 +100,16 @@ export default function MyStudentsPage() {
         const allowed = value === true
         if (!cancelled) {
           setCanViewInactive(allowed)
-          if (!allowed && statusFilter !== 'active') {
+          
+          // If permission is not available, force to 'active'
+          if (!allowed) {
             setStatusFilter('active')
+          } else {
+            // Permission is available - restore saved filter if exists
+            const savedFilters = loadFilterState(activeOrgId, 'instructor')
+            if (savedFilters?.statusFilter && savedFilters.statusFilter !== 'active') {
+              setStatusFilter(savedFilters.statusFilter)
+            }
           }
         }
       } catch (error) {
@@ -112,9 +119,7 @@ export default function MyStudentsPage() {
         console.error('Failed to load instructor visibility setting', error)
         if (!cancelled) {
           setCanViewInactive(false)
-          if (statusFilter !== 'active') {
-            setStatusFilter('active')
-          }
+          setStatusFilter('active')
         }
       }
     }
@@ -125,7 +130,14 @@ export default function MyStudentsPage() {
       cancelled = true
       abortController.abort()
     }
-  }, [activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter])
+  }, [activeOrgId, activeOrgHasConnection, tenantClientReady])
+  
+  // Separate effect: force statusFilter to 'active' when permission is revoked
+  useEffect(() => {
+    if (!canViewInactive && statusFilter !== 'active') {
+      setStatusFilter('active')
+    }
+  }, [canViewInactive, statusFilter])
 
   useEffect(() => {
     if (!canFetch) {
