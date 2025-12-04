@@ -27,6 +27,8 @@ export function StudentFilterSection({
   onResetFilters,
   showInstructorFilter = true, // Allow hiding instructor filter for non-admin views
   showStatusFilter = true, // Allow hiding status filter when instructors can't view inactive
+  showMyStudentsOption = false, // Show 'My Students' option in instructor dropdown for admin instructors
+  currentUserId = null, // Current user ID for 'My Students' option
 }) {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -119,6 +121,9 @@ export function StudentFilterSection({
                   <SelectValue placeholder="כל המדריכים" />
                 </SelectTrigger>
                 <SelectContent>
+                  {showMyStudentsOption && currentUserId && (
+                    <SelectItem value={currentUserId}>התלמידים שלי</SelectItem>
+                  )}
                   <SelectItem value="all-instructors">כל המדריכים</SelectItem>
                   {instructors.map((inst) => (
                     <SelectItem key={inst.id} value={inst.id}>

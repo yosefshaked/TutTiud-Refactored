@@ -53,7 +53,6 @@ export default function StudentManagementPage() {
   const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const [isMaintenanceOpen, setIsMaintenanceOpen] = useState(false);
-  const [filterMode, setFilterMode] = useState('all'); // 'mine' | 'all'
   const [searchQuery, setSearchQuery] = useState('');
   const [dayFilter, setDayFilter] = useState(null);
   const [instructorFilterId, setInstructorFilterId] = useState('');
@@ -176,7 +175,6 @@ export default function StudentManagementPage() {
     
     const savedFilters = loadFilterState(activeOrgId, 'admin');
     if (savedFilters) {
-      if (savedFilters.filterMode !== undefined) setFilterMode(savedFilters.filterMode);
       if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery);
       if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter);
       if (savedFilters.instructorFilterId !== undefined) setInstructorFilterId(savedFilters.instructorFilterId);
@@ -207,10 +205,10 @@ export default function StudentManagementPage() {
     
     // Only set default if no saved 'admin' filter exists for this org
     const savedFilters = loadFilterState(activeOrgId, 'admin');
-    const hasExistingPreference = savedFilters && savedFilters.filterMode !== undefined;
+    const hasExistingPreference = savedFilters && savedFilters.instructorFilterId !== undefined;
     
     if (!hasExistingPreference) {
-      setFilterMode('mine');
+      setInstructorFilterId(user.id);
     }
   }, [user, instructors, activeOrgId]);
 
@@ -221,18 +219,10 @@ export default function StudentManagementPage() {
     }
   }, [statusFilter, canFetch, fetchStudents]);
 
-  // Ensure instructor-specific filter is cleared when viewing "my students"
-  useEffect(() => {
-    if (filterMode === 'mine' && instructorFilterId) {
-      setInstructorFilterId('');
-    }
-  }, [filterMode, instructorFilterId]);
-
   // Save filter state whenever it changes
   useEffect(() => {
     if (activeOrgId) {
       saveFilterState(activeOrgId, 'admin', {
-        filterMode,
         searchQuery,
         dayFilter,
         instructorFilterId,
@@ -241,7 +231,7 @@ export default function StudentManagementPage() {
         statusFilter,
       });
     }
-  }, [activeOrgId, filterMode, searchQuery, dayFilter, instructorFilterId, tagFilter, sortBy, statusFilter]);
+  }, [activeOrgId, searchQuery, dayFilter, instructorFilterId, tagFilter, sortBy, statusFilter]);
 
   // Client-side filtering and sorting - applied to all fetched students
   useEffect(() => {
@@ -287,20 +277,14 @@ export default function StudentManagementPage() {
       });
     }
 
-    // Filter by mode
-    if (filterMode === 'mine' && user?.id) {
-      result = result.filter((s) => s.assigned_instructor_id === user.id);
-    }
-
     // Sort
     const comparator = getStudentComparator(sortBy);
     result.sort(comparator);
 
     setFilteredStudents(result);
-  }, [students, statusFilter, searchQuery, dayFilter, instructorFilterId, tagFilter, filterMode, sortBy, user?.id]);
+  }, [students, statusFilter, searchQuery, dayFilter, instructorFilterId, tagFilter, sortBy]);
 
   const handleResetFilters = () => {
-    setFilterMode('all');
     setInstructorFilterId('');
     setSearchQuery('');
     setDayFilter(null);
@@ -316,10 +300,9 @@ export default function StudentManagementPage() {
       dayFilter !== null ||
       instructorFilterId !== '' ||
       tagFilter !== '' ||
-      filterMode !== 'all' ||
       statusFilter !== 'active'
     );
-  }, [searchQuery, dayFilter, instructorFilterId, tagFilter, filterMode, statusFilter]);
+  }, [searchQuery, dayFilter, instructorFilterId, tagFilter, statusFilter]);
 
   const handleOpenAddDialog = () => {
     setCreateError('');
@@ -547,6 +530,8 @@ export default function StudentManagementPage() {
             tags={tagOptions}
             hasActiveFilters={hasActiveFilters}
             onResetFilters={handleResetFilters}
+            showMyStudentsOption={instructors.some((i) => i?.id === user?.id)}
+            currentUserId={user?.id}
           />
         </CardHeader>
         <CardContent>
@@ -634,7 +619,7 @@ export default function StudentManagementPage() {
                                 </Badge>
                               )}
                             </div>
-                            {filterMode === 'all' ? (
+                            {!instructorFilterId ? (
                               <div className="mt-0.5 text-xs text-neutral-500">
                                 {instructor?.name ? (
                                   <>מדריך: {instructor.name}</>
