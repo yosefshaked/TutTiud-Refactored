@@ -46,13 +46,13 @@ const HEBREW_HEADERS = {
 };
 
 const DAYS_OF_WEEK_HEBREW = {
-  0: 'ראשון',
-  1: 'שני',
-  2: 'שלישי',
-  3: 'רביעי',
-  4: 'חמישי',
-  5: 'שישי',
-  6: 'שבת',
+  1: 'ראשון',
+  2: 'שני',
+  3: 'שלישי',
+  4: 'רביעי',
+  5: 'חמישי',
+  6: 'שישי',
+  7: 'שבת',
 };
 
 export default async function handler(context, req) {
