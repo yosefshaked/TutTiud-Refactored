@@ -168,15 +168,25 @@ export default function MyStudentsPage() {
           status: statusParam,
         })
         
-        // Fetch students and compliance summary in parallel
-        const [studentsPayload, compliancePayload] = await Promise.all([
-          authenticatedFetch(endpoint, { signal: abortController.signal }),
-          authenticatedFetch(`students/compliance-summary?org_id=${activeOrgId}`, { signal: abortController.signal })
-            .catch(err => {
-              console.error('Failed to load compliance summary', err)
-              return {} // Don't fail if compliance summary fails
-            })
-        ])
+        // Fetch students - skip compliance summary for non-admin users (they don't have permission)
+        const fetchPromises = [
+          authenticatedFetch(endpoint, { signal: abortController.signal })
+        ]
+        
+        // Only admin/owner can access compliance summary endpoint
+        if (isAdminMember) {
+          fetchPromises.push(
+            authenticatedFetch(`students/compliance-summary?org_id=${activeOrgId}`, { signal: abortController.signal })
+              .catch(err => {
+                console.error('Failed to load compliance summary', err)
+                return {} // Don't fail if compliance summary fails
+              })
+          )
+        }
+        
+        const results = await Promise.all(fetchPromises)
+        const studentsPayload = results[0]
+        const compliancePayload = results[1] || {} // Will be empty object for non-admin users
 
         if (!isMounted) {
           return
@@ -209,7 +219,7 @@ export default function MyStudentsPage() {
       isMounted = false
       abortController.abort()
     }
-  }, [activeOrgId, canFetch, normalizedRole, statusFilter, canViewInactive])
+  }, [activeOrgId, canFetch, normalizedRole, statusFilter, canViewInactive, isAdminMember])
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
