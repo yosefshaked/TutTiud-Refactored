@@ -19,7 +19,7 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="sm:max-w-3xl" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Info className="h-6 w-6 text-primary" />
