@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { Loader2, Users, Search, X, User, RotateCcw, FileWarning } from "lucide-react"
+import { Loader2, Users, User, FileWarning } from "lucide-react"
 
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
@@ -16,7 +16,9 @@ import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/f
 import { includesDayQuery, describeSchedule } from "@/features/students/utils/schedule.js"
 import { sortStudentsBySchedule } from "@/features/students/utils/sorting.js"
 import DayOfWeekSelect from "@/components/ui/DayOfWeekSelect.jsx"
+import { StudentFilterSection } from "@/features/students/components/StudentFilterSection.jsx"
 import { saveFilterState, loadFilterState } from "@/features/students/utils/filter-state.js"
+import { STUDENT_SORT_OPTIONS, getStudentComparator } from "@/features/students/utils/sorting.js"
 
 const REQUEST_STATUS = Object.freeze({
   idle: "idle",
@@ -36,6 +38,7 @@ export default function MyStudentsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [dayFilter, setDayFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState('active')
+  const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE)
   const [canViewInactive, setCanViewInactive] = useState(false)
   const [visibilityLoaded, setVisibilityLoaded] = useState(false)
 
@@ -62,6 +65,7 @@ export default function MyStudentsPage() {
         if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery)
         if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter)
         if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter)
+        if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy)
       }
     }
   }, [activeOrgId])
@@ -73,9 +77,10 @@ export default function MyStudentsPage() {
         searchQuery,
         dayFilter,
         statusFilter,
+        sortBy,
       })
     }
-  }, [activeOrgId, searchQuery, dayFilter, statusFilter])
+  }, [activeOrgId, searchQuery, dayFilter, statusFilter, sortBy])
 
   useEffect(() => {
     if (!activeOrgId || !activeOrgHasConnection || !tenantClientReady) {
@@ -148,8 +153,10 @@ export default function MyStudentsPage() {
       setErrorMessage("")
 
       try {
+        // Smart fetching: use statusFilter directly if instructor can view inactive, else always fetch active only
+        const statusParam = canViewInactive ? statusFilter : 'active'
         const endpoint = buildStudentsEndpoint(activeOrgId, normalizedRole, {
-          status: canViewInactive ? statusFilter : 'active',
+          status: statusParam,
         })
         
         // Fetch students and compliance summary in parallel
@@ -195,70 +202,64 @@ export default function MyStudentsPage() {
     }
   }, [activeOrgId, canFetch, normalizedRole, statusFilter, canViewInactive])
 
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      searchQuery.trim() !== '' ||
+      dayFilter !== null ||
+      (canViewInactive && statusFilter !== 'active')
+    )
+  }, [searchQuery, dayFilter, statusFilter, canViewInactive])
+
+  const handleResetFilters = () => {
+    setSearchQuery('')
+    setDayFilter(null)
+    setSortBy(STUDENT_SORT_OPTIONS.SCHEDULE)
+    if (canViewInactive) {
+      setStatusFilter('active')
+    }
+  }
+
   const isLoading = status === REQUEST_STATUS.loading
   const isError = status === REQUEST_STATUS.error
   const isSuccess = status === REQUEST_STATUS.success
 
   const filteredStudents = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim()
-    const filtered = students.filter((student) => {
-      try {
-        if ((statusFilter === 'active' || (!canViewInactive && statusFilter !== 'active')) && student?.is_active === false) {
-          return false
-        }
-        if (statusFilter === 'inactive' && student?.is_active !== false) {
-          return false
-        }
-        if (dayFilter && Number(student?.default_day_of_week) !== Number(dayFilter)) {
-          return false
-        }
+    let result = students;
 
-        if (!query) return true
-        // Search by student name
-        const studentName = String(student.name || '').toLowerCase()
-        if (studentName.includes(query)) return true
+    // Filter by status - if instructor cannot view inactive, this is already filtered on server
+    if (canViewInactive && statusFilter !== 'all') {
+      result = result.filter((s) => {
+        const isActive = s.is_active !== false;
+        return statusFilter === 'active' ? isActive : !isActive;
+      });
+    }
 
-        // Search by contact name
-        const contactName = String(student.contact_name || '').toLowerCase()
-        if (contactName.includes(query)) return true
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((s) => {
+        const name = (s.name || '').toLowerCase();
+        const phone = (s.contact_phone || '').toLowerCase();
+        const nationalId = (s.national_id || '').toLowerCase();
+        return name.includes(query) || phone.includes(query) || nationalId.includes(query);
+      });
+    }
 
-        // Search by contact phone
-        const contactPhone = String(student.contact_phone || '').toLowerCase()
-        if (contactPhone.includes(query)) return true
+    // Filter by day of week
+    if (dayFilter !== null) {
+      result = result.filter((s) => {
+        if (!s.schedule || !Array.isArray(s.schedule)) return false;
+        return s.schedule.some((day) => day.day === dayFilter);
+      });
+    }
 
-        // Search by legacy contact_info field
-        const contactInfo = String(student.contact_info || '').toLowerCase()
-        if (contactInfo.includes(query)) return true
+    // Sort
+    const comparator = getStudentComparator(sortBy);
+    result.sort(comparator);
 
-  // Search by default day of week (Hebrew label)
-  if (includesDayQuery(student.default_day_of_week, query)) return true
-
-        // Search by default session time
-        const sessionTime = String(student.default_session_time || '').toLowerCase()
-        if (sessionTime.includes(query)) return true
-
-        return false
-      } catch (error) {
-        console.error('Error filtering student:', student, error)
-        return false
-      }
-    })
-    
-    // Apply default sorting by schedule (day → hour → name)
-    // Note: instructor comparison is not needed here as all students belong to the same instructor
-    return sortStudentsBySchedule(filtered, new Map())
-  }, [students, searchQuery, dayFilter, statusFilter, canViewInactive])
-
-  const handleResetFilters = () => {
-    setSearchQuery('')
-    setDayFilter(null)
-    setStatusFilter('active')
-  }
-
-  // Check if any filters are active
-  const hasActiveFilters = useMemo(() => {
-    return searchQuery.trim() !== '' || dayFilter !== null || statusFilter !== 'active'
-  }, [searchQuery, dayFilter, statusFilter])
+    return result;
+  }, [students, searchQuery, dayFilter, statusFilter, sortBy, canViewInactive])
 
   const hasNoResults = isSuccess && filteredStudents.length === 0
 
@@ -297,74 +298,20 @@ export default function MyStudentsPage() {
       ) : isSuccess ? (
             <>
               <div className="mb-md">
-                <div className="grid grid-cols-1 gap-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <div className="relative w-full">
-                    <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-                    <Input
-                      type="text"
-                      placeholder="חיפוש לפי שם, הורה, יום או שעה..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pr-10 text-sm"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-                        aria-label="נקה חיפוש"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-sm items-center">
-                    <DayOfWeekSelect
-                      value={dayFilter}
-                      onChange={setDayFilter}
-                      placeholder="סינון לפי יום"
-                    />
-                    {canViewInactive ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <label htmlFor="instructor-status-filter" className="text-neutral-600 whitespace-nowrap">
-                          מצב:
-                        </label>
-                        <Select
-                          value={statusFilter}
-                          onValueChange={(value) => setStatusFilter(value)}
-                          disabled={!visibilityLoaded}
-                        >
-                          <SelectTrigger id="instructor-status-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">תלמידים פעילים</SelectItem>
-                            <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
-                            <SelectItem value="all">הצג הכל</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : null}
-                    {hasActiveFilters && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleResetFilters}
-                        className="gap-xs"
-                        title="נקה כל המסננים"
-                      >
-                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                        <span className="hidden sm:inline">נקה מסננים</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                {searchQuery && (
-                  <div className="mt-sm text-xs text-neutral-600">
-                    נמצאו {filteredStudents.length} תלמידים
-                  </div>
-                )}
+                <StudentFilterSection
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  statusFilter={canViewInactive ? statusFilter : 'active'}
+                  onStatusChange={setStatusFilter}
+                  dayFilter={dayFilter}
+                  onDayChange={setDayFilter}
+                  sortBy={sortBy}
+                  onSortChange={setSortBy}
+                  instructors={[]}
+                  showInstructorFilter={false}
+                  hasActiveFilters={hasActiveFilters}
+                  onResetFilters={handleResetFilters}
+                />
               </div>
               {hasNoResults ? (
                 <div className="flex flex-col items-center justify-center gap-sm rounded-xl border border-dashed border-neutral-200 p-xl text-center text-neutral-600">

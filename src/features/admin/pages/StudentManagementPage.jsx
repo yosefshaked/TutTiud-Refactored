@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Loader2, Pencil, Search, X, User, RotateCcw, FileWarning } from 'lucide-react';
+import { Plus, Loader2, Pencil, X, User, FileWarning } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -18,6 +18,7 @@ import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentFo
 import EditStudentModal from '../components/EditStudentModal.jsx';
 import DataMaintenanceModal from '../components/DataMaintenanceModal.jsx';
 import { DataMaintenanceMenu } from '../components/DataMaintenanceMenu.jsx';
+import { StudentFilterSection } from '@/features/students/components/StudentFilterSection.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
 import { includesDayQuery, DAY_NAMES, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
@@ -25,6 +26,7 @@ import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
 import { getStudentComparator, STUDENT_SORT_OPTIONS } from '@/features/students/utils/sorting.js';
 import { saveFilterState, loadFilterState } from '@/features/students/utils/filter-state.js';
+import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -35,6 +37,17 @@ const REQUEST_STATES = {
 export default function StudentManagementPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
+
+  // Role-based access control: Only admin/owner can access this page
+  const membershipRole = activeOrg?.membership?.role;
+  const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole]);
+  const isAdminMember = isAdminRole(normalizedRole);
+
+  // Redirect non-admin users to instructor view
+  if (!supabaseLoading && activeOrg && !isAdminMember) {
+    return <Navigate to="/my-students" replace />;
+  }
+
   const { tagOptions, loadTags } = useStudentTags();
   const [students, setStudents] = useState([]);
   const [studentsState, setStudentsState] = useState(REQUEST_STATES.idle);
@@ -56,6 +69,7 @@ export default function StudentManagementPage() {
   const [instructorFilterId, setInstructorFilterId] = useState('');
   const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE); // Default sort by schedule
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
+  const [filteredStudents, setFilteredStudents] = useState([]); // Local client-side filtered list
 
   // Mobile fix: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
@@ -102,10 +116,10 @@ export default function StudentManagementPage() {
     setStudentsError('');
 
     try {
-      const searchParams = new URLSearchParams({ org_id: activeOrgId });
-      if (statusFilter) {
-        searchParams.set('status', statusFilter);
-      }
+      // Smart fetching: only fetch what we need
+      // If looking for active only, just fetch active; if looking for all, fetch all
+      const statusParam = statusFilter === 'all' ? 'all' : statusFilter;
+      const searchParams = new URLSearchParams({ org_id: activeOrgId, status: statusParam });
       const payload = await authenticatedFetch(`students?${searchParams.toString()}`, { session });
       setStudents(Array.isArray(payload) ? payload : []);
     } catch (error) {
@@ -177,6 +191,7 @@ export default function StudentManagementPage() {
 
   useEffect(() => {
     if (canFetch) {
+      // Refetch when statusFilter changes to get the right subset from server
       refreshRoster(true);
       void loadTags();
     } else {
@@ -193,6 +208,13 @@ export default function StudentManagementPage() {
       setFilterMode((prev) => (prev === 'all' ? 'mine' : prev));
     }
   }, [user, instructors]);
+
+  // Refetch students when statusFilter changes
+  useEffect(() => {
+    if (canFetch) {
+      void fetchStudents();
+    }
+  }, [statusFilter, canFetch, fetchStudents]);
 
   // Ensure instructor-specific filter is cleared when viewing "my students"
   useEffect(() => {
@@ -215,7 +237,55 @@ export default function StudentManagementPage() {
     }
   }, [activeOrgId, filterMode, searchQuery, dayFilter, instructorFilterId, sortBy, statusFilter]);
 
-  // Combined filter options for the control: mine, all, and per-instructor
+  // Client-side filtering and sorting - applied to all fetched students
+  useEffect(() => {
+    let result = students;
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      result = result.filter((s) => {
+        const isActive = s.is_active !== false;
+        return statusFilter === 'active' ? isActive : !isActive;
+      });
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((s) => {
+        const name = (s.name || '').toLowerCase();
+        const phone = (s.phone || '').toLowerCase();
+        const nationalId = (s.national_id || '').toLowerCase();
+        return name.includes(query) || phone.includes(query) || nationalId.includes(query);
+      });
+    }
+
+    // Filter by day of week
+    if (dayFilter !== null) {
+      result = result.filter((s) => {
+        if (!s.schedule || !Array.isArray(s.schedule)) return false;
+        return s.schedule.some((day) => day.day === dayFilter);
+      });
+    }
+
+    // Filter by instructor
+    if (instructorFilterId) {
+      result = result.filter((s) => s.assigned_instructor_id === instructorFilterId);
+    }
+
+    // Filter by mode
+    if (filterMode === 'mine' && user?.id) {
+      result = result.filter((s) => s.assigned_instructor_id === user.id);
+    }
+
+    // Sort
+    const comparator = getStudentComparator(sortBy);
+    result.sort(comparator);
+
+    setFilteredStudents(result);
+  }, [students, statusFilter, searchQuery, dayFilter, instructorFilterId, filterMode, sortBy, user?.id]);
+
+  // Combined filter options - DEPRECATED, kept for backward compat
   const combinedFilterOptions = useMemo(() => {
     const base = [
       { value: 'mine', label: 'התלמידים שלי' },
@@ -414,63 +484,9 @@ export default function StudentManagementPage() {
 
   // Compute filtered/sorted students before any early returns to satisfy hooks rules
   const displayedStudents = useMemo(() => {
-    let filtered = students;
-
-    if (statusFilter === 'active') {
-      filtered = filtered.filter((s) => s?.is_active !== false);
-    } else if (statusFilter === 'inactive') {
-      filtered = filtered.filter((s) => s?.is_active === false);
-    }
-
-    // Filter by instructor (explicit instructor takes precedence over mode)
-    if (instructorFilterId) {
-      filtered = filtered.filter((s) => s.assigned_instructor_id === instructorFilterId);
-    } else if (filterMode === 'mine' && user?.id) {
-      filtered = filtered.filter((s) => s.assigned_instructor_id === user.id);
-    }
-    // Filter by day of week if selected
-    if (dayFilter) {
-      filtered = filtered.filter((s) => Number(s?.default_day_of_week) === Number(dayFilter));
-    }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter((student) => {
-        try {
-          // Search by student name
-          const studentName = String(student.name || '').toLowerCase();
-          if (studentName.includes(query)) return true;
-
-          // Search by parent/contact name
-          const contactName = String(student.contact_name || '').toLowerCase();
-          if (contactName.includes(query)) return true;
-
-          // Search by phone number
-          const contactPhone = String(student.contact_phone || '').toLowerCase();
-          if (contactPhone.includes(query)) return true;
-
-          // Search by default day of week (Hebrew label)
-          if (includesDayQuery(student.default_day_of_week, query)) return true;
-
-          // Search by default session time
-          const sessionTime = String(student.default_session_time || '').toLowerCase();
-          if (sessionTime.includes(query)) return true;
-
-          return false;
-        } catch (error) {
-          console.error('Error filtering student:', student, error);
-          return false;
-        }
-      });
-    }
-
-    // Apply sorting
-    const comparator = getStudentComparator(sortBy, instructorMap);
-    const sorted = [...filtered].sort(comparator);
-
-    return sorted;
-  }, [students, filterMode, user?.id, searchQuery, dayFilter, instructorFilterId, sortBy, instructorMap, statusFilter]);
+    // Use the pre-computed filtered students from our comprehensive filter effect
+    return filteredStudents;
+  }, [filteredStudents]);
 
   if (supabaseLoading) {
     return (
@@ -503,29 +519,13 @@ export default function StudentManagementPage() {
       <PageLayout
       title="ניהול תלמידים"
       actions={(
-        <div className="flex items-center gap-3 self-start">
-          <div className="flex items-center gap-2 text-sm">
-            <label htmlFor="students-filter-combined" className="text-neutral-600">הצג:</label>
-            <Select
-              value={combinedFilterValue}
-              onValueChange={handleCombinedFilterChange}
-            >
-              <SelectTrigger id="students-filter-combined" className="w-[clamp(8rem,20vw,12rem)]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                {combinedFilterOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center gap-2 self-start">
           <DataMaintenanceMenu 
             onImportClick={handleOpenMaintenance}
             instructors={instructors}
             tags={tagOptions}
           />
-          <Button type="button" className="gap-sm" onClick={handleOpenAddDialog}>
+          <Button type="button" className="gap-2" onClick={handleOpenAddDialog}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             תלמיד חדש
           </Button>
@@ -544,78 +544,23 @@ export default function StudentManagementPage() {
               </p>
             ) : null}
           </div>
-          <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
-            <div className="relative sm:col-span-2">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-              <Input
-                type="text"
-                placeholder="חיפוש לפי שם, הורה, יום או שעה..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pr-10 text-sm"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-                  aria-label="נקה חיפוש"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          <DayOfWeekSelect
-            value={dayFilter}
-            onChange={setDayFilter}
-            placeholder="סינון לפי יום"
+
+          {/* New filter section */}
+          <StudentFilterSection
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            dayFilter={dayFilter}
+            onDayChange={setDayFilter}
+            instructorFilterId={instructorFilterId}
+            onInstructorFilterChange={setInstructorFilterId}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            instructors={instructors}
+            hasActiveFilters={hasActiveFilters}
+            onResetFilters={handleResetFilters}
           />
-          <div className="flex items-center gap-2 text-sm">
-            <label htmlFor="students-status" className="text-neutral-600 whitespace-nowrap">מצב:</label>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value)}
-            >
-              <SelectTrigger id="students-status" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">תלמידים פעילים</SelectItem>
-                <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
-                <SelectItem value="all">הצג הכל</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <label htmlFor="students-sort" className="text-neutral-600 whitespace-nowrap">מיון:</label>
-            <Select
-              value={sortBy}
-              onValueChange={(value) => setSortBy(value)}
-            >
-              <SelectTrigger id="students-sort" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={STUDENT_SORT_OPTIONS.SCHEDULE}>יום ושעה</SelectItem>
-                <SelectItem value={STUDENT_SORT_OPTIONS.NAME}>שם התלמיד</SelectItem>
-                <SelectItem value={STUDENT_SORT_OPTIONS.INSTRUCTOR}>מדריך</SelectItem>
-              </SelectContent>
-            </Select>
-            </div>
-            {hasActiveFilters && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleResetFilters}
-                className="gap-xs"
-                title="נקה כל המסננים"
-              >
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">נקה מסננים</span>
-              </Button>
-            )}
-          </div>
         </CardHeader>
         <CardContent>
           {isLoadingStudents ? (

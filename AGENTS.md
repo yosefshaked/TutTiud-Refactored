@@ -891,6 +891,50 @@
   - Controlled state pattern: `showAdvancedFilters` state managed in `NewSessionModal` and passed to `NewSessionForm` via props
   - Implementation uses `animate-in fade-in slide-in-from-top-2` classes for smooth expansion animation
 
+- **Student Management Filtering Refactor (2025-11)**:
+  - **StudentFilterSection** (`src/features/students/components/StudentFilterSection.jsx`): New unified filter component consolidating all filtering UI
+    - Shared component (not admin-only) - supports both admin and instructor views
+    - `showInstructorFilter` prop (default true) allows hiding instructor filter for instructor/non-admin views
+    - Basic search (always visible): Searches name/phone/national_id with RTL support
+    - Advanced filters toggle: Collapsible section with "סינון מתקדם" label and dot indicator when active but collapsed
+    - Advanced filter controls: status (active/inactive/all), day of week, instructor (optional), sort option, reset button
+    - Smooth animations: `animate-in fade-in slide-in-from-top-2` on expand/collapse
+    - RTL-first design: All text right-aligned, flex-row-reverse buttons
+  - **Smart Fetching Strategy (2025-11)** - Fixes blank state bug with optimized server calls:
+    - **Server-side filtering**: Status parameter sent to API (`status='active'` | `'inactive'` | `'all'`)
+    - **Only fetches needed data**: If admin filters to active, fetches only active; if admin filters to all, fetches all
+    - **Client-side filtering**: Remaining filters (search, day, instructor) applied client-side on fetched results
+    - **No spam**: Only one request per statusFilter change (not every keystroke/action)
+    - **Refetch trigger**: When statusFilter changes, `fetchStudents` is called via dependency in useEffect
+    - **Benefits**: 
+      - Reduces network traffic (doesn't fetch unnecessary data)
+      - No race conditions (one request at a time)
+      - Instant filtering for client-side filters (no server latency)
+      - No blank state issues (server returns correct subset, client filters it)
+  - **StudentManagementPage** (admin roster view):
+    - **Access control (2025-12)**: Admin/owner only - redirects non-admin users to `/my-students` automatically
+    - Uses `normalizeMembershipRole` and `isAdminRole` from endpoints utils to validate access
+    - Redirect happens before any data fetching to prevent unauthorized API calls
+    - Imports `StudentFilterSection` from `@/features/students/components/StudentFilterSection.jsx`
+    - Uses smart fetching with `status` parameter in fetchStudents
+    - Client-side filtering with 6 filter types: status, search, day, instructor, mode, sort
+    - Dependency on `statusFilter` in useEffect ensures refetch when status changes
+    - `displayedStudents` uses `filteredStudents` directly (no additional client-side filtering)
+    - `showInstructorFilter={true}` (default) displays full instructor filter for admins
+  - **MyStudentsPage** (instructor roster view):
+    - Imports same `StudentFilterSection` component
+    - Uses smart fetching with conditional `status` parameter (respects `canViewInactive` setting)
+    - Client-side filtering with 4 filter types: status (if canViewInactive), search, day, sort
+    - `showInstructorFilter={false}` hides instructor filter (instructor sees only their students)
+    - Respects `instructors_can_view_inactive_students` setting to hide status filter option
+  - **Rules preserved from original implementations**:
+    - Status filter: 'active' (is_active !== false) / 'inactive' (is_active === false) / 'all' (both)
+    - Day filter: Searches student.schedule array for matching day_of_week
+    - Instructor filter: Exact match on assigned_instructor_id, 'mine' mode for instructors
+    - Search: Case-insensitive substring on name/phone/national_id
+    - Sort: By schedule (day+time) or by name via getStudentComparator
+    - Filter state persistence: Via filter-state.js utility (survives page refreshes)
+
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.
 - Supabase tenant clients must set `db: { schema: 'tuttiud' }`. Existing endpoints that used default schema have been updated accordingly.
