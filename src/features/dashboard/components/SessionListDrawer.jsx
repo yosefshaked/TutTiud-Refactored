@@ -12,7 +12,7 @@ import {
 import NewSessionModal from '@/features/sessions/components/NewSessionModal'
 import SessionCardList from './SessionCardList.jsx'
 
-export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
+export function SessionListDrawer({ isOpen, onClose, cellData, orgId, onSessionCreated }) {
   const navigate = useNavigate()
   const [quickDocModal, setQuickDocModal] = useState(null) // { studentId, date }
   // Intentionally unused for now; keep in signature for future enhancements
@@ -31,7 +31,10 @@ export function SessionListDrawer({ isOpen, onClose, cellData, orgId }) {
   function handleQuickDocComplete() {
     // Modal now stays open with success state - no need to close it here
     // Data refresh will happen when user finally closes the modal
-    // Optionally reload the compliance data
+    // Trigger parent heatmap refresh to show updated compliance data
+    if (onSessionCreated) {
+      onSessionCreated()
+    }
   }
 
   function handleViewStudent(studentId) {

@@ -245,6 +245,11 @@ export function ComplianceHeatmap({ orgId }) {
     setDetailQuickDoc({ studentId: session.studentId, date: detailedDayData?.date || detailRequestDate })
   }
 
+  function handleDrawerSessionCreated() {
+    // Refetch the heatmap data when a session is created through the drawer
+    setCurrentWeekStart(prev => prev) // Trigger re-fetch by updating state
+  }
+
   function handleDetailDocCreated() {
     // Modal now stays open with success state - refresh data but don't close modal
     if (detailRequestDate) {
@@ -502,6 +507,7 @@ export function ComplianceHeatmap({ orgId }) {
           onClose={() => setSelectedCell(null)}
           cellData={selectedCell}
           orgId={orgId}
+          onSessionCreated={handleDrawerSessionCreated}
         />
       )}
 
