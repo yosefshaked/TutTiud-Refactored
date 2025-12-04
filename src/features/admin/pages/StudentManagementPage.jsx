@@ -19,7 +19,7 @@ import DataMaintenanceModal from '../components/DataMaintenanceModal.jsx';
 import { DataMaintenanceMenu } from '../components/DataMaintenanceMenu.jsx';
 import { StudentFilterSection } from '@/features/students/components/StudentFilterSection.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
-import { includesDayQuery, DAY_NAMES, formatDefaultTime } from '@/features/students/utils/schedule.js';
+import { DAY_NAMES, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
@@ -37,16 +37,7 @@ export default function StudentManagementPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
 
-  // Role-based access control: Only admin/owner can access this page
-  const membershipRole = activeOrg?.membership?.role;
-  const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole]);
-  const isAdminMember = isAdminRole(normalizedRole);
-
-  // Redirect non-admin users to instructor view
-  if (!supabaseLoading && activeOrg && !isAdminMember) {
-    return <Navigate to="/my-students" replace />;
-  }
-
+  // All hooks must be called before any conditional returns
   const { tagOptions, loadTags } = useStudentTags();
   const [students, setStudents] = useState([]);
   const [studentsState, setStudentsState] = useState(REQUEST_STATES.idle);
@@ -66,6 +57,7 @@ export default function StudentManagementPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dayFilter, setDayFilter] = useState(null);
   const [instructorFilterId, setInstructorFilterId] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
   const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE); // Default sort by schedule
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
   const [filteredStudents, setFilteredStudents] = useState([]); // Local client-side filtered list
@@ -73,6 +65,11 @@ export default function StudentManagementPage() {
   // Mobile fix: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
   const isClosingSelectRef = useRef(false);
+
+  // Role-based access control: Only admin/owner can access this page
+  const membershipRole = activeOrg?.membership?.role;
+  const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole]);
+  const isAdminMember = isAdminRole(normalizedRole);
 
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
@@ -182,6 +179,7 @@ export default function StudentManagementPage() {
         if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery);
         if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter);
         if (savedFilters.instructorFilterId !== undefined) setInstructorFilterId(savedFilters.instructorFilterId);
+        if (savedFilters.tagFilter !== undefined) setTagFilter(savedFilters.tagFilter);
         if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy);
         if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter);
       }
@@ -230,11 +228,12 @@ export default function StudentManagementPage() {
         searchQuery,
         dayFilter,
         instructorFilterId,
+        tagFilter,
         sortBy,
         statusFilter,
       });
     }
-  }, [activeOrgId, filterMode, searchQuery, dayFilter, instructorFilterId, sortBy, statusFilter]);
+  }, [activeOrgId, filterMode, searchQuery, dayFilter, instructorFilterId, tagFilter, sortBy, statusFilter]);
 
   // Client-side filtering and sorting - applied to all fetched students
   useEffect(() => {
@@ -272,6 +271,14 @@ export default function StudentManagementPage() {
       result = result.filter((s) => s.assigned_instructor_id === instructorFilterId);
     }
 
+    // Filter by tag
+    if (tagFilter) {
+      result = result.filter((s) => {
+        const studentTags = s.tags || [];
+        return studentTags.includes(tagFilter);
+      });
+    }
+
     // Filter by mode
     if (filterMode === 'mine' && user?.id) {
       result = result.filter((s) => s.assigned_instructor_id === user.id);
@@ -282,50 +289,14 @@ export default function StudentManagementPage() {
     result.sort(comparator);
 
     setFilteredStudents(result);
-  }, [students, statusFilter, searchQuery, dayFilter, instructorFilterId, filterMode, sortBy, user?.id]);
-
-  // Combined filter options - DEPRECATED, kept for backward compat
-  const combinedFilterOptions = useMemo(() => {
-    const base = [
-      { value: 'mine', label: 'התלמידים שלי' },
-      { value: 'all', label: 'כל התלמידים' },
-    ];
-    if (!Array.isArray(instructors) || instructors.length === 0) return base;
-    const instructorOptions = instructors.map((inst) => ({
-      value: `inst:${inst.id}`,
-      label: `התלמידים של ${inst.name || inst.email || inst.id}`,
-    }));
-    return base.concat(instructorOptions);
-  }, [instructors]);
-
-  const combinedFilterValue = useMemo(() => {
-    if (instructorFilterId) return `inst:${instructorFilterId}`;
-    return filterMode; // 'mine' or 'all'
-  }, [filterMode, instructorFilterId]);
-
-  const handleCombinedFilterChange = (value) => {
-    if (value === 'mine') {
-      setFilterMode('mine');
-      setInstructorFilterId('');
-      return;
-    }
-    if (value === 'all') {
-      setFilterMode('all');
-      setInstructorFilterId('');
-      return;
-    }
-    if (value.startsWith('inst:')) {
-      const id = value.slice(5);
-      setFilterMode('all');
-      setInstructorFilterId(id);
-    }
-  };
+  }, [students, statusFilter, searchQuery, dayFilter, instructorFilterId, tagFilter, filterMode, sortBy, user?.id]);
 
   const handleResetFilters = () => {
     setFilterMode('all');
     setInstructorFilterId('');
     setSearchQuery('');
     setDayFilter(null);
+    setTagFilter('');
     setSortBy(STUDENT_SORT_OPTIONS.SCHEDULE);
     setStatusFilter('active');
   };
@@ -336,10 +307,11 @@ export default function StudentManagementPage() {
       searchQuery.trim() !== '' ||
       dayFilter !== null ||
       instructorFilterId !== '' ||
+      tagFilter !== '' ||
       filterMode !== 'all' ||
       statusFilter !== 'active'
     );
-  }, [searchQuery, dayFilter, instructorFilterId, filterMode, statusFilter]);
+  }, [searchQuery, dayFilter, instructorFilterId, tagFilter, filterMode, statusFilter]);
 
   const handleOpenAddDialog = () => {
     setCreateError('');
@@ -495,6 +467,11 @@ export default function StudentManagementPage() {
     );
   }
 
+  // Redirect non-admin users to instructor view
+  if (activeOrg && !isAdminMember) {
+    return <Navigate to="/my-students" replace />;
+  }
+
   if (!user) {
     return (
       <div className="p-6 text-center text-neutral-600">
@@ -554,9 +531,12 @@ export default function StudentManagementPage() {
             onDayChange={setDayFilter}
             instructorFilterId={instructorFilterId}
             onInstructorFilterChange={setInstructorFilterId}
+            tagFilter={tagFilter}
+            onTagFilterChange={setTagFilter}
             sortBy={sortBy}
             onSortChange={setSortBy}
             instructors={instructors}
+            tags={tagOptions}
             hasActiveFilters={hasActiveFilters}
             onResetFilters={handleResetFilters}
           />

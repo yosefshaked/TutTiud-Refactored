@@ -17,9 +17,12 @@ export function StudentFilterSection({
   onDayChange,
   instructorFilterId,
   onInstructorFilterChange,
+  tagFilter,
+  onTagFilterChange,
   sortBy,
   onSortChange,
   instructors = [],
+  tags = [],
   hasActiveFilters,
   onResetFilters,
   showInstructorFilter = true, // Allow hiding instructor filter for non-admin views
@@ -28,8 +31,8 @@ export function StudentFilterSection({
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const hasAdvancedFilters = useMemo(() => {
-    return dayFilter !== null || (showInstructorFilter && instructorFilterId !== null && instructorFilterId !== '') || (showStatusFilter && statusFilter !== 'active');
-  }, [dayFilter, instructorFilterId, statusFilter, showInstructorFilter, showStatusFilter]);
+    return dayFilter !== null || (showInstructorFilter && instructorFilterId !== null && instructorFilterId !== '') || (showStatusFilter && statusFilter !== 'active') || (tagFilter !== null && tagFilter !== '');
+  }, [dayFilter, instructorFilterId, statusFilter, tagFilter, showInstructorFilter, showStatusFilter]);
 
   return (
     <div className="space-y-sm">
@@ -120,6 +123,28 @@ export function StudentFilterSection({
                   {instructors.map((inst) => (
                     <SelectItem key={inst.id} value={inst.id}>
                       {inst.name || inst.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Tag filter */}
+          {tags.length > 0 && (
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-neutral-600 text-right">
+                תגית
+              </label>
+              <Select value={tagFilter || 'all-tags'} onValueChange={(v) => onTagFilterChange(v === 'all-tags' ? '' : v)}>
+                <SelectTrigger className="text-right">
+                  <SelectValue placeholder="כל התגיות" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-tags">כל התגיות</SelectItem>
+                  {tags.map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      {tag.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

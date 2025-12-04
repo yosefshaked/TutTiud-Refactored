@@ -14,6 +14,7 @@ import { describeSchedule } from "@/features/students/utils/schedule.js"
 import { StudentFilterSection } from "@/features/students/components/StudentFilterSection.jsx"
 import { saveFilterState, loadFilterState } from "@/features/students/utils/filter-state.js"
 import { STUDENT_SORT_OPTIONS, getStudentComparator } from "@/features/students/utils/sorting.js"
+import { useStudentTags } from "@/features/students/hooks/useStudentTags.js"
 
 const REQUEST_STATUS = Object.freeze({
   idle: "idle",
@@ -25,6 +26,7 @@ const REQUEST_STATUS = Object.freeze({
 export default function MyStudentsPage() {
   const { loading: supabaseLoading } = useSupabase()
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg()
+  const { tagOptions, loadTags } = useStudentTags()
 
   const [students, setStudents] = useState([])
   const [complianceSummary, setComplianceSummary] = useState({}) // Map of student_id -> { expiredDocuments: number }
@@ -32,6 +34,7 @@ export default function MyStudentsPage() {
   const [errorMessage, setErrorMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [dayFilter, setDayFilter] = useState(null)
+  const [tagFilter, setTagFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE)
   const [canViewInactive, setCanViewInactive] = useState(false)
@@ -54,15 +57,17 @@ export default function MyStudentsPage() {
   // Load saved filter state on mount (except statusFilter which depends on permissions)
   useEffect(() => {
     if (activeOrgId) {
+      void loadTags()
       const savedFilters = loadFilterState(activeOrgId, 'instructor')
       if (savedFilters) {
         if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery)
         if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter)
+        if (savedFilters.tagFilter !== undefined) setTagFilter(savedFilters.tagFilter)
         // Don't restore statusFilter yet - wait for permission check
         if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy)
       }
     }
-  }, [activeOrgId])
+  }, [activeOrgId, loadTags])
 
   // Save filter state whenever it changes
   useEffect(() => {
@@ -70,11 +75,12 @@ export default function MyStudentsPage() {
       saveFilterState(activeOrgId, 'instructor', {
         searchQuery,
         dayFilter,
+        tagFilter,
         statusFilter,
         sortBy,
       })
     }
-  }, [activeOrgId, searchQuery, dayFilter, statusFilter, sortBy])
+  }, [activeOrgId, searchQuery, dayFilter, tagFilter, statusFilter, sortBy])
 
   // Load visibility setting and handle statusFilter restoration/reset
   useEffect(() => {
@@ -210,13 +216,15 @@ export default function MyStudentsPage() {
     return (
       searchQuery.trim() !== '' ||
       dayFilter !== null ||
+      tagFilter !== '' ||
       (canViewInactive && statusFilter !== 'active')
     )
-  }, [searchQuery, dayFilter, statusFilter, canViewInactive])
+  }, [searchQuery, dayFilter, tagFilter, statusFilter, canViewInactive])
 
   const handleResetFilters = () => {
     setSearchQuery('')
     setDayFilter(null)
+    setTagFilter('')
     setSortBy(STUDENT_SORT_OPTIONS.SCHEDULE)
     if (canViewInactive) {
       setStatusFilter('active')
@@ -257,12 +265,20 @@ export default function MyStudentsPage() {
       });
     }
 
+    // Filter by tag
+    if (tagFilter) {
+      result = result.filter((s) => {
+        const studentTags = s.tags || [];
+        return studentTags.includes(tagFilter);
+      });
+    }
+
     // Sort
     const comparator = getStudentComparator(sortBy);
     result.sort(comparator);
 
     return result;
-  }, [students, searchQuery, dayFilter, statusFilter, sortBy, canViewInactive])
+  }, [students, searchQuery, dayFilter, tagFilter, statusFilter, sortBy, canViewInactive])
 
   const hasNoResults = isSuccess && filteredStudents.length === 0
 
@@ -310,9 +326,12 @@ export default function MyStudentsPage() {
               onStatusChange={setStatusFilter}
               dayFilter={dayFilter}
               onDayChange={setDayFilter}
+              tagFilter={tagFilter}
+              onTagFilterChange={setTagFilter}
               sortBy={sortBy}
               onSortChange={setSortBy}
               instructors={[]}
+              tags={tagOptions}
               showInstructorFilter={false}
               showStatusFilter={canViewInactive}
               hasActiveFilters={hasActiveFilters}
