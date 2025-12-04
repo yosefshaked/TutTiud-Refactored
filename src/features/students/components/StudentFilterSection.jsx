@@ -23,12 +23,13 @@ export function StudentFilterSection({
   hasActiveFilters,
   onResetFilters,
   showInstructorFilter = true, // Allow hiding instructor filter for non-admin views
+  showStatusFilter = true, // Allow hiding status filter when instructors can't view inactive
 }) {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const hasAdvancedFilters = useMemo(() => {
-    return dayFilter !== null || (showInstructorFilter && instructorFilterId !== null && instructorFilterId !== '') || statusFilter !== 'active';
-  }, [dayFilter, instructorFilterId, statusFilter, showInstructorFilter]);
+    return dayFilter !== null || (showInstructorFilter && instructorFilterId !== null && instructorFilterId !== '') || (showStatusFilter && statusFilter !== 'active');
+  }, [dayFilter, instructorFilterId, statusFilter, showInstructorFilter, showStatusFilter]);
 
   return (
     <div className="space-y-sm">
@@ -72,22 +73,24 @@ export function StudentFilterSection({
           <div className="pt-2 border-t border-neutral-200 animate-in fade-in slide-in-from-top-2 duration-200">
             <p className="text-xs font-medium text-neutral-600 text-right mb-2">⚙️ מסננים מתקדמים</p>
             <div className="grid gap-sm sm:grid-cols-2 lg:grid-cols-4">
-          {/* Status filter */}
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-neutral-600 text-right">
-              סטטוס
-            </label>
-            <Select value={statusFilter} onValueChange={onStatusChange}>
-              <SelectTrigger className="text-right">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">פעילים בלבד</SelectItem>
-                <SelectItem value="inactive">לא פעילים בלבד</SelectItem>
-                <SelectItem value="all">הכל</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Status filter - only shown if showStatusFilter is true */}
+          {showStatusFilter && (
+            <div className="space-y-1">
+              <label className="block text-xs font-medium text-neutral-600 text-right">
+                סטטוס
+              </label>
+              <Select value={statusFilter} onValueChange={onStatusChange}>
+                <SelectTrigger className="text-right">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">פעילים בלבד</SelectItem>
+                  <SelectItem value="inactive">לא פעילים בלבד</SelectItem>
+                  <SelectItem value="all">הכל</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Day filter */}
           <div className="space-y-1">
