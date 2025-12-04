@@ -203,11 +203,11 @@ export default function StudentManagementPage() {
     const isInstructor = instructors.some((i) => i?.id === user.id);
     if (!isInstructor) return;
     
-    // Only set default if no saved 'admin' filter exists for this org
+    // Only set default if no saved 'admin' filter exists for this org at all (truly first visit)
     const savedFilters = loadFilterState(activeOrgId, 'admin');
-    const hasExistingPreference = savedFilters && savedFilters.instructorFilterId !== undefined && savedFilters.instructorFilterId !== '';
+    const isFirstVisit = !savedFilters || Object.keys(savedFilters).length === 0;
     
-    if (!hasExistingPreference) {
+    if (isFirstVisit) {
       setInstructorFilterId(user.id);
     }
   }, [user, instructors, activeOrgId]);
