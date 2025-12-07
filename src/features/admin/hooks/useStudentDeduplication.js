@@ -96,10 +96,6 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
       return undefined;
     }
 
-    if (trimmed === lastCheckedRef.current && lastDuplicateIdRef.current) {
-      return undefined;
-    }
-
     setLoading(true);
     setError('');
 
