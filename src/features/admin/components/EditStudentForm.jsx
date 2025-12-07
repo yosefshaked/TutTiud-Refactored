@@ -180,8 +180,15 @@ export default function EditStudentForm({
     });
   };
 
+  const trimmedNationalId = values.nationalId.trim();
   const showNameError = touched.name && !values.name.trim();
-  const showNationalIdError = touched.nationalId && (!values.nationalId.trim() || Boolean(values.nationalId.trim() && (duplicate || nationalIdError)));
+  const nationalIdErrorMessage = (() => {
+    if (!touched.nationalId) return '';
+    if (!trimmedNationalId) return 'יש להזין מספר זהות.';
+    if (nationalIdError) return nationalIdError;
+    if (duplicate) return 'מספר זהות זה כבר קיים במערכת.';
+    return '';
+  })();
   const showContactNameError = touched.contactName && !values.contactName.trim();
   const showContactPhoneError = touched.contactPhone && (!values.contactPhone.trim() || !validateIsraeliPhone(values.contactPhone));
   const showInstructorError = touched.assignedInstructorId && !values.assignedInstructorId;
@@ -241,7 +248,7 @@ export default function EditStudentForm({
             placeholder="הקלד מספר זהות למניעת כפילויות"
             disabled={isSubmitting}
             required
-            error={showNationalIdError ? 'מספר זהות זה כבר קיים במערכת.' : ''}
+            error={nationalIdErrorMessage}
             description={checkingNationalId ? 'בודק כפילויות...' : duplicate ? `התלמיד קיים: ${duplicate.name}` : ''}
           />
 
