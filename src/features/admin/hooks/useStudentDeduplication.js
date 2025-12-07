@@ -81,6 +81,10 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
 
   useEffect(() => {
     if (!session || !activeOrgId) {
+      console.log('[useNationalIdGuard] Missing session or org, clearing state', {
+        hasSession: !!session,
+        activeOrgId: activeOrgId || 'none',
+      });
       setDuplicate(null);
       lastCheckedRef.current = '';
       lastDuplicateIdRef.current = '';
@@ -88,7 +92,15 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
     }
 
     const trimmed = typeof nationalIdInput === 'string' ? nationalIdInput.trim() : '';
+    console.log('[useNationalIdGuard] Input changed', {
+      raw: nationalIdInput,
+      trimmed,
+      isEmpty: !trimmed,
+      excludeStudentId: excludeStudentId || 'none',
+    });
+
     if (!trimmed) {
+      console.log('[useNationalIdGuard] Empty input, clearing duplicate state');
       setDuplicate(null);
       setError('');
       lastCheckedRef.current = '';
@@ -96,6 +108,7 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
       return undefined;
     }
 
+    console.log('[useNationalIdGuard] Starting debounced check (250ms)', { trimmed });
     setLoading(true);
     setError('');
 
@@ -105,27 +118,60 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
           national_id: trimmed,
           exclude_id: excludeStudentId,
         });
-        const payload = await authenticatedFetch(`students/check-id?${searchParams.toString()}`, { session });
+        const url = `students/check-id?${searchParams.toString()}`;
+        console.log('[useNationalIdGuard] Calling API', {
+          url,
+          nationalId: trimmed,
+          excludeStudentId: excludeStudentId || 'none',
+          orgId: activeOrgId,
+        });
+
+        const payload = await authenticatedFetch(url, { session });
+        console.log('[useNationalIdGuard] API response received', {
+          payload,
+          exists: payload?.exists,
+          hasStudent: !!payload?.student,
+          studentId: payload?.student?.id,
+          studentName: payload?.student?.name,
+        });
+
         lastCheckedRef.current = trimmed;
 
         if (payload?.exists && payload.student) {
           // Extra safety check: ensure the duplicate is not the student being excluded
           if (excludeStudentId && payload.student.id === excludeStudentId) {
+            console.log('[useNationalIdGuard] Duplicate is excluded student, ignoring', {
+              duplicateId: payload.student.id,
+              excludeStudentId,
+            });
             setDuplicate(null);
             lastDuplicateIdRef.current = '';
           } else {
+            console.log('[useNationalIdGuard] Setting duplicate state', {
+              student: payload.student,
+              id: payload.student.id,
+              name: payload.student.name,
+            });
             setDuplicate(payload.student);
             lastDuplicateIdRef.current = payload.student.id || trimmed;
           }
         } else {
+          console.log('[useNationalIdGuard] No duplicate found, clearing state');
           setDuplicate(null);
           lastDuplicateIdRef.current = '';
         }
       } catch (err) {
+        console.error('[useNationalIdGuard] API call failed', {
+          error: err,
+          message: err?.message,
+          status: err?.status,
+          nationalId: trimmed,
+        });
         setDuplicate(null);
         lastDuplicateIdRef.current = '';
         setError(err?.message || 'אימות תעודה נכשל.');
       } finally {
+        console.log('[useNationalIdGuard] Finished check, setting loading=false');
         setLoading(false);
       }
     }, 250);

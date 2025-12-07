@@ -81,12 +81,26 @@ export default async function (context, req) {
   }
 
   const nationalId = normalizeString(req?.query?.national_id || req?.query?.nationalId || '');
+  context.log?.info?.('[students-check-id] Request received', {
+    nationalId,
+    hasNationalId: !!nationalId,
+    orgId,
+    userId,
+  });
+
   if (!nationalId) {
+    context.log?.info?.('[students-check-id] Empty national ID, returning exists=false');
     return respond(context, 200, { exists: false });
   }
 
   const excludeIdRaw = normalizeString(req?.query?.exclude_id || req?.query?.excludeId || '');
   const excludeId = excludeIdRaw && UUID_PATTERN.test(excludeIdRaw) ? excludeIdRaw : '';
+
+  context.log?.info?.('[students-check-id] Query params', {
+    nationalId,
+    excludeId: excludeId || 'none',
+    hasExcludeId: !!excludeId,
+  });
 
   let query = tenantClient
     .from('Students')
@@ -96,18 +110,41 @@ export default async function (context, req) {
 
   if (excludeId) {
     query = query.neq('id', excludeId);
+    context.log?.info?.('[students-check-id] Excluding student ID from search', { excludeId });
   }
 
   const { data, error } = await query.maybeSingle();
 
   if (error) {
-    context.log?.error?.('students-check-id failed to query roster', { message: error.message, orgId });
+    context.log?.error?.('[students-check-id] Database query failed', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      orgId,
+      nationalId,
+    });
     return respond(context, 500, { message: 'failed_to_validate_national_id' });
   }
 
   if (!data) {
+    context.log?.info?.('[students-check-id] No duplicate found', {
+      nationalId,
+      excludeId: excludeId || 'none',
+      result: 'exists=false',
+    });
     return respond(context, 200, { exists: false });
   }
+
+  context.log?.info?.('[students-check-id] Duplicate found', {
+    nationalId,
+    excludeId: excludeId || 'none',
+    duplicateStudent: {
+      id: data.id,
+      name: data.name,
+      is_active: data.is_active,
+    },
+    result: 'exists=true',
+  });
 
   return respond(context, 200, { exists: true, student: data });
 }
