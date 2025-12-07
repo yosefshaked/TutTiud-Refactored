@@ -82,6 +82,8 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
   useEffect(() => {
     if (!session || !activeOrgId) {
       setDuplicate(null);
+      lastCheckedRef.current = '';
+      lastDuplicateIdRef.current = '';
       return undefined;
     }
 
@@ -89,6 +91,8 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
     if (!trimmed) {
       setDuplicate(null);
       setError('');
+      lastCheckedRef.current = '';
+      lastDuplicateIdRef.current = '';
       return undefined;
     }
 
