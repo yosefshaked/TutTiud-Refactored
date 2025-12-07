@@ -394,7 +394,7 @@ export default async function handler(context, req) {
       }));
       continue;
     }
-    if (defaultDay.value !== undefined) {
+    if (defaultDay.value !== undefined && defaultDay.value !== null) {
       addIfChanged(updates, 'default_day_of_week', defaultDay.value, existing.default_day_of_week);
     }
 
@@ -409,7 +409,7 @@ export default async function handler(context, req) {
       }));
       continue;
     }
-    if (defaultTime.value !== undefined) {
+    if (defaultTime.value !== undefined && defaultTime.value !== null) {
       addIfChanged(updates, 'default_session_time', defaultTime.value, existing.default_session_time);
     }
 
