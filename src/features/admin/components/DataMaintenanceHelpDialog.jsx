@@ -96,6 +96,15 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
             <CardContent className="space-y-2 text-right">
               <ul className="list-disc list-inside space-y-1.5 text-sm pr-4 text-blue-900">
                 <li>
+                  <strong className="text-green-700">תאים ריקים = ללא שינוי!</strong>
+                  {' '}אם אתם לא רוצים לעדכן שדה מסוים, פשוט תשאירו את התא ריק.
+                  {' '}רק שדות עם ערכים חדשים יעודכנו.
+                </li>
+                <li>
+                  <strong className="text-amber-700">למחוק שדה אופציונלי?</strong>
+                  {' '}הקלידו <code className="bg-white px-1 rounded font-bold">CLEAR</code> או <code className="bg-white px-1 rounded font-bold">-</code> כדי למחוק את הערך (עובד בהערות, שירות ברירת מחדל, שם איש קשר).
+                </li>
+                <li>
                   <strong className="text-green-700">מספרי טלפון מתוקנים אוטומטית!</strong>
                   {' '}אפשר למחוק את הנוסחה {' '}<code className="bg-white px-1 rounded">="0546341150"</code> ולהקליד את המספר רגיל.
                   עם 0 או בלי 0 - המערכת מוסיפה אותו אוטומטית (546341150 → 0546341150).
@@ -168,6 +177,8 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
                     <p className="font-semibold text-sm mb-1">תכונות ייבוא מתקדמות</p>
                     <ul className="list-disc list-inside space-y-0.5 text-sm pr-4 text-muted-foreground">
                       <li>המערכת מזהה רק שדות ששונו ומעדכנת אותם בלבד</li>
+                      <li><strong>תאים ריקים נשארים ללא שינוי</strong> - רק תאים עם ערכים חדשים מתעדכנים</li>
+                      <li><strong>שדות אופציונליים:</strong> הקלידו <code className="bg-muted px-1 rounded text-xs">CLEAR</code> או <code className="bg-muted px-1 rounded text-xs">-</code> כדי למחוק הערות, שירות, או שם איש קשר</li>
                       <li>תמיכה מלאה בעברית (UTF-8)</li>
                       <li>הודעות שגיאה בעברית עם מספרי שורות מדויקים</li>
                       <li>עמודת "סיבת ייצוא" מתעלמת בייבוא (לא משפיעה)</li>

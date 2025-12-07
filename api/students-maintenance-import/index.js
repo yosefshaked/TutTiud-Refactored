@@ -25,6 +25,7 @@ import { parseCsv } from '../_shared/csv.js';
 
 const ID_COLUMN_CANDIDATES = ['system_uuid', 'student_id', 'id'];
 const IGNORED_COLUMNS = ['extraction_reason', 'סיבת ייצוא']; // Columns to skip during import
+const CLEAR_SENTINEL = 'CLEAR'; // Special value to explicitly clear optional fields
 const MAX_ROWS = 2000;
 
 function normalizeTagsForCsv(raw) {
@@ -40,6 +41,16 @@ function addIfChanged(updates, key, newValue, existingValue) {
   if (JSON.stringify(current) !== JSON.stringify(desired)) {
     updates[key] = newValue;
   }
+}
+
+function shouldClearField(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim().toUpperCase();
+  return trimmed === CLEAR_SENTINEL || trimmed === '-';
+}
+
+function isEmptyCell(value) {
+  return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
 }
 
 function formatFailure({ lineNumber, studentId, name, code, message }) {
@@ -303,9 +314,16 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'national_id', national.value, existing.national_id);
     }
 
-    const contactName = coerceOptionalText(raw?.contact_name ?? raw?.ContactName ?? raw?.contactName);
-    if (contactName.valid && contactName.value !== undefined && contactName.value !== null) {
-      addIfChanged(updates, 'contact_name', contactName.value, existing.contact_name);
+    const contactNameRaw = raw?.contact_name ?? raw?.ContactName ?? raw?.contactName;
+    if (!isEmptyCell(contactNameRaw)) {
+      if (shouldClearField(contactNameRaw)) {
+        addIfChanged(updates, 'contact_name', null, existing.contact_name);
+      } else {
+        const contactName = coerceOptionalText(contactNameRaw);
+        if (contactName.valid && contactName.value !== undefined && contactName.value !== null) {
+          addIfChanged(updates, 'contact_name', contactName.value, existing.contact_name);
+        }
+      }
     }
 
     const phoneCheck = validateIsraeliPhone(raw?.contact_phone ?? raw?.phone ?? raw?.contactPhone);
@@ -378,9 +396,16 @@ export default async function handler(context, req) {
       }
     }
 
-    const defaultService = coerceOptionalText(raw?.default_service ?? raw?.service);
-    if (defaultService.valid && defaultService.value !== undefined) {
-      addIfChanged(updates, 'default_service', defaultService.value, existing.default_service);
+    const defaultServiceRaw = raw?.default_service ?? raw?.service;
+    if (!isEmptyCell(defaultServiceRaw)) {
+      if (shouldClearField(defaultServiceRaw)) {
+        addIfChanged(updates, 'default_service', null, existing.default_service);
+      } else {
+        const defaultService = coerceOptionalText(defaultServiceRaw);
+        if (defaultService.valid && defaultService.value !== undefined) {
+          addIfChanged(updates, 'default_service', defaultService.value, existing.default_service);
+        }
+      }
     }
 
     const defaultDay = coerceDayOfWeek(raw?.default_day_of_week ?? raw?.day);
@@ -413,9 +438,16 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'default_session_time', defaultTime.value, existing.default_session_time);
     }
 
-    const notes = coerceOptionalText(raw?.notes ?? raw?.Notes);
-    if (notes.valid && notes.value !== undefined) {
-      addIfChanged(updates, 'notes', notes.value, existing.notes);
+    const notesRaw = raw?.notes ?? raw?.Notes;
+    if (!isEmptyCell(notesRaw)) {
+      if (shouldClearField(notesRaw)) {
+        addIfChanged(updates, 'notes', null, existing.notes);
+      } else {
+        const notes = coerceOptionalText(notesRaw);
+        if (notes.valid && notes.value !== undefined) {
+          addIfChanged(updates, 'notes', notes.value, existing.notes);
+        }
+      }
     }
 
     const tagsInput = normalizeTagsForCsv(raw?.tags ?? raw?.Tags);

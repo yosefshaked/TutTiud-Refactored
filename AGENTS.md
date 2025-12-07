@@ -1000,6 +1000,8 @@
   - Uses `papaparse` library for reliable CSV generation with proper escaping
 - **Import API** (`/api/students-maintenance-import`):
   - Ingests edited CSV text keyed by `system_uuid` (required for all rows)
+  - **Empty cell behavior (2025-12)**: Empty CSV cells are treated as "no change" - only cells with values update the database
+  - **Clearing optional fields (2025-12)**: Use sentinel value `CLEAR` or `-` to explicitly clear optional fields (notes, default_service, contact_name)
   - **Instructor name matching** (2025-12): Accepts both UUID and instructor name in `assigned_instructor_name` column
     - Name matching is case-insensitive and uses exact match against `Instructors.name` or `Instructors.email`
     - Helpful errors when name not found: "מדריך בשם 'X' לא נמצא. מדריכים זמינים: [list of 5 active names]..."
@@ -1016,6 +1018,7 @@
   - `DataMaintenanceMenu.jsx`: Dropdown menu with 4 options (export all, export problematic, export filtered, import)
   - `FilteredExportDialog.jsx`: Dialog with day/instructor/tag filter controls, requires at least one filter selection
   - `DataMaintenanceModal.jsx`: Import modal with CSV upload, validation, and error display
+  - `DataMaintenanceHelpDialog.jsx`: Comprehensive help with instructions about empty cells, CLEAR sentinel, and Excel best practices
   - `StudentManagementPage.jsx`: Integrates menu, passes instructors and tags data, refreshes roster after import
 - **Radix UI dependencies**: Uses `@radix-ui/react-dropdown-menu` for menu and `@radix-ui/react-checkbox` for filter selection
 - **API client helper**: `authenticatedFetchBlob()` in `lib/api-client.js` preserves UTF-8 BOM and binary encoding for CSV downloads
