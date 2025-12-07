@@ -63,7 +63,7 @@ export function coerceNationalId(raw) {
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
     if (!trimmed) {
-      return { value: null, valid: true, provided: true };
+      return { value: null, valid: true, provided: false };
     }
     if (NATIONAL_ID_PATTERN.test(trimmed)) {
       return { value: trimmed, valid: true, provided: true };
