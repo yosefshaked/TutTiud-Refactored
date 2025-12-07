@@ -246,7 +246,7 @@ export default function MyStudentsPage() {
   const isSuccess = status === REQUEST_STATUS.success
 
   const filteredStudents = useMemo(() => {
-    let result = students;
+    let result = [...students]; // Always copy to prevent mutation
 
     // Filter by status - if instructor cannot view inactive, this is already filtered on server
     if (canViewInactive && statusFilter !== 'all') {

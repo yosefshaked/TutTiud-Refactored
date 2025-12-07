@@ -235,7 +235,7 @@ export default function StudentManagementPage() {
 
   // Client-side filtering and sorting - applied to all fetched students
   useEffect(() => {
-    let result = students;
+    let result = [...students]; // Always copy to prevent mutation
 
     // Filter by status
     if (statusFilter !== 'all') {
