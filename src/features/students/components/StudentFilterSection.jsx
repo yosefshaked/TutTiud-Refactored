@@ -104,8 +104,7 @@ export function StudentFilterSection({
             </label>
             <DayOfWeekSelect
               value={dayFilter}
-              onValueChange={onDayChange}
-              clearable
+              onChange={onDayChange}
               placeholder="כל הימים"
             />
           </div>

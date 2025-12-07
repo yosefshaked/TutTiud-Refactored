@@ -27,6 +27,7 @@ export default function DayOfWeekSelect({ value, onChange, disabled, required, p
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value="">כל הימים</SelectItem>
         {DAYS_OF_WEEK.map((day) => (
           <SelectItem key={day.value} value={String(day.value)}>
             {day.label}
