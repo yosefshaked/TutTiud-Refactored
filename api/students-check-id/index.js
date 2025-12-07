@@ -3,7 +3,6 @@ import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
   ensureMembership,
-  isAdminRole,
   normalizeString,
   parseRequestBody,
   readEnv,
@@ -69,9 +68,12 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_verify_membership' });
   }
 
-  if (!role || !isAdminRole(role)) {
-    return respond(context, 403, { message: 'forbidden' });
+  if (!role) {
+    return respond(context, 403, { message: 'not_a_member' });
   }
+
+  // All org members can check for duplicate national IDs to prevent data quality issues
+  // Non-admin members cannot create students, so this is a read-only validation check
 
   const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
   if (tenantError) {
