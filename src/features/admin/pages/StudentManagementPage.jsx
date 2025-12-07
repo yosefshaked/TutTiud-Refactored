@@ -19,7 +19,7 @@ import DataMaintenanceModal from '../components/DataMaintenanceModal.jsx';
 import { DataMaintenanceMenu } from '../components/DataMaintenanceMenu.jsx';
 import { StudentFilterSection } from '@/features/students/components/StudentFilterSection.jsx';
 import PageLayout from '@/components/ui/PageLayout.jsx';
-import { DAY_NAMES, formatDefaultTime } from '@/features/students/utils/schedule.js';
+import { DAY_NAMES, formatDefaultTime, dayMatches } from '@/features/students/utils/schedule.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
@@ -258,10 +258,7 @@ export default function StudentManagementPage() {
 
     // Filter by day of week
     if (dayFilter !== null) {
-      result = result.filter((s) => {
-        if (!s.schedule || !Array.isArray(s.schedule)) return false;
-        return s.schedule.some((day) => day.day === dayFilter);
-      });
+      result = result.filter((s) => dayMatches(s.default_day_of_week, dayFilter));
     }
 
     // Filter by instructor

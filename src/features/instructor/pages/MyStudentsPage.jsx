@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
-import { describeSchedule } from "@/features/students/utils/schedule.js"
+import { describeSchedule, dayMatches } from "@/features/students/utils/schedule.js"
 import { StudentFilterSection } from "@/features/students/components/StudentFilterSection.jsx"
 import { saveFilterState, loadFilterState } from "@/features/students/utils/filter-state.js"
 import { STUDENT_SORT_OPTIONS, getStudentComparator } from "@/features/students/utils/sorting.js"
@@ -269,10 +269,7 @@ export default function MyStudentsPage() {
 
     // Filter by day of week
     if (dayFilter !== null) {
-      result = result.filter((s) => {
-        if (!s.schedule || !Array.isArray(s.schedule)) return false;
-        return s.schedule.some((day) => day.day === dayFilter);
-      });
+      result = result.filter((s) => dayMatches(s.default_day_of_week, dayFilter));
     }
 
     // Filter by tag
