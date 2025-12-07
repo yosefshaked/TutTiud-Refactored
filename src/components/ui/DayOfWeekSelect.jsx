@@ -11,18 +11,28 @@ const DAYS_OF_WEEK = [
   { value: 7, label: 'שבת' },
 ];
 
-export default function DayOfWeekSelect({ value, onChange, disabled, required, placeholder = 'בחר יום' }) {
+export default function DayOfWeekSelect({
+  value,
+  onChange,
+  disabled,
+  required,
+  placeholder = 'בחר יום',
+  includeAllOption = true,
+}) {
   const handleValueChange = (newValue) => {
-    if (newValue === 'all') {
+    if (includeAllOption && newValue === 'all') {
       onChange?.(null);
       return;
     }
     onChange?.(newValue ? parseInt(newValue, 10) : null);
   };
 
+  const hasSelection = value !== undefined && value !== null && value !== '';
+  const selectValue = hasSelection ? String(value) : includeAllOption ? 'all' : '';
+
   return (
     <Select
-      value={value ? String(value) : 'all'}
+      value={selectValue}
       onValueChange={handleValueChange}
       disabled={disabled}
       required={required}
@@ -31,7 +41,7 @@ export default function DayOfWeekSelect({ value, onChange, disabled, required, p
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">כל הימים</SelectItem>
+        {includeAllOption && <SelectItem value="all">כל הימים</SelectItem>}
         {DAYS_OF_WEEK.map((day) => (
           <SelectItem key={day.value} value={String(day.value)}>
             {day.label}

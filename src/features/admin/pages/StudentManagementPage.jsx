@@ -390,8 +390,15 @@ export default function StudentManagementPage() {
       await refreshRoster();
     } catch (error) {
       console.error('Failed to create student', error);
-      setCreateError(error?.message || 'יצירת התלמיד נכשלה.');
-      toast.error('יצירת התלמיד נכשלה.');
+      const message = error?.message;
+      if (message === 'duplicate_national_id') {
+        const friendly = 'מספר זהות זה כבר קיים במערכת.';
+        setCreateError(message);
+        toast.error(friendly);
+      } else {
+        setCreateError(message || 'יצירת התלמיד נכשלה.');
+        toast.error('יצירת התלמיד נכשלה.');
+      }
     } finally {
       setIsCreatingStudent(false);
     }

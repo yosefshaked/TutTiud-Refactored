@@ -179,6 +179,7 @@ export default function AddStudentForm({
     if (!trimmedNationalId) return 'יש להזין מספר זהות.';
     if (nationalIdError) return nationalIdError;
     if (duplicate) return 'מספר זהות זה כבר קיים במערכת.';
+    if (error === 'duplicate_national_id') return 'מספר זהות זה כבר קיים במערכת.';
     return '';
   })();
   const showContactNameError = touched.contactName && !values.contactName.trim();
@@ -189,6 +190,12 @@ export default function AddStudentForm({
 
   return (
     <form id="add-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
+      {error && error !== 'duplicate_national_id' && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+          {error}
+        </div>
+      )}
+
       <div className="space-y-5 divide-y divide-border">
         <div className="space-y-5 py-1">
           <TextField
