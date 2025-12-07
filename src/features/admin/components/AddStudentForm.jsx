@@ -175,11 +175,10 @@ export default function AddStudentForm({
   const trimmedNationalId = values.nationalId.trim();
   const showNameError = touched.name && !values.name.trim();
   const nationalIdErrorMessage = (() => {
-    if (!touched.nationalId) return '';
-    if (!trimmedNationalId) return 'יש להזין מספר זהות.';
-    if (nationalIdError) return nationalIdError;
     if (duplicate) return 'מספר זהות זה כבר קיים במערכת.';
+    if (nationalIdError) return nationalIdError;
     if (error === 'duplicate_national_id') return 'מספר זהות זה כבר קיים במערכת.';
+    if (touched.nationalId && !trimmedNationalId) return 'יש להזין מספר זהות.';
     return '';
   })();
   const showContactNameError = touched.contactName && !values.contactName.trim();
