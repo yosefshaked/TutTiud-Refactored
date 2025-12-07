@@ -106,11 +106,15 @@ export default async function handler(context, req) {
   }
 
   // Optional tag mappings: { "unmatched_tag_name": "target_tag_id" }
+  // We parse first, then validate against catalog after it's loaded.
   const tagMappings = new Map();
   if (body?.tag_mappings && typeof body.tag_mappings === 'object') {
     for (const [unmatchedName, targetTagId] of Object.entries(body.tag_mappings)) {
       if (typeof targetTagId === 'string' && UUID_PATTERN.test(targetTagId)) {
-        tagMappings.set(normalizeString(unmatchedName).toLowerCase(), targetTagId);
+        const normalized = normalizeString(unmatchedName);
+        if (normalized) {
+          tagMappings.set(normalized.toLowerCase(), targetTagId);
+        }
       }
     }
   }
@@ -179,6 +183,24 @@ export default async function handler(context, req) {
         tagById.set(tag.id, tag);
         tagByName.set(normalizeString(tag.name).toLowerCase(), tag.id);
       }
+    }
+  }
+
+  // Validate tag mappings against catalog to prevent typos from persisting unknown IDs
+  if (tagMappings.size > 0) {
+    const invalidMappings = [];
+    for (const [nameKey, targetTagId] of tagMappings.entries()) {
+      if (!tagById.has(targetTagId)) {
+        invalidMappings.push({ source: nameKey, target: targetTagId });
+      }
+    }
+    if (invalidMappings.length > 0) {
+      return respond(context, 400, {
+        code: 'invalid_tag_mappings',
+        message: 'Mappings must point to existing tags.',
+        invalid_mappings: invalidMappings,
+        available_tags: Array.from(tagById.values()).map(tag => ({ id: tag.id, name: tag.name })),
+      });
     }
   }
 
@@ -282,7 +304,7 @@ export default async function handler(context, req) {
     }
 
     const contactName = coerceOptionalText(raw?.contact_name ?? raw?.ContactName ?? raw?.contactName);
-    if (contactName.valid && contactName.value !== undefined) {
+    if (contactName.valid && contactName.value !== undefined && contactName.value !== null) {
       addIfChanged(updates, 'contact_name', contactName.value, existing.contact_name);
     }
 
@@ -297,7 +319,7 @@ export default async function handler(context, req) {
       }));
       continue;
     }
-    if (phoneCheck.value !== undefined) {
+    if (phoneCheck.value !== undefined && phoneCheck.value !== null) {
       addIfChanged(updates, 'contact_phone', phoneCheck.value, existing.contact_phone);
     }
 
