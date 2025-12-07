@@ -39,12 +39,12 @@ The Student Data Maintenance feature provides admins with tools to export, edit,
 - מספר זהות (national_id)
 - שם איש קשר (contact_name)
 - טלפון (contact_phone)
-- שם מדריך (assigned_instructor_name) - **Name, not UUID**
+- שם מדריך (assigned_instructor_name)**Name, not UUID**
 - שירות ברירת מחדל (default_service)
 - יום ברירת מחדל (default_day_of_week)
 - שעת מפגש ברירת מחדל (default_session_time)
 - הערות (notes)
-- תגיות (tags)
+- תגיות (tags)**Name, not UUID**
 - פעיל (is_active)
 - מזהה מערכת (UUID) (system_uuid)
 
@@ -339,10 +339,8 @@ The Student Data Maintenance feature provides admins with tools to export, edit,
 
 **Steps:**
 1. Export CSV
-2. Edit tags column (comma-separated UUIDs)
+2. Edit tags column (text)
 3. Import
-
-**Expected Results:**
 
 **Expected Results:**
 - Import fails for that row
@@ -355,7 +353,7 @@ The Student Data Maintenance feature provides admins with tools to export, edit,
 2. Import
 
 **Expected Results:**
-2. Edit tags column (comma-separated UUIDs)
+2. Edit tags column (text)
 3. Import
 
 **Expected Results:**
