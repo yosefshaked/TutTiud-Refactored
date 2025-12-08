@@ -75,7 +75,7 @@ export function DataMaintenanceMenu({ onImportClick, instructors = [], tags = []
       />
       <DataMaintenanceHelpDialog
         open={showHelpDialog}
-        onClose={() => setShowHelpDialog(false)}
+        onOpenChange={setShowHelpDialog}
       />
       <DropdownMenu dir="rtl">
       <DropdownMenuTrigger asChild>

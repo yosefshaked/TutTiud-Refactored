@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { toast } from 'sonner';
-import { Download, FileWarning, UploadCloud, HelpCircle, ArrowRight } from 'lucide-react';
+import { Download, FileWarning, UploadCloud, HelpCircle, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -243,7 +244,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose?.(); }}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl" hideDefaultClose={showHelp}>
         <DialogHeader>
           <DialogTitle>
             {showHelp 
@@ -254,6 +255,14 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
               ? 'תצוגה מקדימה - אשר שינויים'
               : 'תחזוקת נתונים (CSV)'}
           </DialogTitle>
+          {showHelp ? (
+            <DialogPrimitive.Close
+              className="absolute left-4 top-4 sm:left-auto sm:right-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">סגור</span>
+            </DialogPrimitive.Close>
+          ) : null}
         </DialogHeader>
 
         {showHelp ? (
