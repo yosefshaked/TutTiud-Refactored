@@ -175,15 +175,21 @@ export function coerceSessionTime(value) {
     return { value: null, valid: true };
   }
 
-  // Accept HH:MM format and normalize to HH:MM:SS (database expects time with seconds)
+  // Accept HH:MM format (store as-is without seconds)
   const hhmmPattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
   const hhmmMatch = trimmed.match(hhmmPattern);
   if (hhmmMatch) {
-    return { value: `${trimmed}:00`, valid: true };
+    return { value: trimmed, valid: true };
   }
 
-  // Accept full time format (HH:MM:SS with optional timezone)
+  // Accept full time format (HH:MM:SS with optional timezone) - extract just HH:MM
   if (TIME_PATTERN.test(trimmed)) {
+    // Extract HH:MM from formats like "16:30:00", "16:30:00+00", "16:30:00Z"
+    const timeOnly = trimmed.split('+')[0].split('Z')[0];
+    const parts = timeOnly.split(':');
+    if (parts.length >= 2) {
+      return { value: `${parts[0]}:${parts[1]}`, valid: true };
+    }
     return { value: trimmed, valid: true };
   }
 

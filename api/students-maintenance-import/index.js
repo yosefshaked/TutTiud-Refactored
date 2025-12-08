@@ -35,10 +35,38 @@ function normalizeTagsForCsv(raw) {
   return raw.replace(/[;|]/g, ',');
 }
 
+function normalizeTimeForComparison(time) {
+  if (!time) return null;
+  if (typeof time !== 'string') return time;
+  
+  // Normalize time format for comparison: extract HH:MM without timezone
+  // Handles: "16:30:00", "16:30:00+00", "16:30:00Z", "16:30", etc.
+  const timeOnly = time.split('+')[0].split('Z')[0];
+  const parts = timeOnly.split(':');
+  
+  // Return HH:MM format (with leading zeros)
+  if (parts.length >= 2) {
+    const hours = parts[0].padStart(2, '0');
+    const minutes = parts[1].padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+  
+  return time;
+}
+
 function addIfChanged(updates, key, newValue, existingValue) {
   const current = existingValue === undefined || existingValue === null ? null : existingValue;
   const desired = newValue === undefined || newValue === null ? null : newValue;
-  if (JSON.stringify(current) !== JSON.stringify(desired)) {
+  
+  // For time fields, normalize both sides before comparison
+  let currentCompare = current;
+  let desiredCompare = desired;
+  if (key === 'default_session_time') {
+    currentCompare = normalizeTimeForComparison(current);
+    desiredCompare = normalizeTimeForComparison(desired);
+  }
+  
+  if (JSON.stringify(currentCompare) !== JSON.stringify(desiredCompare)) {
     updates[key] = newValue;
   }
 }

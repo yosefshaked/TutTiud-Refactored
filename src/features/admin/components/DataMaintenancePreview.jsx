@@ -39,6 +39,17 @@ function formatFieldValue(field, value, instructors = []) {
     return !isNaN(dayNum) && dayNum >= 0 && dayNum <= 6 ? DAY_LABELS[dayNum] : value;
   }
 
+  if (field === 'default_session_time') {
+    // Normalize time display to HH:MM format (strip timezone if present)
+    if (typeof value === 'string') {
+      // Handle formats like "16:00", "16:00:00", "16:00:00+00", etc.
+      const timeOnly = value.split('+')[0].split('Z')[0];
+      const parts = timeOnly.split(':');
+      return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : value;
+    }
+    return value;
+  }
+
   if (field === 'is_active') {
     return value === true || value === 'true' ? 'פעיל' : 'לא פעיל';
   }
