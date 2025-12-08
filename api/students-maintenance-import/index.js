@@ -139,6 +139,50 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'missing_id_column' });
   }
 
+  // Validate column names - detect unrecognized columns to help users catch typos
+  const RECOGNIZED_COLUMNS = [
+    // UUID columns
+    'system_uuid', 'student_id', 'id', 'מזהה מערכת (uuid)', 'מזהה מערכת',
+    // Data columns (English)
+    'name', 'student_name',
+    'national_id', 'nationalid',
+    'contact_name', 'contactname',
+    'contact_phone', 'contactphone',
+    'assigned_instructor_name', 'assigned_instructor', 'instructor_name', 'instructor',
+    'default_service', 'service',
+    'default_day_of_week', 'day',
+    'default_session_time', 'session_time', 'sessiontime',
+    'notes',
+    'tags', 'tag_ids',
+    'is_active', 'active', 'status',
+    // Data columns (Hebrew)
+    'שם התלמיד',
+    'מספר זהות',
+    'שם איש קשר',
+    'טלפון',
+    'שם מדריך',
+    'שירות ברירת מחדל',
+    'יום ברירת מחדל',
+    'שעת מפגש ברירת מחדל',
+    'הערות',
+    'תגיות',
+    'פעיל',
+    // Export metadata (can be safely ignored)
+    'extraction_reason', 'סיבת ייצוא',
+  ];
+
+  const unrecognizedColumns = parsed.columns.filter(
+    (col) => !RECOGNIZED_COLUMNS.includes(col.toLowerCase())
+  );
+
+  if (unrecognizedColumns.length > 0) {
+    return respond(context, 400, {
+      message: 'unrecognized_columns',
+      columns: unrecognizedColumns,
+      hint: 'Check for typos in column names. Supported columns include: system_uuid, name, national_id, contact_name, contact_phone, assigned_instructor_name, default_service, default_day_of_week, default_session_time, notes, tags, is_active (or Hebrew equivalents).',
+    });
+  }
+
   const stagedRows = parsed.rows.map((row, index) => ({
     lineNumber: index + 2, // account for header
     studentId: normalizeString(row[idColumn]),

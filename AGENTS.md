@@ -1019,6 +1019,11 @@
     - Tags: `tags`, `tag_ids`, `Tags`, `תגיות`
     - Active: `is_active`, `active`, `status`, `פעיל` (supports Hebrew כן/לא)
   - **Round-trip compatibility**: CSVs exported with Hebrew headers can be re-imported without modification
+  - **Column name validation (2025-12)**: Import validates all column names and rejects CSVs with unrecognized columns
+    - Returns `unrecognized_columns` error with list of invalid column names and helpful hint
+    - Prevents confusion from typos in column headers (e.g., "namee" instead of "name")
+    - Frontend displays detailed error message showing which columns are invalid
+    - Recognized columns: All English/Hebrew field names listed above, plus metadata columns (extraction_reason, סיבת ייצוא)
   - **Empty cell behavior (2025-12)**: Empty CSV cells are treated as "no change" - only cells with values update the database
   - **Clearing optional fields (2025-12)**: Use sentinel value `CLEAR` or `-` to explicitly clear optional fields (notes, default_service, contact_name)
   - **Instructor name matching** (2025-12): Accepts both UUID and instructor name in `assigned_instructor_name` column

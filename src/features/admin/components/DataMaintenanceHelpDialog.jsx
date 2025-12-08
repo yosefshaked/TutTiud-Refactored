@@ -111,6 +111,7 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
                   עם 0 או בלי 0 - המערכת מוסיפה אותו אוטומטית (546341150 → 0546341150).
                 </li>
                 <li><strong>אל תשנו את עמודת UUID</strong> - זה המזהה שמחבר לתלמיד במערכת</li>
+                <li><strong className="text-red-700">אל תשנו שמות עמודות!</strong> המערכת מזהה עמודות בשמות קבועים (עברית או אנגלית). שינוי שם עמודה יגרום לשגיאה.</li>
                 <li><strong>שמרו תמיד כ-CSV</strong>, לא XLSX! File → Save As → CSV (UTF-8)</li>
                 <li><strong>שמות מדריכים עובדים</strong> - לא צריך UUID, פשוט שם המדריך. <span className="text-amber-700">מדריכים לא פעילים יידחו.</span></li>
                 <li><strong>ימים בשבוע:</strong> השתמשו בשמות העבריים (ראשון, שני, שלישי וכו')</li>

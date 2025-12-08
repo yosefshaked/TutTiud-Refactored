@@ -158,6 +158,15 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
         return;
       }
 
+      // If unrecognized columns, show detailed error
+      if (payload.code === 'unrecognized_columns') {
+        const columnList = payload.columns?.join(', ') || '';
+        const errorMsg = `שגיאת עמודות: הקובץ מכיל עמודות לא מזוהות: ${columnList}. ${payload.hint || 'בדוק שגיאות כתיב בשמות העמודות.'}`;
+        setImportError(errorMsg);
+        toast.error(errorMsg, { duration: 8000 }); // Longer duration for detailed error
+        return;
+      }
+
       // Show preview
       if (payload.dry_run) {
         setPreviewData(payload);
@@ -199,6 +208,15 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
           excluded_ids: excludedIds, // IDs user deselected
         },
       });
+
+      // Handle unrecognized columns error (shouldn't happen in apply phase, but be safe)
+      if (payload.code === 'unrecognized_columns') {
+        const columnList = payload.columns?.join(', ') || '';
+        const errorMsg = `שגיאת עמודות: ${columnList}. ${payload.hint || ''}`;
+        setImportError(errorMsg);
+        toast.error(errorMsg, { duration: 8000 });
+        return;
+      }
 
       setSummary(payload);
       setPreviewData(null); // Clear preview
