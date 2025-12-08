@@ -45,9 +45,10 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
                 <li><strong>ערכו באקסל</strong> - פתחו הקובץ ושנו מה שצריך (אל תגעו בעמודת UUID)</li>
                 <li><strong>שמרו כ-CSV</strong> - File → Save As → CSV (UTF-8)</li>
                 <li><strong>ייבאו</strong> - בחרו "ייבוא עדכונים" והעלו את הקובץ</li>
+                <li><strong>אשרו שינויים</strong> - בדקו את התצוגה המקדימה, בטלו שינויים לא רצויים, ואשרו</li>
               </ol>
-              <p className="text-xs text-amber-600 font-medium mt-3 pr-4">
-                ⚠️ שינויים מיידיים - אין "בטל". נסו עם 5-10 תלמידים לפני ייבוא גדול.
+              <p className="text-xs text-green-600 font-medium mt-3 pr-4">
+                ✅ תצוגה מקדימה - רואים בדיוק מה משתנה לפני האישור. בטוחים ושקופים!
               </p>
             </CardContent>
           </Card>
@@ -119,6 +120,25 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
           </Card>
 
           {/* Restrictions */}
+          <Card className="border-green-200 bg-green-50/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base text-green-900">
+                <CheckCircle className="h-5 w-5" />
+                תצוגה מקדימה חכמה
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-right">
+              <ul className="list-disc list-inside space-y-1 text-sm pr-4 text-green-900">
+                <li><strong>רואים הכל לפני השינוי</strong> - ערך נוכחי מול ערך חדש לכל שדה</li>
+                <li><strong>בחירה סלקטיבית</strong> - תוכלו לבטל שינויים בודדים או תלמידים ספציפיים</li>
+                <li><strong>הרחבה/כיווץ</strong> - לחצו על כל תלמיד לראות פירוט מלא של השינויים</li>
+                <li><strong>תרגום חכם</strong> - שמות מדריכים, ימים בשבוע, וסטטוסים מוצגים בעברית</li>
+                <li><strong>בטל לפני אישור</strong> - כל התלמידים נבחרים כברירת מחדל, אבל אפשר לבטל סימון בנפרד</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Restrictions */}
           <Card className="border-amber-200 bg-amber-50/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base text-amber-900">
@@ -129,7 +149,6 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
             <CardContent className="text-right">
               <ul className="list-disc list-inside space-y-1 text-sm pr-4 text-amber-900">
                 <li><strong>מקסימום 2000 שורות</strong> בייבוא אחד</li>
-                <li><strong>שינויים מיידיים</strong> - אין אפשרות לבטל</li>
                 <li><strong>מספרי זהות ייחודיים</strong> - כפילויות נחסמות</li>
                 <li><strong>מדריכים לא פעילים</strong> - לא ניתן לשבץ מדריך שהושבת במערכת</li>
                 <li><strong>רק קובצי CSV</strong> - קובצי XLSX לא נתמכים, שמרו כ-CSV בלבד</li>
@@ -176,6 +195,8 @@ export function DataMaintenanceHelpDialog({ open, onClose }) {
                   <div>
                     <p className="font-semibold text-sm mb-1">תכונות ייבוא מתקדמות</p>
                     <ul className="list-disc list-inside space-y-0.5 text-sm pr-4 text-muted-foreground">
+                      <li><strong>תצוגה מקדימה אינטראקטיבית:</strong> רואים כל שינוי לפני שהוא קורה - ערך ישן (אדום) לעומת ערך חדש (ירוק)</li>
+                      <li><strong>בחירה סלקטיבית:</strong> אפשר לבטל שינויים לתלמידים ספציפיים, רק מה שנבחר יעודכן</li>
                       <li>המערכת מזהה רק שדות ששונו ומעדכנת אותם בלבד</li>
                       <li><strong>תאים ריקים נשארים ללא שינוי</strong> - רק תאים עם ערכים חדשים מתעדכנים</li>
                       <li><strong>שדות אופציונליים:</strong> הקלידו <code className="bg-muted px-1 rounded text-xs">CLEAR</code> או <code className="bg-muted px-1 rounded text-xs">-</code> כדי למחוק הערות, שירות, או שם איש קשר</li>

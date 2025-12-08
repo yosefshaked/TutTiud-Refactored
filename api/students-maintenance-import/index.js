@@ -91,6 +91,10 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'missing_csv' });
   }
 
+  // Support dry-run mode for preview
+  const dryRun = body?.dry_run === true;
+  const excludedIds = Array.isArray(body?.excluded_ids) ? body.excluded_ids : [];
+
   let role;
   try {
     role = await ensureMembership(supabase, orgId, userId);
@@ -583,7 +587,45 @@ export default async function handler(context, req) {
   }
 
   const blockedIds = new Set(failures.map((failure) => failure.student_id));
-  const actionableCandidates = filteredCandidates.filter((candidate) => !blockedIds.has(candidate.studentId));
+  let actionableCandidates = filteredCandidates.filter((candidate) => !blockedIds.has(candidate.studentId));
+
+  // In dry-run mode, return preview without applying changes
+  if (dryRun) {
+    const previews = actionableCandidates.map((candidate) => {
+      const { updates, studentId, displayName, existing, lineNumber } = candidate;
+      const changes = {};
+      
+      for (const [field, newValue] of Object.entries(updates || {})) {
+        changes[field] = {
+          old: existing[field],
+          new: newValue,
+        };
+      }
+      
+      return {
+        student_id: studentId,
+        name: displayName,
+        line_number: lineNumber,
+        changes,
+        has_changes: Object.keys(changes).length > 0,
+      };
+    });
+    
+    return respond(context, 200, {
+      dry_run: true,
+      total_rows: stagedRows.length,
+      preview_count: previews.length,
+      failed_count: failures.length,
+      previews,
+      failed: failures,
+    });
+  }
+
+  // Filter out excluded IDs if provided (user deselected some changes)
+  if (excludedIds.length > 0) {
+    const excludedSet = new Set(excludedIds);
+    actionableCandidates = actionableCandidates.filter((candidate) => !excludedSet.has(candidate.studentId));
+  }
 
   const successes = [];
   for (const candidate of actionableCandidates) {

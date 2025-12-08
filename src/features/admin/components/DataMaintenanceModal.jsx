@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { authenticatedFetch, authenticatedFetchBlob } from '@/lib/api-client.js';
+import DataMaintenancePreview from './DataMaintenancePreview.jsx';
 
 function buildErrorLabel(entry) {
   const lineLabel = entry.line_number ? `שורה ${entry.line_number}: ` : '';
@@ -28,6 +29,12 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
   const [unmatchedTags, setUnmatchedTags] = useState([]);
   const [availableTags, setAvailableTags] = useState([]);
   const [tagMappings, setTagMappings] = useState({});
+  const [csvText, setCsvText] = useState('');
+  
+  // Preview state
+  const [previewData, setPreviewData] = useState(null);
+  const [instructors, setInstructors] = useState([]);
+  const [isApplying, setIsApplying] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -39,8 +46,28 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
       setUnmatchedTags([]);
       setAvailableTags([]);
       setTagMappings({});
+      setCsvText('');
+      setPreviewData(null);
+      setInstructors([]);
+      setIsApplying(false);
     }
   }, [open]);
+
+  // Load instructors when modal opens (needed for preview display)
+  useEffect(() => {
+    async function loadInstructors() {
+      if (!open || !orgId) return;
+      try {
+        const searchParams = new URLSearchParams({ org_id: orgId });
+        const roster = await authenticatedFetch(`instructors?${searchParams.toString()}`);
+        setInstructors(Array.isArray(roster) ? roster : []);
+      } catch (error) {
+        console.error('Failed to load instructors for preview', error);
+        setInstructors([]);
+      }
+    }
+    loadInstructors();
+  }, [open, orgId]);
 
   const failureEntries = useMemo(() => {
     return Array.isArray(summary?.failed) ? summary.failed : [];
@@ -111,6 +138,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
 
     try {
       const text = await selectedFile.text();
+      setCsvText(text); // Store for later use when confirming
       
       const payload = await authenticatedFetch('students-maintenance-import', {
         method: 'POST',
@@ -118,6 +146,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
           org_id: orgId,
           csv_text: text,
           tag_mappings: retryMappings,
+          dry_run: true, // Request preview first
         },
       });
 
@@ -129,6 +158,13 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
         return;
       }
 
+      // Show preview
+      if (payload.dry_run) {
+        setPreviewData(payload);
+        return;
+      }
+
+      // This shouldn't happen with dry_run: true, but handle it just in case
       setSummary(payload);
       toast.success('ייבוא העדכונים הושלם.');
       if (typeof onRefresh === 'function') {
@@ -143,14 +179,71 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
     }
   };
 
+  const handleConfirmChanges = async (excludedIds) => {
+    if (!orgId || !csvText) {
+      toast.error('נתונים חסרים לביצוע העדכון.');
+      return;
+    }
+
+    setIsApplying(true);
+    setImportError('');
+
+    try {
+      const payload = await authenticatedFetch('students-maintenance-import', {
+        method: 'POST',
+        body: {
+          org_id: orgId,
+          csv_text: csvText,
+          tag_mappings: tagMappings,
+          dry_run: false, // Actually apply changes
+          excluded_ids: excludedIds, // IDs user deselected
+        },
+      });
+
+      setSummary(payload);
+      setPreviewData(null); // Clear preview
+      toast.success('ייבוא העדכונים הושלם.');
+      if (typeof onRefresh === 'function') {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Failed to apply maintenance CSV changes', error);
+      setImportError(error?.message || 'ייבוא הקובץ נכשל.');
+      toast.error(error?.message || 'ייבוא הקובץ נכשל.');
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setPreviewData(null);
+    setCsvText('');
+  };
+
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose?.(); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{unmatchedTags.length > 0 ? 'מיפוי תוויות' : 'תחזוקת נתונים (CSV)'}</DialogTitle>
+          <DialogTitle>
+            {unmatchedTags.length > 0 
+              ? 'מיפוי תוויות' 
+              : previewData 
+              ? 'תצוגה מקדימה - אשר שינויים'
+              : 'תחזוקת נתונים (CSV)'}
+          </DialogTitle>
         </DialogHeader>
 
-        {unmatchedTags.length > 0 ? (
+        {previewData ? (
+          // Preview mode
+          <DataMaintenancePreview
+            previews={previewData.previews || []}
+            failures={previewData.failed || []}
+            instructors={instructors}
+            onConfirm={handleConfirmChanges}
+            onCancel={handleCancelPreview}
+            isApplying={isApplying}
+          />
+        ) : unmatchedTags.length > 0 ? (
           // Tag Mapping UI
           <div className="space-y-4 text-sm text-neutral-700 text-right" dir="rtl">
             <p className="text-neutral-600">

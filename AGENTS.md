@@ -1000,6 +1000,11 @@
   - **Instructor column**: Exports instructor NAME (not UUID) for user-friendly editing
   - Uses `papaparse` library for reliable CSV generation with proper escaping
 - **Import API** (`/api/students-maintenance-import`):
+  - **Preview/dry-run mode (2025-12)**: Supports `dry_run: true` parameter to return preview without applying changes
+    - Preview response includes old vs. new values for each field change
+    - Returns student name, ID, line number, and detailed change breakdown
+    - Validation errors included in preview before any data is modified
+  - **Selective application (2025-12)**: Accepts `excluded_ids` array to skip specific students when applying changes
   - Ingests edited CSV text keyed by `system_uuid` (required for all rows)
   - **Empty cell behavior (2025-12)**: Empty CSV cells are treated as "no change" - only cells with values update the database
   - **Clearing optional fields (2025-12)**: Use sentinel value `CLEAR` or `-` to explicitly clear optional fields (notes, default_service, contact_name)
@@ -1018,9 +1023,18 @@
 - **Frontend components**:
   - `DataMaintenanceMenu.jsx`: Dropdown menu with 4 options (export all, export problematic, export filtered, import)
   - `FilteredExportDialog.jsx`: Dialog with day/instructor/tag filter controls, requires at least one filter selection
-  - `DataMaintenanceModal.jsx`: Import modal with CSV upload, validation, and error display
-  - `DataMaintenanceHelpDialog.jsx`: Comprehensive help with instructions about empty cells, CLEAR sentinel, and Excel best practices
+  - `DataMaintenanceModal.jsx`: Import modal with three-stage workflow:
+    1. Upload CSV → Backend validates and returns preview
+    2. Preview & Select → User reviews changes, can deselect specific students
+    3. Apply & Summary → Only approved changes written to database
+  - `DataMaintenancePreview.jsx` (2025-12): Interactive preview component showing:
+    - Side-by-side comparison: current value (red X) vs. new value (green checkmark)
+    - Expandable cards per student with detailed field-by-field changes
+    - Checkbox selection: individual students or "select all"
+    - Smart formatting: instructor names, Hebrew days, active status in Hebrew
+    - Visual indicators: change counts, validation errors in red
+  - `DataMaintenanceHelpDialog.jsx`: Comprehensive help with instructions about preview workflow, empty cells, CLEAR sentinel, and Excel best practices
   - `StudentManagementPage.jsx`: Integrates menu, passes instructors and tags data, refreshes roster after import
-- **Radix UI dependencies**: Uses `@radix-ui/react-dropdown-menu` for menu and `@radix-ui/react-checkbox` for filter selection
+- **Radix UI dependencies**: Uses `@radix-ui/react-dropdown-menu` for menu and `@radix-ui/react-checkbox` for filter selection and preview
 - **API client helper**: `authenticatedFetchBlob()` in `lib/api-client.js` preserves UTF-8 BOM and binary encoding for CSV downloads
 - **Comprehensive QA documentation**: See `docs/student-data-maintenance-qa.md` for full test plan covering all scenarios, edge cases, and validation rules
