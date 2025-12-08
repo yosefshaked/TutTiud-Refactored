@@ -325,7 +325,8 @@
 - File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
 
 ### Polymorphic Documents Table Architecture (2025-11)
-- **Schema**: Centralized `tuttiud.Documents` table replaces JSON-based file storage in `Students.files`, `Instructors.files`, and `Settings.org_documents`.
+- **Schema**: Centralized `tuttiud.Documents` table is the **source of truth** for all file metadata. Legacy JSON columns (`Students.files`, `Instructors.files`, `Settings.org_documents`) are **DEPRECATED** and no longer created in fresh deployments.
+- **Legacy API Endpoints**: `/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*` endpoints still exist for backward compatibility with old clients but should NOT be used for new development. All new code must use `/api/documents`.
 - **Discriminator pattern**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID) identifies which entity owns each document.
 - **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
 - **Indexes**: Composite index on (entity_type, entity_id) for fast entity-scoped queries; individual indexes on uploaded_at, expiration_date, hash.
@@ -335,14 +336,12 @@
   - INSERT requires `uploaded_by` matches authenticated user ID
   - UPDATE/DELETE allowed for authenticated users (entity-level permission checks in API layer)
   - API layer (`validateEntityAccess`) enforces org membership and entity-specific permissions
-- **Migration strategy** (non-destructive):
-  - Setup script includes `DO $$` block that copies from JSON columns to Documents table
-  - **Organization documents migration**: Requires visiting Settings page first to save org_id to Settings table
-  - Script reads `_system_org_id` from Settings automatically (saved by frontend on Settings page load)
-  - If org_id not found, org documents migration is skipped with a notice (student/instructor files still migrate)
-  - Verifies counts match after migration; RAISES EXCEPTION if data integrity check fails
-  - Original JSON columns retained for rollback capability and backward compatibility
-  - Migration runs idempotently (safe to rerun on existing tenants)
+- **Migration strategy** (DEPRECATED FOR FRESH DEPLOYMENTS):
+  - The SQL setup script NO LONGER creates `Students.files` or `Instructors.files` columns on fresh deployments
+  - The SQL setup script NO LONGER attempts to migrate from legacy JSON columns to Documents table
+  - For existing deployments with data in legacy columns: manual migration required before column removal
+  - Documents table is the ONLY file storage mechanism for new deployments
+  - Legacy API endpoints (`/api/student-files*`, `/api/instructor-files*`) remain for backward compatibility but query Documents table, not JSON columns
 - **API Endpoints**:
   - **`/api/documents`** (GET/POST/PUT/DELETE): Unified polymorphic endpoint for all document types
     - GET: `?entity_type=student&entity_id=<uuid>` returns all documents for that entity
@@ -382,7 +381,7 @@
   - Easy to extend to new entity types without duplicating logic
 - **Backward compatibility**: JSON columns in Students/Instructors/Settings remain intact; migration copies data without deletion, allowing gradual transition and rollback if needed.
 
-### Organizational Documents (2025-11)
+- **Backward compatibility**: Legacy API endpoints (`/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*`) remain functional for old clients but now proxy to Documents table. **Do NOT use these for new development** - use `/api/documents` instead.
 - `/api/org-documents` (POST/PUT/DELETE/GET) manages organization-level documents (licenses, approvals, certificates) not tied to specific students or instructors.
   - **Storage paths**:
     - Managed R2: `managed/{org_id}/general-docs/{file_id}.{ext}`
@@ -490,8 +489,8 @@
      - Updates `org_settings`: sets `storage_profile = null`, `storage_grace_ends_at = null`, `storage_access_level = false`
 - **Data ownership principles**:
   - ✅ Delete files from YOUR managed R2 bucket
-  - ❌ Do NOT force-delete from user's tenant database
-  - ℹ️ Leave `Students.files` metadata intact (user owns their DB)
+  - ❌ Do NOT force-delete from user's tenant database Documents table
+  - ℹ️ Documents table is the source of truth; legacy JSON columns are deprecated
   - 📧 Send email notifications at grace period start and after deletion
 - **S3 driver enhancement**: `deletePrefix(prefix)` method lists and deletes all objects with given prefix in batches of 1000 (S3 limit).
 - **Permission**: `storage_grace_period_days` in registry allows system-wide control of deletion timeline without code changes.
@@ -748,7 +747,7 @@
 ### Instructor Types and Document Management (2025-11)
 - **Instructor Types**: Similar to student tags, instructors can be categorized by type (e.g., "Therapist", "Volunteer", "Staff")
   - Tenant type definitions live in `tuttiud."Settings"` row keyed `instructor_types` (JSONB array of `{ id, name }`)
-  - Database schema: `Instructors.instructor_type` (text) and `Instructors.files` (jsonb) columns added in setup script
+  - **Database schema**: `Instructors.instructor_types` (uuid array) column added in setup script. The legacy `Instructors.files` (jsonb) column is **DEPRECATED** and no longer created on fresh deployments.
   - Frontend hook: `useInstructorTypes()` (`src/features/instructors/hooks/useInstructorTypes.js`) provides load/create/update/delete operations
   - Management UI: **Unified `TagsManager.jsx`** in Settings manages both student tags and instructor types via mode toggle
     - Card renamed to "ניהול תגיות וסיווגים" (Manage Tags and Classifications)

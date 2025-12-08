@@ -13,6 +13,7 @@ const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 export default function DocumentCenterView({ session, orgId, canLoad }) {
   const [instructors, setInstructors] = useState([]);
   const [definitions, setDefinitions] = useState([]);
+  const [allDocuments, setAllDocuments] = useState([]);
   const [loadState, setLoadState] = useState(REQUEST.idle);
   const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +26,7 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
     if (!canLoad) {
       setInstructors([]);
       setDefinitions([]);
+      setAllDocuments([]);
       return;
     }
     setLoadState(REQUEST.loading);
@@ -39,6 +41,25 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
       const loadedInstructors = Array.isArray(roster) ? roster : [];
       setInstructors(loadedInstructors);
       setDefinitions(Array.isArray(settingsData?.value) ? settingsData.value : []);
+      
+      // Fetch all instructor documents at once from Documents table
+      try {
+        const allDocs = [];
+        for (const instructor of loadedInstructors) {
+          const docsParams = new URLSearchParams({ 
+            org_id: orgId, 
+            entity_type: 'instructor',
+            entity_id: instructor.id
+          });
+          const docs = await authenticatedFetch(`documents?${docsParams.toString()}`, { session });
+          allDocs.push(...(Array.isArray(docs?.documents) ? docs.documents : []));
+        }
+        setAllDocuments(allDocs);
+      } catch (docsError) {
+        console.error('Failed to load instructor documents', docsError);
+        // Non-fatal: continue without documents
+        setAllDocuments([]);
+      }
       
       // Update selectedInstructor if it exists to prevent stale data
       // Use ref to avoid dependency loop
@@ -56,6 +77,7 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
       setLoadState(REQUEST.error);
       setInstructors([]);
       setDefinitions([]);
+      setAllDocuments([]);
     }
   }, [canLoad, orgId, session]);
 
@@ -94,7 +116,9 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
   // Calculate document status for each instructor
   const getDocumentStatus = (instructor) => {
     const instructorTypes = Array.isArray(instructor?.instructor_types) ? instructor.instructor_types : [];
-    const instructorFiles = Array.isArray(instructor?.files) ? instructor.files : [];
+    
+    // Get documents for this instructor from allDocuments state
+    const instructorFiles = allDocuments.filter(doc => doc.entity_id === instructor.id);
     
     // Filter definitions relevant to this instructor
     const relevantDefinitions = definitions.filter(def => {
