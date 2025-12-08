@@ -14,11 +14,11 @@ import {
 } from '@/components/ui/collapsible';
 import { useState } from 'react';
 
-export function DataMaintenanceHelpDialog({ open, onClose }) {
+export function DataMaintenanceHelpDialog({ open, onOpenChange }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl" dir="rtl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
