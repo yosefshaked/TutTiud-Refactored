@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, FileWarning, UploadCloud } from 'lucide-react';
+import { Download, FileWarning, UploadCloud, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { authenticatedFetch, authenticatedFetchBlob } from '@/lib/api-client.js';
 import DataMaintenancePreview from './DataMaintenancePreview.jsx';
+import DataMaintenanceHelpDialog from './DataMaintenanceHelpDialog.jsx';
 
 function buildErrorLabel(entry) {
   const lineLabel = entry.line_number ? `שורה ${entry.line_number}: ` : '';
@@ -35,6 +36,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
   const [previewData, setPreviewData] = useState(null);
   const [instructors, setInstructors] = useState([]);
   const [isApplying, setIsApplying] = useState(false);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -239,7 +241,9 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose?.(); }}>
+    <>
+      <DataMaintenanceHelpDialog open={showHelpDialog} onOpenChange={setShowHelpDialog} />
+      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose?.(); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
@@ -339,8 +343,10 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
                     onChange={handleFileChange}
                   />
                   <p className="text-xs text-neutral-500">
-                    העמודות הנתמכות: System UUID, Name, National ID, Contact Phone, Contact Name, Assigned Instructor ID,
-                    Default Service, Default Day of Week, Default Session Time, Notes, Tags, Is Active.
+                    צריכים עזרה? <button type="button" onClick={() => setShowHelpDialog(true)} className="inline-flex items-center gap-1 text-primary hover:underline font-semibold">
+                      <HelpCircle className="h-3.5 w-3.5" />
+                      לחצו כאן לעזרה
+                    </button>
                   </p>
                 </div>
                 {importError ? (
@@ -402,5 +408,6 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

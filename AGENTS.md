@@ -1032,7 +1032,8 @@
     - Blocks assignment to inactive instructors with error listing active alternatives
     - Falls back to UUID matching if cell contains valid UUID format
   - **Hebrew input validation** (`api/_shared/student-validation.js`):
-    - `coerceDayOfWeek`: Accepts Hebrew day names (ראשון→0, שני→1, etc.), 0-6, or 1-7 numbers
+    - `coerceDayOfWeek`: Accepts Hebrew day names (ראשון→1, שני→2, etc.), 1-7 numbers (canonical format), or 0-6 (converted to 1-7 for backward compatibility)
+    - `coerceSessionTime`: Accepts HH:MM format (exported format) and normalizes to HH:MM:SS (database format), also accepts full HH:MM:SS with optional timezone
     - `validateIsraeliPhone`: Strips Excel formula wrapper `="..."` before validation
     - `coerceBooleanFlag`: Accepts כן→true, לא→false, in addition to TRUE/FALSE/1/0
   - Updates only changed fields, enforces national ID uniqueness per row and against database

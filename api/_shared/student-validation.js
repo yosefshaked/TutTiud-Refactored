@@ -128,15 +128,15 @@ export function coerceDayOfWeek(value) {
     return { value: null, valid: true };
   }
 
-  // Hebrew day name mapping
+  // Hebrew day name mapping (database stores 1-7)
   const hebrewDays = {
-    'ראשון': 0,
-    'שני': 1,
-    'שלישי': 2,
-    'רביעי': 3,
-    'חמישי': 4,
-    'שישי': 5,
-    'שבת': 6,
+    'ראשון': 1,
+    'שני': 2,
+    'שלישי': 3,
+    'רביעי': 4,
+    'חמישי': 5,
+    'שישי': 6,
+    'שבת': 7,
   };
 
   const str = String(value).trim();
@@ -146,15 +146,16 @@ export function coerceDayOfWeek(value) {
     return { value: hebrewDays[str], valid: true };
   }
 
-  // Try numeric (1-7 or 0-6)
+  // Try numeric (1-7 is the canonical format)
   const numeric = typeof value === 'number' ? value : Number.parseInt(str, 10);
 
-  if (Number.isInteger(numeric) && numeric >= 0 && numeric <= 6) {
+  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 7) {
     return { value: numeric, valid: true };
   }
   
-  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 7) {
-    return { value: numeric - 1, valid: true }; // Convert 1-7 to 0-6
+  // Also accept 0-6 for backward compatibility (convert to 1-7)
+  if (Number.isInteger(numeric) && numeric >= 0 && numeric <= 6) {
+    return { value: numeric === 0 ? 7 : numeric, valid: true }; // 0 → 7 (Sunday), 1-6 → 1-6
   }
 
   return { value: null, valid: false };
@@ -174,6 +175,14 @@ export function coerceSessionTime(value) {
     return { value: null, valid: true };
   }
 
+  // Accept HH:MM format and normalize to HH:MM:SS (database expects time with seconds)
+  const hhmmPattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  const hhmmMatch = trimmed.match(hhmmPattern);
+  if (hhmmMatch) {
+    return { value: `${trimmed}:00`, valid: true };
+  }
+
+  // Accept full time format (HH:MM:SS with optional timezone)
   if (TIME_PATTERN.test(trimmed)) {
     return { value: trimmed, valid: true };
   }
