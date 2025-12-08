@@ -164,8 +164,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
 
       // If unrecognized columns, show detailed error
       if (payload.code === 'unrecognized_columns') {
-        const columnList = payload.columns?.join(', ') || '';
-        const errorMsg = `שגיאת עמודות: הקובץ מכיל עמודות לא מזוהות: ${columnList}. ${payload.hint || 'בדוק שגיאות כתיב בשמות העמודות.'}`;
+        const errorMsg = `${payload.message}. ${payload.hint || ''}`;
         setImportError(errorMsg);
         toast.error(errorMsg, { duration: 8000 }); // Longer duration for detailed error
         return;
@@ -215,8 +214,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
 
       // Handle unrecognized columns error (shouldn't happen in apply phase, but be safe)
       if (payload.code === 'unrecognized_columns') {
-        const columnList = payload.columns?.join(', ') || '';
-        const errorMsg = `שגיאת עמודות: ${columnList}. ${payload.hint || ''}`;
+        const errorMsg = `${payload.message}. ${payload.hint || ''}`;
         setImportError(errorMsg);
         toast.error(errorMsg, { duration: 8000 });
         return;

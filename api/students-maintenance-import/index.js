@@ -169,46 +169,83 @@ export default async function handler(context, req) {
   }
 
   // Validate column names - detect unrecognized columns to help users catch typos
-  const RECOGNIZED_COLUMNS = [
+  const COLUMN_MAPPING = {
     // UUID columns
-    'system_uuid', 'student_id', 'id', 'מזהה מערכת (uuid)', 'מזהה מערכת',
-    // Data columns (English)
-    'name', 'student_name',
-    'national_id', 'nationalid',
-    'contact_name', 'contactname',
-    'contact_phone', 'contactphone',
-    'assigned_instructor_name', 'assigned_instructor', 'instructor_name', 'instructor',
-    'default_service', 'service',
-    'default_day_of_week', 'day',
-    'default_session_time', 'session_time', 'sessiontime',
-    'notes',
-    'tags', 'tag_ids',
-    'is_active', 'active', 'status',
-    // Data columns (Hebrew)
-    'שם התלמיד',
-    'מספר זהות',
-    'שם איש קשר',
-    'טלפון',
-    'שם מדריך',
-    'שירות ברירת מחדל',
-    'יום ברירת מחדל',
-    'שעת מפגש ברירת מחדל',
-    'הערות',
-    'תגיות',
-    'פעיל',
+    'system_uuid': 'מזהה מערכת',
+    'student_id': 'מזהה מערכת',
+    'id': 'מזהה מערכת',
+    'מזהה מערכת (uuid)': 'מזהה מערכת',
+    'מזהה מערכת': 'מזהה מערכת',
+    // Name
+    'name': 'שם התלמיד',
+    'student_name': 'שם התלמיד',
+    'שם התלמיד': 'שם התלמיד',
+    // National ID
+    'national_id': 'מספר זהות',
+    'nationalid': 'מספר זהות',
+    'מספר זהות': 'מספר זהות',
+    // Contact name
+    'contact_name': 'שם איש קשר',
+    'contactname': 'שם איש קשר',
+    'שם איש קשר': 'שם איש קשר',
+    // Contact phone
+    'contact_phone': 'טלפון',
+    'contactphone': 'טלפון',
+    'טלפון': 'טלפון',
+    // Instructor
+    'assigned_instructor_name': 'שם מדריך',
+    'assigned_instructor': 'שם מדריך',
+    'instructor_name': 'שם מדריך',
+    'instructor': 'שם מדריך',
+    'שם מדריך': 'שם מדריך',
+    // Service
+    'default_service': 'שירות ברירת מחדל',
+    'service': 'שירות ברירת מחדל',
+    'שירות ברירת מחדל': 'שירות ברירת מחדל',
+    // Day
+    'default_day_of_week': 'יום ברירת מחדל',
+    'day': 'יום ברירת מחדל',
+    'יום ברירת מחדל': 'יום ברירת מחדל',
+    // Time
+    'default_session_time': 'שעת מפגש ברירת מחדל',
+    'session_time': 'שעת מפגש ברירת מחדל',
+    'sessiontime': 'שעת מפגש ברירת מחדל',
+    'שעת מפגש ברירת מחדל': 'שעת מפגש ברירת מחדל',
+    // Notes
+    'notes': 'הערות',
+    'הערות': 'הערות',
+    // Tags
+    'tags': 'תגיות',
+    'tag_ids': 'תגיות',
+    'תגיות': 'תגיות',
+    // Active status
+    'is_active': 'פעיל',
+    'active': 'פעיל',
+    'status': 'פעיל',
+    'פעיל': 'פעיל',
     // Export metadata (can be safely ignored)
-    'extraction_reason', 'סיבת ייצוא',
-  ];
+    'extraction_reason': null,
+    'סיבת ייצוא': null,
+  };
 
   const unrecognizedColumns = parsed.columns.filter(
-    (col) => !RECOGNIZED_COLUMNS.includes(col.toLowerCase())
+    (col) => !Object.prototype.hasOwnProperty.call(COLUMN_MAPPING, col.toLowerCase())
   );
 
   if (unrecognizedColumns.length > 0) {
+    // Get unique Hebrew names for all valid columns (excluding nulls and duplicates)
+    const validHebrewNames = [...new Set(
+      Object.values(COLUMN_MAPPING).filter(name => name !== null)
+    )].sort();
+    
+    const invalidColumnsList = unrecognizedColumns.join(', ');
+    const validColumnsList = validHebrewNames.join(', ');
+    
     return respond(context, 400, {
-      message: 'unrecognized_columns',
+      code: 'unrecognized_columns',
+      message: `ערך "${invalidColumnsList}" אינו חוקי`,
       columns: unrecognizedColumns,
-      hint: 'Check for typos in column names. Supported columns include: system_uuid, name, national_id, contact_name, contact_phone, assigned_instructor_name, default_service, default_day_of_week, default_session_time, notes, tags, is_active (or Hebrew equivalents).',
+      hint: `ערכים חוקיים: ${validColumnsList}`,
     });
   }
 
@@ -376,7 +413,8 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'name', name, existing.name);
     }
 
-    const national = coerceNationalId(raw?.national_id ?? raw?.NationalId ?? raw?.nationalId ?? raw?.['מספר זהות']);
+    const nationalIdRaw = raw?.national_id ?? raw?.NationalId ?? raw?.nationalId ?? raw?.['מספר זהות'];
+    const national = coerceNationalId(nationalIdRaw);
     if (national.provided) {
       if (!national.valid) {
         failures.push(formatFailure({
@@ -384,7 +422,7 @@ export default async function handler(context, req) {
           studentId,
           name: displayName,
           code: 'invalid_national_id',
-          message: 'תעודת הזהות אינה חוקית.',
+          message: `ערך "${nationalIdRaw}" אינו חוקי עבור מספר זהות. יש להזין 5-12 ספרות.`,
         }));
         continue;
       }
@@ -403,14 +441,15 @@ export default async function handler(context, req) {
       }
     }
 
-    const phoneCheck = validateIsraeliPhone(raw?.contact_phone ?? raw?.phone ?? raw?.contactPhone ?? raw?.['טלפון']);
+    const phoneRaw = raw?.contact_phone ?? raw?.phone ?? raw?.contactPhone ?? raw?.['טלפון'];
+    const phoneCheck = validateIsraeliPhone(phoneRaw);
     if (!phoneCheck.valid) {
       failures.push(formatFailure({
         lineNumber,
         studentId,
         name: displayName,
         code: 'invalid_contact_phone',
-        message: 'מספר הטלפון אינו חוקי.',
+        message: `ערך "${phoneRaw}" אינו חוקי עבור טלפון. דוגמה: 050-1234567 או 0501234567`,
       }));
       continue;
     }
@@ -485,14 +524,15 @@ export default async function handler(context, req) {
       }
     }
 
-    const defaultDay = coerceDayOfWeek(raw?.default_day_of_week ?? raw?.day ?? raw?.['יום ברירת מחדל']);
+    const dayRaw = raw?.default_day_of_week ?? raw?.day ?? raw?.['יום ברירת מחדל'];
+    const defaultDay = coerceDayOfWeek(dayRaw);
     if (!defaultDay.valid) {
       failures.push(formatFailure({
         lineNumber,
         studentId,
         name: displayName,
         code: 'invalid_default_day',
-        message: 'יום ברירת מחדל אינו חוקי.',
+        message: `ערך "${dayRaw}" אינו חוקי עבור יום. ערכים חוקיים: ראשון, שני, שלישי, רביעי, חמישי, שישי, שבת (או 1-7)`,
       }));
       continue;
     }
@@ -500,14 +540,15 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'default_day_of_week', defaultDay.value, existing.default_day_of_week);
     }
 
-    const defaultTime = coerceSessionTime(raw?.default_session_time ?? raw?.session_time ?? raw?.sessionTime ?? raw?.['שעת מפגש ברירת מחדל']);
+    const timeRaw = raw?.default_session_time ?? raw?.session_time ?? raw?.sessionTime ?? raw?.['שעת מפגש ברירת מחדל'];
+    const defaultTime = coerceSessionTime(timeRaw);
     if (!defaultTime.valid) {
       failures.push(formatFailure({
         lineNumber,
         studentId,
         name: displayName,
         code: 'invalid_default_session_time',
-        message: 'שעת ברירת המחדל אינה חוקית.',
+        message: `ערך "${timeRaw}" אינו חוקי עבור שעה. דוגמה: 15:30 או 09:00`,
       }));
       continue;
     }
@@ -563,14 +604,15 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'tags', tagIds.length ? tagIds : null, existing.tags);
     }
 
-    const isActive = coerceBooleanFlag(raw?.is_active ?? raw?.active ?? raw?.status ?? raw?.['פעיל'], { defaultValue: existing.is_active, allowUndefined: true });
+    const isActiveRaw = raw?.is_active ?? raw?.active ?? raw?.status ?? raw?.['פעיל'];
+    const isActive = coerceBooleanFlag(isActiveRaw, { defaultValue: existing.is_active, allowUndefined: true });
     if (!isActive.valid) {
       failures.push(formatFailure({
         lineNumber,
         studentId,
         name: displayName,
         code: 'invalid_is_active',
-        message: 'ערך הפעילות אינו חוקי.',
+        message: `ערך "${isActiveRaw}" אינו חוקי עבור סטטוס. ערכים חוקיים: כן, לא, פעיל, לא פעיל, true, false, 1, 0`,
       }));
       continue;
     }
