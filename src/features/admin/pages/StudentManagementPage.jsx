@@ -52,6 +52,7 @@ export default function StudentManagementPage() {
   const [studentForEdit, setStudentForEdit] = useState(null);
   const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
   const [updateError, setUpdateError] = useState('');
+  const [addSubmitDisabled, setAddSubmitDisabled] = useState(false);
   const [isMaintenanceOpen, setIsMaintenanceOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dayFilter, setDayFilter] = useState(null);
@@ -728,6 +729,7 @@ export default function StudentManagementPage() {
               onSubmit={() => document.getElementById('add-student-form')?.requestSubmit()}
               onCancel={handleCloseAddDialog}
               isSubmitting={isCreatingStudent}
+              disableSubmit={addSubmitDisabled}
             />
           }
         >
@@ -740,6 +742,7 @@ export default function StudentManagementPage() {
             isSubmitting={isCreatingStudent}
             error={createError}
             renderFooterOutside={true}
+            onSubmitDisabledChange={setAddSubmitDisabled}
             onSelectOpenChange={handleSelectOpenChange}
           />
         </DialogContent>

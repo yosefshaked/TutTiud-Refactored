@@ -27,6 +27,7 @@ export default function AddStudentForm({
   error = '', 
   renderFooterOutside = false,
   onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
+  onSubmitDisabledChange = () => {},
 }) {
   const [values, setValues] = useState(() => createStudentFormState());
   const [touched, setTouched] = useState({});
@@ -45,6 +46,10 @@ export default function AddStudentForm({
     if (nationalIdError) return 'error';
     return '';
   }, [duplicate, nationalIdError]);
+
+  useEffect(() => {
+    onSubmitDisabledChange(Boolean(preventSubmitReason) || isSubmitting);
+  }, [preventSubmitReason, isSubmitting, onSubmitDisabledChange]);
 
   useEffect(() => {
     if (!isSubmitting && !error) {
@@ -175,9 +180,10 @@ export default function AddStudentForm({
   const trimmedNationalId = values.nationalId.trim();
   const showNameError = touched.name && !values.name.trim();
   const nationalIdErrorMessage = (() => {
-    if (duplicate) return 'מספר זהות זה כבר קיים במערכת.';
+    // Avoid double-surfacing duplicates; detailed banner handles it
+    if (duplicate) return '';
     if (nationalIdError) return nationalIdError;
-    if (error === 'duplicate_national_id') return 'מספר זהות זה כבר קיים במערכת.';
+    if (error === 'duplicate_national_id') return '';
     if (touched.nationalId && !trimmedNationalId) return 'יש להזין מספר זהות.';
     return '';
   })();
@@ -246,12 +252,12 @@ export default function AddStudentForm({
             disabled={isSubmitting}
             required
             error={nationalIdErrorMessage}
-            description={checkingNationalId ? 'בודק כפילויות...' : duplicate ? `התלמיד קיים: ${duplicate.name}` : ''}
+            description={checkingNationalId ? 'בודק כפילויות...' : ''}
           />
 
           {duplicate && (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 space-y-2" role="alert">
-              <p className="font-semibold">נמצאה התאמה לפי מספר זהות.</p>
+              <p className="font-semibold">מספר זהות זה כבר קיים.</p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span>כדי למנוע כפילויות, עברו לפרופיל של {duplicate.name}.</span>
                 <Link
@@ -395,10 +401,10 @@ export default function AddStudentForm({
   );
 }
 
-export function AddStudentFormFooter({ onSubmit, onCancel, isSubmitting = false }) {
+export function AddStudentFormFooter({ onSubmit, onCancel, isSubmitting = false, disableSubmit = false }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
-      <Button onClick={onSubmit} disabled={isSubmitting} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+      <Button onClick={onSubmit} disabled={isSubmitting || disableSubmit} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
         {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         שמירת תלמיד חדש
       </Button>
