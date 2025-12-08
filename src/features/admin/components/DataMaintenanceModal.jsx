@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { authenticatedFetch, authenticatedFetchBlob } from '@/lib/api-client.js';
 import DataMaintenancePreview from './DataMaintenancePreview.jsx';
-import DataMaintenanceHelpDialog from './DataMaintenanceHelpDialog.jsx';
+import { DataMaintenanceHelpDialog } from './DataMaintenanceHelpDialog.jsx';
 
 function buildErrorLabel(entry) {
   const lineLabel = entry.line_number ? `שורה ${entry.line_number}: ` : '';
