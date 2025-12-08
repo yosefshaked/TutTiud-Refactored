@@ -38,7 +38,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | טבלה | תפקיד | עמודות מרכזיות |
 | :--- | :---- | :------------- |
 | `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK ששומר את `auth.users.id` ומנוהל ברמת האפליקציה), `name`, פרטי קשר, `is_active`, `metadata` (כולל `instructor_color` עבור צבע קבוע וייחודי) |
-| `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `is_active` (boolean, ברירת מחדל `true`), `tags`, `notes`, `metadata` |
+| `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `national_id` (אופציונלי, נאכף ייחודיות באפליקציה), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `is_active` (boolean, ברירת מחדל `true`), `tags`, `notes`, `metadata` |
 | `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, `is_legacy` (מסמן שורות עבר שיובאו), חותמות זמן, `metadata` |
 | `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` |
 
@@ -75,6 +75,10 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `/api/students` | GET | מנהל/בעלים | מחזיר תלמידים פעילים כברירת מחדל (`status=active`), עם אפשרויות `status=inactive` ו-`status=all` ופרמטר תאימות `include_inactive=true`. התגובה מחזירה גם את הדגל `is_active` להצגת סטטוס. |
 | `/api/students` | POST | מנהל/בעלים | מוסיף תלמיד (שם + פרטי קשר, הגדרות ברירת מחדל ושיוך למדריך) ומחזיר את הרשומה שנוצרה. |
 | `/api/students/{studentId}` | PUT | מנהל/בעלים | מעדכן שדות תלמיד ניתנים לעריכה (שם, פרטי קשר, הגדרות ברירת מחדל, שיוך מדריך, `is_active`) ומחזיר את הרשומה המעודכנת או 404. |
+| `/api/students/check-id` | GET | מנהל/בעלים | בודק ייחודיות של מספר זהות, עם אפשרות להתעלם מתלמיד קיים בעת עריכה. מחזיר `{ exists, student }` כדי לחסום כפילויות ולספק קישור לפרופיל. |
+| `/api/students-search` | GET | מנהל/בעלים | חיפוש מטושטש לפי שם שמחזיר `{ id, name, national_id, is_active }` להצגת רמזי כפילות מתחת לשדה השם בטופס. |
+| `/api/students/maintenance-export` | GET | מנהל/בעלים | מחזיר CSV עם `system_uuid`, שם, מספר זהות, פרטי קשר, שיוך מדריך, הגדרות ברירת מחדל, תגיות וסטטוס פעילות לצורך ניקוי נתונים. |
+| `/api/students/maintenance-import` | POST | מנהל/בעלים | מקבל טקסט CSV מעודכן לפי `system_uuid`, מעדכן רק שדות שהשתנו, בודק ייחודיות מספר זהות בכל שורה ומול המאגר, ומחזיר דו"ח כשלונות פר שורה. |
 | `/api/my-students` | GET | מדריך/מנהל/בעלים | מסנן את הרשימה לפי `assigned_instructor_id === caller.id` (מזהה ה-Supabase של המשתמש) ומסתיר תלמידים לא פעילים אלא אם הארגון מאפשר זאת. תומך באותם פרמטרי `status` כמו נקודת הקצה למנהלים. |
 | `/api/weekly-compliance` | GET | מדריך/מנהל/בעלים | מחזיר את נתוני "תצוגת הציות השבועית" עם מזהי הצבע של המדריכים, שבביי תלמידים לכל מועד, חלון שעות דינמי וסטטוס תיעוד (✔ הושלם / ✖ חסר) לכל מפגש בעבר. |
 | `/api/sessions` | POST | מדריך/מנהל/בעלים | מוסיף רשומת `SessionRecords` (מטען תשובות במבנה JSON + הקשר שירות אופציונלי) לאחר אימות שמדריכים כותבים רק על תלמידים שהוקצו להם. |
@@ -149,6 +153,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - **חלוקה לפיצ'רים** – כל ה-UI הייעודי למנהלים נמצא תחת `src/features/admin/`. רכיבים פנימיים חיים בתיקיית `components/` בעוד שקומפוננטות עמוד מלא נמצאות תחת `pages/`.
 - **StudentManagementPage.jsx** – משרת את הנתיב `/admin/students`. הקומפוננטה קוראת את הארגון הפעיל מ-`OrgContext`, טוענת את `/api/students` עם `status=active` כברירת מחדל, מציגה מצבי טעינה/שגיאה/ריק, ושומרת מפת מדריכים בזיכרון לצורך הצגה. מצב הדיאלוגים מנוהל מקומית עבור הוספה ועריכה, והמסנן (פעילים/לא פעילים/הכול) נשמר ב-sessionStorage ומדגיש תלמידים לא פעילים בתגים ייעודיים.
+- **DataMaintenanceModal.jsx** – זמין מפעולות הרשימה להורדת CSV תחזוקה (`/api/students/maintenance-export`) הכולל את כל השדות הניתנים לעריכה (UUID, תעודת זהות, טלפון, מדריך, תגיות, הגדרות ברירת מחדל, הערות, סטטוס פעילות) ולהעלאת CSV מעודכן (`/api/students/maintenance-import`). הייבוא מעדכן רק שדות שהשתנו, בודק ייחודיות מספר זהות בכל שורה ומול המאגר, מחזיר פירוט כשלונות לפי שורה ומרענן את הרשימה/מדריכים.
 - **AddStudentForm.jsx** – אוספת פרטי קשר, ברירות מחדל ללוח זמנים, בחירת תגית ושדה הערות חופשי; מבצעת ולידציה על הקלט ומעבירה את הערכים המקוצצים (כולל ההערות) ל-`onSubmit` כדי שיישמרו דרך `/api/students`. הטופס מוצג בתוך דיאלוג שנפתח מדף הניהול.
 - **AssignInstructorModal.jsx** – נפתח מכל שורה ברשימה, מבצע בקשה ל-`/api/instructors` בעת ההצגה ושולח את השיוך דרך `PUT /api/students/{id}`. מונע סגירה בזמן שמירה ומשדר `onAssigned` כדי לרענן את הרשימה.
 - **EditStudentForm.jsx** – מוסיף מתג פעילות עם טקסט אזהרה כדי שמנהלים יוכלו להשבית ולהחזיר תלמידים לפעילות בלי לפגוע בנתונים היסטוריים, ומאפשר לעדכן את אותם פרטי קשר, לוח זמנים, תגיות והערות כאשר ההערות המקוצצות מועברות אל ה-API.

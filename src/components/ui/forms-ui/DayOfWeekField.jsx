@@ -22,6 +22,7 @@ export default function DayOfWeekField({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        includeAllOption={false}
       />
     </FormField>
   );

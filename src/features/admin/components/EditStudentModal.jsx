@@ -1,8 +1,9 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import EditStudentForm, { EditStudentFormFooter } from './EditStudentForm.jsx';
 
 export default function EditStudentModal({ open, onClose, student, onSubmit, isSubmitting = false, error = '' }) {
+  const [editSubmitDisabled, setEditSubmitDisabled] = useState(false);
   // Mobile fix: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
   const isClosingSelectRef = useRef(false);
@@ -42,6 +43,7 @@ export default function EditStudentModal({ open, onClose, student, onSubmit, isS
             onSubmit={() => document.getElementById('edit-student-form')?.requestSubmit()}
             onCancel={handleCancel}
             isSubmitting={isSubmitting}
+            disableSubmit={editSubmitDisabled}
           />
         }
       >
@@ -56,6 +58,7 @@ export default function EditStudentModal({ open, onClose, student, onSubmit, isS
           error={error}
           renderFooterOutside={true}
           onSelectOpenChange={handleSelectOpenChange}
+          onSubmitDisabledChange={setEditSubmitDisabled}
         />
       </DialogContent>
     </Dialog>

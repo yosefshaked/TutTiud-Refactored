@@ -167,39 +167,46 @@ export default async function (context, req) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
-  // Check for duplicate files across ALL students
-  const { data: allStudents, error: studentsError } = await tenantClient
-    .from('Students')
-    .select('id, name, files');
+  // Check for duplicate files across ALL students in Documents table
+  const { data: allDocuments, error: documentsError } = await tenantClient
+    .from('Documents')
+    .select('id, name, uploaded_at, entity_id, hash')
+    .eq('entity_type', 'student')
+    .eq('hash', fileHash);
 
-  if (studentsError) {
-    context.log?.error?.('Failed to fetch students for duplicate check', { 
-      message: studentsError.message,
-      code: studentsError.code,
-      details: studentsError.details,
-      hint: studentsError.hint,
+  if (documentsError) {
+    context.log?.error?.('Failed to check duplicates in Documents table', { 
+      message: documentsError.message,
+      code: documentsError.code,
+      details: documentsError.details,
+      hint: documentsError.hint,
       orgId,
     });
     return respond(context, 500, { 
       message: 'failed_to_check_duplicates',
-      error: studentsError.message,
+      error: documentsError.message,
     });
   }
 
-  // Find duplicates by hash
+  // Fetch student names for found duplicates
   const duplicates = [];
-  for (const student of allStudents || []) {
-    const studentFiles = Array.isArray(student.files) ? student.files : [];
-    for (const file of studentFiles) {
-      if (file.hash === fileHash) {
-        duplicates.push({
-          file_id: file.id,
-          file_name: file.name,
-          uploaded_at: file.uploaded_at,
-          student_id: student.id,
-          student_name: student.name,
-        });
-      }
+  if (allDocuments && allDocuments.length > 0) {
+    const studentIds = [...new Set(allDocuments.map(doc => doc.entity_id))];
+    const { data: students } = await tenantClient
+      .from('Students')
+      .select('id, name')
+      .in('id', studentIds);
+
+    const studentMap = new Map((students || []).map(s => [s.id, s.name]));
+
+    for (const doc of allDocuments) {
+      duplicates.push({
+        file_id: doc.id,
+        file_name: doc.name,
+        uploaded_at: doc.uploaded_at,
+        student_id: doc.entity_id,
+        student_name: studentMap.get(doc.entity_id) || 'Unknown',
+      });
     }
   }
 

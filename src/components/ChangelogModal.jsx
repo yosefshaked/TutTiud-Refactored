@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.6.1': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.7.0': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,127 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.7.0 - Student data management, CSV import/export, national ID, deduplication */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.7.0')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.7.0'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.7.0'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.7.0
+                    </span>
+                    <time dateTime="2025-12-08" style={{ color: '#64748b', fontSize: '14px' }}>
+                      8 בדצמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.7.0'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  🎯 ניהול נתוני תלמידים ומניעת כפילויות
+                </h3>
+              </header>
+
+              {expandedVersions['1.7.0'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תוספות:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>ייצוא ויבוא נתוני תלמידים (למנהלים בלבד):</strong> ייצוא לקובץ Excel של כל התלמידים, תלמידים בעייתיים בלבד (חסרי ת"ז, מדריך לא פעיל, התנגשויות בלו"ז), או לפי סינון. ניתן לערוך בקובץ ולייבא בחזרה לעדכון מהיר של מספר תלמידים בבת אחת
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>התראה על שמות דומים (למנהלים בלבד):</strong> בעת יצירה או עריכה של תלמיד, המערכת מציגה תלמידים קיימים עם שמות דומים כדי למנוע כפילויות
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>מספר זהות:</strong> שדה חובה וייחודי לכל תלמיד למניעת כפילויות
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>סינון לפי תגיות:</strong> ניתן כעת לסנן תלמידים לפי תגיות שהוגדרו
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0 16px',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>דפי תלמידים משופרים:</strong> סינון מתקדם משופר, חיפוש מהיר יותר, וניווט נוח יותר
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>תיעוד מפגש משופר:</strong> לאחר שמירת תיעוד, ניתן לבחור את התאריך הבא לתיעוד (אותו התאריך, היום, או תאריך אחר) - מקל על תיעוד מפגשים ברצף
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>סינון לפי יום:</strong> הוספת אפשרות "כל הימים" לאיפוס סינון היום
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>מדריכים-מנהלים:</strong> מדריכים שהם גם מנהלים רואים כעת את התלמידים שלהם כברירת מחדל, עם אפשרות לעבור לצפייה בכל התלמידים
+                  </li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  תיקוני באגים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '8px 0',
+                  color: '#334155'
+                }}>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>הגנה על דף מנהל:</strong> משתמשים שאינם מנהלים מנותבים אוטומטית לדף התלמידים שלהם במקום להיתקע בדף ניהולי ללא הרשאות
+                  </li>
+                  <li style={{ marginBottom: '6px' }}>
+                    <strong>רענון לוח השנה:</strong> לוח החום בדף הראשי מתעדכן אוטומטית לאחר יצירת תיעוד חדש
+                  </li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.6.1 - Organizational documents, session report UX, and document management improvements */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>

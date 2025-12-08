@@ -104,6 +104,7 @@ export const AUDIT_ACTIONS = {
   STUDENT_CREATED: 'student.created',
   STUDENT_UPDATED: 'student.updated',
   STUDENT_DELETED: 'student.deleted',
+  STUDENTS_BULK_UPDATE: 'students.bulk_update',
   
   // Instructors
   INSTRUCTOR_CREATED: 'instructor.created',

@@ -264,7 +264,7 @@ export default function NewSessionForm({
 
   // Expose reset function to parent via ref
   useImperativeHandle(formResetRef, () => (options = {}) => {
-    const { keepStudent = false, studentId = null } = options;
+    const { keepStudent = false, studentId = null, date = null } = options;
     
     // Reset all form fields
     const initialAnswers = {};
@@ -278,7 +278,13 @@ export default function NewSessionForm({
       }
     }
     setAnswers(initialAnswers);
-    setSessionDate('');
+    
+    // Set date from options if provided, otherwise reset
+    if (date) {
+      setSessionDate(date);
+    } else {
+      setSessionDate('');
+    }
     
     // Preserve service context when keeping same student
     if (!keepStudent) {

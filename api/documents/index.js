@@ -68,27 +68,14 @@ function validateEntityAccess(entityType, userRole, userId, entityId, isAdmin, o
  * GET - List documents for an entity
  */
 async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, isAdmin) {
-  console.log('[DEBUG] ===== handleGet START =====');
-  console.log('[DEBUG] handleGet params:', { 
-    entity_type: req.query?.entity_type, 
-    entity_id: req.query?.entity_id,
-    orgId,
-    userId,
-    userRole,
-    isAdmin
-  });
-
   const { entity_type, entity_id } = req.query;
 
   if (!entity_type || !entity_id) {
-    console.warn('[WARN] handleGet: Missing required parameters');
     return { status: 400, body: { error: 'entity_type and entity_id required' } };
   }
 
-  console.log('[DEBUG] Validating entity access...', { entity_type, userRole, isAdmin });
   const validation = validateEntityAccess(entity_type, userRole, userId, entity_id, isAdmin, 'GET');
   if (!validation.valid) {
-    console.error('[ERROR] Entity access validation failed:', validation.error);
     return { status: 403, body: { error: validation.error } };
   }
 
@@ -102,47 +89,11 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
 
     const memberVisibility = visibilitySetting?.settings_value === true;
     if (!memberVisibility) {
-      console.log('[DEBUG] Member visibility disabled for org documents');
       return { status: 403, body: { error: 'members_cannot_view_org_documents' } };
     }
-    console.log('[DEBUG] Member visibility enabled, allowing access');
   }
-  
-  console.log('[DEBUG] Entity access validated successfully');
 
   // Fetch documents from Documents table
-  console.log('[DEBUG] Querying Documents table...', { 
-    table: 'Documents',
-    schema: 'tuttiud',
-    filters: { entity_type, entity_id }
-  });
-  
-  // Debug: Check if any org documents exist at all
-  if (entity_type === 'organization') {
-    try {
-      const { data: allOrgDocs, error: debugError } = await tenantClient
-        .from('Documents')
-        .select('id, entity_type, entity_id, name')
-        .eq('entity_type', 'organization');
-      
-      if (debugError) {
-        console.warn('[WARN] Debug query failed:', debugError);
-      } else {
-        console.log('[DEBUG] All organization documents in table:', {
-          count: allOrgDocs?.length || 0,
-          docs: allOrgDocs?.map(d => ({ 
-            id: d.id, 
-            entity_id: d.entity_id,
-            name: d.name,
-            matches: d.entity_id === entity_id 
-          })) || []
-        });
-      }
-    } catch (debugErr) {
-      console.warn('[WARN] Debug query exception:', debugErr);
-    }
-  }
-  
   const { data: documents, error } = await tenantClient
     .from('Documents')
     .select('*')
@@ -150,23 +101,9 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
     .eq('entity_id', entity_id)
     .order('uploaded_at', { ascending: false });
 
-  console.log('[DEBUG] Documents query completed', { 
-    hasError: !!error,
-    errorMessage: error?.message,
-    errorCode: error?.code,
-    errorHint: error?.hint,
-    errorDetails: error?.details,
-    documentCount: documents?.length || 0,
-    documents: documents?.map(d => ({ id: d.id, name: d.name, entity_type: d.entity_type })) || []
-  });
-
   if (error) {
-    console.error('[ERROR] Documents fetch failed');
-    console.error('[ERROR] Full error object:', JSON.stringify(error, null, 2));
-    
     // Check if table doesn't exist
     if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
-      console.error('[ERROR] Documents table does not exist in tenant database');
       return { 
         status: 424, 
         body: { 
@@ -190,11 +127,6 @@ async function handleGet(req, supabase, tenantClient, orgId, userId, userRole, i
     };
   }
 
-  console.log('[DEBUG] Documents fetched successfully', { 
-    count: documents?.length || 0,
-    documentIds: documents?.map(d => d.id) || []
-  });
-  console.log('[DEBUG] ===== handleGet END =====');
   return { status: 200, body: { documents: documents || [] } };
 }
 
@@ -212,15 +144,12 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
   // Use pre-parsed parts if available, otherwise parse now
   let parts = multipartParts;
   if (!parts) {
-    console.log('[DEBUG] handlePost: Parsing multipart data...');
     try {
       parts = multipart.parse(req.body, boundary);
     } catch (err) {
       console.error('Multipart parsing error:', err);
       return { status: 400, body: { error: 'parse_failed' } };
     }
-  } else {
-    console.log('[DEBUG] handlePost: Using pre-parsed multipart parts');
   }
 
   // Extract metadata
@@ -297,26 +226,14 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
 
       // Get entity name for file naming (cache after first lookup)
       if (entityName === null) {
-        console.log('[DEBUG] Fetching entity name for file naming', { entityType, entityId });
-        
         if (entityType === 'student') {
           const { data: student, error: studentError } = await tenantClient.from('Students').select('name').eq('id', entityId).single();
-          console.log('[DEBUG] Student query result', { 
-            hasData: !!student, 
-            name: student?.name,
-            error: studentError?.message
-          });
           if (studentError) {
             console.error('Failed to fetch student name:', { entityId, error: studentError.message });
           }
           entityName = student?.name || 'Unknown';
         } else if (entityType === 'instructor') {
           const { data: instructor, error: instructorError } = await tenantClient.from('Instructors').select('name').eq('id', entityId).single();
-          console.log('[DEBUG] Instructor query result', { 
-            hasData: !!instructor, 
-            name: instructor?.name,
-            error: instructorError?.message
-          });
           if (instructorError) {
             console.error('Failed to fetch instructor name:', { entityId, error: instructorError.message });
           }
@@ -324,8 +241,6 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
         } else {
           entityName = '';
         }
-        
-        console.log('[DEBUG] Entity name resolved to:', entityName);
       }
 
       // Build final file name
@@ -535,21 +450,6 @@ async function handlePost(req, supabase, tenantClient, orgId, userId, userEmail,
  * PUT - Update document metadata
  */
 async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, userRole, isAdmin) {
-  console.log('[DEBUG] ========== handlePut START ==========');
-  console.log('[DEBUG] handlePut parameters:', {
-    hasReq: !!req,
-    hasSupabase: !!supabase,
-    hasTenantClient: !!tenantClient,
-    orgId,
-    userId,
-    userEmail,
-    userRole,
-    isAdmin,
-    hasReqParams: !!req.params,
-    hasReqBody: !!req.body,
-    reqUrl: req.url
-  });
-  
   let documentId = req.params?.id;
   
   // Fallback: extract from URL if params not populated
@@ -569,7 +469,6 @@ async function handlePut(req, supabase, tenantClient, orgId, userId, userEmail, 
     return { status: 400, body: { error: 'document_id_required' } };
   }
 
-  console.log('[DEBUG] handlePut: Processing update', { documentId, bodyType: typeof req.body, bodyKeys: req.body ? Object.keys(req.body) : [] });
   const { name, relevant_date, expiration_date, resolved } = req.body;
 
   // Fetch existing document
@@ -683,7 +582,7 @@ async function handleDelete(req, supabase, tenantClient, orgId, userId, userEmai
     return { status: 400, body: { error: 'document_id_required' } };
   }
 
-  console.log('[DEBUG] handleDelete: Processing deletion', { documentId });
+  console.log('[DEBUG] handleDelete: Processing deletion');
 
   // Fetch existing document
   const { data: existingDoc, error: fetchError } = await tenantClient

@@ -131,28 +131,36 @@ export default async function (context, req) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
-  // Fetch all students with files
+  // Fetch all students
   const { data: students, error: studentsError } = await tenantClient
     .from('Students')
-    .select('id, name, files')
-    .not('files', 'is', null);
+    .select('id, name');
 
   if (studentsError) {
     context.log.error('Failed to fetch students', { message: studentsError.message });
     return respond(context, 500, { message: 'failed_to_fetch_students' });
   }
 
-  // Collect all files
+  // Fetch all student documents from Documents table
+  const { data: documents, error: documentsError } = await tenantClient
+    .from('Documents')
+    .select('*')
+    .eq('entity_type', 'student');
+
+  if (documentsError) {
+    context.log.error('Failed to fetch documents', { message: documentsError.message });
+    return respond(context, 500, { message: 'failed_to_fetch_documents' });
+  }
+
+  // Collect all files with student names
   const allFiles = [];
-  for (const student of students || []) {
-    const files = Array.isArray(student.files) ? student.files : [];
-    for (const file of files) {
-      allFiles.push({
-        ...file,
-        student_id: student.id,
-        student_name: student.name,
-      });
-    }
+  for (const doc of documents || []) {
+    const student = students.find(s => s.id === doc.entity_id);
+    allFiles.push({
+      ...doc,
+      student_id: doc.entity_id,
+      student_name: student?.name || 'Unknown',
+    });
   }
 
   if (allFiles.length === 0) {

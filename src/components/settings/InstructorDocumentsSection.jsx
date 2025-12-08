@@ -13,6 +13,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { getAuthClient } from '@/lib/supabase-manager.js';
 import { useDocuments } from '@/hooks/useDocuments';
+import { checkDocumentDuplicate } from '@/features/students/api/documents-check.js';
 import {
   Dialog,
   DialogContent,
@@ -480,7 +481,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
 
   const checkForDuplicates = useCallback(
     async (file) => {
-      if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
+      if (!session || !orgId || !instructor) return { has_duplicates: false, duplicates: [] };
 
       const token = session.access_token;
       if (!token) {
@@ -490,43 +491,31 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       }
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('org_id', orgId);
-
-        const response = await fetch('/api/instructor-files-check', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Supabase-Authorization': `Bearer ${token}`,
-            'x-supabase-authorization': `Bearer ${token}`,
-            'x-supabase-auth': `Bearer ${token}`,
-          },
-          body: formData,
+        const result = await checkDocumentDuplicate({
+          entityType: 'instructor',
+          entityId: instructor.id,
+          file,
+          orgId,
+          sessionToken: token,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Duplicate check failed', response.status, response.statusText, errorData);
-          
-          if (response.status === 401) {
-            toast.error('שגיאת הרשאה. נא להתחבר מחדש');
-          } else if (errorData.message === 'storage_not_configured') {
-            toast.error('אחסון לא מוגדר. נא להגדיר אחסון בהגדרות המערכת');
-          } else if (response.status >= 500) {
-            toast.error(`שגיאת שרת: ${errorData.message || 'שגיאה לא ידועה'}`);
-          }
-          return { has_duplicates: false, duplicates: [] };
-        }
-
-        const data = await response.json();
-        return data;
+        return result;
       } catch (error) {
         console.error('Duplicate check error:', error);
+        
+        const errorMessage = error?.message || '';
+        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+          toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        } else if (errorMessage.includes('403') || errorMessage.includes('can_only_check_own')) {
+          toast.error('ניתן לבדוק רק קבצים ששייכים לך');
+        } else if (errorMessage.includes('500')) {
+          toast.error('שגיאת שרת בעת בדיקת כפליות');
+        } else if (!errorMessage.includes('AbortError')) {
+          console.warn('Duplicate check error details:', error);
+        }
         return { has_duplicates: false, duplicates: [] };
       }
     },
-    [session, orgId]
+    [session, orgId, instructor]
   );
 
   const handleFileUpload = useCallback(async (file, definitionId = null, customName = null, relevantDate = null, expirationDate = null) => {
@@ -704,7 +693,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       // Remove from background uploads on error
       setBackgroundUploads(prev => prev.filter(u => u.id !== uploadId));
     }
-  }, [instructor, session, orgId, onRefresh, fetchDocuments]);
+  }, [instructor, orgId, onRefresh, fetchDocuments]);
 
   const handleDeleteFile = useCallback(async (fileId) => {
     if (!confirm('האם למחוק את הקובץ? פעולה זו בלתי הפיכה.')) {
@@ -833,7 +822,7 @@ export default function InstructorDocumentsSection({ instructor, session, orgId,
       console.error('Toggle resolved failed', error);
       toast.error(`עדכון המסמך נכשל: ${error?.message || 'שגיאה לא ידועה'}`, { id: toastId });
     }
-  }, [session, orgId, instructor?.id, onRefresh, fetchDocuments]);
+  }, [session, orgId, onRefresh, fetchDocuments]);
 
   const handleEditFile = useCallback(
     async ({ fileId, name, relevantDate, expirationDate }) => {

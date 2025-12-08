@@ -5,8 +5,8 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post", "delete"],
-      "route": "student-files"
+      "methods": ["get"],
+      "route": "students-maintenance-export"
     },
     {
       "type": "http",

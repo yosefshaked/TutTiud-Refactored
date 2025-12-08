@@ -5,8 +5,8 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post", "delete"],
-      "route": "instructor-files"
+      "methods": ["get"],
+      "route": "students/compliance-summary"
     },
     {
       "type": "http",

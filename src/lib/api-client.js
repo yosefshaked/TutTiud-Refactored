@@ -17,22 +17,27 @@ async function resolveBearerToken() {
   return token;
 }
 
-export async function authenticatedFetch(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
-  void _session; void _accessToken;
-  const token = await resolveBearerToken();
-  const bearer = `Bearer ${token}`;
-
-  const { headers: customHeaders = {}, body, ...rest } = options;
-  const headers = {
-    'Content-Type': 'application/json',
-    ...customHeaders,
-  };
+function createAuthorizationHeaders(customHeaders = {}, bearer, { includeJsonContentType = false } = {}) {
+  const headers = includeJsonContentType
+    ? { 'Content-Type': 'application/json', ...customHeaders }
+    : { ...customHeaders };
 
   headers.Authorization = bearer;
   headers.authorization = bearer;
   headers['X-Supabase-Authorization'] = bearer;
   headers['x-supabase-authorization'] = bearer;
   headers['x-supabase-auth'] = bearer;
+
+  return headers;
+}
+
+export async function authenticatedFetch(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
+  void _session; void _accessToken;
+  const token = await resolveBearerToken();
+  const bearer = `Bearer ${token}`;
+
+  const { headers: customHeaders = {}, body, ...rest } = options;
+  const headers = createAuthorizationHeaders(customHeaders, bearer, { includeJsonContentType: true });
 
   let requestBody = body;
   if (requestBody && typeof requestBody === 'object' && !(requestBody instanceof FormData)) {
@@ -68,4 +73,72 @@ export async function authenticatedFetch(path, { session: _session, accessToken:
   }
 
   return payload;
+}
+
+export async function authenticatedFetchBlob(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
+  void _session; void _accessToken;
+  const token = await resolveBearerToken();
+  const bearer = `Bearer ${token}`;
+
+  const { headers: customHeaders = {}, ...rest } = options;
+  const headers = createAuthorizationHeaders(customHeaders, bearer, { includeJsonContentType: false });
+
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  const response = await fetch(`/api/${normalizedPath}`, {
+    ...rest,
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = 'An API error occurred';
+    try {
+      const text = await response.text();
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+        message = parsed.message;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return response.blob();
+}
+
+export async function authenticatedFetchText(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
+  void _session; void _accessToken;
+  const token = await resolveBearerToken();
+  const bearer = `Bearer ${token}`;
+
+  const { headers: customHeaders = {}, ...rest } = options;
+  const headers = createAuthorizationHeaders(customHeaders, bearer, { includeJsonContentType: false });
+
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  const response = await fetch(`/api/${normalizedPath}`, {
+    ...rest,
+    headers,
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    let message = 'An API error occurred';
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+        message = parsed.message;
+      }
+    } catch {
+      // ignore JSON parsing failures
+    }
+
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return text;
 }

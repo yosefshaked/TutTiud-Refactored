@@ -13,6 +13,7 @@ import { he } from 'date-fns/locale';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { getAuthClient } from '@/lib/supabase-manager.js';
 import { useDocuments } from '@/hooks/useDocuments';
+import { checkDocumentDuplicate } from '@/features/students/api/documents-check.js';
 import {
   Dialog,
   DialogContent,
@@ -497,7 +498,7 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
 
   const checkForDuplicates = useCallback(
     async (file) => {
-      if (!session || !orgId) return { has_duplicates: false, duplicates: [] };
+      if (!session || !orgId || !student?.id) return { has_duplicates: false, duplicates: [] };
 
       const token = session.access_token;
       if (!token) {
@@ -507,43 +508,31 @@ export default function StudentDocumentsSection({ student, session, orgId, onRef
       }
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('org_id', orgId);
-
-        const response = await fetch('/api/student-files-check', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Supabase-Authorization': `Bearer ${token}`,
-            'x-supabase-authorization': `Bearer ${token}`,
-            'x-supabase-auth': `Bearer ${token}`,
-          },
-          body: formData,
+        const result = await checkDocumentDuplicate({
+          entityType: 'student',
+          entityId: student.id,
+          file,
+          orgId,
+          sessionToken: token,
         });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Duplicate check failed', response.status, response.statusText, errorData);
-          
-          if (response.status === 401) {
-            toast.error('שגיאת הרשאה. נא להתחבר מחדש');
-          } else if (errorData.message === 'storage_not_configured') {
-            toast.error('אחסון לא מוגדר. נא להגדיר אחסון בהגדרות המערכת');
-          } else if (response.status >= 500) {
-            toast.error(`שגיאת שרת: ${errorData.message || 'שגיאה לא ידועה'}`);
-          }
-          return { has_duplicates: false, duplicates: [] };
-        }
-
-        const data = await response.json();
-        return data;
+        return result;
       } catch (error) {
         console.error('Duplicate check error:', error);
+        
+        const errorMessage = error?.message || '';
+        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+          toast.error('שגיאת הרשאה. נא להתחבר מחדש');
+        } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+          toast.error('אין לך הרשאה לבצע בדיקה זו');
+        } else if (errorMessage.includes('500')) {
+          toast.error('שגיאת שרת בעת בדיקת כפליות');
+        } else if (!errorMessage.includes('AbortError')) {
+          console.warn('Duplicate check error details:', error);
+        }
         return { has_duplicates: false, duplicates: [] };
       }
     },
-    [session, orgId]
+    [session, orgId, student?.id]
   );
 
   // DEPRECATED: handleFileUpload - replaced by handleBulkFileUpload for efficiency

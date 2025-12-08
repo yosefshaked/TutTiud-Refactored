@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calendar, CalendarCheck, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -15,6 +15,169 @@ const REQUEST_STATE = Object.freeze({
   loading: 'loading',
   error: 'error',
 });
+
+/**
+ * Format date as DD/MM/YYYY for display
+ */
+function formatDateForDisplay(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Get today's date in YYYY-MM-DD format
+ */
+function getTodayDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function DateChoiceFooter({ lastReportDate, studentName, onClose, onNewReport, onNewReportSameStudent }) {
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [mode, setMode] = useState('choose'); // 'choose' | 'same-student' | 'other-student'
+  const todayDate = getTodayDate();
+  const showSameDate = lastReportDate && lastReportDate !== todayDate;
+
+  const handleChooseSameStudent = () => {
+    setMode('same-student');
+    setSelectedDate(null);
+  };
+
+  const handleChooseOtherStudent = () => {
+    setMode('other-student');
+    setSelectedDate(null);
+  };
+
+  const handleBack = () => {
+    setMode('choose');
+    setSelectedDate(null);
+  };
+
+  const handleContinue = () => {
+    if (!selectedDate) return;
+    
+    const dateValue = selectedDate === 'same' ? lastReportDate : 
+                     selectedDate === 'today' ? todayDate : 
+                     null; // 'other' - let user pick in form
+    
+    if (mode === 'same-student') {
+      onNewReportSameStudent({ date: dateValue });
+    } else {
+      onNewReport({ date: dateValue });
+    }
+  };
+
+  // Initial choice: same student or other student
+  if (mode === 'choose') {
+    return (
+      <div className="flex flex-col gap-3" dir="rtl">
+        <p className="text-sm font-medium text-center text-neutral-700">
+          מה תרצו לעשות?
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button 
+            onClick={handleChooseSameStudent}
+            className="flex-1 gap-xs shadow-md hover:shadow-lg transition-shadow"
+          >
+            דיווח נוסף - {studentName}
+          </Button>
+          <Button 
+            onClick={handleChooseOtherStudent}
+            className="flex-1 gap-xs shadow-md hover:shadow-lg transition-shadow"
+          >
+            דיווח נוסף - תלמיד אחר
+          </Button>
+        </div>
+        <Button 
+          onClick={onClose}
+          variant="outline"
+          className="hover:shadow-sm"
+        >
+          סגור
+        </Button>
+      </div>
+    );
+  }
+
+  // Date selection for chosen mode
+  return (
+    <div className="flex flex-col gap-4" dir="rtl">
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-center text-neutral-700">
+          בחרו תאריך לדיווח הבא:
+        </p>
+        
+        <div className="grid gap-2">
+          {showSameDate && (
+            <Button
+              variant={selectedDate === 'same' ? 'default' : 'outline'}
+              onClick={() => setSelectedDate('same')}
+              className="justify-start gap-2 h-auto py-3"
+            >
+              <CalendarCheck className="h-4 w-4 shrink-0" />
+              <div className="flex flex-col items-start text-right">
+                <span className="font-medium">אותו התאריך</span>
+                <span className="text-xs opacity-80">{formatDateForDisplay(lastReportDate)}</span>
+              </div>
+            </Button>
+          )}
+          
+          <Button
+            variant={selectedDate === 'today' ? 'default' : 'outline'}
+            onClick={() => setSelectedDate('today')}
+            className="justify-start gap-2 h-auto py-3"
+          >
+            <CalendarClock className="h-4 w-4 shrink-0" />
+            <div className="flex flex-col items-start text-right">
+              <span className="font-medium">היום</span>
+              <span className="text-xs opacity-80">{formatDateForDisplay(todayDate)}</span>
+            </div>
+          </Button>
+          
+          <Button
+            variant={selectedDate === 'other' ? 'default' : 'outline'}
+            onClick={() => setSelectedDate('other')}
+            className="justify-start gap-2 h-auto py-3"
+          >
+            <Calendar className="h-4 w-4 shrink-0" />
+            <div className="flex flex-col items-start text-right">
+              <span className="font-medium">תאריך אחר</span>
+              <span className="text-xs opacity-80">בחירה חופשית</span>
+            </div>
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Button 
+          onClick={handleContinue}
+          disabled={!selectedDate}
+          className="flex-1"
+        >
+          המשך לדיווח
+        </Button>
+        <Button 
+          onClick={handleBack}
+          variant="outline"
+          className="flex-1"
+        >
+          חזור
+        </Button>
+        <Button 
+          onClick={onClose}
+          variant="outline"
+          className="flex-1"
+        >
+          סגור
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function SuccessFooter({ studentName, onClose, onNewReport, onNewReportSameStudent }) {
   return (
@@ -414,20 +577,24 @@ export default function NewSessionModal({
     onClose?.();
   }, [onClose]);
 
-  const handleNewReport = useCallback(() => {
+  const handleNewReport = useCallback(({ date = null } = {}) => {
     setSuccessState(null);
     // Reset form using the ref
     if (formResetRef.current) {
-      formResetRef.current();
+      formResetRef.current({ date });
     }
   }, []);
 
-  const handleNewReportSameStudent = useCallback(() => {
+  const handleNewReportSameStudent = useCallback(({ date = null } = {}) => {
     if (!successState) return;
     setSuccessState(null);
-    // Reset form but keep the same student
+    // Reset form but keep the same student and optionally set date
     if (formResetRef.current) {
-      formResetRef.current({ keepStudent: true, studentId: successState.studentId });
+      formResetRef.current({ 
+        keepStudent: true, 
+        studentId: successState.studentId,
+        date: date // Pass the selected date
+      });
     }
   }, [successState]);
 
@@ -443,7 +610,8 @@ export default function NewSessionModal({
 
   const footer = canFetchStudents && !showLoading && studentsState !== REQUEST_STATE.error ? (
     successState ? (
-      <SuccessFooter
+      <DateChoiceFooter
+        lastReportDate={successState.date}
         studentName={successState.studentName}
         onClose={handleCloseAfterSuccess}
         onNewReport={handleNewReport}

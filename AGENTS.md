@@ -32,6 +32,13 @@
     - `entity_type` or `organization` - Org documents specific calls
 
 ## Workflow
+- **Database Schema Backwards Compatibility (CRITICAL)**: When adding new columns or features that require schema changes:
+  - Always use `ADD COLUMN IF NOT EXISTS` in the setup script for idempotent migrations
+  - API endpoints must gracefully handle missing columns without throwing 500 errors
+  - Return clear error messages (e.g., `schema_upgrade_required`) instead of database errors
+  - Consider using `setup_assistant_diagnostics()` to detect missing columns before queries
+  - Document required schema versions in AGENTS.md and update setup script version
+  - Example: The `national_id` column for Students was added in setup script v2.5 - older databases without it should receive a clear upgrade prompt, not a 500 error
 - **Azure Functions Response Pattern (CRITICAL)**: All Azure Functions HTTP handlers MUST set `context.res` before returning:
   ```javascript
   // ✅ CORRECT (use respond helper):
@@ -260,65 +267,29 @@
 - See `api/cross-platform/README.md` for architectural principles and usage guidelines
 
 ### File Upload and Document Management (2025-11)
-- `/api/student-files` (POST/PUT/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
+- **File Upload and Document Management**: All file operations now use the unified `/api/documents` endpoint (see Polymorphic Documents Table Architecture section above).
   - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
   - **File metadata**: Each file record includes `{id, name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
-  - **PUT endpoint**: Updates file metadata (name, relevant_date, expiration_date, resolved) post-upload
-    - Admin/owner only
-    - Logs audit event with updated fields
   - **Hebrew filename encoding**: Properly decodes UTF-8 filenames from multipart data by detecting latin1 mis-encoding and converting back to UTF-8
-  - **Bulk upload support (2025-11)**: File inputs accept `multiple` attribute, allowing users to select and upload multiple files at once
-  - **Sorting functionality (2025-11)**: Additional files section includes sort controls for name (alphabetical) and date (chronological), with ascending/descending toggle
+  - **Bulk upload support**: File inputs accept `multiple` attribute, allowing users to select and upload multiple files at once
+  - **Sorting functionality**: Additional files section includes sort controls for name (alphabetical) and date (chronological), with ascending/descending toggle
   - **Progress tracking**: Frontend uses XMLHttpRequest with upload progress events for real-time feedback
   - **Background uploads**: Uploads continue in background with toast notifications; users can navigate away while files upload
   - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures
-  - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Student Name}" (e.g., "אישור רפואי - יוסי כהן")
+  - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Entity Name}" (e.g., "אישור רפואי - יוסי כהן")
   - **Definition name preservation**: Stores `definition_name` in file metadata so orphaned files (deleted definitions) maintain proper display name
   - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant_date, and add expiration_date
-    - Name auto-populated from filename (without extension) or definition name
-    - Name locked for required documents (uses admin-configured definition name)
-    - Both dates optional
-    - Confirmation triggers upload with metadata via multipart/form-data
-  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
-    - Edit name, relevant_date, expiration_date
-    - Admin/owner only
-    - Edit button next to each file (required and adhoc)
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded (admin/owner or own files only)
   - **Resolved status for expired documents**: Files with expiration dates can be marked as "taken care of"
-    - Green "טופל" badge for resolved files vs red "פג תוקף" for expired unresolved
-    - Resolved files excluded from expired document counts on student list pages
-    - Toggle button appears for files with expiration_date
-    - Allows marking files as resolved when: new version uploaded, expiration no longer relevant, or issue addressed
-  - **Configuration changes handling**: When admins modify document definitions after files are uploaded:
-    - **Rename definition**: Files automatically show the NEW definition name (fetched dynamically from current definitions); `definition_name` metadata only used as fallback if definition is deleted
-    - **Change target_tags**: Files remain associated with `definition_id`; display uses current definition regardless of tag changes, so file stays in "Required Documents" section with updated tags
-    - **Delete definition**: Files become orphaned, shown in "Additional Files" with amber styling and "הגדרה ישנה" badge using stored `definition_name`
-    - **Implementation**: Frontend and download endpoint both check current definitions first, falling back to stored `definition_name` only for truly deleted definitions
-- `/api/student-files-check` (POST) performs pre-upload duplicate detection.
-  - Calculates MD5 hash of file content before uploading to storage
-  - Searches for duplicates across ALL students in the organization (not just current student)
-  - Returns list of duplicates with `{file_id, file_name, uploaded_at, student_id, student_name}`
-  - Frontend shows confirmation dialog listing which students have the duplicate file before proceeding
-  - Users can cancel upload or proceed to upload anyway (allows intentional duplicates)
-- `/api/student-files-download` (GET) generates presigned download URLs with proper Hebrew filename encoding.
-  - Uses RFC 5987 encoding for non-ASCII filenames: `filename*=UTF-8''<encoded-name>`
-  - Reconstructs filename from `definition_name` + student name for orphaned files
-  - Ensures file extension is always included from `original_name`
-  - 1-hour expiration on presigned URLs for security
-- Frontend (`StudentDocumentsSection.jsx`):
-  - **Tag-based filtering**: Shows only document definitions relevant to student's tags
-    - Definitions with no `target_tags` apply to all students (shown to everyone)
-    - Definitions with `target_tags` shown only if student has at least one matching tag
-    - Students without tags see only universal documents (no `target_tags`)
-  - **Pre-upload duplicate check**: Calls check endpoint before starting upload, shows confirmation with student names
-  - **Visual progress indicator**: Shows progress bar and percentage for each active upload in blue info box at top of section
-  - **Background upload tracking**: State tracks multiple concurrent uploads with `backgroundUploads` array
-  - **Toast notifications**: Loading toast updates with progress percentage, then success/error on completion
-  - **Delete functionality**: Uses native fetch with proper JSON body and authorization headers
-  - **Orphaned files display**: Files from deleted definitions show with amber background, "הגדרה ישנה" badge, and reconstructed name from stored `definition_name`
+  - **Configuration changes handling**: When admins modify document definitions after files are uploaded, files automatically show new definition names or become orphaned with amber "הגדרה ישנה" badge
+  - **Tag-based filtering**: Shows only document definitions relevant to entity's tags
+  - **Duplicate detection**: Pre-upload MD5 hash check searches across all entities in organization
+  - **Download URLs**: RFC 5987 encoding for Hebrew filenames, 1-hour expiration on presigned URLs
 - File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
 
 ### Polymorphic Documents Table Architecture (2025-11)
-- **Schema**: Centralized `tuttiud.Documents` table replaces JSON-based file storage in `Students.files`, `Instructors.files`, and `Settings.org_documents`.
+- **Schema**: Centralized `tuttiud.Documents` table is the **source of truth** for all file metadata. Legacy JSON columns (`Students.files`, `Instructors.files`, `Settings.org_documents`) have been fully deprecated and removed.
+- **API Endpoint**: `/api/documents` is the unified endpoint for all document operations (GET/POST/PUT/DELETE). Legacy endpoints have been removed.
 - **Discriminator pattern**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID) identifies which entity owns each document.
 - **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
 - **Indexes**: Composite index on (entity_type, entity_id) for fast entity-scoped queries; individual indexes on uploaded_at, expiration_date, hash.
@@ -328,14 +299,11 @@
   - INSERT requires `uploaded_by` matches authenticated user ID
   - UPDATE/DELETE allowed for authenticated users (entity-level permission checks in API layer)
   - API layer (`validateEntityAccess`) enforces org membership and entity-specific permissions
-- **Migration strategy** (non-destructive):
-  - Setup script includes `DO $$` block that copies from JSON columns to Documents table
-  - **Organization documents migration**: Requires visiting Settings page first to save org_id to Settings table
-  - Script reads `_system_org_id` from Settings automatically (saved by frontend on Settings page load)
-  - If org_id not found, org documents migration is skipped with a notice (student/instructor files still migrate)
-  - Verifies counts match after migration; RAISES EXCEPTION if data integrity check fails
-  - Original JSON columns retained for rollback capability and backward compatibility
-  - Migration runs idempotently (safe to rerun on existing tenants)
+- **Migration strategy**:
+  - Fresh deployments: Setup script creates only the Documents table (no legacy columns)
+  - Existing deployments: Legacy JSON columns should be manually migrated to Documents table before upgrading
+  - Documents table is the ONLY file storage mechanism
+  - All legacy API endpoints have been removed - use `/api/documents` exclusively
 - **API Endpoints**:
   - **`/api/documents`** (GET/POST/PUT/DELETE): Unified polymorphic endpoint for all document types
     - GET: `?entity_type=student&entity_id=<uuid>` returns all documents for that entity
@@ -361,12 +329,25 @@
   - `OrgDocumentsManager.jsx`: Uses `useDocuments('organization', orgId)`
   - `MyInstructorDocuments.jsx`: Uses `useDocuments('instructor', instructor.id)` for instructor self-service document portal
   - All components updated to use unified /api/documents endpoints, replacing old entity-specific endpoints
-  - **Note (2025-11)**: Legacy endpoints (`/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*`) still exist for backward compatibility but are no longer used by frontend components. The duplicate check endpoints (`/api/student-files-check`, `/api/instructor-files-check`) remain in use until a polymorphic `/api/documents-check` endpoint is implemented.
+  - **Deprecation (2025-12)**: Legacy upload/download endpoints removed (`/api/student-files`, `/api/student-files-download`, `/api/instructor-files`, `/api/instructor-files-download`, `/api/org-documents`, `/api/org-documents-download`). Duplicate check endpoints preserved but refactored to use Documents table (`/api/student-files-check`, `/api/instructor-files-check`, `/api/org-documents-check`). All file operations now use `/api/documents` for CRUD operations; check endpoints remain for backward compatibility with existing frontend code.
 - **Audit logging**: All document operations (upload/update/delete) logged via `logAuditEvent()` with:
   - Action types: FILE_UPLOADED, FILE_METADATA_UPDATED, FILE_DELETED
   - Category: FILES
   - Resource type: `{entity_type}_file` (e.g., "student_file", "instructor_file", "organization_file")
   - Details include: entity_type, entity_id, file_name, file_size, storage_mode, updated_fields
+- **Unified duplicate check endpoint (2025-12)**: `/api/documents-check` provides polymorphic pre-upload MD5 hash duplicate detection.
+  - **Query params**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID or org_id)
+  - **Body**: multipart/form-data with `file` field
+  - **Permission model**:
+    - Student documents: All org members can check duplicates
+    - Instructor documents: Admins see all; non-admins only their own
+    - Organization documents: Admin/owner only
+  - **Response**: `{ hash, has_duplicates, duplicates: [{ file_id, file_name, uploaded_at, entity_id, entity_name }] }`
+  - **Benefits**: Single endpoint handles all entity types, reduces code duplication, cleaner API design
+- **Legacy duplicate check endpoints (deprecated)**: `/api/student-files-check`, `/api/instructor-files-check`, `/api/org-documents-check`
+  - Still active for backward compatibility, now query Documents table instead of legacy JSON columns
+  - Frontend components should migrate to `/api/documents-check` when convenient
+  - No hard deprecation timeline yet; existing code continues to work
 - **Benefits of polymorphic approach**:
   - Single source of truth for all document storage
   - Consistent permission validation across entity types
@@ -375,68 +356,25 @@
   - Easy to extend to new entity types without duplicating logic
 - **Backward compatibility**: JSON columns in Students/Instructors/Settings remain intact; migration copies data without deletion, allowing gradual transition and rollback if needed.
 
-### Organizational Documents (2025-11)
-- `/api/org-documents` (POST/PUT/DELETE/GET) manages organization-level documents (licenses, approvals, certificates) not tied to specific students or instructors.
+- **Breaking change (2025-12)**: Upload and download endpoints removed (`/api/student-files`, `/api/student-files-download`, `/api/instructor-files`, `/api/instructor-files-download`, `/api/org-documents`, `/api/org-documents-download`). Use `/api/documents` exclusively for all file CRUD operations. Duplicate check endpoints remain active (`/api/student-files-check`, `/api/instructor-files-check`, `/api/org-documents-check`) but refactored to query Documents table instead of legacy JSON columns.
+- `/api/org-documents` - Organization-level documents: REMOVED. Use `/api/documents` with `entity_type=organization` instead.
+  - All organization document operations now use the unified `/api/documents` endpoint
   - **Storage paths**:
     - Managed R2: `managed/{org_id}/general-docs/{file_id}.{ext}`
     - BYOS: `general-docs/{org_id}/{file_id}.{ext}`
-  - **Metadata storage**: Stored in `tuttiud.Settings` table with key `'org_documents'` as JSONB array
-  - **Metadata schema**: `{id, name, original_name, relevant_date, expiration_date, url, path, storage_provider, uploaded_at, uploaded_by, size, type, hash}`
   - **Member visibility control**: Setting `org_documents_member_visibility` (boolean, default false) controls whether non-admin members can view org documents
     - Admin/owner can always view and manage documents
     - Non-admin members require the setting to be enabled to view documents
     - GET endpoint checks this setting and returns 403 `members_cannot_view_org_documents` error when disabled
     - Frontend hides the org documents card from non-admin members when visibility is disabled
     - Backend enforces restriction as security layer in case of UI bugs
-  - **POST (upload)**: Multipart form data with file + optional metadata (name, relevant_date, expiration_date)
-    - Validates file size (10MB max) and MIME types (PDF, images, Word, Excel)
-    - Decodes Hebrew filenames properly (UTF-8/latin1 encoding)
-    - Generates MD5 hash for duplicate detection
-    - Uploads to storage and saves metadata to Settings
-    - Requires admin/owner role
-    - Logs FILE_UPLOADED audit event
-  - **PUT (update metadata)**: Update name, relevant_date, or expiration_date for existing document
-    - Admin/owner only
-    - Logs org_document_updated audit event
-  - **DELETE**: Remove file from storage and metadata from Settings
-    - Admin/owner only
-    - Logs FILE_DELETED audit event
-  - **GET (list)**: Returns all org documents for the organization
-    - Available to members when visibility setting is enabled
-    - Admin/owner can always access
-- `/api/org-documents-download` (GET) returns public URLs for org documents.
-  - Query params: `org_id` and `file_id`
-  - Verifies membership (any org member can download if visibility enabled)
-  - Uses public URLs directly (same approach as student/instructor files)
-  - Future: Cloudflare worker will handle custom domain presigned URLs
-- Frontend (`OrgDocumentsManager.jsx`):
-  - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant date, and add expiration date
-    - Name auto-populated from filename (without extension)
-    - Both dates optional
-    - Confirmation triggers upload with metadata via multipart/form-data
-    - Fresh session token obtained before upload to prevent silent failures
-  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
-    - Edit name, relevant_date, expiration_date
-    - Admin/owner only
-  - **Document separation**: Expired documents (expiration_date < today) displayed in separate section with red badges and CalendarX icon
-  - **Sorting**: Three-way sort by upload date, name, or expiration date with asc/desc toggle
-  - **Download**: Fetches public URL and triggers browser download with proper Hebrew filename
-  - **Delete**: Admin/owner only, confirmation dialog before deletion
-  - **Upload guidelines**: Info box explaining 10MB limit, allowed file types, Hebrew filename support
-  - **Visibility toggle (admin-only)**: Checkbox inside card to enable/disable member access
-    - Stored in tenant DB setting `org_documents_member_visibility`
-    - When disabled: Only admin/owner can view documents
-    - When enabled: All org members can view and download (but not upload/delete)
-  - **Visibility restriction handling**: Non-admin members see amber warning message when visibility is disabled
-- Settings page integration:
-  - Card: "מסמכי הארגון" (Organization Documents) with Briefcase icon
-  - Positioned after Document Rules Manager card (admin section)
-  - Visibility logic:
-    - Admins/owners: Always see the card when storage is enabled
-    - Non-admin members: Card only visible when `org_documents_member_visibility = true` AND storage is enabled
-  - Opens dialog with `OrgDocumentsManager` component
-  - Backend enforces visibility restriction as security layer
-- **Use cases**: Organization licenses, veterinary approvals, business permits, insurance certificates, general documentation not tied to specific students or instructors
+  - Frontend (`OrgDocumentsManager.jsx`):
+    - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant date, and add expiration date
+    - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded (admin/owner only)
+    - **Document separation**: Expired documents displayed in separate section with red badges
+    - **Sorting**: Three-way sort by upload date, name, or expiration date with asc/desc toggle
+    - **Visibility toggle (admin-only)**: Checkbox to enable/disable member access
+  - **Use cases**: Organization licenses, veterinary approvals, business permits, insurance certificates, general documentation not tied to specific students or instructors
 
 ### PDF Export Feature (2025-11)
 - `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.
@@ -483,8 +421,8 @@
      - Updates `org_settings`: sets `storage_profile = null`, `storage_grace_ends_at = null`, `storage_access_level = false`
 - **Data ownership principles**:
   - ✅ Delete files from YOUR managed R2 bucket
-  - ❌ Do NOT force-delete from user's tenant database
-  - ℹ️ Leave `Students.files` metadata intact (user owns their DB)
+  - ❌ Do NOT force-delete from user's tenant database Documents table
+  - ℹ️ Documents table is the source of truth; legacy JSON columns are deprecated
   - 📧 Send email notifications at grace period start and after deletion
 - **S3 driver enhancement**: `deletePrefix(prefix)` method lists and deletes all objects with given prefix in batches of 1000 (S3 limit).
 - **Permission**: `storage_grace_period_days` in registry allows system-wide control of deletion timeline without code changes.
@@ -741,7 +679,7 @@
 ### Instructor Types and Document Management (2025-11)
 - **Instructor Types**: Similar to student tags, instructors can be categorized by type (e.g., "Therapist", "Volunteer", "Staff")
   - Tenant type definitions live in `tuttiud."Settings"` row keyed `instructor_types` (JSONB array of `{ id, name }`)
-  - Database schema: `Instructors.instructor_type` (text) and `Instructors.files` (jsonb) columns added in setup script
+  - **Database schema**: `Instructors.instructor_types` (uuid array) column added in setup script. The legacy `Instructors.files` (jsonb) column is **DEPRECATED** and no longer created on fresh deployments.
   - Frontend hook: `useInstructorTypes()` (`src/features/instructors/hooks/useInstructorTypes.js`) provides load/create/update/delete operations
   - Management UI: **Unified `TagsManager.jsx`** in Settings manages both student tags and instructor types via mode toggle
     - Card renamed to "ניהול תגיות וסיווגים" (Manage Tags and Classifications)
@@ -839,27 +777,42 @@
 
 ### Session Report Success Flow (2025-11)
 - **Success state UX**: After successfully saving a session report, the modal stays open and shows a success state instead of closing immediately.
+- **Date Selection Enhancement (2025-12)**: After completing a report, users choose their next action through a **two-step workflow**:
+  1. **Action selection**: Choose between "דיווח נוסף - [Student Name]" (same student, displays actual student name) or "דיווח נוסף - תלמיד אחר" (different student)
+  2. **Date selection**: Once action is chosen, three date options are displayed:
+     - **אותו התאריך** (Same date) - Uses the date from the just-completed report (only shown if different from today)
+     - **היום** (Today) - Current date, shown with DD/MM/YYYY format
+     - **תאריך אחר** (Other date) - Opens form with empty date field for manual selection
+  - Each date button displays both the Hebrew label and the actual date that will be used (e.g., "03/12/2025")
+  - User can navigate back from date selection to action selection using "חזור" button
+  - Benefits: **Universal date selection** for both same-student and different-student workflows, prevents date entry errors, speeds up bulk documentation
 - **Implementation** (`NewSessionModal.jsx` + `NewSessionForm.jsx`):
   - Modal tracks success state: `{ studentId, studentName, date }`
   - Toast displayed with enhanced configuration for mobile: `toast.success('...', { duration: 2500, position: 'top-center' })`
-  - Success footer (`SuccessFooter` component) replaces standard form footer with three action buttons:
-    1. **סגור** (Close) - Closes modal, returns to parent view
-    2. **דיווח נוסף - תלמיד אחר** (New report - another student) - Resets entire form, allows selecting different student
-    3. **דיווח נוסף - [Student Name]** (New report - same student) - Resets form but keeps student selected for quick consecutive reports
+  - Date choice footer (`DateChoiceFooter` component) manages two-step workflow with internal state:
+    - Mode state: `'choose'` (action selection) → `'same-student'` or `'other-student'` (date selection)
+    - Uses `formatDateForDisplay()` helper to show dates in DD/MM/YYYY format
+    - `getTodayDate()` helper provides current date in YYYY-MM-DD format
+    - Each date option button shows icon (CalendarCheck, CalendarClock, Calendar) + label + formatted date
+    - Navigation: Initial screen has two action buttons + close; date screen has continue + back + close buttons
   - Form reset via `formResetRef` using `useImperativeHandle`:
-    - Resets all fields: answers, date, service, filters
-    - Optionally preserves student selection (for same-student workflow)
-    - Called from parent via ref: `formResetRef.current({ keepStudent: true, studentId })`
-  - Visual feedback: Green success banner appears at top of form showing student name and prompting user to choose action
+    - Resets all fields: answers, service, filters
+    - Accepts `date` parameter: if provided, pre-fills the date field; if null, leaves empty for user selection
+    - Accepts `keepStudent` parameter: if true, preserves student selection (for same-student workflow)
+    - Called from parent: `formResetRef.current({ keepStudent: true, studentId, date: '2025-12-03' })`
+  - Both `handleNewReport` and `handleNewReportSameStudent` accept `{ date }` parameter
 - **Mobile optimization**:
   - Toast duration increased to 2500ms (from default) for better visibility
   - Toast positioned `top-center` on mobile for maximum visibility
   - Success state prevents race condition where modal closes before toast renders on mobile browsers
+  - All buttons use proper RTL layout with `dir="rtl"` and right-aligned text
 - **User benefits**:
-  - No confusion about whether report was saved (success state stays visible)
-  - Faster bulk documentation: instructors can create multiple reports without reopening modal
-  - Flexible workflow: choose to document same student multiple times or switch students
-  - Eliminates mobile Android issue where toasts disappeared due to rapid modal closure
+  - **Consistent workflow**: Same date selection experience whether documenting same student or switching students
+  - **No confusion**: Success state stays visible, clear two-step process
+  - **Speed**: Quick date selection in 1-2 clicks instead of manual date entry
+  - **Flexibility**: Can still choose custom date or navigate back to change action
+  - **Error prevention**: Visual date display prevents date entry mistakes
+  - **Bulk documentation**: Optimized for instructors documenting multiple sessions in sequence
 - **Advanced Filters Pattern (2025-11)**:
   - Filter section now separates basic search (always visible) from advanced filters (collapsible)
   - Advanced filters section includes: instructor scope selector (admin only), day-of-week filter, and active/inactive status filter
@@ -868,6 +821,50 @@
   - State persistence: Advanced filter visibility persists when creating additional reports from success window, but resets when modal is closed/reopened
   - Controlled state pattern: `showAdvancedFilters` state managed in `NewSessionModal` and passed to `NewSessionForm` via props
   - Implementation uses `animate-in fade-in slide-in-from-top-2` classes for smooth expansion animation
+
+- **Student Management Filtering Refactor (2025-11)**:
+  - **StudentFilterSection** (`src/features/students/components/StudentFilterSection.jsx`): New unified filter component consolidating all filtering UI
+    - Shared component (not admin-only) - supports both admin and instructor views
+    - `showInstructorFilter` prop (default true) allows hiding instructor filter for instructor/non-admin views
+    - Basic search (always visible): Searches name/phone/national_id with RTL support
+    - Advanced filters toggle: Collapsible section with "סינון מתקדם" label and dot indicator when active but collapsed
+    - Advanced filter controls: status (active/inactive/all), day of week, instructor (optional), sort option, reset button
+    - Smooth animations: `animate-in fade-in slide-in-from-top-2` on expand/collapse
+    - RTL-first design: All text right-aligned, flex-row-reverse buttons
+  - **Smart Fetching Strategy (2025-11)** - Fixes blank state bug with optimized server calls:
+    - **Server-side filtering**: Status parameter sent to API (`status='active'` | `'inactive'` | `'all'`)
+    - **Only fetches needed data**: If admin filters to active, fetches only active; if admin filters to all, fetches all
+    - **Client-side filtering**: Remaining filters (search, day, instructor) applied client-side on fetched results
+    - **No spam**: Only one request per statusFilter change (not every keystroke/action)
+    - **Refetch trigger**: When statusFilter changes, `fetchStudents` is called via dependency in useEffect
+    - **Benefits**: 
+      - Reduces network traffic (doesn't fetch unnecessary data)
+      - No race conditions (one request at a time)
+      - Instant filtering for client-side filters (no server latency)
+      - No blank state issues (server returns correct subset, client filters it)
+  - **StudentManagementPage** (admin roster view):
+    - **Access control (2025-12)**: Admin/owner only - redirects non-admin users to `/my-students` automatically
+    - Uses `normalizeMembershipRole` and `isAdminRole` from endpoints utils to validate access
+    - Redirect happens before any data fetching to prevent unauthorized API calls
+    - Imports `StudentFilterSection` from `@/features/students/components/StudentFilterSection.jsx`
+    - Uses smart fetching with `status` parameter in fetchStudents
+    - Client-side filtering with 6 filter types: status, search, day, instructor, mode, sort
+    - Dependency on `statusFilter` in useEffect ensures refetch when status changes
+    - `displayedStudents` uses `filteredStudents` directly (no additional client-side filtering)
+    - `showInstructorFilter={true}` (default) displays full instructor filter for admins
+  - **MyStudentsPage** (instructor roster view):
+    - Imports same `StudentFilterSection` component
+    - Uses smart fetching with conditional `status` parameter (respects `canViewInactive` setting)
+    - Client-side filtering with 4 filter types: status (if canViewInactive), search, day, sort
+    - `showInstructorFilter={false}` hides instructor filter (instructor sees only their students)
+    - Respects `instructors_can_view_inactive_students` setting to hide status filter option
+  - **Rules preserved from original implementations**:
+    - Status filter: 'active' (is_active !== false) / 'inactive' (is_active === false) / 'all' (both)
+    - Day filter: Searches student.schedule array for matching day_of_week
+    - Instructor filter: Exact match on assigned_instructor_id, 'mine' mode for instructors
+    - Search: Case-insensitive substring on name/phone/national_id
+    - Sort: By schedule (day+time) or by name via getStudentComparator
+    - Filter state persistence: Via filter-state.js utility (survives page refreshes)
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.
@@ -908,3 +905,86 @@
 
 ## Future Implementation: Organization Switching
 - The legacy AppShell sub-header (removed in the cleanup that consolidated the global header) previously hosted the organization-switching dropdown. When it rendered, it embedded the logic now housed in `src/org/OrgSwitcher.jsx` (see the git history for the pre-removal `AppShell.jsx` block) to list orgs, handle focus, and persist selection. When reintroducing org switching into the refreshed header, reuse that approach instead of recreating it from scratch.
+
+### Student deduplication (2025-02, Enhanced 2025-12)
+- New API helpers: `/api/students-check-id` enforces national ID uniqueness (supports `exclude_id`), and `/api/students-search` surfaces fuzzy name matches with `id`, `national_id`, and `is_active`.
+- **Route pattern (2025-12)**: Uses `students-check-id` (not `students/check-id`) to avoid conflict with `students/{id}` wildcard route
+- **Permission model (2025-12)**: `/api/students-check-id` is available to ALL org members (not just admin/owner) to prevent duplicate national IDs and improve data quality. This is safe because non-admin members cannot create students or access other instructors' rosters - it's a read-only validation check.
+- Admin student forms now require checking these endpoints for duplicate alerts; national ID conflicts must block submission with a profile shortcut.
+- The roster surfaces a red badge when `national_id` is missing so admins can prioritize cleanup.
+
+### Student data maintenance CSV (2025-02, Enhanced 2025-12)
+- **Export API** (`/api/students-maintenance-export`):
+  - Returns user-friendly CSV with Hebrew headers, preserving Excel compatibility
+  - **Route pattern**: Uses `students-maintenance-export` (not `students/maintenance-export`) to avoid conflict with `students/{id}` route
+  - **CSV formatting for Excel**:
+    - UTF-8 BOM (`\uFEFF`) ensures Hebrew text displays correctly
+    - Phone numbers use `="0546341150"` Excel formula to preserve leading zeros
+    - Day of week shows Hebrew names (ראשון, שני, etc.) instead of numbers
+    - Active status shows כן/לא instead of TRUE/FALSE
+    - Times display as HH:MM without timezone (strips +00)
+    - UUID column appears last for user convenience
+  - **Three export modes** accessed via dropdown menu:
+    1. **Export All** (`?filter=none`): All students, downloads as `student-data-maintenance.csv`
+    2. **Export Problematic** (`?filter=problematic`): Students with missing national_id, inactive/missing instructor, or schedule conflicts (same instructor + day + time), downloads as `students-problematic.csv`
+    3. **Export Filtered** (`?filter=custom&instructors=X,Y&tags=A,B&day=3`): Filter by instructor IDs, tag IDs, and/or day of week (0-6), downloads as `students-filtered.csv`
+  - **Instructor column**: Exports instructor NAME (not UUID) for user-friendly editing
+  - Uses `papaparse` library for reliable CSV generation with proper escaping
+- **Import API** (`/api/students-maintenance-import`):
+  - **Preview/dry-run mode (2025-12)**: Supports `dry_run: true` parameter to return preview without applying changes
+    - Preview response includes old vs. new values for each field change
+    - Returns student name, ID, line number, and detailed change breakdown
+    - Validation errors included in preview before any data is modified
+  - **Selective application (2025-12)**: Accepts `excluded_ids` array to skip specific students when applying changes
+  - Ingests edited CSV text keyed by `system_uuid` (required for all rows)
+  - **Column name flexibility (2025-12)**: Accepts both English and Hebrew column names for ALL fields:
+    - UUID: `system_uuid`, `student_id`, `id`, `מזהה מערכת (uuid)`, `מזהה מערכת`
+    - Name: `name`, `student_name`, `שם התלמיד`
+    - National ID: `national_id`, `nationalId`, `מספר זהות`
+    - Contact: `contact_name`, `contactName`, `שם איש קשר` + `contact_phone`, `contactPhone`, `טלפון`
+    - Instructor: `assigned_instructor_name`, `assigned_instructor`, `instructor_name`, `instructor`, `שם מדריך`
+    - Service: `default_service`, `service`, `שירות ברירת מחדל`
+    - Day: `default_day_of_week`, `day`, `יום ברירת מחדל` (supports Hebrew day names and numbers)
+    - Time: `default_session_time`, `session_time`, `sessionTime`, `שעת מפגש ברירת מחדל`
+    - Notes: `notes`, `Notes`, `הערות`
+    - Tags: `tags`, `tag_ids`, `Tags`, `תגיות`
+    - Active: `is_active`, `active`, `status`, `פעיל` (supports Hebrew כן/לא)
+  - **Round-trip compatibility**: CSVs exported with Hebrew headers can be re-imported without modification
+  - **Column name validation (2025-12)**: Import validates all column names and rejects CSVs with unrecognized columns
+    - Returns `unrecognized_columns` error with list of invalid column names and helpful hint
+    - Prevents confusion from typos in column headers (e.g., "namee" instead of "name")
+    - Frontend displays detailed error message showing which columns are invalid
+    - Recognized columns: All English/Hebrew field names listed above, plus metadata columns (extraction_reason, סיבת ייצוא)
+  - **Empty cell behavior (2025-12)**: Empty CSV cells are treated as "no change" - only cells with values update the database
+  - **Clearing optional fields (2025-12)**: Use sentinel value `CLEAR` or `-` to explicitly clear optional fields (notes, default_service, contact_name)
+  - **Instructor name matching** (2025-12): Accepts both UUID and instructor name in `assigned_instructor_name` column
+    - Name matching is case-insensitive and uses exact match against `Instructors.name` or `Instructors.email`
+    - Helpful errors when name not found: "מדריך בשם 'X' לא נמצא. מדריכים זמינים: [list of 5 active names]..."
+    - Blocks assignment to inactive instructors with error listing active alternatives
+    - Falls back to UUID matching if cell contains valid UUID format
+  - **Hebrew input validation** (`api/_shared/student-validation.js`):
+    - `coerceDayOfWeek`: Accepts Hebrew day names (ראשון→1, שני→2, etc.), 1-7 numbers (canonical format), or 0-6 (converted to 1-7 for backward compatibility)
+    - `coerceSessionTime`: Accepts HH:MM format (exported format) and normalizes to HH:MM:SS (database format), also accepts full HH:MM:SS with optional timezone
+    - `validateIsraeliPhone`: Strips Excel formula wrapper `="..."` before validation
+    - `coerceBooleanFlag`: Accepts כן→true, לא→false, in addition to TRUE/FALSE/1/0
+  - Updates only changed fields, enforces national ID uniqueness per row and against database
+  - Returns per-row failure details with line numbers, student names, error codes, and Hebrew messages
+  - **Max limit**: 2000 rows per import to prevent timeout
+- **Frontend components**:
+  - `DataMaintenanceMenu.jsx`: Dropdown menu with 4 options (export all, export problematic, export filtered, import)
+  - `FilteredExportDialog.jsx`: Dialog with day/instructor/tag filter controls, requires at least one filter selection
+  - `DataMaintenanceModal.jsx`: Import modal with three-stage workflow:
+    1. Upload CSV → Backend validates and returns preview
+    2. Preview & Select → User reviews changes, can deselect specific students
+    3. Apply & Summary → Only approved changes written to database
+  - `DataMaintenancePreview.jsx` (2025-12): Interactive preview component showing:
+    - Side-by-side comparison: current value (red X) vs. new value (green checkmark)
+    - Expandable cards per student with detailed field-by-field changes
+    - Checkbox selection: individual students or "select all"
+    - Smart formatting: instructor names, Hebrew days, active status in Hebrew
+    - Visual indicators: change counts, validation errors in red
+  - `DataMaintenanceHelpDialog.jsx`: Comprehensive help with instructions about preview workflow, empty cells, CLEAR sentinel, and Excel best practices
+  - `StudentManagementPage.jsx`: Integrates menu, passes instructors and tags data, refreshes roster after import
+- **Radix UI dependencies**: Uses `@radix-ui/react-dropdown-menu` for menu and `@radix-ui/react-checkbox` for filter selection and preview
+- **API client helper**: `authenticatedFetchBlob()` in `lib/api-client.js` preserves UTF-8 BOM and binary encoding for CSV downloads
+- **Comprehensive QA documentation**: See `docs/student-data-maintenance-qa.md` for full test plan covering all scenarios, edge cases, and validation rules

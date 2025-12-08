@@ -651,6 +651,7 @@ export default function StudentDetailPage() {
       const body = {
         org_id: activeOrgId,
         name: payload.name,
+        national_id: payload.nationalId || null,
         contact_name: payload.contactName,
         contact_phone: payload.contactPhone,
         assigned_instructor_id: payload.assignedInstructorId,
@@ -752,6 +753,7 @@ export default function StudentDetailPage() {
   const contactName = student?.contact_name || 'לא סופק';
   const contactPhone = student?.contact_phone || '';
   const contactInfo = student?.contact_info || '';
+  const nationalId = student?.national_id || '';
   const notes = typeof student?.notes === 'string' ? student.notes.trim() : '';
   const defaultService = student?.default_service || 'לא הוגדר';
   const scheduleDescription = describeSchedule(student?.default_day_of_week, student?.default_session_time);
@@ -905,6 +907,12 @@ export default function StudentDetailPage() {
                   ) : null}
                 </dd>
               </div>
+              {nationalId ? (
+                <div className="space-y-1">
+                  <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מספר זהות</dt>
+                  <dd className="text-foreground">{nationalId}</dd>
+                </div>
+              ) : null}
               <div className="space-y-1">
                 <dt className="text-xs font-medium text-neutral-500 sm:text-sm">מדריך מוקצה</dt>
                 <dd className="text-foreground">{instructorName}</dd>

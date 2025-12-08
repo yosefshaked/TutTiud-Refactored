@@ -1,23 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { Loader2, Users, Search, X, User, RotateCcw, FileWarning } from "lucide-react"
-import { parseISO, isBefore, startOfDay } from 'date-fns'
+import { Loader2, Users, User, FileWarning } from "lucide-react"
 
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 import { authenticatedFetch } from "@/lib/api-client.js"
 import PageLayout from "@/components/ui/PageLayout.jsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
-import { includesDayQuery, describeSchedule } from "@/features/students/utils/schedule.js"
-import { sortStudentsBySchedule } from "@/features/students/utils/sorting.js"
-import DayOfWeekSelect from "@/components/ui/DayOfWeekSelect.jsx"
+import { describeSchedule, dayMatches } from "@/features/students/utils/schedule.js"
+import { StudentFilterSection } from "@/features/students/components/StudentFilterSection.jsx"
 import { saveFilterState, loadFilterState } from "@/features/students/utils/filter-state.js"
+import { STUDENT_SORT_OPTIONS, getStudentComparator } from "@/features/students/utils/sorting.js"
+import { useStudentTags } from "@/features/students/hooks/useStudentTags.js"
 
 const REQUEST_STATUS = Object.freeze({
   idle: "idle",
@@ -26,38 +23,21 @@ const REQUEST_STATUS = Object.freeze({
   error: "error",
 })
 
-/**
- * Count expired documents for a student
- */
-function countExpiredDocuments(student) {
-  if (!student?.files || !Array.isArray(student.files)) return 0;
-  
-  const today = startOfDay(new Date());
-  
-  return student.files.filter(file => {
-    if (!file.expiration_date) return false;
-    if (file.resolved === true) return false; // Exclude resolved files
-    try {
-      const expDate = parseISO(file.expiration_date);
-      return isBefore(expDate, today);
-    } catch {
-      return false;
-    }
-  }).length;
-}
-
 export default function MyStudentsPage() {
   const { loading: supabaseLoading } = useSupabase()
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg()
+  const { tagOptions, loadTags } = useStudentTags()
 
   const [students, setStudents] = useState([])
+  const [complianceSummary, setComplianceSummary] = useState({}) // Map of student_id -> { expiredDocuments: number }
   const [status, setStatus] = useState(REQUEST_STATUS.idle)
   const [errorMessage, setErrorMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
   const [dayFilter, setDayFilter] = useState(null)
+  const [tagFilter, setTagFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
+  const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE)
   const [canViewInactive, setCanViewInactive] = useState(false)
-  const [visibilityLoaded, setVisibilityLoaded] = useState(false)
 
   const activeOrgId = activeOrg?.id ?? null
   const membershipRole = activeOrg?.membership?.role
@@ -74,17 +54,20 @@ export default function MyStudentsPage() {
     )
   }, [activeOrgId, tenantClientReady, activeOrgHasConnection, supabaseLoading, isAdminMember])
 
-  // Load saved filter state on mount
+  // Load saved filter state on mount (except statusFilter which depends on permissions)
   useEffect(() => {
     if (activeOrgId) {
+      void loadTags()
       const savedFilters = loadFilterState(activeOrgId, 'instructor')
       if (savedFilters) {
         if (savedFilters.searchQuery !== undefined) setSearchQuery(savedFilters.searchQuery)
         if (savedFilters.dayFilter !== undefined) setDayFilter(savedFilters.dayFilter)
-        if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter)
+        if (savedFilters.tagFilter !== undefined) setTagFilter(savedFilters.tagFilter)
+        // Don't restore statusFilter yet - wait for permission check
+        if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy)
       }
     }
-  }, [activeOrgId])
+  }, [activeOrgId, loadTags])
 
   // Save filter state whenever it changes
   useEffect(() => {
@@ -92,18 +75,18 @@ export default function MyStudentsPage() {
       saveFilterState(activeOrgId, 'instructor', {
         searchQuery,
         dayFilter,
+        tagFilter,
         statusFilter,
+        sortBy,
       })
     }
-  }, [activeOrgId, searchQuery, dayFilter, statusFilter])
+  }, [activeOrgId, searchQuery, dayFilter, tagFilter, statusFilter, sortBy])
 
+  // Load visibility setting and handle statusFilter restoration/reset
   useEffect(() => {
     if (!activeOrgId || !activeOrgHasConnection || !tenantClientReady) {
       setCanViewInactive(false)
-      setVisibilityLoaded(false)
-      if (statusFilter !== 'active') {
-        setStatusFilter('active')
-      }
+      setStatusFilter('active') // Always reset when org changes
       return
     }
 
@@ -123,9 +106,16 @@ export default function MyStudentsPage() {
         const allowed = value === true
         if (!cancelled) {
           setCanViewInactive(allowed)
-          setVisibilityLoaded(true)
-          if (!allowed && statusFilter !== 'active') {
+          
+          // If permission is not available, force to 'active'
+          if (!allowed) {
             setStatusFilter('active')
+          } else {
+            // Permission is available - restore saved filter if exists
+            const savedFilters = loadFilterState(activeOrgId, 'instructor')
+            if (savedFilters?.statusFilter && savedFilters.statusFilter !== 'active') {
+              setStatusFilter(savedFilters.statusFilter)
+            }
           }
         }
       } catch (error) {
@@ -135,10 +125,7 @@ export default function MyStudentsPage() {
         console.error('Failed to load instructor visibility setting', error)
         if (!cancelled) {
           setCanViewInactive(false)
-          setVisibilityLoaded(true)
-          if (statusFilter !== 'active') {
-            setStatusFilter('active')
-          }
+          setStatusFilter('active')
         }
       }
     }
@@ -149,13 +136,21 @@ export default function MyStudentsPage() {
       cancelled = true
       abortController.abort()
     }
-  }, [activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter])
+  }, [activeOrgId, activeOrgHasConnection, tenantClientReady])
+  
+  // Separate effect: force statusFilter to 'active' when permission is revoked
+  useEffect(() => {
+    if (!canViewInactive && statusFilter !== 'active') {
+      setStatusFilter('active')
+    }
+  }, [canViewInactive, statusFilter])
 
   useEffect(() => {
     if (!canFetch) {
       setStatus(REQUEST_STATUS.idle)
       setErrorMessage("")
       setStudents([])
+      setComplianceSummary({})
       return
     }
 
@@ -167,18 +162,38 @@ export default function MyStudentsPage() {
       setErrorMessage("")
 
       try {
+        // Smart fetching: use statusFilter directly if instructor can view inactive, else always fetch active only
+        const statusParam = canViewInactive ? statusFilter : 'active'
         const endpoint = buildStudentsEndpoint(activeOrgId, normalizedRole, {
-          status: canViewInactive ? statusFilter : 'active',
+          status: statusParam,
         })
-        const payload = await authenticatedFetch(endpoint, {
-          signal: abortController.signal,
-        })
+        
+        // Fetch students - skip compliance summary for non-admin users (they don't have permission)
+        const fetchPromises = [
+          authenticatedFetch(endpoint, { signal: abortController.signal })
+        ]
+        
+        // Only admin/owner can access compliance summary endpoint
+        if (isAdminMember) {
+          fetchPromises.push(
+            authenticatedFetch(`students/compliance-summary?org_id=${activeOrgId}`, { signal: abortController.signal })
+              .catch(err => {
+                console.error('Failed to load compliance summary', err)
+                return {} // Don't fail if compliance summary fails
+              })
+          )
+        }
+        
+        const results = await Promise.all(fetchPromises)
+        const studentsPayload = results[0]
+        const compliancePayload = results[1] || {} // Will be empty object for non-admin users
 
         if (!isMounted) {
           return
         }
 
-        setStudents(Array.isArray(payload) ? payload : [])
+        setStudents(Array.isArray(studentsPayload) ? studentsPayload : [])
+        setComplianceSummary(compliancePayload || {})
         setStatus(REQUEST_STATUS.success)
       } catch (error) {
         if (error?.name === "AbortError") {
@@ -193,6 +208,7 @@ export default function MyStudentsPage() {
 
         setErrorMessage(error?.message || "טעינת רשימת התלמידים נכשלה.")
         setStudents([])
+        setComplianceSummary({})
         setStatus(REQUEST_STATUS.error)
       }
     }
@@ -203,72 +219,73 @@ export default function MyStudentsPage() {
       isMounted = false
       abortController.abort()
     }
-  }, [activeOrgId, canFetch, normalizedRole, statusFilter, canViewInactive])
+  }, [activeOrgId, canFetch, normalizedRole, statusFilter, canViewInactive, isAdminMember])
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      searchQuery.trim() !== '' ||
+      dayFilter !== null ||
+      tagFilter !== '' ||
+      (canViewInactive && statusFilter !== 'active')
+    )
+  }, [searchQuery, dayFilter, tagFilter, statusFilter, canViewInactive])
+
+  const handleResetFilters = () => {
+    setSearchQuery('')
+    setDayFilter(null)
+    setTagFilter('')
+    setSortBy(STUDENT_SORT_OPTIONS.SCHEDULE)
+    if (canViewInactive) {
+      setStatusFilter('active')
+    }
+  }
 
   const isLoading = status === REQUEST_STATUS.loading
   const isError = status === REQUEST_STATUS.error
   const isSuccess = status === REQUEST_STATUS.success
 
   const filteredStudents = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim()
-    const filtered = students.filter((student) => {
-      try {
-        if ((statusFilter === 'active' || (!canViewInactive && statusFilter !== 'active')) && student?.is_active === false) {
-          return false
-        }
-        if (statusFilter === 'inactive' && student?.is_active !== false) {
-          return false
-        }
-        if (dayFilter && Number(student?.default_day_of_week) !== Number(dayFilter)) {
-          return false
-        }
+    let result = [...students]; // Always copy to prevent mutation
 
-        if (!query) return true
-        // Search by student name
-        const studentName = String(student.name || '').toLowerCase()
-        if (studentName.includes(query)) return true
+    // Filter by status - if instructor cannot view inactive, this is already filtered on server
+    if (canViewInactive && statusFilter !== 'all') {
+      result = result.filter((s) => {
+        const isActive = s.is_active !== false;
+        return statusFilter === 'active' ? isActive : !isActive;
+      });
+    }
 
-        // Search by contact name
-        const contactName = String(student.contact_name || '').toLowerCase()
-        if (contactName.includes(query)) return true
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((s) => {
+        const name = (s.name || '').toLowerCase();
+        const phone = (s.contact_phone || '').toLowerCase();
+        const nationalId = (s.national_id || '').toLowerCase();
+        return name.includes(query) || phone.includes(query) || nationalId.includes(query);
+      });
+    }
 
-        // Search by contact phone
-        const contactPhone = String(student.contact_phone || '').toLowerCase()
-        if (contactPhone.includes(query)) return true
+    // Filter by day of week
+    if (dayFilter !== null) {
+      result = result.filter((s) => dayMatches(s.default_day_of_week, dayFilter));
+    }
 
-        // Search by legacy contact_info field
-        const contactInfo = String(student.contact_info || '').toLowerCase()
-        if (contactInfo.includes(query)) return true
+    // Filter by tag
+    if (tagFilter) {
+      result = result.filter((s) => {
+        const studentTags = s.tags || [];
+        return studentTags.includes(tagFilter);
+      });
+    }
 
-  // Search by default day of week (Hebrew label)
-  if (includesDayQuery(student.default_day_of_week, query)) return true
+    // Sort
+    const comparator = getStudentComparator(sortBy);
+    result.sort(comparator);
 
-        // Search by default session time
-        const sessionTime = String(student.default_session_time || '').toLowerCase()
-        if (sessionTime.includes(query)) return true
-
-        return false
-      } catch (error) {
-        console.error('Error filtering student:', student, error)
-        return false
-      }
-    })
-    
-    // Apply default sorting by schedule (day → hour → name)
-    // Note: instructor comparison is not needed here as all students belong to the same instructor
-    return sortStudentsBySchedule(filtered, new Map())
-  }, [students, searchQuery, dayFilter, statusFilter, canViewInactive])
-
-  const handleResetFilters = () => {
-    setSearchQuery('')
-    setDayFilter(null)
-    setStatusFilter('active')
-  }
-
-  // Check if any filters are active
-  const hasActiveFilters = useMemo(() => {
-    return searchQuery.trim() !== '' || dayFilter !== null || statusFilter !== 'active'
-  }, [searchQuery, dayFilter, statusFilter])
+    return result;
+  }, [students, searchQuery, dayFilter, tagFilter, statusFilter, sortBy, canViewInactive])
 
   const hasNoResults = isSuccess && filteredStudents.length === 0
 
@@ -305,78 +322,32 @@ export default function MyStudentsPage() {
           <span>טוען את התלמידים שהוקצו לך...</span>
         </div>
       ) : isSuccess ? (
-            <>
-              <div className="mb-md">
-                <div className="grid grid-cols-1 gap-sm sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <div className="relative w-full">
-                    <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-                    <Input
-                      type="text"
-                      placeholder="חיפוש לפי שם, הורה, יום או שעה..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pr-10 text-sm"
-                    />
-                    {searchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setSearchQuery('')}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-                        aria-label="נקה חיפוש"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-sm items-center">
-                    <DayOfWeekSelect
-                      value={dayFilter}
-                      onChange={setDayFilter}
-                      placeholder="סינון לפי יום"
-                    />
-                    {canViewInactive ? (
-                      <div className="flex items-center gap-2 text-sm">
-                        <label htmlFor="instructor-status-filter" className="text-neutral-600 whitespace-nowrap">
-                          מצב:
-                        </label>
-                        <Select
-                          value={statusFilter}
-                          onValueChange={(value) => setStatusFilter(value)}
-                          disabled={!visibilityLoaded}
-                        >
-                          <SelectTrigger id="instructor-status-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">תלמידים פעילים</SelectItem>
-                            <SelectItem value="inactive">תלמידים לא פעילים</SelectItem>
-                            <SelectItem value="all">הצג הכל</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : null}
-                    {hasActiveFilters && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleResetFilters}
-                        className="gap-xs"
-                        title="נקה כל המסננים"
-                      >
-                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                        <span className="hidden sm:inline">נקה מסננים</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                {searchQuery && (
-                  <div className="mt-sm text-xs text-neutral-600">
-                    נמצאו {filteredStudents.length} תלמידים
-                  </div>
-                )}
-              </div>
-              {hasNoResults ? (
+        <Card className="w-full">
+          <CardHeader className="space-y-sm">
+            <CardTitle className="text-base font-semibold text-foreground">רשימת התלמידים שלי</CardTitle>
+            
+            <StudentFilterSection
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              statusFilter={statusFilter}
+              onStatusChange={setStatusFilter}
+              dayFilter={dayFilter}
+              onDayChange={setDayFilter}
+              tagFilter={tagFilter}
+              onTagFilterChange={setTagFilter}
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+              instructors={[]}
+              tags={tagOptions}
+              showInstructorFilter={false}
+              showStatusFilter={canViewInactive}
+              hasActiveFilters={hasActiveFilters}
+              onResetFilters={handleResetFilters}
+            />
+          </CardHeader>
+          
+          <CardContent>
+            {hasNoResults ? (
                 <div className="flex flex-col items-center justify-center gap-sm rounded-xl border border-dashed border-neutral-200 p-xl text-center text-neutral-600">
                   <Users className="h-10 w-10 text-neutral-400" aria-hidden="true" />
                   <p className="text-body-md">{searchQuery ? 'לא נמצאו תלמידים התואמים את החיפוש.' : 'לא הוקצו לך תלמידים עדיין.'}</p>
@@ -384,100 +355,101 @@ export default function MyStudentsPage() {
                     {searchQuery ? 'נסו חיפוש אחר או נקו את תיבת החיפוש.' : 'כאשר מנהל הארגון יקצה אותך לתלמיד, הוא יופיע כאן.'}
                   </p>
                 </div>
-              ) : (
-                <div className="grid gap-md md:grid-cols-2">
-          {filteredStudents.map((student) => {
-            const contactName = student.contact_name || ''
-            const contactPhone = student.contact_phone || ''
-            const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ')
-            const legacyContactInfo = student?.contact_info?.trim?.()
-            const finalContactDisplay = contactDisplay || legacyContactInfo || "לא סופק מידע ליצירת קשר"
-            const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time)
-            const expiredCount = countExpiredDocuments(student)
+            ) : (
+              <div className="grid gap-md md:grid-cols-2">
+                {filteredStudents.map((student) => {
+                  const contactName = student.contact_name || ''
+                  const contactPhone = student.contact_phone || ''
+                  const contactDisplay = [contactName, contactPhone].filter(Boolean).join(' · ')
+                  const legacyContactInfo = student?.contact_info?.trim?.()
+                  const finalContactDisplay = contactDisplay || legacyContactInfo || "לא סופק מידע ליצירת קשר"
+                  const schedule = describeSchedule(student?.default_day_of_week, student?.default_session_time)
+                  const expiredCount = complianceSummary[student.id]?.expiredDocuments || 0
 
-            return (
-              <Card key={student.id || student.name}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg font-semibold text-neutral-900">
-                    <span className="flex-1">{student?.name || "ללא שם"}</span>
-                    {student?.is_active === false ? (
-                      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
-                        לא פעיל
-                      </Badge>
-                    ) : null}
-                    {expiredCount > 0 && (
-                      <Badge variant="destructive" className="gap-1 text-xs">
-                        <FileWarning className="h-3 w-3" />
-                        {expiredCount}
-                      </Badge>
-                    )}
-                    {(contactName || contactPhone) && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
-                            aria-label="הצג פרטי קשר"
-                          >
-                            <User className="h-5 w-5" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-64 text-sm" align="end">
-                          <div className="space-y-2">
-                            <div className="font-semibold text-neutral-900">פרטי קשר</div>
-                            {contactName && (
-                              <div>
-                                <span className="text-xs text-neutral-500">שם: </span>
-                                <span className="text-neutral-700">{contactName}</span>
-                              </div>
-                            )}
-                            {contactPhone && (
-                              <div>
-                                <span className="text-xs text-neutral-500">טלפון: </span>
-                                <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
-                                  {contactPhone}
-                                </a>
-                              </div>
-                            )}
+                  return (
+                    <Card key={student.id || student.name}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-neutral-900">
+                          <span className="flex-1">{student?.name || "ללא שם"}</span>
+                          {student?.is_active === false ? (
+                            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                              לא פעיל
+                            </Badge>
+                          ) : null}
+                          {expiredCount > 0 && (
+                            <Badge variant="destructive" className="gap-1 text-xs">
+                              <FileWarning className="h-3 w-3" />
+                              {expiredCount}
+                            </Badge>
+                          )}
+                          {(contactName || contactPhone) && (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+                                  aria-label="הצג פרטי קשר"
+                                >
+                                  <User className="h-5 w-5" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 text-sm" align="end">
+                                <div className="space-y-2">
+                                  <div className="font-semibold text-neutral-900">פרטי קשר</div>
+                                  {contactName && (
+                                    <div>
+                                      <span className="text-xs text-neutral-500">שם: </span>
+                                      <span className="text-neutral-700">{contactName}</span>
+                                    </div>
+                                  )}
+                                  {contactPhone && (
+                                    <div>
+                                      <span className="text-xs text-neutral-500">טלפון: </span>
+                                      <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
+                                        {contactPhone}
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <dl className="space-y-sm text-sm text-neutral-600">
+                          <div>
+                            <dt className="font-medium text-neutral-700">יום ושעת המפגש</dt>
+                            <dd>{schedule || '—'}</dd>
                           </div>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <dl className="space-y-sm text-sm text-neutral-600">
-                    <div>
-                      <dt className="font-medium text-neutral-700">יום ושעת המפגש</dt>
-                      <dd>{schedule || '—'}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-medium text-neutral-700">פרטי קשר</dt>
-                      <dd>
-                        {contactPhone ? (
-                          <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
-                            {finalContactDisplay}
-                          </a>
-                        ) : (
-                          finalContactDisplay
-                        )}
-                      </dd>
-                    </div>
-                  </dl>
-                  {student?.id ? (
-                    <div className="pt-sm">
-                      <Link to={`/students/${student.id}`} className="text-sm font-semibold text-primary hover:underline">
-                        צפייה בפרטי התלמיד
-                      </Link>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            )
-          })}
-            </div>
-          )}
-        </>
+                          <div>
+                            <dt className="font-medium text-neutral-700">פרטי קשר</dt>
+                            <dd>
+                              {contactPhone ? (
+                                <a href={`tel:${contactPhone}`} className="text-primary hover:underline">
+                                  {finalContactDisplay}
+                                </a>
+                              ) : (
+                                finalContactDisplay
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+                        {student?.id ? (
+                          <div className="pt-sm">
+                            <Link to={`/students/${student.id}`} className="text-sm font-semibold text-primary hover:underline">
+                              צפייה בפרטי התלמיד
+                            </Link>
+                          </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       ) : null}
     </PageLayout>
   )

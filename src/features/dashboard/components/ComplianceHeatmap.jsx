@@ -245,6 +245,25 @@ export function ComplianceHeatmap({ orgId }) {
     setDetailQuickDoc({ studentId: session.studentId, date: detailedDayData?.date || detailRequestDate })
   }
 
+  const handleDrawerSessionCreated = useCallback(async () => {
+    // Refetch the heatmap data when a session is created through the drawer
+    if (!orgId) return
+    setIsLoading(true)
+    setError(null)
+    try {
+      const result = await fetchWeeklyComplianceView({
+        orgId,
+        weekStart: format(currentWeekStart, 'yyyy-MM-dd'),
+      })
+      setData(result)
+    } catch (err) {
+      console.error('Failed to refresh compliance data:', err)
+      setError(err.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [orgId, currentWeekStart])
+
   function handleDetailDocCreated() {
     // Modal now stays open with success state - refresh data but don't close modal
     if (detailRequestDate) {
@@ -502,6 +521,7 @@ export function ComplianceHeatmap({ orgId }) {
           onClose={() => setSelectedCell(null)}
           cellData={selectedCell}
           orgId={orgId}
+          onSessionCreated={handleDrawerSessionCreated}
         />
       )}
 

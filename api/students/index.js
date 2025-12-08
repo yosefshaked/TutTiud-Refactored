@@ -13,31 +13,16 @@ import {
   resolveTenantClient,
 } from '../_shared/org-bff.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
-
-const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?(?:Z|[+-](?:0\d|1\d|2[0-3]):[0-5]\d)?$/;
-const ISRAELI_PHONE_PATTERN = /^(?:0(?:5[0-9]|[2-4|8-9][0-9])-?\d{7}|(?:\+?972-?)?5[0-9]-?\d{7})$/;
-
-function validateIsraeliPhone(value) {
-  if (value === null || value === undefined) {
-    return { value: null, valid: true };
-  }
-  
-  if (typeof value !== 'string') {
-    return { value: null, valid: false };
-  }
-  
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { value: null, valid: true };
-  }
-  
-  const normalized = trimmed.replace(/[\s-]/g, '');
-  if (ISRAELI_PHONE_PATTERN.test(normalized)) {
-    return { value: trimmed, valid: true };
-  }
-  
-  return { value: null, valid: false };
-}
+import {
+  coerceBooleanFlag,
+  coerceDayOfWeek,
+  coerceNationalId,
+  coerceOptionalText,
+  coerceSessionTime,
+  coerceTags,
+  validateAssignedInstructor,
+  validateIsraeliPhone,
+} from '../_shared/student-validation.js';
 
 function extractStudentId(context, req, body) {
   const candidate =
@@ -51,128 +36,19 @@ function extractStudentId(context, req, body) {
   return '';
 }
 
-function validateAssignedInstructor(candidate) {
-  if (candidate === null) {
-    return { value: null, valid: true };
-  }
-  if (typeof candidate === 'string') {
-    const trimmed = candidate.trim();
-    if (!trimmed) {
-      return { value: null, valid: true };
-    }
-    if (UUID_PATTERN.test(trimmed)) {
-      return { value: trimmed, valid: true };
-    }
-  }
-  return { value: null, valid: false };
-}
-
-function coerceOptionalText(value) {
-  if (value === null || value === undefined) {
-    return { value: null, valid: true };
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return { value: trimmed || null, valid: true };
-  }
-  return { value: null, valid: false };
-}
-
-function coerceDayOfWeek(value) {
-  if (value === null || value === undefined || value === '') {
-    return { value: null, valid: true };
+async function findStudentByNationalId(tenantClient, nationalId, { excludeId } = {}) {
+  if (!nationalId) {
+    return { data: null, error: null };
   }
 
-  const numeric = typeof value === 'number' ? value : Number.parseInt(String(value).trim(), 10);
+  let query = tenantClient.from('Students').select('id, name, is_active, national_id').eq('national_id', nationalId).limit(1);
 
-  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 7) {
-    return { value: numeric, valid: true };
+  if (excludeId) {
+    query = query.neq('id', excludeId);
   }
 
-  return { value: null, valid: false };
-}
-
-function coerceSessionTime(value) {
-  if (value === null || value === undefined || value === '') {
-    return { value: null, valid: true };
-  }
-
-  if (typeof value !== 'string') {
-    return { value: null, valid: false };
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return { value: null, valid: true };
-  }
-
-  if (TIME_PATTERN.test(trimmed)) {
-    return { value: trimmed, valid: true };
-  }
-
-  return { value: null, valid: false };
-}
-
-function coerceTags(value) {
-  if (value === null || value === undefined) {
-    return { value: null, valid: true };
-  }
-
-  if (Array.isArray(value)) {
-    const normalized = value
-      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-      .filter(Boolean);
-    return { value: normalized.length ? normalized : null, valid: true };
-  }
-
-  if (typeof value === 'string') {
-    const normalized = value
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-    return { value: normalized.length ? normalized : null, valid: true };
-  }
-
-  return { value: null, valid: false };
-}
-
-function coerceBooleanFlag(raw, { defaultValue = null, allowUndefined = true } = {}) {
-  if (raw === undefined) {
-    return { value: defaultValue, valid: allowUndefined, provided: false };
-  }
-
-  if (raw === null) {
-    return { value: defaultValue, valid: false, provided: true };
-  }
-
-  if (typeof raw === 'boolean') {
-    return { value: raw, valid: true, provided: true };
-  }
-
-  if (typeof raw === 'string') {
-    const normalized = raw.trim().toLowerCase();
-    if (!normalized) {
-      return { value: defaultValue, valid: false, provided: true };
-    }
-    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on') {
-      return { value: true, valid: true, provided: true };
-    }
-    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'n' || normalized === 'off') {
-      return { value: false, valid: true, provided: true };
-    }
-    return { value: defaultValue, valid: false, provided: true };
-  }
-
-  if (typeof raw === 'number') {
-    if (raw === 1) {
-      return { value: true, valid: true, provided: true };
-    }
-    if (raw === 0) {
-      return { value: false, valid: true, provided: true };
-    }
-  }
-
-  return { value: defaultValue, valid: false, provided: true };
+  const { data, error } = await query.maybeSingle();
+  return { data, error };
 }
 
 function buildStudentPayload(body) {
@@ -236,9 +112,20 @@ function buildStudentPayload(body) {
 
   const isActiveValue = isActiveResult.provided ? Boolean(isActiveResult.value) : true;
 
+  const nationalIdResult = coerceNationalId(body?.national_id ?? body?.nationalId);
+  if (!nationalIdResult.valid) {
+    return { error: 'invalid_national_id' };
+  }
+  
+  // National ID is required
+  if (!nationalIdResult.value) {
+    return { error: 'missing_national_id' };
+  }
+
   return {
     payload: {
       name,
+      national_id: nationalIdResult.value,
       contact_info: contactInfo || null,
       contact_name: contactNameResult.value,
       contact_phone: contactPhoneResult.value,
@@ -391,6 +278,20 @@ function buildStudentUpdates(body) {
     hasAny = true;
   }
 
+  if (
+    Object.prototype.hasOwnProperty.call(body, 'national_id') ||
+    Object.prototype.hasOwnProperty.call(body, 'nationalId')
+  ) {
+    const { value, valid } = coerceNationalId(
+      Object.prototype.hasOwnProperty.call(body, 'national_id') ? body.national_id : body.nationalId,
+    );
+    if (!valid) {
+      return { error: 'invalid_national_id' };
+    }
+    updates.national_id = value;
+    hasAny = true;
+  }
+
   if (!hasAny) {
     return { error: 'missing_updates' };
   }
@@ -513,6 +414,10 @@ export default async function (context, req) {
       const message =
         normalized.error === 'missing_name'
           ? 'missing student name'
+          : normalized.error === 'missing_national_id'
+            ? 'missing national id'
+          : normalized.error === 'invalid_national_id'
+            ? 'invalid national id'
           : normalized.error === 'invalid_assigned_instructor'
             ? 'invalid assigned instructor id'
             : normalized.error === 'invalid_contact_name'
@@ -533,6 +438,22 @@ export default async function (context, req) {
                   ? 'invalid is_active flag'
                   : 'invalid payload';
       return respond(context, 400, { message });
+    }
+
+    if (normalized.payload.national_id) {
+      const { data: existingByNationalId, error: nationalIdLookupError } = await findStudentByNationalId(
+        tenantClient,
+        normalized.payload.national_id,
+      );
+
+      if (nationalIdLookupError) {
+        context.log?.error?.('students failed to check national id uniqueness', { message: nationalIdLookupError.message });
+        return respond(context, 500, { message: 'failed_to_validate_national_id' });
+      }
+
+      if (existingByNationalId) {
+        return respond(context, 409, { message: 'duplicate_national_id', student: existingByNationalId });
+      }
     }
 
     // Build metadata with creator information
@@ -587,6 +508,8 @@ export default async function (context, req) {
     const updateMessage =
       normalizedUpdates.error === 'missing_updates'
         ? 'no updatable fields provided'
+        : normalizedUpdates.error === 'invalid_national_id'
+          ? 'invalid national id'
         : normalizedUpdates.error === 'invalid_name'
           ? 'invalid name'
           : normalizedUpdates.error === 'invalid_contact_info'
@@ -627,6 +550,28 @@ export default async function (context, req) {
 
   if (!existingStudent) {
     return respond(context, 404, { message: 'student_not_found' });
+  }
+
+  if (Object.prototype.hasOwnProperty.call(normalizedUpdates.updates, 'national_id')) {
+    const desiredNationalId = normalizedUpdates.updates.national_id;
+
+    if (desiredNationalId) {
+      const { data: conflict, error: lookupError } = await findStudentByNationalId(tenantClient, desiredNationalId, {
+        excludeId: studentId,
+      });
+
+      if (lookupError) {
+        context.log?.error?.('students failed to validate national id on update', {
+          message: lookupError.message,
+          studentId,
+        });
+        return respond(context, 500, { message: 'failed_to_validate_national_id' });
+      }
+
+      if (conflict) {
+        return respond(context, 409, { message: 'duplicate_national_id', student: conflict });
+      }
+    }
   }
 
   // Determine which fields actually changed

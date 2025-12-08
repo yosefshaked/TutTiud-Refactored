@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["get"],
-      "route": "org-documents-download"
+      "route": "students-check-id"
     },
     {
       "type": "http",

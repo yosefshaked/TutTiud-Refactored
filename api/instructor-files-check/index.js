@@ -155,41 +155,51 @@ export default async function (context, req) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
-  // Check for duplicate files across ALL instructors (admins) or just the user's own files (non-admins)
-  let instructorsQuery = tenantClient.from('Instructors').select('id, name, files');
+  // Check for duplicate files in Documents table
+  // Admins can see all instructor duplicates, non-admins only their own
+  let documentsQuery = tenantClient
+    .from('Documents')
+    .select('id, name, uploaded_at, entity_id, hash')
+    .eq('entity_type', 'instructor')
+    .eq('hash', fileHash);
   
   if (!isAdmin) {
     // Non-admins can only see their own duplicates
-    instructorsQuery = instructorsQuery.eq('id', userId);
+    documentsQuery = documentsQuery.eq('entity_id', userId);
   }
 
-  const { data: allInstructors, error: instructorsError } = await instructorsQuery;
+  const { data: allDocuments, error: documentsError } = await documentsQuery;
 
-  if (instructorsError) {
-    context.log?.error?.('❌ [INSTRUCTOR-CHECK] Failed to fetch instructors', { 
-      message: instructorsError.message,
-      code: instructorsError.code,
+  if (documentsError) {
+    context.log?.error?.('❌ [INSTRUCTOR-CHECK] Failed to check duplicates in Documents table', { 
+      message: documentsError.message,
+      code: documentsError.code,
     });
     return respond(context, 500, { 
       message: 'failed_to_check_duplicates',
-      error: instructorsError.message,
+      error: documentsError.message,
     });
   }
 
-  // Find duplicates by hash
+  // Fetch instructor names for found duplicates
   const duplicates = [];
-  for (const instructor of allInstructors || []) {
-    const instructorFiles = Array.isArray(instructor.files) ? instructor.files : [];
-    for (const file of instructorFiles) {
-      if (file.hash === fileHash) {
-        duplicates.push({
-          file_id: file.id,
-          file_name: file.name,
-          uploaded_at: file.uploaded_at,
-          instructor_id: instructor.id,
-          instructor_name: instructor.name,
-        });
-      }
+  if (allDocuments && allDocuments.length > 0) {
+    const instructorIds = [...new Set(allDocuments.map(doc => doc.entity_id))];
+    const { data: instructors } = await tenantClient
+      .from('Instructors')
+      .select('id, name')
+      .in('id', instructorIds);
+
+    const instructorMap = new Map((instructors || []).map(i => [i.id, i.name]));
+
+    for (const doc of allDocuments) {
+      duplicates.push({
+        file_id: doc.id,
+        file_name: doc.name,
+        uploaded_at: doc.uploaded_at,
+        instructor_id: doc.entity_id,
+        instructor_name: instructorMap.get(doc.entity_id) || 'Unknown',
+      });
     }
   }
 

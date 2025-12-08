@@ -9,6 +9,7 @@ import { format, parseISO } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useDocuments } from '@/hooks/useDocuments';
+import { checkDocumentDuplicate } from '@/features/students/api/documents-check.js';
 import {
   Dialog,
   DialogContent,
@@ -210,73 +211,42 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
     // Check for duplicates before upload
     try {
       console.log('🔍 [UPLOAD] Checking for duplicates...');
-      const checkFormData = new FormData();
-      checkFormData.append('file', file);
-      checkFormData.append('org_id', orgId);
-      checkFormData.append('instructor_id', instructor.id);
-
-      const xhr = new XMLHttpRequest();
       
-      return new Promise((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status === 200) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              console.log('✅ [UPLOAD] Duplicate check response:', response);
-              
-              if (response.has_duplicates && response.duplicates.length > 0) {
-                console.log('⚠️ [UPLOAD] Duplicates found, showing dialog', response.duplicates);
-                // Show duplicate confirmation dialog
-                setDuplicateDialog({
-                  file,
-                  definitionId,
-                  definitionName,
-                  duplicates: response.duplicates,
-                });
-                resolve();
-              } else {
-                console.log('✅ [UPLOAD] No duplicates, proceeding with upload');
-                // No duplicates, proceed with upload
-                performUpload(file, definitionId, definitionName);
-                resolve();
-              }
-            } catch (error) {
-              console.error('❌ [UPLOAD] Failed to parse duplicate check response:', error);
-              reject(error);
-            }
-          } else {
-            console.error('❌ [UPLOAD] Duplicate check failed:', xhr.status, xhr.responseText);
-            // If check fails, still allow upload (fail open)
-            toast.warning('בדיקת כפילויות נכשלה, ממשיך בהעלאה...');
-            performUpload(file, definitionId, definitionName);
-            resolve();
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          console.error('❌ [UPLOAD] Duplicate check network error');
-          // If check fails, still allow upload (fail open)
-          toast.warning('בדיקת כפילויות נכשלה, ממשיך בהעלאה...');
-          performUpload(file, definitionId, definitionName);
-          resolve();
-        });
-
-        const checkUrl = `/api/instructor-files-check?org_id=${orgId}`;
-        xhr.open('POST', checkUrl);
-        
-        const token = session?.access_token;
-        if (token) {
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          xhr.setRequestHeader('X-Supabase-Authorization', `Bearer ${token}`);
-          xhr.setRequestHeader('x-supabase-authorization', `Bearer ${token}`);
-          xhr.setRequestHeader('x-supabase-auth', `Bearer ${token}`);
-        }
-
-        xhr.send(checkFormData);
+      const response = await checkDocumentDuplicate({
+        entityType: 'instructor',
+        entityId: instructor.id,
+        file,
+        orgId,
+        sessionToken: session?.access_token,
       });
+
+      console.log('✅ [UPLOAD] Duplicate check response:', response);
+      
+      if (response.has_duplicates && response.duplicates.length > 0) {
+        console.log('⚠️ [UPLOAD] Duplicates found, showing dialog', response.duplicates);
+        // Show duplicate confirmation dialog
+        setDuplicateDialog({
+          file,
+          definitionId,
+          definitionName,
+          duplicates: response.duplicates,
+        });
+      } else {
+        console.log('✅ [UPLOAD] No duplicates, proceeding with upload');
+        // No duplicates, proceed with upload
+        performUpload(file, definitionId, definitionName);
+      }
     } catch (error) {
       console.error('❌ [UPLOAD] Duplicate check error:', error);
-      // If check fails, still allow upload (fail open)
+      
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('AbortError')) {
+        // User cancelled, don't upload
+        return;
+      }
+      
+      // If check fails, still allow upload (fail open pattern)
+      console.warn('Duplicate check failed, proceeding with upload anyway');
       toast.warning('בדיקת כפילויות נכשלה, ממשיך בהעלאה...');
       performUpload(file, definitionId, definitionName);
     }
@@ -443,7 +413,7 @@ export default function MyInstructorDocuments({ session, orgId, userId }) {
                 <li>גודל מקסימלי: 10MB</li>
                 <li>סוגי קבצים נתמכים: PDF, תמונות (JPG, PNG, GIF), מסמכי Word, Excel</li>
                 <li>תמיכה בשמות קבצים בעברית</li>
-                <li className="font-medium">מחיקת מסמכים אפשרית רק על ידי מנהלים - נא לפנות למנהל הארגון</li>
+                <li className="font-medium">מחיקת מסמכים אפשרית רק על ידי בעלי/ות הרשאות מנהל – נא לפנות לצוות הניהול בארגון</li>
               </ul>
             </div>
           </div>
