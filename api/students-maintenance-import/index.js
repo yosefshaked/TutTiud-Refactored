@@ -68,12 +68,12 @@ export default async function handler(context, req) {
   const supabaseAdminConfig = readSupabaseAdminConfig(env);
   const supabase = createSupabaseAdminClient(supabaseAdminConfig);
 
-  const token = resolveBearerAuthorization(req);
-  if (!token) {
+  const authorization = resolveBearerAuthorization(req);
+  if (!authorization?.token) {
     return respond(context, 401, { message: 'missing bearer token' });
   }
 
-  const authResult = await supabase.auth.getUser(token);
+  const authResult = await supabase.auth.getUser(authorization.token);
   if (authResult.error || !authResult.data?.user?.id) {
     return respond(context, 401, { message: 'invalid or expired token' });
   }
