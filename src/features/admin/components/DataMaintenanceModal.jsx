@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, FileWarning, UploadCloud, HelpCircle } from 'lucide-react';
+import { Download, FileWarning, UploadCloud, HelpCircle, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { authenticatedFetch, authenticatedFetchBlob } from '@/lib/api-client.js';
 import DataMaintenancePreview from './DataMaintenancePreview.jsx';
-import { DataMaintenanceHelpDialog } from './DataMaintenanceHelpDialog.jsx';
+import { DataMaintenanceHelpContent } from './DataMaintenanceHelpContent.jsx';
 
 function buildErrorLabel(entry) {
   const lineLabel = entry.line_number ? `שורה ${entry.line_number}: ` : '';
@@ -36,7 +36,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
   const [previewData, setPreviewData] = useState(null);
   const [instructors, setInstructors] = useState([]);
   const [isApplying, setIsApplying] = useState(false);
-  const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -52,6 +52,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
       setPreviewData(null);
       setInstructors([]);
       setIsApplying(false);
+      setShowHelp(false);
     }
   }, [open]);
 
@@ -241,13 +242,13 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
   };
 
   return (
-    <>
-      <DataMaintenanceHelpDialog open={showHelpDialog} onOpenChange={setShowHelpDialog} />
-      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose?.(); }}>
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose?.(); }}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {unmatchedTags.length > 0 
+            {showHelp 
+              ? 'מדריך תחזוקת נתונים'
+              : unmatchedTags.length > 0 
               ? 'מיפוי תוויות' 
               : previewData 
               ? 'תצוגה מקדימה - אשר שינויים'
@@ -255,7 +256,18 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
           </DialogTitle>
         </DialogHeader>
 
-        {previewData ? (
+        {showHelp ? (
+          // Help content view
+          <>
+            <DataMaintenanceHelpContent />
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setShowHelp(false)} variant="outline" className="gap-2">
+                <ArrowRight className="h-4 w-4" />
+                חזור לייבוא
+              </Button>
+            </div>
+          </>
+        ) : previewData ? (
           // Preview mode
           <DataMaintenancePreview
             previews={previewData.previews || []}
@@ -343,7 +355,7 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
                     onChange={handleFileChange}
                   />
                   <p className="text-xs text-neutral-500">
-                    צריכים עזרה? <button type="button" onClick={() => setShowHelpDialog(true)} className="inline-flex items-center gap-1 text-primary hover:underline font-semibold">
+                    צריכים עזרה? <button type="button" onClick={() => setShowHelp(true)} className="inline-flex items-center gap-1 text-primary hover:underline font-semibold">
                       <HelpCircle className="h-3.5 w-3.5" />
                       לחצו כאן לעזרה
                     </button>
@@ -408,6 +420,5 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
         )}
       </DialogContent>
     </Dialog>
-    </>
   );
 }
