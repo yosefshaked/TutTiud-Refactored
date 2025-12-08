@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["get"],
-      "route": "students/check-id"
+      "route": "students-check-id"
     },
     {
       "type": "http",

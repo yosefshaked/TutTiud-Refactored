@@ -118,7 +118,7 @@ export function useNationalIdGuard(nationalIdInput, { excludeStudentId } = {}) {
           national_id: trimmed,
           exclude_id: excludeStudentId,
         });
-        const url = `students/check-id?${searchParams.toString()}`;
+        const url = `students-check-id?${searchParams.toString()}`;
         console.log('[useNationalIdGuard] Calling API', {
           url,
           nationalId: trimmed,
