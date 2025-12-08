@@ -128,7 +128,7 @@ export default async function handler(context, req) {
 
   const { data: instructors, error: instructorsError } = await tenantClient
     .from('Instructors')
-    .select('id, name, email');
+    .select('id, name, email, is_active');
 
   if (instructorsError) {
     context.log?.error?.('students-maintenance-export failed to fetch instructors', { message: instructorsError.message, orgId });
