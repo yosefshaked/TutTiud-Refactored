@@ -251,7 +251,7 @@ export default function StudentManagementPage() {
       const query = searchQuery.toLowerCase();
       result = result.filter((s) => {
         const name = (s.name || '').toLowerCase();
-        const phone = (s.phone || '').toLowerCase();
+        const phone = (s.contact_phone || '').toLowerCase();
         const nationalId = (s.national_id || '').toLowerCase();
         return name.includes(query) || phone.includes(query) || nationalId.includes(query);
       });
