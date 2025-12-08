@@ -1006,6 +1006,19 @@
     - Validation errors included in preview before any data is modified
   - **Selective application (2025-12)**: Accepts `excluded_ids` array to skip specific students when applying changes
   - Ingests edited CSV text keyed by `system_uuid` (required for all rows)
+  - **Column name flexibility (2025-12)**: Accepts both English and Hebrew column names for ALL fields:
+    - UUID: `system_uuid`, `student_id`, `id`, `מזהה מערכת (uuid)`, `מזהה מערכת`
+    - Name: `name`, `student_name`, `שם התלמיד`
+    - National ID: `national_id`, `nationalId`, `מספר זהות`
+    - Contact: `contact_name`, `contactName`, `שם איש קשר` + `contact_phone`, `contactPhone`, `טלפון`
+    - Instructor: `assigned_instructor_name`, `assigned_instructor`, `instructor_name`, `instructor`, `שם מדריך`
+    - Service: `default_service`, `service`, `שירות ברירת מחדל`
+    - Day: `default_day_of_week`, `day`, `יום ברירת מחדל` (supports Hebrew day names and numbers)
+    - Time: `default_session_time`, `session_time`, `sessionTime`, `שעת מפגש ברירת מחדל`
+    - Notes: `notes`, `Notes`, `הערות`
+    - Tags: `tags`, `tag_ids`, `Tags`, `תגיות`
+    - Active: `is_active`, `active`, `status`, `פעיל` (supports Hebrew כן/לא)
+  - **Round-trip compatibility**: CSVs exported with Hebrew headers can be re-imported without modification
   - **Empty cell behavior (2025-12)**: Empty CSV cells are treated as "no change" - only cells with values update the database
   - **Clearing optional fields (2025-12)**: Use sentinel value `CLEAR` or `-` to explicitly clear optional fields (notes, default_service, contact_name)
   - **Instructor name matching** (2025-12): Accepts both UUID and instructor name in `assigned_instructor_name` column

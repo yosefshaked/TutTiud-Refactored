@@ -23,7 +23,7 @@ import {
 } from '../_shared/student-validation.js';
 import { parseCsv } from '../_shared/csv.js';
 
-const ID_COLUMN_CANDIDATES = ['system_uuid', 'student_id', 'id'];
+const ID_COLUMN_CANDIDATES = ['system_uuid', 'student_id', 'id', 'מזהה מערכת (uuid)', 'מזהה מערכת'];
 const IGNORED_COLUMNS = ['extraction_reason', 'סיבת ייצוא']; // Columns to skip during import
 const CLEAR_SENTINEL = 'CLEAR'; // Special value to explicitly clear optional fields
 const MAX_ROWS = 2000;
@@ -245,7 +245,7 @@ export default async function handler(context, req) {
   const unmatchedTags = new Set();
   for (const entry of stagedRows) {
     const { raw } = entry;
-    const tagsInput = normalizeTagsForCsv(raw?.tags ?? raw?.Tags);
+    const tagsInput = normalizeTagsForCsv(raw?.tags ?? raw?.Tags ?? raw?.['תגיות']);
     const tags = coerceTags(tagsInput);
     if (tags.valid && tags.value) {
       for (const tagName of tags.value) {
@@ -296,14 +296,14 @@ export default async function handler(context, req) {
     }
 
     const updates = {};
-    const displayName = normalizeString(raw?.name) || existing.name || '';
+    const displayName = normalizeString(raw?.name ?? raw?.['שם התלמיד']) || existing.name || '';
 
-    const name = normalizeString(raw?.name);
+    const name = normalizeString(raw?.name ?? raw?.['שם התלמיד']);
     if (name) {
       addIfChanged(updates, 'name', name, existing.name);
     }
 
-    const national = coerceNationalId(raw?.national_id ?? raw?.NationalId ?? raw?.nationalId);
+    const national = coerceNationalId(raw?.national_id ?? raw?.NationalId ?? raw?.nationalId ?? raw?.['מספר זהות']);
     if (national.provided) {
       if (!national.valid) {
         failures.push(formatFailure({
@@ -318,7 +318,7 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'national_id', national.value, existing.national_id);
     }
 
-    const contactNameRaw = raw?.contact_name ?? raw?.ContactName ?? raw?.contactName;
+    const contactNameRaw = raw?.contact_name ?? raw?.ContactName ?? raw?.contactName ?? raw?.['שם איש קשר'];
     if (!isEmptyCell(contactNameRaw)) {
       if (shouldClearField(contactNameRaw)) {
         addIfChanged(updates, 'contact_name', null, existing.contact_name);
@@ -330,7 +330,7 @@ export default async function handler(context, req) {
       }
     }
 
-    const phoneCheck = validateIsraeliPhone(raw?.contact_phone ?? raw?.phone ?? raw?.contactPhone);
+    const phoneCheck = validateIsraeliPhone(raw?.contact_phone ?? raw?.phone ?? raw?.contactPhone ?? raw?.['טלפון']);
     if (!phoneCheck.valid) {
       failures.push(formatFailure({
         lineNumber,
@@ -346,7 +346,7 @@ export default async function handler(context, req) {
     }
 
     // Support both instructor UUID and instructor name
-    const instructorInput = normalizeString(raw?.assigned_instructor_name ?? raw?.assigned_instructor_id ?? raw?.instructor_id ?? raw?.assignedInstructorId ?? raw?.instructor_name ?? raw?.instructorName);
+    const instructorInput = normalizeString(raw?.assigned_instructor_name ?? raw?.assigned_instructor_id ?? raw?.instructor_id ?? raw?.assignedInstructorId ?? raw?.instructor_name ?? raw?.instructorName ?? raw?.['שם מדריך']);
     
     if (instructorInput) {
       let instructorId = null;
@@ -400,7 +400,7 @@ export default async function handler(context, req) {
       }
     }
 
-    const defaultServiceRaw = raw?.default_service ?? raw?.service;
+    const defaultServiceRaw = raw?.default_service ?? raw?.service ?? raw?.['שירות ברירת מחדל'];
     if (!isEmptyCell(defaultServiceRaw)) {
       if (shouldClearField(defaultServiceRaw)) {
         addIfChanged(updates, 'default_service', null, existing.default_service);
@@ -412,7 +412,7 @@ export default async function handler(context, req) {
       }
     }
 
-    const defaultDay = coerceDayOfWeek(raw?.default_day_of_week ?? raw?.day);
+    const defaultDay = coerceDayOfWeek(raw?.default_day_of_week ?? raw?.day ?? raw?.['יום ברירת מחדל']);
     if (!defaultDay.valid) {
       failures.push(formatFailure({
         lineNumber,
@@ -427,7 +427,7 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'default_day_of_week', defaultDay.value, existing.default_day_of_week);
     }
 
-    const defaultTime = coerceSessionTime(raw?.default_session_time ?? raw?.session_time ?? raw?.sessionTime);
+    const defaultTime = coerceSessionTime(raw?.default_session_time ?? raw?.session_time ?? raw?.sessionTime ?? raw?.['שעת מפגש ברירת מחדל']);
     if (!defaultTime.valid) {
       failures.push(formatFailure({
         lineNumber,
@@ -442,7 +442,7 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'default_session_time', defaultTime.value, existing.default_session_time);
     }
 
-    const notesRaw = raw?.notes ?? raw?.Notes;
+    const notesRaw = raw?.notes ?? raw?.Notes ?? raw?.['הערות'];
     if (!isEmptyCell(notesRaw)) {
       if (shouldClearField(notesRaw)) {
         addIfChanged(updates, 'notes', null, existing.notes);
@@ -454,7 +454,8 @@ export default async function handler(context, req) {
       }
     }
 
-    const tagsInput = normalizeTagsForCsv(raw?.tags ?? raw?.Tags);
+    const tagsRaw = raw?.tags ?? raw?.tag_ids ?? raw?.Tags ?? raw?.['תגיות'];
+    const tagsInput = normalizeTagsForCsv(tagsRaw);
     const tags = coerceTags(tagsInput);
     if (!tags.valid) {
       failures.push(formatFailure({
@@ -489,7 +490,7 @@ export default async function handler(context, req) {
       addIfChanged(updates, 'tags', tagIds.length ? tagIds : null, existing.tags);
     }
 
-    const isActive = coerceBooleanFlag(raw?.is_active ?? raw?.active ?? raw?.status, { defaultValue: existing.is_active, allowUndefined: true });
+    const isActive = coerceBooleanFlag(raw?.is_active ?? raw?.active ?? raw?.status ?? raw?.['פעיל'], { defaultValue: existing.is_active, allowUndefined: true });
     if (!isActive.valid) {
       failures.push(formatFailure({
         lineNumber,
