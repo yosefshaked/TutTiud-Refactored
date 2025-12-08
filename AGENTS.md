@@ -267,66 +267,29 @@
 - See `api/cross-platform/README.md` for architectural principles and usage guidelines
 
 ### File Upload and Document Management (2025-11)
-- `/api/student-files` (POST/PUT/DELETE) manages student document uploads with integrated storage backend (managed R2 or BYOS).
+- **File Upload and Document Management**: All file operations now use the unified `/api/documents` endpoint (see Polymorphic Documents Table Architecture section above).
   - **Backend validation**: Enforces 10MB max file size and allowed MIME types (PDF, images, Word, Excel) server-side
   - **File metadata**: Each file record includes `{id, name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash}`
-  - **PUT endpoint**: Updates file metadata (name, relevant_date, expiration_date, resolved) post-upload
-    - Admin/owner only
-    - Logs audit event with updated fields
   - **Hebrew filename encoding**: Properly decodes UTF-8 filenames from multipart data by detecting latin1 mis-encoding and converting back to UTF-8
-  - **Bulk upload support (2025-11)**: File inputs accept `multiple` attribute, allowing users to select and upload multiple files at once
-  - **Sorting functionality (2025-11)**: Additional files section includes sort controls for name (alphabetical) and date (chronological), with ascending/descending toggle
+  - **Bulk upload support**: File inputs accept `multiple` attribute, allowing users to select and upload multiple files at once
+  - **Sorting functionality**: Additional files section includes sort controls for name (alphabetical) and date (chronological), with ascending/descending toggle
   - **Progress tracking**: Frontend uses XMLHttpRequest with upload progress events for real-time feedback
   - **Background uploads**: Uploads continue in background with toast notifications; users can navigate away while files upload
   - **Error messages**: Hebrew localized error messages for file size, type validation, and upload failures
-  - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Student Name}" (e.g., "אישור רפואי - יוסי כהן")
+  - **Naming convention**: Files with `definition_id` are named "{Definition Name} - {Entity Name}" (e.g., "אישור רפואי - יוסי כהן")
   - **Definition name preservation**: Stores `definition_name` in file metadata so orphaned files (deleted definitions) maintain proper display name
   - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant_date, and add expiration_date
-    - Name auto-populated from filename (without extension) or definition name
-    - Name locked for required documents (uses admin-configured definition name)
-    - Both dates optional
-    - Confirmation triggers upload with metadata via multipart/form-data
-  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
-    - Edit name, relevant_date, expiration_date
-    - Admin/owner only
-    - Edit button next to each file (required and adhoc)
+  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded (admin/owner or own files only)
   - **Resolved status for expired documents**: Files with expiration dates can be marked as "taken care of"
-    - Green "טופל" badge for resolved files vs red "פג תוקף" for expired unresolved
-    - Resolved files excluded from expired document counts on student list pages
-    - Toggle button appears for files with expiration_date
-    - Allows marking files as resolved when: new version uploaded, expiration no longer relevant, or issue addressed
-  - **Configuration changes handling**: When admins modify document definitions after files are uploaded:
-    - **Rename definition**: Files automatically show the NEW definition name (fetched dynamically from current definitions); `definition_name` metadata only used as fallback if definition is deleted
-    - **Change target_tags**: Files remain associated with `definition_id`; display uses current definition regardless of tag changes, so file stays in "Required Documents" section with updated tags
-    - **Delete definition**: Files become orphaned, shown in "Additional Files" with amber styling and "הגדרה ישנה" badge using stored `definition_name`
-    - **Implementation**: Frontend and download endpoint both check current definitions first, falling back to stored `definition_name` only for truly deleted definitions
-- `/api/student-files-check` (POST) performs pre-upload duplicate detection.
-  - Calculates MD5 hash of file content before uploading to storage
-  - Searches for duplicates across ALL students in the organization (not just current student)
-  - Returns list of duplicates with `{file_id, file_name, uploaded_at, student_id, student_name}`
-  - Frontend shows confirmation dialog listing which students have the duplicate file before proceeding
-  - Users can cancel upload or proceed to upload anyway (allows intentional duplicates)
-- `/api/student-files-download` (GET) generates presigned download URLs with proper Hebrew filename encoding.
-  - Uses RFC 5987 encoding for non-ASCII filenames: `filename*=UTF-8''<encoded-name>`
-  - Reconstructs filename from `definition_name` + student name for orphaned files
-  - Ensures file extension is always included from `original_name`
-  - 1-hour expiration on presigned URLs for security
-- Frontend (`StudentDocumentsSection.jsx`):
-  - **Tag-based filtering**: Shows only document definitions relevant to student's tags
-    - Definitions with no `target_tags` apply to all students (shown to everyone)
-    - Definitions with `target_tags` shown only if student has at least one matching tag
-    - Students without tags see only universal documents (no `target_tags`)
-  - **Pre-upload duplicate check**: Calls check endpoint before starting upload, shows confirmation with student names
-  - **Visual progress indicator**: Shows progress bar and percentage for each active upload in blue info box at top of section
-  - **Background upload tracking**: State tracks multiple concurrent uploads with `backgroundUploads` array
-  - **Toast notifications**: Loading toast updates with progress percentage, then success/error on completion
-  - **Delete functionality**: Uses native fetch with proper JSON body and authorization headers
-  - **Orphaned files display**: Files from deleted definitions show with amber background, "הגדרה ישנה" badge, and reconstructed name from stored `definition_name`
+  - **Configuration changes handling**: When admins modify document definitions after files are uploaded, files automatically show new definition names or become orphaned with amber "הגדרה ישנה" badge
+  - **Tag-based filtering**: Shows only document definitions relevant to entity's tags
+  - **Duplicate detection**: Pre-upload MD5 hash check searches across all entities in organization
+  - **Download URLs**: RFC 5987 encoding for Hebrew filenames, 1-hour expiration on presigned URLs
 - File restrictions communicated to users via blue info box with bullet points (10MB, allowed types, Hebrew filenames supported)
 
 ### Polymorphic Documents Table Architecture (2025-11)
-- **Schema**: Centralized `tuttiud.Documents` table is the **source of truth** for all file metadata. Legacy JSON columns (`Students.files`, `Instructors.files`, `Settings.org_documents`) are **DEPRECATED** and no longer created in fresh deployments.
-- **Legacy API Endpoints**: `/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*` endpoints still exist for backward compatibility with old clients but should NOT be used for new development. All new code must use `/api/documents`.
+- **Schema**: Centralized `tuttiud.Documents` table is the **source of truth** for all file metadata. Legacy JSON columns (`Students.files`, `Instructors.files`, `Settings.org_documents`) have been fully deprecated and removed.
+- **API Endpoint**: `/api/documents` is the unified endpoint for all document operations (GET/POST/PUT/DELETE). Legacy endpoints have been removed.
 - **Discriminator pattern**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID) identifies which entity owns each document.
 - **Columns**: id (UUID PK), entity_type (text), entity_id (UUID), name, original_name, relevant_date, expiration_date, resolved, url, path, storage_provider, uploaded_at, uploaded_by, definition_id, definition_name, size, type, hash, metadata (JSONB).
 - **Indexes**: Composite index on (entity_type, entity_id) for fast entity-scoped queries; individual indexes on uploaded_at, expiration_date, hash.
@@ -336,12 +299,11 @@
   - INSERT requires `uploaded_by` matches authenticated user ID
   - UPDATE/DELETE allowed for authenticated users (entity-level permission checks in API layer)
   - API layer (`validateEntityAccess`) enforces org membership and entity-specific permissions
-- **Migration strategy** (DEPRECATED FOR FRESH DEPLOYMENTS):
-  - The SQL setup script NO LONGER creates `Students.files` or `Instructors.files` columns on fresh deployments
-  - The SQL setup script NO LONGER attempts to migrate from legacy JSON columns to Documents table
-  - For existing deployments with data in legacy columns: manual migration required before column removal
-  - Documents table is the ONLY file storage mechanism for new deployments
-  - Legacy API endpoints (`/api/student-files*`, `/api/instructor-files*`) remain for backward compatibility but query Documents table, not JSON columns
+- **Migration strategy**:
+  - Fresh deployments: Setup script creates only the Documents table (no legacy columns)
+  - Existing deployments: Legacy JSON columns should be manually migrated to Documents table before upgrading
+  - Documents table is the ONLY file storage mechanism
+  - All legacy API endpoints have been removed - use `/api/documents` exclusively
 - **API Endpoints**:
   - **`/api/documents`** (GET/POST/PUT/DELETE): Unified polymorphic endpoint for all document types
     - GET: `?entity_type=student&entity_id=<uuid>` returns all documents for that entity
@@ -367,12 +329,25 @@
   - `OrgDocumentsManager.jsx`: Uses `useDocuments('organization', orgId)`
   - `MyInstructorDocuments.jsx`: Uses `useDocuments('instructor', instructor.id)` for instructor self-service document portal
   - All components updated to use unified /api/documents endpoints, replacing old entity-specific endpoints
-  - **Note (2025-11)**: Legacy endpoints (`/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*`) still exist for backward compatibility but are no longer used by frontend components. The duplicate check endpoints (`/api/student-files-check`, `/api/instructor-files-check`) remain in use until a polymorphic `/api/documents-check` endpoint is implemented.
+  - **Deprecation (2025-12)**: Legacy upload/download endpoints removed (`/api/student-files`, `/api/student-files-download`, `/api/instructor-files`, `/api/instructor-files-download`, `/api/org-documents`, `/api/org-documents-download`). Duplicate check endpoints preserved but refactored to use Documents table (`/api/student-files-check`, `/api/instructor-files-check`, `/api/org-documents-check`). All file operations now use `/api/documents` for CRUD operations; check endpoints remain for backward compatibility with existing frontend code.
 - **Audit logging**: All document operations (upload/update/delete) logged via `logAuditEvent()` with:
   - Action types: FILE_UPLOADED, FILE_METADATA_UPDATED, FILE_DELETED
   - Category: FILES
   - Resource type: `{entity_type}_file` (e.g., "student_file", "instructor_file", "organization_file")
   - Details include: entity_type, entity_id, file_name, file_size, storage_mode, updated_fields
+- **Unified duplicate check endpoint (2025-12)**: `/api/documents-check` provides polymorphic pre-upload MD5 hash duplicate detection.
+  - **Query params**: `entity_type` ('student'|'instructor'|'organization') + `entity_id` (UUID or org_id)
+  - **Body**: multipart/form-data with `file` field
+  - **Permission model**:
+    - Student documents: All org members can check duplicates
+    - Instructor documents: Admins see all; non-admins only their own
+    - Organization documents: Admin/owner only
+  - **Response**: `{ hash, has_duplicates, duplicates: [{ file_id, file_name, uploaded_at, entity_id, entity_name }] }`
+  - **Benefits**: Single endpoint handles all entity types, reduces code duplication, cleaner API design
+- **Legacy duplicate check endpoints (deprecated)**: `/api/student-files-check`, `/api/instructor-files-check`, `/api/org-documents-check`
+  - Still active for backward compatibility, now query Documents table instead of legacy JSON columns
+  - Frontend components should migrate to `/api/documents-check` when convenient
+  - No hard deprecation timeline yet; existing code continues to work
 - **Benefits of polymorphic approach**:
   - Single source of truth for all document storage
   - Consistent permission validation across entity types
@@ -381,68 +356,25 @@
   - Easy to extend to new entity types without duplicating logic
 - **Backward compatibility**: JSON columns in Students/Instructors/Settings remain intact; migration copies data without deletion, allowing gradual transition and rollback if needed.
 
-- **Backward compatibility**: Legacy API endpoints (`/api/student-files*`, `/api/instructor-files*`, `/api/org-documents*`) remain functional for old clients but now proxy to Documents table. **Do NOT use these for new development** - use `/api/documents` instead.
-- `/api/org-documents` (POST/PUT/DELETE/GET) manages organization-level documents (licenses, approvals, certificates) not tied to specific students or instructors.
+- **Breaking change (2025-12)**: Upload and download endpoints removed (`/api/student-files`, `/api/student-files-download`, `/api/instructor-files`, `/api/instructor-files-download`, `/api/org-documents`, `/api/org-documents-download`). Use `/api/documents` exclusively for all file CRUD operations. Duplicate check endpoints remain active (`/api/student-files-check`, `/api/instructor-files-check`, `/api/org-documents-check`) but refactored to query Documents table instead of legacy JSON columns.
+- `/api/org-documents` - Organization-level documents: REMOVED. Use `/api/documents` with `entity_type=organization` instead.
+  - All organization document operations now use the unified `/api/documents` endpoint
   - **Storage paths**:
     - Managed R2: `managed/{org_id}/general-docs/{file_id}.{ext}`
     - BYOS: `general-docs/{org_id}/{file_id}.{ext}`
-  - **Metadata storage**: Stored in `tuttiud.Settings` table with key `'org_documents'` as JSONB array
-  - **Metadata schema**: `{id, name, original_name, relevant_date, expiration_date, url, path, storage_provider, uploaded_at, uploaded_by, size, type, hash}`
   - **Member visibility control**: Setting `org_documents_member_visibility` (boolean, default false) controls whether non-admin members can view org documents
     - Admin/owner can always view and manage documents
     - Non-admin members require the setting to be enabled to view documents
     - GET endpoint checks this setting and returns 403 `members_cannot_view_org_documents` error when disabled
     - Frontend hides the org documents card from non-admin members when visibility is disabled
     - Backend enforces restriction as security layer in case of UI bugs
-  - **POST (upload)**: Multipart form data with file + optional metadata (name, relevant_date, expiration_date)
-    - Validates file size (10MB max) and MIME types (PDF, images, Word, Excel)
-    - Decodes Hebrew filenames properly (UTF-8/latin1 encoding)
-    - Generates MD5 hash for duplicate detection
-    - Uploads to storage and saves metadata to Settings
-    - Requires admin/owner role
-    - Logs FILE_UPLOADED audit event
-  - **PUT (update metadata)**: Update name, relevant_date, or expiration_date for existing document
-    - Admin/owner only
-    - Logs org_document_updated audit event
-  - **DELETE**: Remove file from storage and metadata from Settings
-    - Admin/owner only
-    - Logs FILE_DELETED audit event
-  - **GET (list)**: Returns all org documents for the organization
-    - Available to members when visibility setting is enabled
-    - Admin/owner can always access
-- `/api/org-documents-download` (GET) returns public URLs for org documents.
-  - Query params: `org_id` and `file_id`
-  - Verifies membership (any org member can download if visibility enabled)
-  - Uses public URLs directly (same approach as student/instructor files)
-  - Future: Cloudflare worker will handle custom domain presigned URLs
-- Frontend (`OrgDocumentsManager.jsx`):
-  - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant date, and add expiration date
-    - Name auto-populated from filename (without extension)
-    - Both dates optional
-    - Confirmation triggers upload with metadata via multipart/form-data
-    - Fresh session token obtained before upload to prevent silent failures
-  - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded
-    - Edit name, relevant_date, expiration_date
-    - Admin/owner only
-  - **Document separation**: Expired documents (expiration_date < today) displayed in separate section with red badges and CalendarX icon
-  - **Sorting**: Three-way sort by upload date, name, or expiration date with asc/desc toggle
-  - **Download**: Fetches public URL and triggers browser download with proper Hebrew filename
-  - **Delete**: Admin/owner only, confirmation dialog before deletion
-  - **Upload guidelines**: Info box explaining 10MB limit, allowed file types, Hebrew filename support
-  - **Visibility toggle (admin-only)**: Checkbox inside card to enable/disable member access
-    - Stored in tenant DB setting `org_documents_member_visibility`
-    - When disabled: Only admin/owner can view documents
-    - When enabled: All org members can view and download (but not upload/delete)
-  - **Visibility restriction handling**: Non-admin members see amber warning message when visibility is disabled
-- Settings page integration:
-  - Card: "מסמכי הארגון" (Organization Documents) with Briefcase icon
-  - Positioned after Document Rules Manager card (admin section)
-  - Visibility logic:
-    - Admins/owners: Always see the card when storage is enabled
-    - Non-admin members: Card only visible when `org_documents_member_visibility = true` AND storage is enabled
-  - Opens dialog with `OrgDocumentsManager` component
-  - Backend enforces visibility restriction as security layer
-- **Use cases**: Organization licenses, veterinary approvals, business permits, insurance certificates, general documentation not tied to specific students or instructors
+  - Frontend (`OrgDocumentsManager.jsx`):
+    - **Pre-upload metadata editor**: Dialog opens before upload, allowing user to edit name, add relevant date, and add expiration date
+    - **Post-upload metadata editor**: Dialog to update metadata after file is uploaded (admin/owner only)
+    - **Document separation**: Expired documents displayed in separate section with red badges
+    - **Sorting**: Three-way sort by upload date, name, or expiration date with asc/desc toggle
+    - **Visibility toggle (admin-only)**: Checkbox to enable/disable member access
+  - **Use cases**: Organization licenses, veterinary approvals, business permits, insurance certificates, general documentation not tied to specific students or instructors
 
 ### PDF Export Feature (2025-11)
 - `/api/students/export` (POST) generates professional PDF reports of student session records. Premium feature requiring `permissions.can_export_pdf_reports = true`.

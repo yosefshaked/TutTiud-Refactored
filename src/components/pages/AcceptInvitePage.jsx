@@ -207,7 +207,7 @@ export default function AcceptInvitePage() {
         <div className="space-y-1">
           <p className="text-sm font-semibold">כתובת האימייל אינה תואמת להזמנה</p>
           <p className="text-sm leading-relaxed">
-            ההזמנה נשלחה לכתובת <span className="font-medium">{invitation?.email}</span>, אך אתה מחובר כעת עם {session?.user?.email}. התנתק והתחבר עם החשבון המתאים כדי להמשיך.
+            ההזמנה נשלחה לכתובת <span className="font-medium">{invitation?.email}</span>, אך את/ה מחובר/ת כעת עם {session?.user?.email}. התנתק/י והתחבר/י עם החשבון המתאים כדי להמשיך.
           </p>
         </div>
       </div>
@@ -265,7 +265,7 @@ export default function AcceptInvitePage() {
       <div className="flex items-center justify-end gap-3 text-green-600">
         <CheckCircle2 className="w-8 h-8" aria-hidden="true" />
         <div>
-          <p className="text-lg font-bold text-slate-900">אתה כבר חבר בארגון</p>
+          <p className="text-lg font-bold text-slate-900">את/ה כבר חבר/ה בארגון</p>
           <p className="text-sm text-slate-600 leading-relaxed">
             סיימנו לעדכן את החברות שלך. תוכל להמשיך ללוח הבקרה כדי להתחיל לעבוד.
           </p>
