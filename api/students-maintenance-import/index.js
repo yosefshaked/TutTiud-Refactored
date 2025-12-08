@@ -22,6 +22,7 @@ import {
   validateIsraeliPhone,
 } from '../_shared/student-validation.js';
 import { parseCsv } from '../_shared/csv.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const ID_COLUMN_CANDIDATES = ['system_uuid', 'student_id', 'id', 'מזהה מערכת (uuid)', 'מזהה מערכת'];
 const IGNORED_COLUMNS = ['extraction_reason', 'סיבת ייצוא']; // Columns to skip during import
@@ -704,7 +705,7 @@ export default async function handler(context, req) {
   for (const candidate of actionableCandidates) {
     const { updates, studentId, displayName, existing } = candidate;
     if (!updates || Object.keys(updates).length === 0) {
-      successes.push({ student_id: studentId, name: displayName, changed_fields: [] });
+      // Skip students with no actual changes (don't count as success)
       continue;
     }
 
@@ -737,6 +738,26 @@ export default async function handler(context, req) {
       student_id: studentId,
       name: displayName,
       changed_fields: Object.keys(updates),
+    });
+  }
+
+  // Log bulk update to audit log
+  if (successes.length > 0) {
+    await logAuditEvent(supabase, {
+      orgId,
+      userId,
+      userEmail: authResult.data.user.email,
+      userRole: role,
+      actionType: AUDIT_ACTIONS.STUDENTS_BULK_UPDATE,
+      actionCategory: AUDIT_CATEGORIES.STUDENTS,
+      resourceType: 'students_bulk',
+      resourceId: orgId,
+      details: {
+        total_rows: stagedRows.length,
+        updated_count: successes.length,
+        failed_count: failures.length,
+        updated_students: successes.map(s => ({ id: s.student_id, name: s.name, fields: s.changed_fields })),
+      },
     });
   }
 
