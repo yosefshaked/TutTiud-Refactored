@@ -95,6 +95,12 @@ function formatFailure({ lineNumber, studentId, name, code, message }) {
 export default async function handler(context, req) {
   const env = readEnv(context);
   const supabaseAdminConfig = readSupabaseAdminConfig(env);
+
+  if (!supabaseAdminConfig.supabaseUrl || !supabaseAdminConfig.serviceRoleKey) {
+    context.log?.error?.('students-maintenance-import missing Supabase admin credentials');
+    return respond(context, 500, { message: 'server_misconfigured' });
+  }
+
   const supabase = createSupabaseAdminClient(supabaseAdminConfig);
 
   const authorization = resolveBearerAuthorization(req);

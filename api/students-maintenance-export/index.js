@@ -58,6 +58,12 @@ const DAYS_OF_WEEK_HEBREW = {
 export default async function handler(context, req) {
   const env = readEnv(context);
   const supabaseAdminConfig = readSupabaseAdminConfig(env);
+
+  if (!supabaseAdminConfig.supabaseUrl || !supabaseAdminConfig.serviceRoleKey) {
+    context.log?.error?.('students-maintenance-export missing Supabase admin credentials');
+    return respond(context, 500, { message: 'server_misconfigured' });
+  }
+
   const supabase = createSupabaseAdminClient(supabaseAdminConfig);
 
   const authorization = resolveBearerAuthorization(req);
