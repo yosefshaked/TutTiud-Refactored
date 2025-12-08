@@ -360,7 +360,6 @@ export default async function handler(context, req) {
 
   context.log?.info?.('Processed rows', {
     rowsCount: rows.length,
-    firstRow: rows[0],
   });
 
   // Map to Hebrew headers BEFORE unparsing to ensure consistency
@@ -376,8 +375,6 @@ export default async function handler(context, req) {
 
   context.log?.info?.('Mapped to Hebrew headers', {
     hebrewRowsCount: hebrewRows.length,
-    firstHebrewRow: hebrewRows[0],
-    firstHebrewRowKeys: hebrewRows[0] ? Object.keys(hebrewRows[0]) : null,
   });
 
   // Use papaparse to generate CSV
@@ -386,11 +383,6 @@ export default async function handler(context, req) {
     header: true,
     newline: '\r\n', // Windows line endings for Excel
     quotes: true,
-  });
-
-  context.log?.info?.('Generated CSV content', {
-    csvLength: csvContent.length,
-    firstChars: csvContent.substring(0, 200),
   });
   
   // Add UTF-8 BOM for proper Excel encoding of Hebrew characters

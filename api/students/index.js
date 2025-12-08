@@ -112,13 +112,6 @@ function buildStudentPayload(body) {
 
   const isActiveValue = isActiveResult.provided ? Boolean(isActiveResult.value) : true;
 
-  // Debug log for national_id
-  console.log('[DEBUG buildStudentPayload] national_id extraction:', {
-    snake_case: body?.national_id,
-    camelCase: body?.nationalId,
-    resolved: body?.national_id ?? body?.nationalId,
-  });
-
   const nationalIdResult = coerceNationalId(body?.national_id ?? body?.nationalId);
   if (!nationalIdResult.valid) {
     return { error: 'invalid_national_id' };
@@ -126,10 +119,6 @@ function buildStudentPayload(body) {
   
   // National ID is required
   if (!nationalIdResult.value) {
-    console.log('[DEBUG buildStudentPayload] National ID missing!', {
-      nationalIdResult,
-      bodyKeys: Object.keys(body || {}),
-    });
     return { error: 'missing_national_id' };
   }
 
@@ -420,13 +409,6 @@ export default async function (context, req) {
   }
 
   if (method === 'POST') {
-    context.log?.info?.('[DEBUG] POST /api/students received', {
-      bodyKeys: Object.keys(body || {}),
-      nationalId: body?.national_id,
-      nationalIdCamel: body?.nationalId,
-      rawBody: JSON.stringify(body).substring(0, 200),
-    });
-
     const normalized = buildStudentPayload(body);
     if (normalized.error) {
       const message =
@@ -520,14 +502,6 @@ export default async function (context, req) {
   if (!studentId) {
     return respond(context, 400, { message: 'invalid student id' });
   }
-
-  context.log?.info?.('[DEBUG] PUT /api/students received', {
-    studentId,
-    bodyKeys: Object.keys(body || {}),
-    nationalId: body?.national_id,
-    nationalIdCamel: body?.nationalId,
-    rawBody: JSON.stringify(body).substring(0, 200),
-  });
 
   const normalizedUpdates = buildStudentUpdates(body);
   if (normalizedUpdates.error) {
