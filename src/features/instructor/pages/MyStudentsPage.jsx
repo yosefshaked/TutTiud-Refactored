@@ -38,6 +38,7 @@ export default function MyStudentsPage() {
   const [statusFilter, setStatusFilter] = useState('active')
   const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE)
   const [canViewInactive, setCanViewInactive] = useState(false)
+  const [filtersRestored, setFiltersRestored] = useState(false) // Track when filters have been restored from sessionStorage
 
   const activeOrgId = activeOrg?.id ?? null
   const membershipRole = activeOrg?.membership?.role
@@ -66,6 +67,9 @@ export default function MyStudentsPage() {
         // Don't restore statusFilter yet - wait for permission check
         if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy)
       }
+      // Mark that non-statusFilter filters have been restored
+      // statusFilter restoration will happen in the visibility check effect
+      setFiltersRestored(true)
     }
   }, [activeOrgId, loadTags])
 
@@ -146,7 +150,7 @@ export default function MyStudentsPage() {
   }, [canViewInactive, statusFilter])
 
   useEffect(() => {
-    if (!canFetch) {
+    if (!canFetch || !filtersRestored) {
       setStatus(REQUEST_STATUS.idle)
       setErrorMessage("")
       setStudents([])
@@ -219,7 +223,7 @@ export default function MyStudentsPage() {
       isMounted = false
       abortController.abort()
     }
-  }, [activeOrgId, canFetch, normalizedRole, statusFilter, canViewInactive, isAdminMember])
+  }, [activeOrgId, canFetch, filtersRestored, normalizedRole, statusFilter, canViewInactive, isAdminMember])
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {

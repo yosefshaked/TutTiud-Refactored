@@ -61,6 +61,7 @@ export default function StudentManagementPage() {
   const [sortBy, setSortBy] = useState(STUDENT_SORT_OPTIONS.SCHEDULE); // Default sort by schedule
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
   const [filteredStudents, setFilteredStudents] = useState([]); // Local client-side filtered list
+  const [filtersRestored, setFiltersRestored] = useState(false); // Track when filters have been restored from sessionStorage
 
   // Mobile fix: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
@@ -170,9 +171,12 @@ export default function StudentManagementPage() {
     await refreshRoster(true);
   }, [refreshRoster]);
 
-  // Load saved filter state on mount
+  // Load saved filter state on mount FIRST, before any fetching happens
   useEffect(() => {
-    if (!activeOrgId) return;
+    if (!activeOrgId) {
+      setFiltersRestored(false);
+      return;
+    }
     
     const savedFilters = loadFilterState(activeOrgId, 'admin');
     if (savedFilters) {
@@ -183,10 +187,14 @@ export default function StudentManagementPage() {
       if (savedFilters.sortBy !== undefined) setSortBy(savedFilters.sortBy);
       if (savedFilters.statusFilter !== undefined) setStatusFilter(savedFilters.statusFilter);
     }
+    
+    // Mark filters as restored so fetching can proceed
+    setFiltersRestored(true);
   }, [activeOrgId]);
 
+  // Fetch students and instructors only AFTER filters have been restored
   useEffect(() => {
-    if (canFetch) {
+    if (canFetch && filtersRestored) {
       // Refetch when statusFilter changes to get the right subset from server
       refreshRoster(true);
       void loadTags();
@@ -194,7 +202,7 @@ export default function StudentManagementPage() {
       setStudents([]);
       setInstructors([]);
     }
-  }, [canFetch, refreshRoster, loadTags]);
+  }, [canFetch, filtersRestored, refreshRoster, loadTags]);
 
   // Default the view for admins/owners who are also instructors to "mine" on first visit
   useEffect(() => {
@@ -213,12 +221,12 @@ export default function StudentManagementPage() {
     }
   }, [user, instructors, activeOrgId]);
 
-  // Refetch students when statusFilter changes
+  // Refetch students when statusFilter changes (after initial restore)
   useEffect(() => {
-    if (canFetch) {
+    if (canFetch && filtersRestored) {
       void fetchStudents();
     }
-  }, [statusFilter, canFetch, fetchStudents]);
+  }, [statusFilter, canFetch, filtersRestored, fetchStudents]);
 
   // Save filter state whenever it changes
   useEffect(() => {
