@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 1.6.0**
-**Last Updated: 2025-11-26**
+**Version: 1.6.1**
+**Last Updated: 2025-12-09**
 
 > **Developer Conventions:** For folder structure, naming rules, API patterns, and feature organization, refer to [Conventions.md](./Conventions.md).
 
@@ -39,7 +39,7 @@ Key characteristics:
 | :---- | :------ | :---------- |
 | `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` (`instructor_color` stores the permanent palette assignment) |
 | `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `national_id` (optional, uniqueness enforced in app), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
-| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (FK → `Students.id`), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, `is_legacy` (marks imported historical rows), timestamps, `metadata` |
+| `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (nullable FK → `Students.id` for loose reports), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, `is_legacy` (marks imported historical rows), timestamps, `metadata` (includes `unassigned_details` for loose reports until resolution) |
 | `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
 
 Supporting indexes:
@@ -78,6 +78,7 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/students/check-id` | GET | Admin/Owner | Validates a national ID for uniqueness, optionally excluding a student ID during edits. Returns `{ exists, student }` so the UI can block duplicates and deep-link to the profile. |
 | `/api/students-search` | GET | Admin/Owner | Fuzzy name search that surfaces `{ id, name, national_id, is_active }` for quick deduplication hints beneath the name input. |
 | `/api/students/maintenance-export` | GET | Admin/Owner | Returns a CSV with `system_uuid`, name, national ID, contact info, assigned instructor, schedule defaults, tags, and `is_active` for bulk cleanup. |
+| `/api/loose-sessions` | GET/POST | Admin/Owner | Lists unassigned session records (`student_id IS NULL`) and resolves them by assigning to an existing student or creating a new student; strips only `metadata.unassigned_details` on resolution and preserves other metadata. |
 | `/api/students/maintenance-import` | POST | Admin/Owner | Accepts edited maintenance CSV text keyed by `system_uuid`, updates only changed fields, enforces national ID uniqueness per row and against the database, and reports per-row failures. |
 | `/api/my-students` | GET | Member/Admin/Owner | Filters the roster by `assigned_instructor_id === caller.id` (Supabase auth UUID) and hides inactive students unless the organization enables instructor visibility; supports optional `status` query parity with the admin endpoint. |
 | `/api/weekly-compliance` | GET | Member/Admin/Owner | Returns the aggregated “Weekly Compliance View” data set with instructor color identifiers, weekly schedule chips, dynamic time window metadata, and per-session documentation status (✔ complete / ✖ missing). |
@@ -134,6 +135,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 
 - Keep `SETUP_SQL_SCRIPT` as the single source of truth; import it anywhere the script must be displayed (wizard, docs, etc.).
 - The setup script now includes `Students.is_active boolean default true` (with backfill) to support inactive lifecycle flows; rerunning it on legacy tenants is safe because every `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` stays idempotent.
+- SessionRecords now allows `student_id` to be NULL to support unassigned ("loose") session reports. Loose writes must add `metadata.unassigned_details` without overwriting existing metadata keys, and downstream queries/endpoints must tolerate NULL student_ids.
 - `verifyOrgConnection` (`src/runtime/verification.js`) now expects a Supabase data client and returns the diagnostics array so callers can render pass/fail status.
 - All onboarding status updates should call `recordVerification(orgId, timestamp)` to persist `setup_completed` / `verified_at` on the control-plane organization row.
 - `api/_shared/instructor-colors.js` exposes the permanent color bank and gradient fallback generator used to populate `metadata.instructor_color`. Call `ensureInstructorColors()` before returning instructor lists from new endpoints.

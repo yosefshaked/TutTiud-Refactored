@@ -99,6 +99,10 @@ export const AUDIT_ACTIONS = {
   FILE_DELETED: 'file.deleted',
   DOCUMENT_UPDATED: 'document.updated',
   FILES_BULK_DOWNLOADED: 'files.bulk_downloaded',
+
+  // Sessions
+  SESSION_CREATED: 'session.created',
+  SESSION_RESOLVED: 'session.resolved',
   
   // Students
   STUDENT_CREATED: 'student.created',
@@ -126,6 +130,7 @@ export const AUDIT_CATEGORIES = {
   BACKUP: 'backup',
   SETTINGS: 'settings',
   FILES: 'files',
+  SESSIONS: 'sessions',
   STUDENTS: 'students',
   INSTRUCTORS: 'instructors',
 };

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Loader2, Pencil, X, User, FileWarning } from 'lucide-react';
+import { Plus, Loader2, Pencil, X, User, FileWarning, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -26,6 +26,7 @@ import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
 import { getStudentComparator, STUDENT_SORT_OPTIONS } from '@/features/students/utils/sorting.js';
 import { saveFilterState, loadFilterState } from '@/features/students/utils/filter-state.js';
 import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { fetchLooseSessions } from '@/features/sessions/api/loose-sessions.js';
 
 const REQUEST_STATES = {
   idle: 'idle',
@@ -62,6 +63,8 @@ export default function StudentManagementPage() {
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
   const [filteredStudents, setFilteredStudents] = useState([]); // Local client-side filtered list
   const [filtersRestored, setFiltersRestored] = useState(false); // Track when filters have been restored from sessionStorage
+  const [pendingReportsCount, setPendingReportsCount] = useState(0); // Count of loose reports awaiting assignment
+  const navigate = useNavigate();
 
   // Mobile fix: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
@@ -101,6 +104,21 @@ export default function StudentManagementPage() {
       console.error('Failed to load compliance summary', error);
       // Don't show error toast - this is supplementary data
       setComplianceSummary({});
+    }
+  }, [canFetch, activeOrgId, session]);
+
+  const fetchPendingReportsCount = useCallback(async () => {
+    if (!canFetch) {
+      return;
+    }
+
+    try {
+      const reports = await fetchLooseSessions({ orgId: activeOrgId, session });
+      setPendingReportsCount(Array.isArray(reports) ? reports.length : 0);
+    } catch (error) {
+      console.error('Failed to load pending reports count', error);
+      // Don't show error toast - this is supplementary data
+      setPendingReportsCount(0);
     }
   }, [canFetch, activeOrgId, session]);
 
@@ -198,11 +216,13 @@ export default function StudentManagementPage() {
       // Refetch when statusFilter changes to get the right subset from server
       refreshRoster(true);
       void loadTags();
+      void fetchPendingReportsCount();
     } else {
       setStudents([]);
       setInstructors([]);
+      setPendingReportsCount(0);
     }
-  }, [canFetch, filtersRestored, refreshRoster, loadTags]);
+  }, [canFetch, filtersRestored, refreshRoster, loadTags, fetchPendingReportsCount]);
 
   // Default the view for admins/owners who are also instructors to "mine" on first visit
   useEffect(() => {
@@ -500,6 +520,20 @@ export default function StudentManagementPage() {
       title="ניהול תלמידים"
       actions={(
         <div className="flex items-center gap-2 self-start">
+          {pendingReportsCount > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 border-amber-500 text-amber-700 hover:bg-amber-50"
+              onClick={() => navigate('/admin/pending-reports')}
+            >
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              דיווחים ממתינים
+              <Badge variant="secondary" className="bg-amber-500 text-white hover:bg-amber-600">
+                {pendingReportsCount}
+              </Badge>
+            </Button>
+          )}
           <DataMaintenanceMenu 
             onImportClick={handleOpenMaintenance}
             instructors={instructors}

@@ -36,9 +36,9 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
-function DateChoiceFooter({ lastReportDate, studentName, onClose, onNewReport, onNewReportSameStudent }) {
+function DateChoiceFooter({ lastReportDate, studentName, onClose, onNewReport, onNewReportSameStudent, allowSameStudent = true }) {
   const [selectedDate, setSelectedDate] = useState(null);
-  const [mode, setMode] = useState('choose'); // 'choose' | 'same-student' | 'other-student'
+  const [mode, setMode] = useState(allowSameStudent ? 'choose' : 'other-student'); // 'choose' | 'same-student' | 'other-student'
   const todayDate = getTodayDate();
   const showSameDate = lastReportDate && lastReportDate !== todayDate;
 
@@ -160,13 +160,15 @@ function DateChoiceFooter({ lastReportDate, studentName, onClose, onNewReport, o
         >
           המשך לדיווח
         </Button>
-        <Button 
-          onClick={handleBack}
-          variant="outline"
-          className="flex-1"
-        >
-          חזור
-        </Button>
+        {allowSameStudent ? (
+          <Button 
+            onClick={handleBack}
+            variant="outline"
+            className="flex-1"
+          >
+            חזור
+          </Button>
+        ) : null}
         <Button 
           onClick={onClose}
           variant="outline"
@@ -523,7 +525,7 @@ export default function NewSessionModal({
     }
   }, []);
 
-  const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
+  const handleSubmit = async ({ studentId, date, time, serviceContext, answers, unassignedDetails }) => {
     setSubmitState(REQUEST_STATE.loading);
     setSubmitError('');
 
@@ -531,9 +533,11 @@ export default function NewSessionModal({
       const body = {
         student_id: studentId,
         date,
+        time,
         service_context: serviceContext,
         content: answers,
         org_id: activeOrgId,
+        ...(unassignedDetails ? { unassigned_details: unassignedDetails } : {}),
       };
       const record = await authenticatedFetch('sessions', {
         method: 'POST',
@@ -550,12 +554,12 @@ export default function NewSessionModal({
       // This ensures any data refresh in the parent component completes
       await Promise.resolve(onCreated?.(record));
       
-      // Find student name for success message
+      const isLoose = !studentId;
       const student = students.find(s => s.id === studentId);
-      const studentName = student?.name || 'תלמיד';
+      const studentName = isLoose ? (unassignedDetails?.name || 'תלמיד/ה') : (student?.name || 'תלמיד');
       
       // Show success state instead of closing
-      setSuccessState({ studentId, studentName, date });
+      setSuccessState({ studentId, studentName, date, allowSameStudent: Boolean(studentId) });
       setSubmitState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to save session record', error);
@@ -567,6 +571,14 @@ export default function NewSessionModal({
         friendly = 'לא ניתן לתעד מפגש: לתלמיד זה לא משויך מדריך פעיל. נא לשייך מדריך תחילה.';
       } else if (serverMessage === 'student_not_assigned_to_user') {
         friendly = 'לא ניתן לתעד: תלמיד זה לא משויך אליך.';
+      } else if (serverMessage === 'missing_unassigned_name') {
+        friendly = 'יש למלא שם תלמיד עבור דיווח לא משויך.';
+      } else if (serverMessage === 'missing_unassigned_reason') {
+        friendly = 'בחרו סיבת דיווח לא משויך.';
+      } else if (serverMessage === 'missing_unassigned_reason_detail') {
+        friendly = 'השלימו פירוט עבור סיבת "אחר".';
+      } else if (serverMessage === 'missing_time') {
+        friendly = 'יש להזין שעה עבור דיווח לא משויך.';
       }
       setSubmitError(friendly);
     }

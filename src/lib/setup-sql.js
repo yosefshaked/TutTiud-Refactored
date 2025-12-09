@@ -183,7 +183,7 @@ $$;
 CREATE TABLE IF NOT EXISTS tuttiud."SessionRecords" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "date" date NOT NULL,
-  "student_id" uuid NOT NULL REFERENCES tuttiud."Students"("id"),
+  "student_id" uuid REFERENCES tuttiud."Students"("id"),
   "instructor_id" uuid REFERENCES tuttiud."Instructors"("id"),
   "service_context" text,
   "content" jsonb,
@@ -194,6 +194,9 @@ CREATE TABLE IF NOT EXISTS tuttiud."SessionRecords" (
   "is_legacy" boolean NOT NULL DEFAULT false,
   "metadata" jsonb
 );
+-- Allow loose reports: student_id may be NULL (idempotent)
+ALTER TABLE tuttiud."SessionRecords"
+  ALTER COLUMN "student_id" DROP NOT NULL;
 ALTER TABLE tuttiud."SessionRecords"
   ADD COLUMN IF NOT EXISTS "service_context" text,
   ADD COLUMN IF NOT EXISTS "content" jsonb,

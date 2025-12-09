@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
+import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 import { describeSchedule, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
@@ -180,10 +181,6 @@ export default function StudentDetailPage() {
   const [tagsState, setTagsState] = useState(REQUEST_STATE.idle);
   const [tagsError, setTagsError] = useState('');
 
-  const [instructors, setInstructors] = useState([]);
-  const [services, setServices] = useState([]);
-  const [servicesState, setServicesState] = useState(REQUEST_STATE.idle);
-  const [servicesError, setServicesError] = useState('');
 
   const [isLegacyModalOpen, setIsLegacyModalOpen] = useState(false);
 
@@ -208,6 +205,9 @@ export default function StudentDetailPage() {
       !supabaseLoading
     );
   }, [studentId, activeOrgId, activeOrgHasConnection, tenantClientReady, supabaseLoading]);
+
+  const { instructors } = useInstructors({ enabled: canFetch });
+  const { services, loadingServices, servicesError, refetchServices } = useServices({ enabled: canFetch });
 
   const loadStudent = useCallback(async () => {
     if (!canFetch) {
@@ -321,45 +321,6 @@ export default function StudentDetailPage() {
     }
   }, [canFetch, studentId, activeOrgId]);
 
-  const loadInstructors = useCallback(async () => {
-    if (!canFetch) {
-      return;
-    }
-
-    try {
-      const searchParams = new URLSearchParams({ org_id: activeOrgId });
-      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`);
-      setInstructors(Array.isArray(payload) ? payload : []);
-    } catch (error) {
-      console.error('Failed to load instructors', error);
-      setInstructors([]);
-    }
-  }, [canFetch, activeOrgId]);
-
-  const loadServices = useCallback(async () => {
-    if (!canFetch) {
-      return;
-    }
-
-    try {
-      setServicesState(REQUEST_STATE.loading);
-      setServicesError('');
-      const searchParams = new URLSearchParams({ keys: 'available_services' });
-      if (activeOrgId) {
-        searchParams.set('org_id', activeOrgId);
-      }
-      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
-      const settingsValue = payload?.settings?.available_services;
-      setServices(Array.isArray(settingsValue) ? settingsValue : []);
-      setServicesState(REQUEST_STATE.idle);
-    } catch (error) {
-      console.error('Failed to load services', error);
-      setServices([]);
-      setServicesState(REQUEST_STATE.error);
-      setServicesError(error?.message || 'טעינת רשימת השירותים נכשלה.');
-    }
-  }, [canFetch, activeOrgId]);
-
   // Refresh student details (for file uploads)
   const loadStudentDetails = useCallback(async () => {
     await loadStudent();
@@ -370,8 +331,6 @@ export default function StudentDetailPage() {
       void loadStudent();
       void loadQuestions();
       void loadSessions();
-      void loadInstructors();
-      void loadServices();
     } else {
       setStudentState(REQUEST_STATE.idle);
       setStudentError('');
@@ -382,12 +341,8 @@ export default function StudentDetailPage() {
       setSessionState(REQUEST_STATE.idle);
       setSessionError('');
       setSessions([]);
-      setInstructors([]);
-      setServices([]);
-      setServicesState(REQUEST_STATE.idle);
-      setServicesError('');
     }
-  }, [canFetch, loadStudent, loadQuestions, loadSessions, loadInstructors, loadServices]);
+  }, [canFetch, loadStudent, loadQuestions, loadSessions]);
 
   const hasStudentTags = Array.isArray(student?.tags) && student.tags.length > 0;
   const studentIdentifier = student?.id || '';
@@ -455,7 +410,7 @@ export default function StudentDetailPage() {
   const studentLoadError = studentState === REQUEST_STATE.error;
   const isSessionsLoading = sessionState === REQUEST_STATE.loading;
   const sessionsLoadError = sessionState === REQUEST_STATE.error;
-  const isServicesLoading = servicesState === REQUEST_STATE.loading;
+  const isServicesLoading = loadingServices;
 
   const backDestination = isAdminRole(membershipRole) ? '/admin/students' : '/my-students';
   const canEdit = isAdminRole(membershipRole);
@@ -1121,7 +1076,7 @@ export default function StudentDetailPage() {
       services={services}
       servicesLoading={isServicesLoading}
       servicesError={servicesError}
-      onReloadServices={loadServices}
+      onReloadServices={refetchServices}
       onSubmit={handleLegacySubmit}
     />
     </>

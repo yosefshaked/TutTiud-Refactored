@@ -11,6 +11,8 @@ import {
 } from '../_shared/org-bff.js';
 import { parseJsonBodyWithLimit, validateSessionWrite } from '../_shared/validation.js';
 import { buildSessionMetadata } from '../_shared/session-metadata.js';
+import { mergeMetadata } from '../_shared/metadata-utils.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 const MAX_BODY_BYTES = 128 * 1024; // observe-only for now
 
@@ -51,6 +53,7 @@ export default async function (context, req) {
   }
 
   const userId = authResult.data.user.id;
+  const userEmail = authResult.data.user.email;
   const body = parseJsonBodyWithLimit(req, MAX_BODY_BYTES, { mode: 'observe', context, endpoint: 'sessions' });
   const orgId = resolveOrgId(req, body);
 
@@ -85,47 +88,69 @@ export default async function (context, req) {
             ? 'missing session content'
             : validation.error === 'invalid_service_context'
               ? 'invalid service context'
-              : 'invalid content';
+              : validation.error === 'missing_service_context'
+                ? 'missing service context'
+                : validation.error === 'missing_time'
+                  ? 'missing time'
+                  : validation.error === 'invalid_time'
+                    ? 'invalid time'
+                    : validation.error === 'missing_unassigned_name'
+                      ? 'missing unassigned name'
+                      : validation.error === 'missing_unassigned_reason'
+                        ? 'missing unassigned reason'
+                        : validation.error === 'missing_unassigned_reason_detail'
+                          ? 'missing unassigned reason detail'
+                          : 'invalid content';
     return respond(context, 400, { message });
   }
+
+  const isLoose = !validation.studentId;
 
   const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
   if (tenantError) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
-  const studentResult = await tenantClient
-    .from('Students')
-    .select('id, assigned_instructor_id, default_service')
-    .eq('id', validation.studentId)
-    .maybeSingle();
-
-  if (studentResult.error) {
-    context.log?.error?.('sessions failed to load student', { message: studentResult.error.message });
-    return respond(context, 500, { message: 'failed_to_load_student' });
-  }
-
-  if (!studentResult.data) {
-    return respond(context, 404, { message: 'student_not_found' });
-  }
-
-  const assignedInstructor = normalizeString(studentResult.data.assigned_instructor_id) || '';
+  let assignedInstructor = '';
   const normalizedUserId = normalizeString(userId);
 
-  if (isMemberRole(role) && assignedInstructor && assignedInstructor !== normalizedUserId) {
-    return respond(context, 403, { message: 'student_not_assigned_to_user' });
-  }
+  let studentRecord = null;
+  if (!isLoose) {
+    const studentResult = await tenantClient
+      .from('Students')
+      .select('id, assigned_instructor_id, default_service')
+      .eq('id', validation.studentId)
+      .maybeSingle();
 
-  if (isMemberRole(role) && !assignedInstructor) {
-    return respond(context, 403, { message: 'student_not_assigned_to_user' });
+    if (studentResult.error) {
+      context.log?.error?.('sessions failed to load student', { message: studentResult.error.message });
+      return respond(context, 500, { message: 'failed_to_load_student' });
+    }
+
+    if (!studentResult.data) {
+      return respond(context, 404, { message: 'student_not_found' });
+    }
+
+    assignedInstructor = normalizeString(studentResult.data.assigned_instructor_id) || '';
+    studentRecord = studentResult.data;
+
+    if (isMemberRole(role) && assignedInstructor && assignedInstructor !== normalizedUserId) {
+      return respond(context, 403, { message: 'student_not_assigned_to_user' });
+    }
+
+    if (isMemberRole(role) && !assignedInstructor) {
+      return respond(context, 403, { message: 'student_not_assigned_to_user' });
+    }
   }
 
   // Resolve which instructor id should be written on the session.
-  // For members: we've already verified assignment above, so we can use the student's assigned instructor id.
-  // For admins/owners: prefer the student's assigned instructor; if missing, only fall back to the acting user
-  // when that user is actually an Instructor in this tenant. Otherwise, surface a clear validation error
-  // instead of letting the DB raise a foreign-key violation (which previously produced a 500).
+  // For loose reports: attribute to the acting user when possible to avoid FK errors.
+  // For members: we've already verified assignment above (or allowed loose mode) so use that mapping.
   let sessionInstructorId = assignedInstructor;
+  if (isLoose) {
+    sessionInstructorId = normalizedUserId;
+  }
+
   if (!sessionInstructorId && !isMemberRole(role) && normalizedUserId) {
     const instructorLookup = await tenantClient
       .from('Instructors')
@@ -143,6 +168,24 @@ export default async function (context, req) {
     }
   }
 
+  // For loose reports, or when attributing to the acting user, ensure the instructor exists to avoid FK errors
+  if (sessionInstructorId && (isLoose || sessionInstructorId === normalizedUserId)) {
+    const instructorCheck = await tenantClient
+      .from('Instructors')
+      .select('id')
+      .eq('id', sessionInstructorId)
+      .maybeSingle();
+
+    if (instructorCheck.error) {
+      context.log?.error?.('sessions failed to verify instructor existence', { message: instructorCheck.error.message });
+      return respond(context, 500, { message: 'failed_to_verify_instructor' });
+    }
+
+    if (!instructorCheck.data) {
+      return respond(context, 400, { message: 'instructor_not_found' });
+    }
+  }
+
   // If after resolution there's still no instructor to attribute to, block with a specific message.
   if (!sessionInstructorId) {
     return respond(context, 400, { message: 'student_missing_instructor' });
@@ -155,6 +198,12 @@ export default async function (context, req) {
     logger: context.log,
   });
 
+  const metadataAdditions = validation.unassignedDetails
+    ? { unassigned_details: validation.unassignedDetails }
+    : {};
+
+  const mergedMetadata = mergeMetadata(metadata, metadataAdditions);
+
   const { data, error } = await tenantClient
     .from('SessionRecords')
     .insert([
@@ -162,11 +211,11 @@ export default async function (context, req) {
         student_id: validation.studentId,
         date: validation.date,
         content: validation.content,
-  instructor_id: sessionInstructorId || null,
+        instructor_id: sessionInstructorId || null,
         service_context: validation.hasExplicitService
           ? validation.serviceContext
-          : validation.serviceContext ?? studentResult.data.default_service ?? null,
-        metadata,
+          : validation.serviceContext ?? studentRecord?.default_service ?? null,
+        metadata: mergedMetadata,
       },
     ])
     .select()
@@ -175,6 +224,28 @@ export default async function (context, req) {
   if (error) {
     context.log?.error?.('sessions failed to create session record', { message: error.message });
     return respond(context, 500, { message: 'failed_to_create_session' });
+  }
+
+  try {
+    await logAuditEvent(supabase, {
+      orgId,
+      userId: normalizedUserId,
+      userEmail: normalizeString(userEmail),
+      userRole: role,
+      actionType: AUDIT_ACTIONS.SESSION_CREATED,
+      actionCategory: AUDIT_CATEGORIES.SESSIONS,
+      resourceType: 'session_record',
+      resourceId: data.id,
+      details: {
+        student_id: validation.studentId,
+        is_loose: isLoose,
+        instructor_id: data.instructor_id,
+        service_context: data.service_context,
+      },
+      metadata: { created_at: data.created_at },
+    });
+  } catch (auditError) {
+    context.log?.error?.('sessions failed to log audit event', { message: auditError?.message });
   }
 
   return respond(context, 201, data);
