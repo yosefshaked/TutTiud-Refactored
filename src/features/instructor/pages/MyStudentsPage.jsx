@@ -1,37 +1,33 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { Loader2, Users, User, FileWarning } from "lucide-react"
+import { Loader2, Users, User, FileWarning, AlertCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
-import { authenticatedFetch } from "@/lib/api-client.js"
 import PageLayout from "@/components/ui/PageLayout.jsx"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
-import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
+import { normalizeMembershipRole, isAdminRole } from "@/features/students/utils/endpoints.js"
 import { describeSchedule, dayMatches } from "@/features/students/utils/schedule.js"
 import { StudentFilterSection } from "@/features/students/components/StudentFilterSection.jsx"
 import { saveFilterState, loadFilterState } from "@/features/students/utils/filter-state.js"
 import { STUDENT_SORT_OPTIONS, getStudentComparator } from "@/features/students/utils/sorting.js"
 import { useStudentTags } from "@/features/students/hooks/useStudentTags.js"
-
-const REQUEST_STATUS = Object.freeze({
-  idle: "idle",
-  loading: "loading",
-  success: "success",
-  error: "error",
-})
+import { useStudents } from "@/hooks/useOrgData.js"
+import MyPendingReportsCard from "@/features/sessions/components/MyPendingReportsCard.jsx"
+import { authenticatedFetch } from "@/lib/api-client.js"
 
 export default function MyStudentsPage() {
   const { loading: supabaseLoading } = useSupabase()
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg()
   const { tagOptions, loadTags } = useStudentTags()
 
-  const [students, setStudents] = useState([])
-  const [complianceSummary, setComplianceSummary] = useState({}) // Map of student_id -> { expiredDocuments: number }
-  const [status, setStatus] = useState(REQUEST_STATUS.idle)
-  const [errorMessage, setErrorMessage] = useState("")
+  const [complianceSummary] = useState({}) // Map of student_id -> { expiredDocuments: number }
+  const [pendingReportsCount, setPendingReportsCount] = useState(0)
+  const [pendingReportsDialogOpen, setPendingReportsDialogOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [dayFilter, setDayFilter] = useState(null)
   const [tagFilter, setTagFilter] = useState('')
@@ -54,6 +50,13 @@ export default function MyStudentsPage() {
       !isAdminMember
     )
   }, [activeOrgId, tenantClientReady, activeOrgHasConnection, supabaseLoading, isAdminMember])
+
+  const effectiveStatus = canViewInactive ? statusFilter : 'active'
+  const { students, loadingStudents, studentsError } = useStudents({
+    status: effectiveStatus,
+    path: 'my-students',
+    enabled: canFetch && filtersRestored,
+  })
 
   // Load saved filter state on mount (except statusFilter which depends on permissions)
   useEffect(() => {
@@ -149,81 +152,27 @@ export default function MyStudentsPage() {
     }
   }, [canViewInactive, statusFilter])
 
+  // Load pending reports count for instructor
+  const fetchPendingReportsCount = useCallback(async () => {
+    if (!canFetch) return
+
+    try {
+      const reports = await authenticatedFetch('loose-sessions', { org_id: activeOrgId })
+      setPendingReportsCount(Array.isArray(reports) ? reports.length : 0)
+    } catch (error) {
+      console.error('Failed to load pending reports count', error)
+      setPendingReportsCount(0)
+    }
+  }, [canFetch, activeOrgId])
+
   useEffect(() => {
-    if (!canFetch || !filtersRestored) {
-      setStatus(REQUEST_STATUS.idle)
-      setErrorMessage("")
-      setStudents([])
-      setComplianceSummary({})
+    if (!canFetch) {
+      setPendingReportsCount(0)
       return
     }
 
-    let isMounted = true
-    const abortController = new AbortController()
-
-    async function loadStudents() {
-      setStatus(REQUEST_STATUS.loading)
-      setErrorMessage("")
-
-      try {
-        // Smart fetching: use statusFilter directly if instructor can view inactive, else always fetch active only
-        const statusParam = canViewInactive ? statusFilter : 'active'
-        const endpoint = buildStudentsEndpoint(activeOrgId, normalizedRole, {
-          status: statusParam,
-        })
-        
-        // Fetch students - skip compliance summary for non-admin users (they don't have permission)
-        const fetchPromises = [
-          authenticatedFetch(endpoint, { signal: abortController.signal })
-        ]
-        
-        // Only admin/owner can access compliance summary endpoint
-        if (isAdminMember) {
-          fetchPromises.push(
-            authenticatedFetch(`students/compliance-summary?org_id=${activeOrgId}`, { signal: abortController.signal })
-              .catch(err => {
-                console.error('Failed to load compliance summary', err)
-                return {} // Don't fail if compliance summary fails
-              })
-          )
-        }
-        
-        const results = await Promise.all(fetchPromises)
-        const studentsPayload = results[0]
-        const compliancePayload = results[1] || {} // Will be empty object for non-admin users
-
-        if (!isMounted) {
-          return
-        }
-
-        setStudents(Array.isArray(studentsPayload) ? studentsPayload : [])
-        setComplianceSummary(compliancePayload || {})
-        setStatus(REQUEST_STATUS.success)
-      } catch (error) {
-        if (error?.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to load instructor students", error)
-
-        if (!isMounted) {
-          return
-        }
-
-        setErrorMessage(error?.message || "טעינת רשימת התלמידים נכשלה.")
-        setStudents([])
-        setComplianceSummary({})
-        setStatus(REQUEST_STATUS.error)
-      }
-    }
-
-    void loadStudents()
-
-    return () => {
-      isMounted = false
-      abortController.abort()
-    }
-  }, [activeOrgId, canFetch, filtersRestored, normalizedRole, statusFilter, canViewInactive, isAdminMember])
+    void fetchPendingReportsCount()
+  }, [canFetch, fetchPendingReportsCount])
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
@@ -245,9 +194,10 @@ export default function MyStudentsPage() {
     }
   }
 
-  const isLoading = status === REQUEST_STATUS.loading
-  const isError = status === REQUEST_STATUS.error
-  const isSuccess = status === REQUEST_STATUS.success
+  const isLoading = loadingStudents && canFetch && filtersRestored
+  const isError = Boolean(studentsError)
+  const isSuccess = !isLoading && !isError && canFetch && filtersRestored
+  const errorMessage = studentsError || "טעינת רשימת התלמידים נכשלה."
 
   const filteredStudents = useMemo(() => {
     let result = [...students]; // Always copy to prevent mutation
@@ -328,7 +278,23 @@ export default function MyStudentsPage() {
       ) : isSuccess ? (
         <Card className="w-full">
           <CardHeader className="space-y-sm">
-            <CardTitle className="text-base font-semibold text-foreground">רשימת התלמידים שלי</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold text-foreground">רשימת התלמידים שלי</CardTitle>
+              {pendingReportsCount > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2 border-amber-500 text-amber-700 hover:bg-amber-50"
+                  onClick={() => setPendingReportsDialogOpen(true)}
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  הדיווחים שלי
+                  <Badge variant="secondary" className="bg-amber-500 text-white hover:bg-amber-600">
+                    {pendingReportsCount}
+                  </Badge>
+                </Button>
+              )}
+            </div>
             
             <StudentFilterSection
               searchQuery={searchQuery}
@@ -455,6 +421,21 @@ export default function MyStudentsPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Pending Reports Dialog */}
+      <Dialog open={pendingReportsDialogOpen} onOpenChange={setPendingReportsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>הדיווחים הממתינים שלי</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-3 border border-blue-200 dark:border-blue-900">
+            <p className="text-sm text-blue-900 dark:text-blue-200 text-right">
+              דיווחים שהגשת ללא שיוך תלמיד. רק מנהל יכול לשייך דיווחים אלה לתלמידים.
+            </p>
+          </div>
+          <MyPendingReportsCard />
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   )
 }

@@ -1,15 +1,21 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock } from 'lucide-react';
+import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
-import { fetchLooseSessions } from '@/features/sessions/api/loose-sessions.js';
+import { fetchLooseSessions, rejectLooseSession } from '@/features/sessions/api/loose-sessions.js';
+import { Checkbox } from '@/components/ui/checkbox';
 import ResolvePendingReportDialog from '../components/ResolvePendingReportDialog.jsx';
+import BulkResolvePendingReportsDialog from '../components/BulkResolvePendingReportsDialog.jsx';
+import { RejectReportDialog } from '../components/RejectReportDialog.jsx';
 import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { mapLooseSessionError } from '@/lib/error-mapping.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -45,6 +51,16 @@ export default function PendingReportsPage() {
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [reportToReject, setReportToReject] = useState(null);
+  const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
+  const [bulkResolveDialogOpen, setBulkResolveDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [serviceFilter, setServiceFilter] = useState('');
+  const [reasonFilter, setReasonFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [selectedReportIds, setSelectedReportIds] = useState(new Set());
 
   const activeOrgId = activeOrg?.id || null;
 
@@ -99,11 +115,6 @@ export default function PendingReportsPage() {
     void loadReports();
   }, [loadReports]);
 
-  // Redirect non-admin users (after all hooks)
-  if (!supabaseLoading && !isAdminMember) {
-    return <Navigate to="/my-students" replace />;
-  }
-
   const handleResolve = (report) => {
     setSelectedReport(report);
     setDialogOpen(true);
@@ -112,6 +123,199 @@ export default function PendingReportsPage() {
   const handleDialogClose = () => {
     setDialogOpen(false);
     setSelectedReport(null);
+  };
+
+  const handleReject = (report) => {
+    setReportToReject(report);
+    setRejectDialogOpen(true);
+  };
+
+  const handleRejectDialogClose = () => {
+    setRejectDialogOpen(false);
+    setReportToReject(null);
+  };
+
+  const handleRejectConfirm = async (rejectReason) => {
+    if (!reportToReject) return;
+
+    try {
+      await rejectLooseSession({
+        sessionId: reportToReject.id,
+        rejectReason,
+        orgId: activeOrgId,
+      });
+      
+      toast.success('הדיווח נדחה בהצלחה.');
+      void loadReports();
+    } catch (err) {
+      console.error('Failed to reject report', err);
+      const errorMessage = mapLooseSessionError(err?.message, 'reject') || 'דחיית הדיווח נכשלה.';
+      toast.error(errorMessage);
+      throw err; // Re-throw so dialog can handle loading state
+    }
+  };
+
+  const handleBulkReject = () => {
+    if (selectedReportIds.size === 0) {
+      toast.error('נא לבחור לפחות דיווח אחד.');
+      return;
+    }
+    setBulkRejectDialogOpen(true);
+  };
+
+  const handleBulkRejectDialogClose = () => {
+    setBulkRejectDialogOpen(false);
+  };
+
+  const handleBulkRejectConfirm = async (rejectReason) => {
+    if (selectedReportIds.size === 0) return;
+
+    const reportIds = Array.from(selectedReportIds);
+    let successCount = 0;
+    let failCount = 0;
+
+    // Process rejections sequentially to avoid overwhelming the server
+    for (const sessionId of reportIds) {
+      try {
+        await rejectLooseSession({
+          sessionId,
+          rejectReason,
+          orgId: activeOrgId,
+        });
+        successCount++;
+      } catch (err) {
+        console.error(`Failed to reject session ${sessionId}`, err);
+        failCount++;
+      }
+    }
+
+    // Clear selection and reload
+    setSelectedReportIds(new Set());
+    void loadReports();
+
+    // Show summary toast
+    if (failCount === 0) {
+      toast.success(`${successCount} דיווחים נדחו בהצלחה.`);
+    } else if (successCount === 0) {
+      toast.error(`דחיית ${failCount} דיווחים נכשלה.`);
+    } else {
+      toast.warning(`${successCount} דיווחים נדחו בהצלחה, ${failCount} נכשלו.`);
+    }
+  };
+
+  const isLoading = state === REQUEST_STATE.loading;
+  const hasError = state === REQUEST_STATE.error;
+
+  const serviceOptions = useMemo(() => {
+    const unique = new Set();
+    reports.forEach((report) => {
+      const service = report?.service_context;
+      if (service) unique.add(service);
+    });
+    return Array.from(unique);
+  }, [reports]);
+
+  const reasonOptions = useMemo(() => {
+    const unique = new Set();
+    reports.forEach((report) => {
+      const reason = report?.metadata?.unassigned_details?.reason;
+      if (reason) unique.add(reason);
+    });
+    return Array.from(unique);
+  }, [reports]);
+
+  const filteredReports = useMemo(() => {
+    return reports.filter((report) => {
+      const name = report?.metadata?.unassigned_details?.name || '';
+      const reason = report?.metadata?.unassigned_details?.reason || '';
+      const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
+      const service = report?.service_context || '';
+      const createdBy = report?.metadata?.created_by || '';
+      const query = searchQuery.trim().toLowerCase();
+
+      if (query) {
+        const haystack = `${name} ${reason} ${reasonOther} ${service} ${createdBy}`.toLowerCase();
+        if (!haystack.includes(query)) {
+          return false;
+        }
+      }
+
+      if (serviceFilter && service !== serviceFilter) {
+        return false;
+      }
+
+      if (reasonFilter && reason !== reasonFilter) {
+        return false;
+      }
+
+      if (fromDate && report.date < fromDate) {
+        return false;
+      }
+
+      if (toDate && report.date > toDate) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [reports, searchQuery, serviceFilter, reasonFilter, fromDate, toDate]);
+
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setServiceFilter('');
+    setReasonFilter('');
+    setFromDate('');
+    setToDate('');
+  };
+
+  const handleToggleReport = (reportId) => {
+    setSelectedReportIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(reportId)) {
+        next.delete(reportId);
+      } else {
+        next.add(reportId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleAll = () => {
+    if (selectedReportIds.size === filteredReports.length) {
+      setSelectedReportIds(new Set());
+    } else {
+      setSelectedReportIds(new Set(filteredReports.map((r) => r.id)));
+    }
+  };
+
+  const handleSelectAllWithSameName = (name) => {
+    const matching = filteredReports.filter(
+      (r) => r?.metadata?.unassigned_details?.name === name
+    );
+    setSelectedReportIds(new Set(matching.map((r) => r.id)));
+    toast.info(`נבחרו ${matching.length} דיווחים עם השם "${name}"`);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedReportIds(new Set());
+  };
+
+  const handleBulkResolve = () => {
+    if (selectedReportIds.size === 0) {
+      toast.error('נא לבחור לפחות דיווח אחד.');
+      return;
+    }
+    setBulkResolveDialogOpen(true);
+  };
+
+  const handleBulkResolveDialogClose = () => {
+    setBulkResolveDialogOpen(false);
+  };
+
+  const handleBulkResolved = () => {
+    setBulkResolveDialogOpen(false);
+    setSelectedReportIds(new Set());
+    void loadReports();
   };
 
   if (!canFetch) {
@@ -132,8 +336,10 @@ export default function PendingReportsPage() {
     );
   }
 
-  const isLoading = state === REQUEST_STATE.loading;
-  const hasError = state === REQUEST_STATE.error;
+  // Redirect non-admin users (after hooks are defined)
+  if (!supabaseLoading && !isAdminMember) {
+    return <Navigate to="/my-students" replace />;
+  }
 
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-7xl" dir="rtl">
@@ -145,13 +351,93 @@ export default function PendingReportsPage() {
               דיווחי מפגשים שממתינים לשיוך תלמיד
             </p>
           </div>
-          {reports.length > 0 && (
+          {filteredReports.length > 0 && (
             <Badge variant="outline" className="text-lg px-3 py-1">
-              {reports.length}
+              {filteredReports.length}
             </Badge>
           )}
         </CardHeader>
         <CardContent>
+          {filteredReports.length > 0 && (
+            <div className="mb-4 flex items-center gap-3 p-3 border rounded-lg bg-muted/30" dir="rtl">
+              <Checkbox
+                checked={selectedReportIds.size === filteredReports.length && filteredReports.length > 0}
+                onCheckedChange={handleToggleAll}
+                id="select-all"
+              />
+              <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                {selectedReportIds.size === filteredReports.length && filteredReports.length > 0
+                  ? 'בטל בחירת הכל'
+                  : 'בחר הכל'}
+              </label>
+              {selectedReportIds.size > 0 && (
+                <>
+                  <span className="text-sm text-neutral-600">({selectedReportIds.size} נבחרו)</span>
+                  <Button size="sm" variant="outline" onClick={handleClearSelection}>
+                    נקה בחירה
+                  </Button>
+                  <Button size="sm" onClick={handleBulkResolve}>
+                    שיוך מרובה
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={handleBulkReject}>
+                    דחה מרובה
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4" dir="rtl">
+            <Input
+              placeholder="חיפוש לפי שם/סיבה/שירות/יוצר"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Select value={serviceFilter} onValueChange={setServiceFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="סינון לפי שירות" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">כל השירותים</SelectItem>
+                {serviceOptions.map((service) => (
+                  <SelectItem key={service} value={service}>
+                    {service}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={reasonFilter} onValueChange={setReasonFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="סינון לפי סיבה" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">כל הסיבות</SelectItem>
+                {reasonOptions.map((reason) => (
+                  <SelectItem key={reason} value={reason}>
+                    {getReasonLabel(reason)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                placeholder="מתאריך"
+              />
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                placeholder="עד תאריך"
+              />
+            </div>
+            {(searchQuery || serviceFilter || reasonFilter || fromDate || toDate) && (
+              <Button variant="outline" size="sm" className="w-full md:w-auto" onClick={handleResetFilters}>
+                איפוס סינונים
+              </Button>
+            )}
+          </div>
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-neutral-600">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -161,7 +447,7 @@ export default function PendingReportsPage() {
             <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
               {error || 'טעינת הדיווחים נכשלה.'}
             </div>
-          ) : reports.length === 0 ? (
+          ) : filteredReports.length === 0 ? (
             <div className="text-center py-12 text-neutral-500">
               <AlertCircle className="h-12 w-12 mx-auto mb-4 text-neutral-400" />
               <p className="text-lg font-medium">אין דיווחים ממתינים</p>
@@ -169,7 +455,7 @@ export default function PendingReportsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {reports.map((report) => {
+              {filteredReports.map((report) => {
                 const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
                 const reason = report?.metadata?.unassigned_details?.reason || '';
                 const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
@@ -177,16 +463,34 @@ export default function PendingReportsPage() {
                 const service = report?.service_context || '';
                 const createdBy = report?.metadata?.created_by || '';
 
+                const isSelected = selectedReportIds.has(report.id);
+
                 return (
-                  <Card key={report.id} className="border-2 hover:border-primary/30 transition-colors">
+                  <Card key={report.id} className={`border-2 transition-colors ${
+                    isSelected ? 'border-primary bg-primary/5' : 'hover:border-primary/30'
+                  }`}>
                     <CardContent className="p-4">
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                        <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-3 flex-1">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => handleToggleReport(report.id)}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">{name}</h3>
                             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
                               ממתין לשיוך
                             </Badge>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-xs"
+                              onClick={() => handleSelectAllWithSameName(name)}
+                            >
+                              בחר כל "{name}"
+                            </Button>
                           </div>
                           
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
@@ -217,6 +521,7 @@ export default function PendingReportsPage() {
                               נוצר על ידי: {createdBy}
                             </p>
                           )}
+                          </div>
                         </div>
 
                         <div className="flex flex-row sm:flex-col gap-2 sm:shrink-0">
@@ -237,6 +542,15 @@ export default function PendingReportsPage() {
                             <UserPlus className="h-4 w-4" />
                             יצירה ושיוך
                           </Button>
+                          <Button
+                            onClick={() => handleReject(report)}
+                            variant="destructive"
+                            className="gap-2 flex-1 sm:flex-none"
+                            size="sm"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            דחה
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -256,6 +570,30 @@ export default function PendingReportsPage() {
           onResolved={handleResolved}
         />
       )}
+
+      {reportToReject && (
+        <RejectReportDialog
+          open={rejectDialogOpen}
+          onClose={handleRejectDialogClose}
+          onReject={handleRejectConfirm}
+          reportName={reportToReject?.metadata?.unassigned_details?.name}
+        />
+      )}
+
+      <RejectReportDialog
+        open={bulkRejectDialogOpen}
+        onClose={handleBulkRejectDialogClose}
+        onReject={handleBulkRejectConfirm}
+        reportName={`${selectedReportIds.size} דיווחים`}
+        isBulk={true}
+      />
+
+      <BulkResolvePendingReportsDialog
+        open={bulkResolveDialogOpen}
+        onClose={handleBulkResolveDialogClose}
+        reports={filteredReports.filter((r) => selectedReportIds.has(r.id))}
+        onResolved={handleBulkResolved}
+      />
     </div>
   );
 }

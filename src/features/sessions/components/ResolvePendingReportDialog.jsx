@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, UserCheck, UserPlus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ComboBoxField } from '@/components/ui/forms-ui';
 import { useOrg } from '@/org/OrgContext.jsx';
-import { authenticatedFetch } from '@/lib/api-client.js';
+import { useStudents } from '@/hooks/useOrgData.js';
 import { assignLooseSession, createAndAssignLooseSession } from '@/features/sessions/api/loose-sessions.js';
+import AddStudentForm from '@/features/admin/components/AddStudentForm.jsx';
+import { mapLooseSessionError } from '@/lib/error-mapping.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -19,127 +20,27 @@ const REQUEST_STATE = Object.freeze({
 
 export default function ResolvePendingReportDialog({ open, onClose, report, onResolved }) {
   const { activeOrg } = useOrg();
+  const activeOrgId = activeOrg?.id || null;
   const [mode, setMode] = useState('assign'); // 'assign' | 'create'
   const [state, setState] = useState(REQUEST_STATE.idle);
   const [error, setError] = useState('');
   
   // Assign existing mode
   const [studentQuery, setStudentQuery] = useState('');
-  const [students, setStudents] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  
-  // Create new mode
-  const [newStudentName, setNewStudentName] = useState('');
-  const [nationalId, setNationalId] = useState('');
-  const [instructorId, setInstructorId] = useState('');
-  const [defaultService, setDefaultService] = useState('');
-  const [instructors, setInstructors] = useState([]);
-  const [services, setServices] = useState([]);
-  const [loadingInstructors, setLoadingInstructors] = useState(false);
-  const [loadingServices, setLoadingServices] = useState(false);
-
-  const activeOrgId = activeOrg?.id || null;
+  const { students, loadingStudents } = useStudents({
+    status: 'all',
+    enabled: open && mode === 'assign' && Boolean(activeOrgId),
+    orgId: activeOrgId,
+  });
   const unassignedName = report?.metadata?.unassigned_details?.name || '';
   const reportService = report?.service_context || '';
+  const createInitialValues = useMemo(() => ({
+    name: unassignedName || '',
+    defaultService: reportService || '',
+  }), [unassignedName, reportService]);
 
-  // Load students for assign mode
-  useEffect(() => {
-    if (!open || mode !== 'assign' || !activeOrgId) {
-      setStudents([]);
-      return;
-    }
-
-    const abortController = new AbortController();
-    setLoadingStudents(true);
-
-    const loadStudents = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (activeOrgId) params.set('org_id', activeOrgId);
-        params.set('status', 'all');
-        
-        const data = await authenticatedFetch(`students?${params}`, {
-          signal: abortController.signal,
-        });
-        setStudents(Array.isArray(data) ? data : []);
-      } catch (err) {
-        if (err?.name === 'AbortError') return;
-        console.error('Failed to load students', err);
-      } finally {
-        setLoadingStudents(false);
-      }
-    };
-
-    void loadStudents();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [open, mode, activeOrgId]);
-
-  // Load instructors and services for create mode
-  useEffect(() => {
-    if (!open || mode !== 'create' || !activeOrgId) {
-      setInstructors([]);
-      setServices([]);
-      return;
-    }
-
-    const abortController = new AbortController();
-    setLoadingInstructors(true);
-    setLoadingServices(true);
-
-    const loadInstructors = async () => {
-      try {
-        const params = new URLSearchParams();
-        if (activeOrgId) params.set('org_id', activeOrgId);
-        
-        const data = await authenticatedFetch(`instructors?${params}`, {
-          signal: abortController.signal,
-        });
-        setInstructors(Array.isArray(data) ? data : []);
-      } catch (err) {
-        if (err?.name === 'AbortError') return;
-        console.error('Failed to load instructors', err);
-      } finally {
-        setLoadingInstructors(false);
-      }
-    };
-
-    const loadServices = async () => {
-      try {
-        const params = new URLSearchParams({ keys: 'available_services' });
-        if (activeOrgId) params.set('org_id', activeOrgId);
-        
-        const payload = await authenticatedFetch(`settings?${params}`, {
-          signal: abortController.signal,
-        });
-        const settingsValue = payload?.settings?.available_services;
-        setServices(Array.isArray(settingsValue) ? settingsValue : []);
-      } catch (err) {
-        if (err?.name === 'AbortError') return;
-        console.error('Failed to load services', err);
-      } finally {
-        setLoadingServices(false);
-      }
-    };
-
-    void loadInstructors();
-    void loadServices();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [open, mode, activeOrgId]);
-
-  // Pre-fill name and service when opening
-  useEffect(() => {
-    if (open && mode === 'create') {
-      setNewStudentName(unassignedName);
-      setDefaultService(reportService);
-    }
-  }, [open, mode, unassignedName, reportService]);
+  // Data loading handled by shared hooks above based on open/mode/org
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -149,10 +50,6 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
       setError('');
       setStudentQuery('');
       setSelectedStudentId('');
-      setNewStudentName('');
-      setNationalId('');
-      setInstructorId('');
-      setDefaultService('');
     }
   }, [open]);
 
@@ -190,82 +87,44 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
     } catch (err) {
       console.error('Failed to assign loose session', err);
       setState(REQUEST_STATE.error);
-      
       const serverMessage = err?.data?.message || err?.message || '';
-      let friendly = 'שיוך הדיווח נכשל.';
-      
-      if (serverMessage === 'student_not_found') {
-        friendly = 'התלמיד לא נמצא במערכת.';
-      } else if (serverMessage === 'session_already_assigned') {
-        friendly = 'הדיווח כבר משויך לתלמיד.';
-      } else if (serverMessage === 'session_not_found') {
-        friendly = 'הדיווח לא נמצא במערכת.';
-      }
-      
+      const friendly = mapLooseSessionError(serverMessage, 'assign', 'שיוך הדיווח נכשל.');
       setError(friendly);
     }
   };
 
-  const handleCreateAndAssign = async () => {
-    if (!newStudentName.trim()) {
-      setError('נא למלא שם תלמיד.');
-      return;
-    }
-    
-    if (!nationalId || !nationalId.trim()) {
-      setError('נא למלא מספר זהות.');
-      return;
-    }
-    
-    if (!instructorId) {
-      setError('נא לבחור מדריך.');
-      return;
-    }
-
-    if (!defaultService || !defaultService.trim()) {
-      setError('נא למלא שירות דיווח.');
-      return;
-    }
-
+  const handleCreateAndAssign = async (studentPayload) => {
     setState(REQUEST_STATE.loading);
     setError('');
 
     try {
       await createAndAssignLooseSession({
         sessionId: report.id,
-        name: newStudentName.trim(),
-        nationalId: nationalId.trim(),
-        assignedInstructorId: instructorId,
-        defaultService: defaultService.trim(),
+        name: studentPayload.name,
+        nationalId: studentPayload.nationalId,
+        assignedInstructorId: studentPayload.assignedInstructorId,
+        defaultService: studentPayload.defaultService,
         orgId: activeOrgId,
       });
-      
+
       setState(REQUEST_STATE.idle);
       toast.success('תלמיד חדש נוצר והדיווח שוייך בהצלחה.');
       onResolved?.();
+      onClose?.();
     } catch (err) {
       console.error('Failed to create and assign loose session', err);
       setState(REQUEST_STATE.error);
-      
+
       const serverMessage = err?.data?.message || err?.message || '';
-      let friendly = 'יצירת התלמיד ושיוך הדיווח נכשלו.';
-      
-      if (serverMessage === 'instructor_not_found') {
-        friendly = 'המדריך לא נמצא במערכת.';
-      } else if (serverMessage === 'instructor_inactive') {
-        friendly = 'המדריך אינו פעיל. נא לבחור מדריך פעיל.';
-      } else if (serverMessage === 'session_already_assigned') {
-        friendly = 'הדיווח כבר משויך לתלמיד.';
-      } else if (serverMessage === 'duplicate_national_id') {
-        friendly = 'מספר זהות כבר קיים במערכת. נא לבחור תלמיד קיים או להזין מספר זהות אחר.';
-      }
-      
+      const friendly = mapLooseSessionError(serverMessage, 'create', 'יצירת התלמיד ושיוך הדיווח נכשלו.');
       setError(friendly);
+    } finally {
+      setState(REQUEST_STATE.idle);
     }
   };
 
   const isSubmitting = state === REQUEST_STATE.loading;
-  const showLoading = loadingStudents || loadingInstructors || loadingServices;
+  const showLoading = loadingStudents;
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose?.(); }}>
@@ -349,97 +208,40 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
                   </p>
                 )}
               </div>
+
+              {error && (
+                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 text-right">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row-reverse sm:justify-end pt-4 border-t">
+                <Button
+                  onClick={handleAssignExisting}
+                  disabled={isSubmitting || showLoading}
+                  className="gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  שיוך קיים
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                >
+                  ביטול
+                </Button>
+              </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="new-student-name" className="block text-right">שם התלמיד *</Label>
-                <Input
-                  id="new-student-name"
-                  value={newStudentName}
-                  onChange={(e) => setNewStudentName(e.target.value)}
-                  disabled={isSubmitting}
-                  placeholder="הקלידו שם מלא"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="national-id" className="block text-right">מספר זהות *</Label>
-                <Input
-                  id="national-id"
-                  value={nationalId}
-                  onChange={(e) => setNationalId(e.target.value)}
-                  disabled={isSubmitting}
-                  placeholder="הקלידו מספר זהות"
-                  maxLength={9}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="instructor-select" className="block text-right">בחרו מדריך *</Label>
-                <Select
-                  value={instructorId}
-                  onValueChange={setInstructorId}
-                  disabled={isSubmitting || instructors.length === 0}
-                >
-                  <SelectTrigger id="instructor-select" className="w-full">
-                    <SelectValue placeholder="בחרו מדריך" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {instructors.map((instructor) => (
-                      <SelectItem key={instructor.id} value={instructor.id}>
-                        {instructor.name || instructor.email || instructor.id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {instructors.length === 0 && (
-                  <p className="text-xs text-neutral-500 text-right">
-                    אין מדריכים זמינים. נא להוסיף מדריך תחילה.
-                  </p>
-                )}
-              </div>
-
-              <ComboBoxField
-                id="default-service"
-                name="default_service"
-                label="שירות דיווח *"
-                value={defaultService}
-                onChange={setDefaultService}
-                options={services}
-                placeholder="בחרו מהרשימה או הקלידו שירות"
-                disabled={isSubmitting}
-                dir="rtl"
-                emptyMessage="לא נמצאו שירותים תואמים"
-                description="השירות שתועד במפגש זה. יוצע כברירת מחדל בדיווחים עתידיים."
-                required
-              />
-            </div>
+            <AddStudentForm
+              onSubmit={handleCreateAndAssign}
+              onCancel={onClose}
+              isSubmitting={isSubmitting}
+              error={error}
+              initialValues={createInitialValues}
+            />
           )}
-
-          {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 text-right">
-              {error}
-            </div>
-          )}
-
-          <div className="flex flex-col-reverse gap-2 sm:flex-row-reverse sm:justify-end pt-4 border-t">
-            <Button
-              onClick={mode === 'assign' ? handleAssignExisting : handleCreateAndAssign}
-              disabled={isSubmitting || showLoading}
-              className="gap-2"
-            >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {mode === 'assign' ? 'שיוך קיים' : 'יצירה ושיוך'}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              ביטול
-            </Button>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

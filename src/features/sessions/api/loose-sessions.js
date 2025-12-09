@@ -27,6 +27,7 @@ export async function createAndAssignLooseSession({
   sessionId,
   name,
   assignedInstructorId,
+  nationalId,
   defaultService,
   orgId,
   signal,
@@ -35,8 +36,24 @@ export async function createAndAssignLooseSession({
     action: 'create_and_assign',
     session_id: sessionId,
     name,
+    national_id: nationalId,
     assigned_instructor_id: assignedInstructorId,
     ...(defaultService ? { default_service: defaultService } : {}),
+    org_id: orgId,
+  };
+  
+  return authenticatedFetch('loose-sessions', {
+    method: 'POST',
+    body,
+    signal,
+  });
+}
+
+export async function rejectLooseSession({ sessionId, rejectReason, orgId, signal } = {}) {
+  const body = {
+    action: 'reject',
+    session_id: sessionId,
+    reject_reason: rejectReason,
     org_id: orgId,
   };
   

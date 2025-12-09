@@ -12,7 +12,6 @@ import {
   TimeField
 } from '@/components/ui/forms-ui';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
-import { useAuth } from '@/auth/AuthContext';
 import StudentTagsField from './StudentTagsField.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { createStudentFormState } from '@/features/students/utils/form-state.js';
@@ -27,10 +26,11 @@ export default function AddStudentForm({
   renderFooterOutside = false,
   onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
   onSubmitDisabledChange = () => {},
+  initialValues = {},
 }) {
-  const [values, setValues] = useState(() => createStudentFormState());
+  const initialState = useMemo(() => ({ ...createStudentFormState(), ...initialValues }), [initialValues]);
+  const [values, setValues] = useState(() => initialState);
   const [touched, setTouched] = useState({});
-  const { session } = useAuth();
   const { services, loadingServices } = useServices();
   const { instructors, loadingInstructors } = useInstructors();
 
@@ -48,11 +48,16 @@ export default function AddStudentForm({
   }, [preventSubmitReason, isSubmitting, onSubmitDisabledChange]);
 
   useEffect(() => {
+    setValues(initialState);
+    setTouched({});
+  }, [initialState]);
+
+  useEffect(() => {
     if (!isSubmitting && !error) {
-      setValues(createStudentFormState());
+      setValues(initialState);
       setTouched({});
     }
-  }, [isSubmitting, error]);
+  }, [isSubmitting, error, initialState]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;

@@ -603,17 +603,19 @@ export default function NewSessionForm({
             disabled={isSubmitting}
           />
         </div>
-        <div className="space-y-sm">
-          <Label htmlFor="session-time" className="block text-right">שעת המפגש {looseMode ? '*' : ''}</Label>
-          <TimeField
-            id="session-time"
-            value={sessionTime}
-            onChange={setSessionTime}
-            disabled={isSubmitting}
-            required={looseMode}
-            placeholder="HH:MM"
-          />
-        </div>
+        {looseMode && (
+          <div className="space-y-sm">
+            <Label htmlFor="session-time" className="block text-right">שעת המפגש *</Label>
+            <TimeField
+              id="session-time"
+              value={sessionTime}
+              onChange={setSessionTime}
+              disabled={isSubmitting}
+              required
+              placeholder="HH:MM"
+            />
+          </div>
+        )}
         <ComboBoxField
           id="session-service"
           name="service"

@@ -75,7 +75,15 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_verify_membership' });
   }
 
-  if (!role || !isAdminRole(role)) {
+  // For GET: allow instructors to view their own reports, admins to view all
+  // For POST: admin-only
+  const isAdmin = isAdminRole(role);
+  
+  if (method === 'POST' && !isAdmin) {
+    return respond(context, 403, { message: 'forbidden' });
+  }
+
+  if (!role) {
     return respond(context, 403, { message: 'forbidden' });
   }
 
@@ -85,12 +93,19 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
-    const { data, error } = await tenantClient
+    let query = tenantClient
       .from('SessionRecords')
-      .select('id, date, content, service_context, instructor_id, metadata, created_at, updated_at')
+      .select('id, date, content, service_context, instructor_id, metadata, created_at, updated_at, student_id, deleted')
       .is('student_id', null)
       .eq('deleted', false)
       .order('date', { ascending: true }); // Oldest session dates first
+
+    // Non-admin instructors can only see their own loose reports
+    if (!isAdmin) {
+      query = query.eq('instructor_id', userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       context.log?.error?.('loose-sessions failed to list pending records', { message: error.message });
@@ -111,7 +126,7 @@ export default async function (context, req) {
     return respond(context, 400, { message: 'invalid_session_id' });
   }
 
-  if (action !== 'assign_existing' && action !== 'create_and_assign') {
+  if (action !== 'assign_existing' && action !== 'create_and_assign' && action !== 'reject') {
     return respond(context, 400, { message: 'invalid_action' });
   }
 
@@ -139,6 +154,53 @@ export default async function (context, req) {
   }
 
   const cleanedMetadata = stripUnassignedDetails(sessionRow.metadata);
+
+  if (action === 'reject') {
+    const rejectReason = normalizeString(body?.reject_reason || body?.rejectReason || '');
+    if (!rejectReason) {
+      return respond(context, 400, { message: 'missing_reject_reason' });
+    }
+
+    const rejectionMetadata = {
+      ...cleanedMetadata,
+      rejection: {
+        reason: rejectReason,
+        rejected_by: userId,
+        rejected_at: new Date().toISOString(),
+      },
+    };
+
+    const { error: deleteError } = await tenantClient
+      .from('SessionRecords')
+      .update({ deleted: true, metadata: rejectionMetadata })
+      .eq('id', sessionId);
+
+    if (deleteError) {
+      context.log?.error?.('loose-sessions failed to reject session', { message: deleteError.message });
+      return respond(context, 500, { message: 'failed_to_reject_session' });
+    }
+
+    try {
+      await logAuditEvent(supabase, {
+        orgId,
+        userId,
+        userEmail,
+        userRole: role,
+        actionType: AUDIT_ACTIONS.SESSION_DELETED,
+        actionCategory: AUDIT_CATEGORIES.SESSIONS,
+        resourceType: 'session_record',
+        resourceId: sessionId,
+        details: {
+          mode: 'reject_loose_report',
+          reject_reason: rejectReason,
+        },
+      });
+    } catch (auditError) {
+      context.log?.error?.('loose-sessions failed to log rejection audit', { message: auditError?.message });
+    }
+
+    return respond(context, 200, { message: 'session_rejected' });
+  }
 
   if (action === 'assign_existing') {
     const studentId = normalizeString(body?.student_id || body?.studentId);

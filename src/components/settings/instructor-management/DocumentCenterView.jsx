@@ -7,11 +7,17 @@ import { Loader2, Search, ChevronLeft, AlertCircle, CheckCircle2 } from 'lucide-
 import { authenticatedFetch } from '@/lib/api-client';
 import { fetchSettingsValue } from '@/features/settings/api/settings.js';
 import InstructorDocumentsSection from '../InstructorDocumentsSection.jsx';
+import { useInstructors } from '@/hooks/useOrgData.js';
 
 const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 
 export default function DocumentCenterView({ session, orgId, canLoad }) {
-  const [instructors, setInstructors] = useState([]);
+  const { instructors, loadingInstructors, instructorsError, refetchInstructors } = useInstructors({
+    includeInactive: true,
+    orgId,
+    session,
+    enabled: canLoad,
+  });
   const [definitions, setDefinitions] = useState([]);
   const [allDocuments, setAllDocuments] = useState([]);
   const [loadState, setLoadState] = useState(REQUEST.idle);
@@ -22,68 +28,67 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
   // Use a ref to track selected instructor ID for refresh without causing dependency loops
   const selectedInstructorIdRef = useRef(null);
 
-  const loadAll = useCallback(async () => {
-    if (!canLoad) {
-      setInstructors([]);
-      setDefinitions([]);
-      setAllDocuments([]);
+  const loadDefinitionsAndDocs = useCallback(async () => {
+    if (!canLoad || loadingInstructors) {
       return;
     }
+
     setLoadState(REQUEST.loading);
     setLoadError('');
+
     try {
-      const params = new URLSearchParams({ org_id: orgId, include_inactive: 'true' });
-      const [roster, settingsData] = await Promise.all([
-        authenticatedFetch(`instructors?${params.toString()}`, { session }),
-        fetchSettingsValue({ session, orgId, key: 'instructor_document_definitions' }),
-      ]);
-      
-      const loadedInstructors = Array.isArray(roster) ? roster : [];
-      setInstructors(loadedInstructors);
+      const settingsData = await fetchSettingsValue({ session, orgId, key: 'instructor_document_definitions' });
       setDefinitions(Array.isArray(settingsData?.value) ? settingsData.value : []);
-      
-      // Fetch all instructor documents at once from Documents table
-      try {
-        const allDocs = [];
-        for (const instructor of loadedInstructors) {
-          const docsParams = new URLSearchParams({ 
-            org_id: orgId, 
-            entity_type: 'instructor',
-            entity_id: instructor.id
+
+      const docRequests = instructors.map((instructor) => {
+        const docsParams = new URLSearchParams({
+          org_id: orgId,
+          entity_type: 'instructor',
+          entity_id: instructor.id,
+        });
+        return authenticatedFetch(`documents?${docsParams.toString()}`, { session })
+          .catch((err) => {
+            console.error('Failed to load instructor documents', err);
+            return { documents: [] };
           });
-          const docs = await authenticatedFetch(`documents?${docsParams.toString()}`, { session });
-          allDocs.push(...(Array.isArray(docs?.documents) ? docs.documents : []));
-        }
-        setAllDocuments(allDocs);
-      } catch (docsError) {
-        console.error('Failed to load instructor documents', docsError);
-        // Non-fatal: continue without documents
-        setAllDocuments([]);
-      }
-      
-      // Update selectedInstructor if it exists to prevent stale data
-      // Use ref to avoid dependency loop
+      });
+
+      const docsPayloads = await Promise.all(docRequests);
+      const allDocs = docsPayloads.flatMap((payload) => Array.isArray(payload?.documents) ? payload.documents : []);
+      setAllDocuments(allDocs);
+
       if (selectedInstructorIdRef.current) {
-        const updated = loadedInstructors.find(i => i.id === selectedInstructorIdRef.current);
+        const updated = instructors.find(i => i.id === selectedInstructorIdRef.current);
         if (updated) {
           setSelectedInstructor(updated);
         }
       }
-      
+
       setLoadState(REQUEST.idle);
     } catch (error) {
       console.error('Failed to load data', error);
       setLoadError(error?.message || 'טעינת הנתונים נכשלה.');
       setLoadState(REQUEST.error);
-      setInstructors([]);
       setDefinitions([]);
       setAllDocuments([]);
     }
-  }, [canLoad, orgId, session]);
+  }, [canLoad, loadingInstructors, instructors, orgId, session]);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    if (!canLoad) {
+      setDefinitions([]);
+      setAllDocuments([]);
+      setSelectedInstructor(null);
+      selectedInstructorIdRef.current = null;
+      setLoadState(REQUEST.idle);
+      setLoadError('');
+      return;
+    }
+
+    if (!loadingInstructors) {
+      void loadDefinitionsAndDocs();
+    }
+  }, [canLoad, loadingInstructors, loadDefinitionsAndDocs]);
 
   const handleSelectInstructor = (instructor) => {
     selectedInstructorIdRef.current = instructor?.id || null;
@@ -95,7 +100,8 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
     setSelectedInstructor(null);
   };
 
-  const isLoading = loadState === REQUEST.loading;
+  const isLoading = loadState === REQUEST.loading || loadingInstructors;
+  const combinedError = loadError || instructorsError;
 
   const filteredInstructors = instructors.filter((instructor) => {
     const query = searchQuery.toLowerCase();
@@ -150,10 +156,10 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
     );
   }
 
-  if (loadError) {
+  if (combinedError) {
     return (
       <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-        {loadError}
+        {combinedError}
       </div>
     );
   }
@@ -194,7 +200,10 @@ export default function DocumentCenterView({ session, orgId, canLoad }) {
           instructor={selectedInstructor}
           session={session}
           orgId={orgId}
-          onRefresh={loadAll}
+          onRefresh={async () => {
+            await refetchInstructors();
+            await loadDefinitionsAndDocs();
+          }}
         />
       </div>
     );

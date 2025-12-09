@@ -126,8 +126,28 @@
 - Use ProjectDoc/Eng.md to understand the overall project.
 - **Refer to [ProjectDoc/Conventions.md](ProjectDoc/Conventions.md)** for folder structure, naming conventions, API patterns, and feature organization. Update it when adding new patterns or changing structure (with approval).
 - SessionRecords now includes `is_legacy boolean NOT NULL DEFAULT false` for marking imported historical session rows. Control DB registry adds `can_reupload_legacy_reports` (default false) to gate repeated legacy imports per organization.
-- SessionRecords `student_id` is now nullable to support unassigned ("loose") session reports. When creating loose reports, write `metadata.unassigned_details` additively (do not clobber existing metadata) and ensure downstream queries tolerate `student_id` being NULL.
-- Loose reports resolution: Admin-only `/api/loose-sessions` lists pending `student_id IS NULL` records (GET) and resolves them (POST) either by assigning to an existing student (`action=assign_existing`, `student_id`) or by creating a new student (`action=create_and_assign`, `name`, `assigned_instructor_id`, optional `default_service`). Resolution removes only `metadata.unassigned_details`, preserves other metadata, and updates `service_context` using the session payload or student default. Audit logging uses `SESSION_CREATED`/`SESSION_RESOLVED` actions in `AUDIT_CATEGORIES.SESSIONS`.
+- **Loose Reports Feature** (2025-12, Phase 6 Complete):
+  - SessionRecords `student_id` is now nullable to support unassigned ("loose") session reports. When creating loose reports, write `metadata.unassigned_details` additively (do not clobber existing metadata) and ensure downstream queries tolerate `student_id` being NULL.
+  - **Backend Endpoint** (`/api/loose-sessions`):
+    - `GET`: Lists pending `student_id IS NULL` records with role-based filtering:
+      - **Admin/Owner**: See all pending loose reports for the organization
+      - **Instructor (non-admin)**: Only see their own submitted loose reports (filtered by `instructor_id`)
+    - `POST`: Admin-only resolution operations with three action types:
+      - `action=assign_existing` (`student_id`): Assign pending report to existing student
+      - `action=create_and_assign` (`name`, `assigned_instructor_id`, optional `default_service`): Create new student and assign report
+      - `action=reject` (`reason`, optional `reason_other` for custom text): Reject pending report with predefined or custom reason
+    - Resolution removes only `metadata.unassigned_details`, preserves other metadata, and updates `service_context` using the session payload or student default
+    - Audit logging uses `SESSION_RESOLVED`/`SESSION_REJECTED` actions in `AUDIT_CATEGORIES.SESSIONS`
+  - **Frontend Components**:
+    - `PendingReportsPage.jsx`: Admin interface with search/filter UI (free text, service, reason, date range), bulk selection with checkboxes, individual/bulk reject via `RejectReportDialog`, bulk assign/create via `BulkResolvePendingReportsDialog`
+    - `MyPendingReportsCard.jsx`: Instructor read-only view of own pending and recently resolved reports
+    - `MyStudentsPage.jsx`: Instructor access button in CardHeader showing pending reports count badge; click opens dialog with `MyPendingReportsCard`
+    - Bulk operations use sequential processing with real-time feedback
+  - **Form Changes (2025-12)**:
+    - Loose session form requires: name, reason (predefined + custom), service, date, **time** (new for loose only)
+    - Regular session form: no time input required (field is hidden when not in loose mode)
+    - Time field only renders when `looseMode === true` with `required` attribute
+    - Backend validation: `if (looseMode && !sessionTime.trim()) return;` blocks submission without time for loose reports
 - Legacy import UI: `StudentDetailPage.jsx` shows an "Import Legacy Reports" button for admin/owner users only. The button disables when a legacy import already exists unless `can_reupload_legacy_reports` is true. The modal (`src/features/students/components/LegacyImportModal.jsx`) walks through backup warning → structure choice → CSV mapping (dropdowns vs. custom labels, session date required) → confirmation with re-upload warning.
 - Legacy import backend: `/api/students/{id}/legacy-import` accepts JSON (`csv_text`, `structure_choice`, `session_date_column`, and either `column_mappings` or `custom_labels`), enforces admin/owner role + `can_reupload_legacy_reports`, deletes prior `is_legacy` rows for the student, and writes new `SessionRecords` with `is_legacy=true`.
 - Legacy importer normalizes session dates from `YYYY-MM-DD`, `DD/MM/YYYY`, `DD.MM.YYYY`, or Excel serial numbers before writing rows. Invalid dates return `invalid_session_date` with the 1-based row index.

@@ -9,6 +9,7 @@ import { authenticatedFetch } from '@/lib/api-client.js';
 import NewSessionForm, { NewSessionFormFooter } from './NewSessionForm.jsx';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
 import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -193,7 +194,6 @@ function SuccessFooter({ studentName, onClose, onNewReport, onNewReportSameStude
         </Button>
         <Button 
           onClick={onNewReport}
-          className="gap-xs shadow-md hover:shadow-lg transition-shadow"
         >
           דיווח נוסף - תלמיד אחר
         </Button>
@@ -226,10 +226,8 @@ export default function NewSessionModal({
   const [questionError, setQuestionError] = useState('');
   const [questions, setQuestions] = useState([]);
   const [suggestions, setSuggestions] = useState({});
-  const [services, setServices] = useState([]);
   const [submitState, setSubmitState] = useState(REQUEST_STATE.idle);
   const [submitError, setSubmitError] = useState('');
-  const [instructors, setInstructors] = useState([]);
   const [studentScope, setStudentScope] = useState('all'); // 'all' | 'mine' | `inst:<id>`
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
   const [canViewInactive, setCanViewInactive] = useState(false);
@@ -245,6 +243,7 @@ export default function NewSessionModal({
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
+  const canAdmin = isAdminRole(membershipRole);
   const canFetchStudents = useMemo(() => {
     return (
       open &&
@@ -255,17 +254,26 @@ export default function NewSessionModal({
     );
   }, [open, activeOrgId, activeOrgHasConnection, tenantClientReady, supabaseLoading]);
 
+  const { instructors } = useInstructors({
+    enabled: open && canFetchStudents && canAdmin,
+    orgId: activeOrgId,
+  });
+
+  const { services } = useServices({
+    enabled: open && canFetchStudents,
+    orgId: activeOrgId,
+  });
+
   useEffect(() => {
-    const isAdmin = isAdminRole(membershipRole);
     if (!open) {
       setStatusFilter('active');
-      setCanViewInactive(isAdmin);
+      setCanViewInactive(canAdmin);
       setVisibilityLoaded(false);
       setInitialStatusApplied(false);
       return;
     }
 
-    if (isAdmin) {
+    if (canAdmin) {
       setCanViewInactive(true);
       setVisibilityLoaded(true);
       return;
@@ -327,7 +335,7 @@ export default function NewSessionModal({
       cancelled = true;
       abortController.abort();
     };
-  }, [open, membershipRole, activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter]);
+  }, [open, membershipRole, activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter, canAdmin]);
 
   useEffect(() => {
     if (!open) {
@@ -352,8 +360,7 @@ export default function NewSessionModal({
       const statusParam = canViewInactive ? (overrideStatus || statusFilter) : 'active';
       const baseEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: statusParam });
       let endpoint = baseEndpoint;
-      const isAdmin = isAdminRole(membershipRole);
-      if (isAdmin) {
+      if (canAdmin) {
         if (studentScope === 'mine') {
           // Admin viewing their own assigned students -> use my-students
           const searchParams = new URLSearchParams();
@@ -379,21 +386,7 @@ export default function NewSessionModal({
       setStudentsState(REQUEST_STATE.error);
       setStudentsError(error?.message || 'טעינת רשימת התלמידים נכשלה.');
     }
-  }, [activeOrgId, canFetchStudents, membershipRole, studentScope, statusFilter, canViewInactive]);
-
-  const loadInstructors = useCallback(async () => {
-    if (!open || !canFetchStudents) return;
-    if (!isAdminRole(membershipRole)) return;
-    try {
-      const searchParams = new URLSearchParams();
-      if (activeOrgId) searchParams.set('org_id', activeOrgId);
-      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`);
-      setInstructors(Array.isArray(payload) ? payload : []);
-    } catch (error) {
-      console.error('Failed to load instructors', error);
-      setInstructors([]);
-    }
-  }, [open, canFetchStudents, membershipRole, activeOrgId]);
+  }, [activeOrgId, canFetchStudents, membershipRole, studentScope, statusFilter, canViewInactive, canAdmin]);
 
   const loadQuestions = useCallback(async () => {
     if (!open || !canFetchStudents) {
@@ -427,25 +420,9 @@ export default function NewSessionModal({
     }
   }, [open, canFetchStudents, activeOrgId]);
 
-  const loadServices = useCallback(async () => {
-    if (!open || !canFetchStudents) return;
-    try {
-      const searchParams = new URLSearchParams({ keys: 'available_services' });
-      if (activeOrgId) searchParams.set('org_id', activeOrgId);
-      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
-      const settingsValue = payload?.settings?.available_services;
-      setServices(Array.isArray(settingsValue) ? settingsValue : []);
-    } catch (error) {
-      console.error('Failed to load available services', error);
-      setServices([]);
-    }
-  }, [open, canFetchStudents, activeOrgId]);
-
   useEffect(() => {
     if (open) {
       void loadQuestions();
-      void loadServices();
-      void loadInstructors();
     } else {
       setStudentsState(REQUEST_STATE.idle);
       setStudentsError('');
@@ -455,11 +432,9 @@ export default function NewSessionModal({
       setQuestionError('');
       setQuestions([]);
       setSuggestions({});
-      setServices([]);
-      setInstructors([]);
       setStudentScope('all');
     }
-  }, [open, loadQuestions, loadServices, loadInstructors]);
+  }, [open, loadQuestions]);
 
   useEffect(() => {
     if (!open || !canFetchStudents) {

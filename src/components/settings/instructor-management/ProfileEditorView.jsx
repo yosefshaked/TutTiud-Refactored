@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -7,44 +7,28 @@ import { Loader2, Search, ChevronLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
+import { useInstructors } from '@/hooks/useOrgData.js';
 
-const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 const SAVE = { idle: 'idle', saving: 'saving', error: 'error' };
 
 export default function ProfileEditorView({ session, orgId, canLoad }) {
-  const [instructors, setInstructors] = useState([]);
-  const [loadState, setLoadState] = useState(REQUEST.idle);
-  const [loadError, setLoadError] = useState('');
+  const { instructors, loadingInstructors, instructorsError, refetchInstructors } = useInstructors({
+    includeInactive: true,
+    orgId,
+    session,
+    enabled: canLoad,
+  });
   const [saveState, setSaveState] = useState(SAVE.idle);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedInstructor, setSelectedInstructor] = useState(null);
   const [formData, setFormData] = useState({ name: '', phone: '', notes: '' });
   const { types, loadTypes } = useInstructorTypes();
 
-  const loadInstructors = useCallback(async () => {
-    if (!canLoad) {
-      setInstructors([]);
-      return;
-    }
-    setLoadState(REQUEST.loading);
-    setLoadError('');
-    try {
-      const params = new URLSearchParams({ org_id: orgId, include_inactive: 'true' });
-      const roster = await authenticatedFetch(`instructors?${params.toString()}`, { session });
-      setInstructors(Array.isArray(roster) ? roster : []);
-      setLoadState(REQUEST.idle);
-    } catch (error) {
-      console.error('Failed to load instructors', error);
-      setLoadError(error?.message || 'טעינת המדריכים נכשלה.');
-      setLoadState(REQUEST.error);
-      setInstructors([]);
-    }
-  }, [canLoad, orgId, session]);
-
   useEffect(() => {
-    loadInstructors();
-    loadTypes();
-  }, [loadInstructors, loadTypes]);
+    if (canLoad) {
+      void loadTypes();
+    }
+  }, [canLoad, loadTypes]);
 
   const handleSelectInstructor = (instructor) => {
     setSelectedInstructor(instructor);
@@ -86,7 +70,7 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
         body: { org_id: orgId, instructor_id: selectedInstructor.id, ...updates },
       });
       toast.success('פרטי המדריך נשמרו בהצלחה.');
-      await loadInstructors();
+      await refetchInstructors();
       handleBack();
     } catch (err) {
       console.error('Failed to update instructor', err);
@@ -96,7 +80,7 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
     }
   };
 
-  const isLoading = loadState === REQUEST.loading;
+  const isLoading = loadingInstructors;
   const isSaving = saveState === SAVE.saving;
 
   // Create a Map of type IDs to type objects for quick lookup
@@ -130,10 +114,10 @@ export default function ProfileEditorView({ session, orgId, canLoad }) {
     );
   }
 
-  if (loadError) {
+  if (instructorsError) {
     return (
       <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-        {loadError}
+        {instructorsError}
       </div>
     );
   }

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
+import { useInstructors, useStudents } from '@/hooks/useOrgData.js';
 import AddStudentForm, { AddStudentFormFooter } from '../components/AddStudentForm.jsx';
 import EditStudentModal from '../components/EditStudentModal.jsx';
 import DataMaintenanceModal from '../components/DataMaintenanceModal.jsx';
@@ -28,24 +29,14 @@ import { saveFilterState, loadFilterState } from '@/features/students/utils/filt
 import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 import { fetchLooseSessions } from '@/features/sessions/api/loose-sessions.js';
 
-const REQUEST_STATES = {
-  idle: 'idle',
-  loading: 'loading',
-  error: 'error',
-};
-
 export default function StudentManagementPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
 
   // All hooks must be called before any conditional returns
   const { tagOptions, loadTags } = useStudentTags();
-  const [students, setStudents] = useState([]);
-  const [studentsState, setStudentsState] = useState(REQUEST_STATES.idle);
   const [studentsError, setStudentsError] = useState('');
   const [complianceSummary, setComplianceSummary] = useState({}); // Map of student_id -> { expiredDocuments: number }
-  const [instructors, setInstructors] = useState([]);
-  const [instructorsState, setInstructorsState] = useState(REQUEST_STATES.idle);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isCreatingStudent, setIsCreatingStudent] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -75,6 +66,18 @@ export default function StudentManagementPage() {
   const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole]);
   const isAdminMember = isAdminRole(normalizedRole);
 
+  const canFetch = Boolean(
+    session &&
+      activeOrgId &&
+      tenantClientReady &&
+      activeOrgHasConnection,
+  );
+
+  const { instructors, loadingInstructors } = useInstructors({
+    enabled: canFetch,
+    orgId: activeOrgId,
+  });
+
   const instructorMap = useMemo(() => {
     return instructors.reduce((map, instructor) => {
       if (instructor?.id) {
@@ -84,12 +87,12 @@ export default function StudentManagementPage() {
     }, new Map());
   }, [instructors]);
 
-  const canFetch = Boolean(
-    session &&
-      activeOrgId &&
-      tenantClientReady &&
-      activeOrgHasConnection,
-  );
+  const { students, loadingStudents, studentsError: hookStudentsError, refetchStudents } = useStudents({
+    status: statusFilter === 'all' ? 'all' : statusFilter,
+    enabled: canFetch && filtersRestored && isAdminMember,
+    orgId: activeOrgId,
+    session,
+  });
 
   const fetchComplianceSummary = useCallback(async () => {
     if (!canFetch) {
@@ -122,71 +125,27 @@ export default function StudentManagementPage() {
     }
   }, [canFetch, activeOrgId, session]);
 
-  const fetchStudents = useCallback(async () => {
-    if (!canFetch) {
-      return;
-    }
-
-    setStudentsState(REQUEST_STATES.loading);
-    setStudentsError('');
-
-    try {
-      // Smart fetching: only fetch what we need
-      // If looking for active only, just fetch active; if looking for all, fetch all
-      const statusParam = statusFilter === 'all' ? 'all' : statusFilter;
-      const searchParams = new URLSearchParams({ org_id: activeOrgId, status: statusParam });
-      const payload = await authenticatedFetch(`students?${searchParams.toString()}`, { session });
-      setStudents(Array.isArray(payload) ? payload : []);
-    } catch (error) {
-      console.error('Failed to load students', error);
-      setStudentsError(error?.message || 'טעינת רשימת התלמידים נכשלה.');
-      toast.error('טעינת רשימת התלמידים נכשלה.');
-      setStudents([]);
-      setStudentsState(REQUEST_STATES.error);
-      return;
-    }
-
-    setStudentsState(REQUEST_STATES.idle);
-  }, [canFetch, activeOrgId, session, statusFilter]);
-
-  const fetchInstructors = useCallback(async () => {
-    if (!canFetch) {
-      return;
-    }
-
-    setInstructorsState(REQUEST_STATES.loading);
-
-    try {
-      const searchParams = new URLSearchParams({ org_id: activeOrgId });
-      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`, { session });
-      setInstructors(Array.isArray(payload) ? payload : []);
-    } catch (error) {
-      console.error('Failed to load instructors', error);
-      toast.error('טעינת רשימת המדריכים נכשלה.');
-      setInstructors([]);
-      setInstructorsState(REQUEST_STATES.error);
-      return;
-    }
-
-    setInstructorsState(REQUEST_STATES.idle);
-  }, [canFetch, activeOrgId, session]);
-
-  const refreshRoster = useCallback(async (includeInstructors = false) => {
+  const refreshRoster = useCallback(async () => {
     const promises = [
-      fetchStudents(),
+      refetchStudents(),
       // Compliance summary is optional - don't let it block the main data load
       fetchComplianceSummary().catch(() => {}),
     ];
     
-    if (includeInstructors) {
-      promises.push(fetchInstructors());
-    }
-    
     await Promise.all(promises);
-  }, [fetchStudents, fetchComplianceSummary, fetchInstructors]);
+  }, [refetchStudents, fetchComplianceSummary]);
+
+  useEffect(() => {
+    if (hookStudentsError) {
+      setStudentsError(hookStudentsError || 'טעינת רשימת התלמידים נכשלה.');
+      toast.error('טעינת רשימת התלמידים נכשלה.');
+    } else {
+      setStudentsError('');
+    }
+  }, [hookStudentsError]);
 
   const handleMaintenanceCompleted = useCallback(async () => {
-    await refreshRoster(true);
+    await refreshRoster();
   }, [refreshRoster]);
 
   // Load saved filter state on mount FIRST, before any fetching happens
@@ -214,12 +173,10 @@ export default function StudentManagementPage() {
   useEffect(() => {
     if (canFetch && filtersRestored) {
       // Refetch when statusFilter changes to get the right subset from server
-      refreshRoster(true);
+      refreshRoster();
       void loadTags();
       void fetchPendingReportsCount();
     } else {
-      setStudents([]);
-      setInstructors([]);
       setPendingReportsCount(0);
     }
   }, [canFetch, filtersRestored, refreshRoster, loadTags, fetchPendingReportsCount]);
@@ -240,13 +197,6 @@ export default function StudentManagementPage() {
       setInstructorFilterId(user.id);
     }
   }, [user, instructors, activeOrgId]);
-
-  // Refetch students when statusFilter changes (after initial restore)
-  useEffect(() => {
-    if (canFetch && filtersRestored) {
-      void fetchStudents();
-    }
-  }, [statusFilter, canFetch, filtersRestored, fetchStudents]);
 
   // Save filter state whenever it changes
   useEffect(() => {
@@ -468,7 +418,7 @@ export default function StudentManagementPage() {
       };
       await authenticatedFetch(`students/${payload.id}`, { session, method: 'PUT', body });
       setStudentForEdit(null);
-      await refreshRoster(true);
+      await refreshRoster();
     } catch (error) {
       console.error('Failed to update student', error);
       setUpdateError(error?.message || 'עדכון התלמיד נכשל.');
@@ -511,8 +461,7 @@ export default function StudentManagementPage() {
       </div>
     );
   }
-
-  const isLoadingStudents = studentsState === REQUEST_STATES.loading;
+  const isLoadingStudents = loadingStudents;
   const isEmpty = !isLoadingStudents && students.length === 0 && !studentsError;
 
   return (
@@ -551,7 +500,7 @@ export default function StudentManagementPage() {
         <CardHeader className="space-y-sm">
           <div className="flex flex-col gap-sm sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-semibold text-foreground">רשימת תלמידים</CardTitle>
-            {instructorsState === REQUEST_STATES.loading ? (
+            {loadingInstructors ? (
               <p className="flex items-center gap-xs text-sm text-neutral-600">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 טוען רשימת מדריכים...
