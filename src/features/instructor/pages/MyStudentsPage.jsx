@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Loader2, Users, User, FileWarning, AlertCircle } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -153,7 +153,17 @@ export default function MyStudentsPage() {
   }, [canViewInactive, statusFilter])
 
   // Load pending reports count for instructor
-  // (Moved inline in the useEffect to avoid infinite loop from callback dependency)
+  const fetchPendingReportsCount = useCallback(async () => {
+    if (!canFetch) return
+
+    try {
+      const reports = await authenticatedFetch('loose-sessions', { org_id: activeOrgId })
+      setPendingReportsCount(Array.isArray(reports) ? reports.length : 0)
+    } catch (error) {
+      console.error('Failed to load pending reports count', error)
+      setPendingReportsCount(0)
+    }
+  }, [canFetch, activeOrgId])
 
   useEffect(() => {
     if (!canFetch) {
@@ -161,21 +171,8 @@ export default function MyStudentsPage() {
       return
     }
 
-    const abortController = new AbortController()
-    const fetchReports = async () => {
-      try {
-        const reports = await authenticatedFetch('loose-sessions', { org_id: activeOrgId, signal: abortController.signal })
-        setPendingReportsCount(Array.isArray(reports) ? reports.length : 0)
-      } catch (error) {
-        if (error?.name !== 'AbortError') {
-          console.error('Failed to load pending reports count', error)
-          setPendingReportsCount(0)
-        }
-      }
-    }
-    void fetchReports()
-    return () => abortController.abort()
-  }, [canFetch, activeOrgId])
+    void fetchPendingReportsCount()
+  }, [canFetch, fetchPendingReportsCount])
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {

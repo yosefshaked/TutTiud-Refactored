@@ -47,7 +47,7 @@ function useOrgDataResource({
 
   const searchParamsString = useMemo(() => buildSearchParamsString(params, orgId), [params, orgId]);
 
-  const fetchResource = useCallback(async ({ updateState = true } = {}) => {
+  const fetchResource = useCallback(async (searchStr, { updateState = true } = {}) => {
     const controller = new AbortController();
     const effectiveEnabled = enabled && shouldInclude(orgId);
 
@@ -64,7 +64,7 @@ function useOrgDataResource({
     }
 
     try {
-      const payload = await authenticatedFetch(`${path}${searchParamsString ? `?${searchParamsString}` : ''}`, {
+      const payload = await authenticatedFetch(`${path}${searchStr ? `?${searchStr}` : ''}`, {
         session,
         signal: controller.signal,
       });
@@ -89,22 +89,22 @@ function useOrgDataResource({
         setLoading(false);
       }
     }
-  }, [enabled, orgId, resetOnDisable, searchParamsString, session, mapResponse, resource, path]);
+  }, [enabled, orgId, resetOnDisable, session, mapResponse, resource, path]);
 
   useEffect(() => {
-    const { controller } = fetchResource();
+    const { controller } = fetchResource(searchParamsString);
     return () => {
       if (controller) {
         controller.abort();
       }
     };
-  }, [fetchResource]);
+  }, [fetchResource, searchParamsString]);
 
   return {
     data,
     loading,
     error,
-    refetch: fetchResource,
+    refetch: () => fetchResource(searchParamsString),
   };
 }
 

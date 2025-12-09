@@ -282,7 +282,6 @@ export default function AppShell({ children }) {
   const { signOut } = useAuth()
   const { activeOrg } = useOrg()
   const { role } = useUserRole()
-  const location = useLocation()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
   const [sessionModalState, setSessionModalState] = useState({
     isOpen: false,
@@ -400,7 +399,7 @@ export default function AppShell({ children }) {
     }
   }, [])
 
-  const content = children ?? <Outlet key={location.pathname} />
+  const content = children ?? <Outlet />
   const pageLayoutMode = React.isValidElement(content) ? content.props?.["data-page-layout"] : null
   const useCustomLayout = pageLayoutMode === "dashboard"
 
