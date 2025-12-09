@@ -282,6 +282,7 @@ export default function AppShell({ children }) {
   const { signOut } = useAuth()
   const { activeOrg } = useOrg()
   const { role } = useUserRole()
+  const location = useLocation()
   const [isChangelogOpen, setIsChangelogOpen] = useState(false)
   const [sessionModalState, setSessionModalState] = useState({
     isOpen: false,
