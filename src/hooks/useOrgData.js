@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
@@ -45,11 +45,15 @@ function useOrgDataResource({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const searchParamsString = useMemo(() => buildSearchParamsString(params, orgId), [params, orgId]);
+  // Store searchParamsString in a ref to avoid dependency updates
+  const paramsRef = useRef({ params, orgId });
+  paramsRef.current = { params, orgId };
 
-  const fetchResource = useCallback(async (searchStr, { updateState = true } = {}) => {
+  const fetchResource = useCallback(async ({ updateState = true } = {}) => {
     const controller = new AbortController();
-    const effectiveEnabled = enabled && shouldInclude(orgId);
+    const { params: currentParams, orgId: currentOrgId } = paramsRef.current;
+    const searchParamsString = buildSearchParamsString(currentParams, currentOrgId);
+    const effectiveEnabled = enabled && shouldInclude(currentOrgId);
 
     if (!effectiveEnabled) {
       if (updateState && resetOnDisable) {
@@ -64,7 +68,7 @@ function useOrgDataResource({
     }
 
     try {
-      const payload = await authenticatedFetch(`${path}${searchStr ? `?${searchStr}` : ''}`, {
+      const payload = await authenticatedFetch(`${path}${searchParamsString ? `?${searchParamsString}` : ''}`, {
         session,
         signal: controller.signal,
       });
@@ -89,22 +93,23 @@ function useOrgDataResource({
         setLoading(false);
       }
     }
-  }, [enabled, orgId, resetOnDisable, session, mapResponse, resource, path]);
+  }, [enabled, resetOnDisable, session, mapResponse, resource, path]);
 
+  // Effect to trigger fetches when params actually change
   useEffect(() => {
-    const { controller } = fetchResource(searchParamsString);
+    const { controller } = fetchResource();
     return () => {
       if (controller) {
         controller.abort();
       }
     };
-  }, [fetchResource, searchParamsString]);
+  }, [fetchResource, params, orgId]);
 
   return {
     data,
     loading,
     error,
-    refetch: () => fetchResource(searchParamsString),
+    refetch: fetchResource,
   };
 }
 
