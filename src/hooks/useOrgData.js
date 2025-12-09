@@ -93,7 +93,11 @@ function useOrgDataResource({
 
   useEffect(() => {
     const { controller } = fetchResource();
-    return () => controller.abort();
+    return () => {
+      if (controller) {
+        controller.abort();
+      }
+    };
   }, [fetchResource]);
 
   return {
