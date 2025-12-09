@@ -399,7 +399,7 @@ export default function AppShell({ children }) {
     }
   }, [])
 
-  const content = children ?? <Outlet />
+  const content = children ?? <Outlet key={location.pathname} />
   const pageLayoutMode = React.isValidElement(content) ? content.props?.["data-page-layout"] : null
   const useCustomLayout = pageLayoutMode === "dashboard"
 

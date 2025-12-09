@@ -13,7 +13,7 @@ function shouldInclude(value) {
   return value !== undefined && value !== null && `${value}`.trim() !== '';
 }
 
-function buildSearchParams(baseParams = {}, orgId) {
+function buildSearchParamsString(baseParams = {}, orgId) {
   const searchParams = new URLSearchParams();
   if (shouldInclude(orgId)) {
     searchParams.set('org_id', orgId);
@@ -23,7 +23,7 @@ function buildSearchParams(baseParams = {}, orgId) {
       searchParams.set(key, value);
     }
   });
-  return searchParams;
+  return searchParams.toString();
 }
 
 function useOrgDataResource({
@@ -45,7 +45,7 @@ function useOrgDataResource({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const searchParams = useMemo(() => buildSearchParams(params, orgId), [params, orgId]);
+  const searchParamsString = useMemo(() => buildSearchParamsString(params, orgId), [params, orgId]);
 
   const fetchResource = useCallback(async ({ updateState = true } = {}) => {
     const controller = new AbortController();
@@ -64,7 +64,7 @@ function useOrgDataResource({
     }
 
     try {
-      const payload = await authenticatedFetch(`${path}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`, {
+      const payload = await authenticatedFetch(`${path}${searchParamsString ? `?${searchParamsString}` : ''}`, {
         session,
         signal: controller.signal,
       });
@@ -89,7 +89,7 @@ function useOrgDataResource({
         setLoading(false);
       }
     }
-  }, [enabled, orgId, resetOnDisable, searchParams, session, mapResponse, resource, path]);
+  }, [enabled, orgId, resetOnDisable, searchParamsString, session, mapResponse, resource, path]);
 
   useEffect(() => {
     const { controller } = fetchResource();

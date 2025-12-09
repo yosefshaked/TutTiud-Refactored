@@ -173,13 +173,13 @@ export default function StudentManagementPage() {
   useEffect(() => {
     if (canFetch && filtersRestored) {
       // Refetch when statusFilter changes to get the right subset from server
-      refreshRoster();
+      refetchStudents();
       void loadTags();
       void fetchPendingReportsCount();
     } else {
       setPendingReportsCount(0);
     }
-  }, [canFetch, filtersRestored, refreshRoster, loadTags, fetchPendingReportsCount]);
+  }, [canFetch, filtersRestored, refetchStudents, statusFilter, loadTags, fetchPendingReportsCount]);
 
   // Default the view for admins/owners who are also instructors to "mine" on first visit
   useEffect(() => {
