@@ -248,7 +248,8 @@ export default function NewSessionForm({
     if (looseMode && !unassignedName.trim()) return;
     if (looseMode && !sessionTime.trim()) return;
     // Non-instructor admins must specify which instructor is submitting
-    if (looseMode && canFilterByInstructor && !userIsInstructor && !looseInstructorId) {
+    if (looseMode && canFilterByInstructor && !userIsInstructor && !looseInstructorId.trim()) {
+      alert('נדרש לבחור מדריך מגיש. כמנהל ללא הרשאות מדריך, עליך לציין איזה מדריך מגיש את הדיווח.');
       return;
     }
 
