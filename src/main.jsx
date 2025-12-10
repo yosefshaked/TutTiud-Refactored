@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
 import AppShell from './components/layout/AppShell.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
-import StudentManagementPage from './features/admin/pages/StudentManagementPage.jsx';
+import StudentsPage from './features/students/pages/StudentsPage.jsx';
 import StudentDetailPage from './features/students/pages/StudentDetailPage.jsx';
 import Settings from './pages/Settings.jsx';
 import { RuntimeConfigProvider } from './runtime/RuntimeConfigContext.jsx';
@@ -21,7 +21,6 @@ import { AuthProvider } from './auth/AuthContext.jsx';
 import AuthGuard from './auth/AuthGuard.jsx';
 import { OrgProvider } from './org/OrgContext.jsx';
 import OrgSelection from './pages/OrgSelection.jsx';
-import MyStudentsPage from './features/instructor/pages/MyStudentsPage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import PendingReportsPage from './features/sessions/pages/PendingReportsPage.jsx';
 import { bootstrapSupabaseCallback } from './auth/bootstrapSupabaseCallback.js';
@@ -50,11 +49,13 @@ function App({ config = null }) {
                     {/* הגדרת כל העמודים */}
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/Dashboard" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="/Employees" element={<Navigate to="/admin/students" replace />} />
-                    <Route path="/admin/students" element={<StudentManagementPage />} />
-                    <Route path="/admin/pending-reports" element={<PendingReportsPage />} />
+                    <Route path="/Employees" element={<Navigate to="/students-list" replace />} />
+                    <Route path="/students-list" element={<StudentsPage />} />
+                    <Route path="/admin/students" element={<Navigate to="/students-list" replace />} />
+                    <Route path="/my-students" element={<Navigate to="/students-list" replace />} />
+                    <Route path="/pending-reports" element={<PendingReportsPage />} />
+                    <Route path="/admin/pending-reports" element={<Navigate to="/pending-reports" replace />} />
                     <Route path="/students/:id" element={<StudentDetailPage />} />
-                    <Route path="/my-students" element={<MyStudentsPage />} />
                     <Route path="/Settings" element={<Settings />} />
                     <Route path="/diagnostics" element={<Diagnostics />} />
                   </Route>

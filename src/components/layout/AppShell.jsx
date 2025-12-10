@@ -27,8 +27,6 @@ function buildNavItems(role) {
   // role is already normalized (lowercase) from useUserRole
   const isAdminRole = role === "admin" || role === "owner"
 
-  const studentsDestination = isAdminRole ? "/admin/students" : "/my-students"
-
   return [
     {
       label: "ראשי",
@@ -39,7 +37,7 @@ function buildNavItems(role) {
     },
     {
       label: "תלמידים",
-      to: studentsDestination,
+      to: "/students-list",
       icon: Users,
       tourKey: isAdminRole ? "admin-students" : "my-students",
     },
@@ -64,8 +62,7 @@ function MobileNavigation({ navItems = [], onOpenSessionModal }) {
   const studentsRouteActive = React.useMemo(() => {
     const p = location.pathname
     return Boolean(
-      matchPath('/admin/students/*', p) ||
-      matchPath('/my-students/*', p) ||
+      matchPath('/students-list/*', p) ||
       matchPath('/students/:id', p)
     )
   }, [location.pathname])
@@ -186,8 +183,7 @@ function DesktopNavigation({ navItems = [], onSignOut, onOpenSessionModal }) {
   const studentsRouteActive = React.useMemo(() => {
     const p = location.pathname
     return Boolean(
-      matchPath('/admin/students/*', p) ||
-      matchPath('/my-students/*', p) ||
+      matchPath('/students-list/*', p) ||
       matchPath('/students/:id', p)
     )
   }, [location.pathname])

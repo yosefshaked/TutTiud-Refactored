@@ -540,6 +540,9 @@ export default function NewSessionModal({
       // This ensures any data refresh in the parent component completes
       await Promise.resolve(onCreated?.(record));
       
+      // Dispatch global event for pages that need to refetch data
+      window.dispatchEvent(new CustomEvent('session-created', { detail: { record } }));
+      
       const isLoose = !studentId;
       const student = students.find(s => s.id === studentId);
       const studentName = isLoose ? (unassignedDetails?.name || 'תלמיד/ה') : (student?.name || 'תלמיד');

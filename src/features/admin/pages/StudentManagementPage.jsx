@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED: This component is kept for reference during testing.
+ * Use StudentsPage.jsx instead for unified admin/instructor student management.
+ * Will be removed after testing phase is complete.
+ */
+
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -180,6 +186,19 @@ export default function StudentManagementPage() {
       setPendingReportsCount(0);
     }
   }, [canFetch, filtersRestored, refreshRoster, loadTags, fetchPendingReportsCount]);
+
+  // Listen for session creation events to refetch pending reports count
+  useEffect(() => {
+    const handleSessionCreated = () => {
+      void fetchPendingReportsCount();
+    };
+    
+    window.addEventListener('session-created', handleSessionCreated);
+    
+    return () => {
+      window.removeEventListener('session-created', handleSessionCreated);
+    };
+  }, [fetchPendingReportsCount]);
 
   // Default the view for admins/owners who are also instructors to "mine" on first visit
   useEffect(() => {
@@ -474,7 +493,7 @@ export default function StudentManagementPage() {
               type="button"
               variant="outline"
               className="gap-2 border-amber-500 text-amber-700 hover:bg-amber-50"
-              onClick={() => navigate('/admin/pending-reports')}
+              onClick={() => navigate('/pending-reports')}
             >
               <AlertCircle className="h-4 w-4" aria-hidden="true" />
               דיווחים ממתינים

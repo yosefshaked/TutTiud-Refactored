@@ -859,49 +859,84 @@
   - Controlled state pattern: `showAdvancedFilters` state managed in `NewSessionModal` and passed to `NewSessionForm` via props
   - Implementation uses `animate-in fade-in slide-in-from-top-2` classes for smooth expansion animation
 
-- **Student Management Filtering Refactor (2025-11)**:
-  - **StudentFilterSection** (`src/features/students/components/StudentFilterSection.jsx`): New unified filter component consolidating all filtering UI
-    - Shared component (not admin-only) - supports both admin and instructor views
-    - `showInstructorFilter` prop (default true) allows hiding instructor filter for instructor/non-admin views
-    - Basic search (always visible): Searches name/phone/national_id with RTL support
-    - Advanced filters toggle: Collapsible section with "סינון מתקדם" label and dot indicator when active but collapsed
-    - Advanced filter controls: status (active/inactive/all), day of week, instructor (optional), sort option, reset button
+- **Unified Student Management Page (2025-12)**:
+  - **StudentsPage** (`src/features/students/pages/StudentsPage.jsx`): Single component for both admin and instructor views
+    - **Role-based rendering**: Uses `isAdminRole()` to determine admin vs instructor mode
+    - **Unified API**: All users use `/api/students-list` endpoint with server-side role filtering
+    - **Admin features**:
+      - Full student roster with instructor assignment column
+      - Add new students, edit existing students, data maintenance tools
+      - Instructor filter to view specific instructor's students
+      - Status filter (active/inactive/all) always available
+      - Compliance summary and expired documents tracking
+      - Pending reports management for loose session assignments
+    - **Instructor features**:
+      - View only assigned students (enforced server-side via `/api/my-students`)
+      - Cannot add/edit students or access data maintenance
+      - No instructor filter (only sees own students)
+      - Status filter conditional on `instructors_can_view_inactive_students` setting
+      - Pending reports dialog showing own submitted loose reports
+    - **Shared features**:
+      - Search by name/phone/national_id with RTL support
+      - Filter by day of week, tags, and sort options
+      - Filter state persistence (separate for admin/instructor modes)
+      - Session creation event listener for real-time pending reports updates
+      - Compliance badges and document expiration warnings
+    - **Security boundaries**:
+      - Server-side enforcement: API automatically filters by `assigned_instructor_id` for non-admin users
+      - Filter mode separation: `filterMode = isAdmin ? 'admin' : 'instructor'`
+      - Permission checks for visibility settings and admin-only features
+      - No data leakage between admin and instructor contexts
+      - Trust boundary at API layer - frontend cannot bypass role restrictions
+  - **StudentFilterSection** (`src/features/students/components/StudentFilterSection.jsx`): Unified filter component
+    - Shared component supporting both admin and instructor views
+    - `showInstructorFilter` prop controls instructor filter visibility (admins only)
+    - Basic search (always visible): name/phone/national_id with RTL support
+    - Advanced filters toggle: Collapsible section with "סינון מתקדם" label
+    - Advanced controls: status (conditional), day of week, instructor (conditional), sort, reset
     - Smooth animations: `animate-in fade-in slide-in-from-top-2` on expand/collapse
-    - RTL-first design: All text right-aligned, flex-row-reverse buttons
-  - **Smart Fetching Strategy (2025-11)** - Fixes blank state bug with optimized server calls:
+  - **Smart Fetching Strategy (2025-11)** - Optimized server calls:
     - **Server-side filtering**: Status parameter sent to API (`status='active'` | `'inactive'` | `'all'`)
-    - **Only fetches needed data**: If admin filters to active, fetches only active; if admin filters to all, fetches all
-    - **Client-side filtering**: Remaining filters (search, day, instructor) applied client-side on fetched results
-    - **No spam**: Only one request per statusFilter change (not every keystroke/action)
-    - **Refetch trigger**: When statusFilter changes, `fetchStudents` is called via dependency in useEffect
-    - **Benefits**: 
-      - Reduces network traffic (doesn't fetch unnecessary data)
-      - No race conditions (one request at a time)
-      - Instant filtering for client-side filters (no server latency)
-      - No blank state issues (server returns correct subset, client filters it)
-  - **StudentManagementPage** (admin roster view):
-    - **Access control (2025-12)**: Admin/owner only - redirects non-admin users to `/my-students` automatically
-    - Uses `normalizeMembershipRole` and `isAdminRole` from endpoints utils to validate access
-    - Redirect happens before any data fetching to prevent unauthorized API calls
-    - Imports `StudentFilterSection` from `@/features/students/components/StudentFilterSection.jsx`
-    - Uses smart fetching with `status` parameter in fetchStudents
-    - Client-side filtering with 6 filter types: status, search, day, instructor, mode, sort
-    - Dependency on `statusFilter` in useEffect ensures refetch when status changes
-    - `displayedStudents` uses `filteredStudents` directly (no additional client-side filtering)
-    - `showInstructorFilter={true}` (default) displays full instructor filter for admins
-  - **MyStudentsPage** (instructor roster view):
-    - Imports same `StudentFilterSection` component
-    - Uses smart fetching with conditional `status` parameter (respects `canViewInactive` setting)
-    - Client-side filtering with 4 filter types: status (if canViewInactive), search, day, sort
-    - `showInstructorFilter={false}` hides instructor filter (instructor sees only their students)
-    - Respects `instructors_can_view_inactive_students` setting to hide status filter option
-  - **Rules preserved from original implementations**:
-    - Status filter: 'active' (is_active !== false) / 'inactive' (is_active === false) / 'all' (both)
-    - Day filter: Searches student.schedule array for matching day_of_week
-    - Instructor filter: Exact match on assigned_instructor_id, 'mine' mode for instructors
-    - Search: Case-insensitive substring on name/phone/national_id
-    - Sort: By schedule (day+time) or by name via getStudentComparator
-    - Filter state persistence: Via filter-state.js utility (survives page refreshes)
+    - **Only fetches needed data**: Admin filters control server query, reducing unnecessary data transfer
+    - **Client-side filtering**: Search, day, instructor (admin), tags applied client-side
+    - **No spam**: Only one request per statusFilter change
+    - **Refetch trigger**: When statusFilter changes, `fetchStudents` called via useEffect dependency
+    - **Benefits**: Reduces network traffic, no race conditions, instant client-side filtering
+  - **Unified API Endpoint** (`/api/students-list`):
+    - **Single endpoint replaces** `/api/students` and `/api/my-students` (eliminated 801 lines of duplicate code)
+    - **Full CRUD operations**: GET (all users), POST (admin only), PUT (admin only)
+    - **GET handler**:
+      - Server-side role-based filtering: non-admin users automatically filtered to assigned students only
+      - Admins can optionally filter by instructor via `assigned_instructor_id` query parameter
+      - Status filter (`active`/`inactive`/`all`) supported for all users
+    - **POST handler** (admin/owner only):
+      - Creates new student with full validation via `buildStudentPayload()`
+      - National ID uniqueness check via `findStudentByNationalId()`
+      - Metadata tracking: `created_by`, `created_at`, `created_role`
+      - Audit logging: `AUDIT_ACTIONS.STUDENT_CREATED`
+    - **PUT handler** (admin/owner only):
+      - Updates existing student with partial updates via `buildStudentUpdates()`
+      - National ID conflict detection (excludes current student)
+      - Changed fields detection for audit log
+      - Metadata preservation and update: `updated_by`, `updated_at`, `updated_role`
+      - Audit logging: `AUDIT_ACTIONS.STUDENT_UPDATED` with `changed_fields` detail
+    - **Validation**: Uses shared helpers from `api/_shared/student-validation.js`
+      - `coerceDayOfWeek`, `coerceSessionTime`, `validateIsraeliPhone`, `coerceNationalId`, `coerceTags`, `validateAssignedInstructor`
+    - **Permission model**:
+      - GET: All authenticated org members (non-admin filtered by `assigned_instructor_id`)
+      - POST/PUT: Admin/owner only (403 Forbidden for non-admin)
+    - **Benefits**: No code duplication, consistent caching, simpler maintenance, complete feature parity with original endpoints
+  - **Routing**:
+    - Primary route: `/students-list` → `StudentsPage` (role-based rendering)
+    - Legacy redirects: `/admin/students` → `/students-list`, `/my-students` → `/students-list`
+    - Pending reports: `/pending-reports` (accessible to all users)
+    - Legacy redirect: `/admin/pending-reports` → `/pending-reports`
+  - **Migration from separate pages**:
+    - Replaced `StudentManagementPage.jsx` (755 lines) and `MyStudentsPage.jsx` (442 lines)
+    - Replaced two API endpoints with single unified endpoint
+    - Eliminated code duplication while maintaining all features from both pages
+    - Filter state preserved separately for admin/instructor modes
+    - Automatic redirects ensure existing bookmarks/links continue working
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.

@@ -210,7 +210,6 @@ export function useStudents(options = {}) {
     orgId,
     session,
     resetOnDisable = true,
-    path = 'students',
     extraParams = {},
   } = options;
 
@@ -218,7 +217,7 @@ export function useStudents(options = {}) {
 
   const { data, loading, error, refetch } = useOrgDataResource({
     resource: 'students',
-    path,
+    path: 'students-list',
     enabled,
     orgId,
     session,

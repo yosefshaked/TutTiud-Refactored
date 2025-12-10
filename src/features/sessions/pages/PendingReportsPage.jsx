@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrg } from '@/org/OrgContext.jsx';
-import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { fetchLooseSessions, rejectLooseSession } from '@/features/sessions/api/loose-sessions.js';
 import { Checkbox } from '@/components/ui/checkbox';
 import ResolvePendingReportDialog from '../components/ResolvePendingReportDialog.jsx';
@@ -45,7 +44,6 @@ function getReasonLabel(reason, reasonOther) {
 
 export default function PendingReportsPage() {
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
-  const { loading: supabaseLoading } = useSupabase();
   const [state, setState] = useState(REQUEST_STATE.idle);
   const [error, setError] = useState('');
   const [reports, setReports] = useState([]);
@@ -336,11 +334,6 @@ export default function PendingReportsPage() {
     );
   }
 
-  // Redirect non-admin users (after hooks are defined)
-  if (!supabaseLoading && !isAdminMember) {
-    return <Navigate to="/my-students" replace />;
-  }
-
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-7xl" dir="rtl">
       <Card>
@@ -376,12 +369,16 @@ export default function PendingReportsPage() {
                   <Button size="sm" variant="outline" onClick={handleClearSelection}>
                     נקה בחירה
                   </Button>
-                  <Button size="sm" onClick={handleBulkResolve}>
-                    שיוך מרובה
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={handleBulkReject}>
-                    דחה מרובה
-                  </Button>
+                  {isAdminMember && (
+                    <>
+                      <Button size="sm" onClick={handleBulkResolve}>
+                        שיוך מרובה
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={handleBulkReject}>
+                        דחה מרובה
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -525,32 +522,47 @@ export default function PendingReportsPage() {
                         </div>
 
                         <div className="flex flex-row sm:flex-col gap-2 sm:shrink-0">
-                          <Button
-                            onClick={() => handleResolve(report)}
-                            className="gap-2 flex-1 sm:flex-none"
-                            size="sm"
-                          >
-                            <UserCheck className="h-4 w-4" />
-                            שיוך קיים
-                          </Button>
-                          <Button
-                            onClick={() => handleResolve(report)}
-                            variant="outline"
-                            className="gap-2 flex-1 sm:flex-none"
-                            size="sm"
-                          >
-                            <UserPlus className="h-4 w-4" />
-                            יצירה ושיוך
-                          </Button>
-                          <Button
-                            onClick={() => handleReject(report)}
-                            variant="destructive"
-                            className="gap-2 flex-1 sm:flex-none"
-                            size="sm"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            דחה
-                          </Button>
+                          {isAdminMember ? (
+                            <>
+                              <Button
+                                onClick={() => handleResolve(report)}
+                                className="gap-2 flex-1 sm:flex-none"
+                                size="sm"
+                              >
+                                <UserCheck className="h-4 w-4" />
+                                שיוך קיים
+                              </Button>
+                              <Button
+                                onClick={() => handleResolve(report)}
+                                variant="outline"
+                                className="gap-2 flex-1 sm:flex-none"
+                                size="sm"
+                              >
+                                <UserPlus className="h-4 w-4" />
+                                יצירה ושיוך
+                              </Button>
+                              <Button
+                                onClick={() => handleReject(report)}
+                                variant="destructive"
+                                className="gap-2 flex-1 sm:flex-none"
+                                size="sm"
+                              >
+                                <XCircle className="h-4 w-4" />
+                                דחה
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              disabled
+                              variant="outline"
+                              className="gap-2 flex-1 sm:flex-none"
+                              size="sm"
+                              title="רק מנהלים יכולים לטפל בדיווחים"
+                            >
+                              <AlertCircle className="h-4 w-4" />
+                              לא זמין
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>

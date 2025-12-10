@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED: This component is kept for reference during testing.
+ * Use StudentsPage.jsx instead for unified admin/instructor student management.
+ * Will be removed after testing phase is complete.
+ */
+
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Loader2, Users, User, FileWarning, AlertCircle } from "lucide-react"
@@ -173,6 +179,19 @@ export default function MyStudentsPage() {
 
     void fetchPendingReportsCount()
   }, [canFetch, fetchPendingReportsCount])
+
+  // Listen for session creation events to refetch pending reports count
+  useEffect(() => {
+    const handleSessionCreated = () => {
+      void fetchPendingReportsCount()
+    }
+    
+    window.addEventListener('session-created', handleSessionCreated)
+    
+    return () => {
+      window.removeEventListener('session-created', handleSessionCreated)
+    }
+  }, [fetchPendingReportsCount])
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
