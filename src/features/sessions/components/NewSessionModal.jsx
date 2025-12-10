@@ -510,7 +510,7 @@ export default function NewSessionModal({
     }
   }, []);
 
-  const handleSubmit = async ({ studentId, date, time, serviceContext, answers, unassignedDetails }) => {
+  const handleSubmit = async ({ studentId, date, time, serviceContext, answers, unassignedDetails, instructorId }) => {
     setSubmitState(REQUEST_STATE.loading);
     setSubmitError('');
 
@@ -523,6 +523,7 @@ export default function NewSessionModal({
         content: answers,
         org_id: activeOrgId,
         ...(unassignedDetails ? { unassigned_details: unassignedDetails } : {}),
+        ...(instructorId ? { instructor_id: instructorId } : {}),
       };
       const record = await authenticatedFetch('sessions', {
         method: 'POST',
