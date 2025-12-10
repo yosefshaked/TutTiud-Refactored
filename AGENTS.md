@@ -148,6 +148,14 @@
     - Regular session form: no time input required (field is hidden when not in loose mode)
     - Time field only renders when `looseMode === true` with `required` attribute
     - Backend validation: `if (looseMode && !sessionTime.trim()) return;` blocks submission without time for loose reports
+    - **Admin instructor selection (2025-12)**: When admin has `canFilterByInstructor` permission, loose report form shows instructor selector with strict permission rules:
+      - **Non-instructor admins**: REQUIRED field - must specify which instructor is submitting (cannot submit in their own name)
+      - **Instructor admins**: OPTIONAL field - can submit as themselves OR on behalf of other instructors
+      - **Member instructors**: No selector shown - can only submit in their own name
+      - Frontend validates selection before submission; backend enforces permission boundaries
+      - Backend returns `admin_must_specify_instructor` if non-instructor admin tries to submit without selecting an instructor
+      - Backend returns `members_cannot_specify_instructor` if non-admin member tries to specify a different instructor
+      - Helps with data attribution while maintaining strict role-based access control
 - Legacy import UI: `StudentDetailPage.jsx` shows an "Import Legacy Reports" button for admin/owner users only. The button disables when a legacy import already exists unless `can_reupload_legacy_reports` is true. The modal (`src/features/students/components/LegacyImportModal.jsx`) walks through backup warning → structure choice → CSV mapping (dropdowns vs. custom labels, session date required) → confirmation with re-upload warning.
 - Legacy import backend: `/api/students/{id}/legacy-import` accepts JSON (`csv_text`, `structure_choice`, `session_date_column`, and either `column_mappings` or `custom_labels`), enforces admin/owner role + `can_reupload_legacy_reports`, deletes prior `is_legacy` rows for the student, and writes new `SessionRecords` with `is_legacy=true`.
 - Legacy importer normalizes session dates from `YYYY-MM-DD`, `DD/MM/YYYY`, `DD.MM.YYYY`, or Excel serial numbers before writing rows. Invalid dates return `invalid_session_date` with the 1-based row index.

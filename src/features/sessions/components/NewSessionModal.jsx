@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Loader2, Calendar, CalendarCheck, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
@@ -218,6 +219,7 @@ export default function NewSessionModal({
   onCreated,
 }) {
   const { loading: supabaseLoading } = useSupabase();
+  const { user } = useAuth();
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
   const [studentsState, setStudentsState] = useState(REQUEST_STATE.idle);
   const [studentsError, setStudentsError] = useState('');
@@ -244,6 +246,14 @@ export default function NewSessionModal({
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const canAdmin = isAdminRole(membershipRole);
+  const userId = user?.id || null;
+  
+  // Check if the logged-in user is an instructor
+  const userIsInstructor = useMemo(() => {
+    if (!userId || !instructors || instructors.length === 0) return false;
+    return instructors.some(inst => inst.id === userId);
+  }, [userId, instructors]);
+  
   const canFetchStudents = useMemo(() => {
     return (
       open &&
@@ -649,6 +659,7 @@ export default function NewSessionModal({
             services={services}
             instructors={instructors}
             canFilterByInstructor={isAdminRole(membershipRole)}
+            userIsInstructor={userIsInstructor}
             studentScope={studentScope}
             onScopeChange={(next) => setStudentScope(next)}
             statusFilter={statusFilter}

@@ -162,6 +162,12 @@ export function validateSessionWrite(body) {
 
   const isLoose = !hasStudentId;
 
+  // Admin can optionally specify which instructor is submitting the loose report
+  const instructorIdRaw = normalizeString(body?.instructor_id || body?.instructorId);
+  if (instructorIdRaw && !isUUID(instructorIdRaw)) {
+    return { error: 'invalid_instructor_id' };
+  }
+
   const contentSource = resolveContentCandidate(body);
   const contentResult = coerceSessionContent(contentSource);
   if (contentResult.error) return { error: contentResult.error };
@@ -210,6 +216,7 @@ export function validateSessionWrite(body) {
     hasExplicitService: hasServiceField,
     time: timeResult.value,
     unassignedDetails,
+    instructorId: instructorIdRaw || null,
   };
 }
 

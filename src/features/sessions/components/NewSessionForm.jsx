@@ -19,6 +19,7 @@ export default function NewSessionForm({
   services = [],
   instructors = [],
   canFilterByInstructor = false,
+  userIsInstructor = false, // Whether the logged-in user is an instructor
   studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
   onScopeChange,
   statusFilter = 'active',
@@ -52,6 +53,7 @@ export default function NewSessionForm({
   const [unassignedName, setUnassignedName] = useState('');
   const [unassignedReason, setUnassignedReason] = useState('');
   const [unassignedReasonOther, setUnassignedReasonOther] = useState('');
+  const [looseInstructorId, setLooseInstructorId] = useState(''); // For admin selecting which instructor submits loose report
   const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
   const [activeQuestionKey, setActiveQuestionKey] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
@@ -245,6 +247,10 @@ export default function NewSessionForm({
 
     if (looseMode && !unassignedName.trim()) return;
     if (looseMode && !sessionTime.trim()) return;
+    // Non-instructor admins must specify which instructor is submitting
+    if (looseMode && canFilterByInstructor && !userIsInstructor && !looseInstructorId) {
+      return;
+    }
 
     const trimmedService = serviceContext.trim();
     const answerEntries = Object.entries(answers)
@@ -267,6 +273,7 @@ export default function NewSessionForm({
       time: looseMode ? sessionTime : sessionTime || null,
       serviceContext: trimmedService || null,
       answers: Object.fromEntries(answerEntries),
+      instructorId: looseMode && looseInstructorId ? looseInstructorId : undefined,
       unassignedDetails: looseMode
         ? {
             name: unassignedName.trim(),
@@ -307,6 +314,7 @@ export default function NewSessionForm({
     setUnassignedName('');
     setUnassignedReason('');
     setUnassignedReasonOther('');
+    setLooseInstructorId('');
     
     // Preserve service context when keeping same student
     if (!keepStudent) {
@@ -338,7 +346,7 @@ export default function NewSessionForm({
       setIsFormValid(nextIsValid);
     }
     onFormValidityChange?.(nextIsValid);
-  }, [selectedStudentId, sessionDate, sessionTime, serviceContext, looseMode, unassignedName, unassignedReason, unassignedReasonOther, answers, questions, onFormValidityChange, isFormValid]);
+  }, [selectedStudentId, sessionDate, sessionTime, serviceContext, looseMode, unassignedName, unassignedReason, unassignedReasonOther, looseInstructorId, answers, questions, onFormValidityChange, isFormValid]);
 
   return (
     <form
@@ -545,48 +553,80 @@ export default function NewSessionForm({
         ) : null}
 
         {looseMode && (
-          <div className="grid gap-md sm:grid-cols-2">
-            <div className="space-y-sm">
-              <Label htmlFor="unassigned-name" className="block text-right">שם התלמיד *</Label>
-              <Input
-                id="unassigned-name"
-                value={unassignedName}
-                onChange={(e) => setUnassignedName(e.target.value)}
-                required={looseMode}
-                disabled={isSubmitting}
-                placeholder="הקלידו שם"
-              />
-            </div>
-            <div className="space-y-sm">
-              <Label htmlFor="unassigned-reason" className="block text-right">סיבת הדיווח *</Label>
-              <Select
-                value={unassignedReason}
-                onValueChange={setUnassignedReason}
-                onOpenChange={onSelectOpenChange}
-                disabled={isSubmitting}
-                required={looseMode}
-              >
-                <SelectTrigger id="unassigned-reason" className="w-full">
-                  <SelectValue placeholder="בחרו סיבה" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="substitute">מחליף זמני</SelectItem>
-                  <SelectItem value="new_student">תלמיד חדש</SelectItem>
-                  <SelectItem value="other">אחר</SelectItem>
-                </SelectContent>
-              </Select>
-              {unassignedReason === 'other' ? (
+          <div className="space-y-md">
+            <div className="grid gap-md sm:grid-cols-2">
+              <div className="space-y-sm">
+                <Label htmlFor="unassigned-name" className="block text-right">שם התלמיד *</Label>
                 <Input
-                  id="unassigned-reason-other"
-                  className="mt-2"
-                  placeholder="פרטו את הסיבה"
-                  value={unassignedReasonOther}
-                  onChange={(e) => setUnassignedReasonOther(e.target.value)}
+                  id="unassigned-name"
+                  value={unassignedName}
+                  onChange={(e) => setUnassignedName(e.target.value)}
                   required={looseMode}
                   disabled={isSubmitting}
+                  placeholder="הקלידו שם"
                 />
-              ) : null}
+              </div>
+              <div className="space-y-sm">
+                <Label htmlFor="unassigned-reason" className="block text-right">סיבת הדיווח *</Label>
+                <Select
+                  value={unassignedReason}
+                  onValueChange={setUnassignedReason}
+                  onOpenChange={onSelectOpenChange}
+                  disabled={isSubmitting}
+                  required={looseMode}
+                >
+                  <SelectTrigger id="unassigned-reason" className="w-full">
+                    <SelectValue placeholder="בחרו סיבה" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="substitute">מחליף זמני</SelectItem>
+                    <SelectItem value="new_student">תלמיד חדש</SelectItem>
+                    <SelectItem value="other">אחר</SelectItem>
+                  </SelectContent>
+                </Select>
+                {unassignedReason === 'other' ? (
+                  <Input
+                    id="unassigned-reason-other"
+                    className="mt-2"
+                    placeholder="פרטו את הסיבה"
+                    value={unassignedReasonOther}
+                    onChange={(e) => setUnassignedReasonOther(e.target.value)}
+                    required={looseMode}
+                    disabled={isSubmitting}
+                  />
+                ) : null}
+              </div>
             </div>
+            {canFilterByInstructor && instructors.length > 0 && (
+              <div className="space-y-sm">
+                <Label htmlFor="loose-instructor" className="block text-right">
+                  מדריך מגיש {!userIsInstructor && '*'}
+                </Label>
+                <Select
+                  value={looseInstructorId}
+                  onValueChange={setLooseInstructorId}
+                  onOpenChange={onSelectOpenChange}
+                  disabled={isSubmitting}
+                  required={!userIsInstructor}
+                >
+                  <SelectTrigger id="loose-instructor" className="w-full">
+                    <SelectValue placeholder={userIsInstructor ? "בחרו מדריך (אופציונלי)" : "בחרו מדריך *"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {instructors.map((inst) => (
+                      <SelectItem key={inst.id} value={inst.id}>
+                        {inst.name || inst.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-neutral-500 text-right">
+                  {userIsInstructor 
+                    ? "ללא בחירה, הדיווח יוצמד אליך כמגיש"
+                    : "נדרש לבחור מדריך - אין לך הרשאות מדריך"}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

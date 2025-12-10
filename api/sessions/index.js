@@ -144,11 +144,47 @@ export default async function (context, req) {
   }
 
   // Resolve which instructor id should be written on the session.
-  // For loose reports: attribute to the acting user when possible to avoid FK errors.
-  // For members: we've already verified assignment above (or allowed loose mode) so use that mapping.
+  // PERMISSION RULES:
+  // - Non-admin members: can only submit for their assigned students (verified above)
+  // - Admin members (instructors): can submit as themselves OR on behalf of other instructors (loose reports)
+  // - Admin non-instructors: MUST specify an instructor for loose reports (cannot submit in their own name)
   let sessionInstructorId = assignedInstructor;
   if (isLoose) {
-    sessionInstructorId = normalizedUserId;
+    // For loose reports, admin MUST specify which instructor is submitting
+    if (validation.instructorId) {
+      // Admin specified an instructor - verify they have admin permission
+      if (!isAdminRole(role)) {
+        return respond(context, 403, { message: 'members_cannot_specify_instructor' });
+      }
+      sessionInstructorId = validation.instructorId;
+    } else {
+      // No instructor specified - can only use logged-in user if they're an instructor
+      // Members always submit as themselves (already verified as instructor via student assignment)
+      // Admins can only submit as themselves if they're also an instructor
+      if (!isMemberRole(role)) {
+        // Admin without specified instructor - must be an instructor themselves
+        const adminInstructorCheck = await tenantClient
+          .from('Instructors')
+          .select('id, is_active')
+          .eq('id', normalizedUserId)
+          .maybeSingle();
+
+        if (adminInstructorCheck.error) {
+          context.log?.error?.('sessions failed to verify admin is instructor', { message: adminInstructorCheck.error.message });
+          return respond(context, 500, { message: 'failed_to_verify_instructor' });
+        }
+
+        if (!adminInstructorCheck.data) {
+          // Admin is not an instructor - cannot submit loose report without specifying instructor
+          return respond(context, 400, { message: 'admin_must_specify_instructor' });
+        }
+
+        sessionInstructorId = adminInstructorCheck.data.id;
+      } else {
+        // Member instructor submitting in their own name
+        sessionInstructorId = normalizedUserId;
+      }
+    }
   }
 
   if (!sessionInstructorId && !isMemberRole(role) && normalizedUserId) {
