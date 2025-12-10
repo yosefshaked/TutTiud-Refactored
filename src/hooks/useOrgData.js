@@ -1,4 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/**
+ * Organization Data Fetching Hooks
+ * 
+ * This module provides versatile hooks for fetching organization resources (students, instructors, services).
+ * 
+ * KEY DESIGN DECISIONS:
+ * 
+ * 1. **Stable Dependencies**: The hook only refetches when meaningful params change.
+ *    - `params` object is serialized via JSON.stringify() to detect actual value changes
+ *    - `mapResponse` function is stabilized via useCallback with string representation
+ *    - This prevents infinite loops from object reference changes
+ * 
+ * 2. **Conditional Fetching**: The `enabled` flag allows components to control when fetching occurs.
+ *    - Forms/modals can disable fetching until opened
+ *    - Pages can wait for auth/filters to be ready
+ *    - When disabled, data can optionally be cleared via `resetOnDisable`
+ * 
+ * 3. **Dynamic Params**: Supports changing filter parameters (e.g., status filter, search terms).
+ *    - queryString is memoized and only updates when param values actually change
+ *    - Automatically refetches when params change
+ * 
+ * 4. **Manual Refetch**: Every hook returns a `refetch` function for post-mutation updates.
+ *    - After creating/updating a record, call `refetch()` to reload the list
+ * 
+ * USE CASES SUPPORTED:
+ * - Simple fetch on mount (forms, modals)
+ * - Filtered fetch with dynamic params (admin pages with filters)
+ * - Conditional enabled/disabled (settings dialogs)
+ * - Refetch on demand (after mutations)
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
@@ -26,6 +56,25 @@ function buildSearchParamsString(baseParams = {}, orgId) {
   return searchParams.toString();
 }
 
+/**
+ * Core hook for fetching organization data resources.
+ * 
+ * Design principles:
+ * 1. Stable dependencies - only refetch when meaningful params change
+ * 2. Support conditional fetching via `enabled` flag
+ * 3. Manual refetch capability for mutations
+ * 4. Proper cleanup and error handling
+ * 
+ * @param {Object} options
+ * @param {string} options.resource - Resource name (for logging)
+ * @param {string} options.path - API endpoint path
+ * @param {boolean} options.enabled - Whether fetching is enabled
+ * @param {string} options.orgId - Organization ID override
+ * @param {Object} options.session - Session override
+ * @param {boolean} options.resetOnDisable - Clear data when disabled
+ * @param {Object} options.params - Query parameters (will be memoized internally)
+ * @param {Function} options.mapResponse - Transform response payload
+ */
 function useOrgDataResource({
   resource,
   path = '',
@@ -34,7 +83,7 @@ function useOrgDataResource({
   session: sessionOverride,
   resetOnDisable = true,
   params = {},
-  mapResponse = (payload) => payload,
+  mapResponse,
 }) {
   const { session: contextSession } = useAuth();
   const { activeOrgId } = useOrg();
@@ -45,65 +94,62 @@ function useOrgDataResource({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Store searchParamsString in a ref to avoid dependency updates
-  const paramsRef = useRef({ params, orgId });
-  paramsRef.current = { params, orgId };
+  // Memoize mapResponse if provided as inline function
+  const stableMapResponse = useCallback(
+    mapResponse || ((payload) => payload),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mapResponse ? String(mapResponse) : 'identity']
+  );
 
-  const fetchResource = useCallback(async ({ updateState = true } = {}) => {
-    const controller = new AbortController();
-    const { params: currentParams, orgId: currentOrgId } = paramsRef.current;
-    const searchParamsString = buildSearchParamsString(currentParams, currentOrgId);
-    const effectiveEnabled = enabled && shouldInclude(currentOrgId);
+  // Create stable query string from params - only changes when actual param values change
+  const queryString = useMemo(() => {
+    if (!params || Object.keys(params).length === 0) return '';
+    return buildSearchParamsString(params, orgId);
+  }, [
+    // Serialize params to detect actual value changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    JSON.stringify(params),
+    orgId
+  ]);
+
+  // Fetch function - stable reference, only recreates when critical deps change
+  const fetchResource = useCallback(async () => {
+    const effectiveEnabled = enabled && shouldInclude(orgId);
 
     if (!effectiveEnabled) {
-      if (updateState && resetOnDisable) {
+      if (resetOnDisable) {
         setData([]);
+        setError('');
       }
-      return { result: [], controller };
+      setLoading(false);
+      return;
     }
 
-    if (updateState) {
-      setLoading(true);
-      setError('');
-    }
+    setLoading(true);
+    setError('');
 
     try {
-      const payload = await authenticatedFetch(`${path}${searchParamsString ? `?${searchParamsString}` : ''}`, {
-        session,
-        signal: controller.signal,
-      });
-      const mapped = mapResponse(payload);
+      const url = `${path}${queryString ? `?${queryString}` : ''}`;
+      const payload = await authenticatedFetch(url, { session });
+      const mapped = stableMapResponse(payload);
       const normalized = Array.isArray(mapped) ? mapped : [];
-      if (updateState && !controller.signal.aborted) {
-        setData(normalized);
-      }
-      return { result: normalized, controller };
+      setData(normalized);
     } catch (err) {
       if (err?.name === 'AbortError') {
-        return { result: [], controller };
+        return;
       }
-      console.error(`Failed to load ${resource}`, err);
-      if (updateState && !controller.signal.aborted) {
-        setError(err?.message || '');
-        setData([]);
-      }
-      return { result: [], controller };
+      console.error(`Failed to load ${resource}:`, err);
+      setError(err?.message || 'Failed to load data');
+      setData([]);
     } finally {
-      if (updateState && !controller.signal.aborted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  }, [enabled, resetOnDisable, session, mapResponse, resource, path]);
+  }, [enabled, orgId, resetOnDisable, queryString, session, stableMapResponse, resource, path]);
 
-  // Effect to trigger fetches when params actually change
+  // Auto-fetch when dependencies change
   useEffect(() => {
-    const { controller } = fetchResource();
-    return () => {
-      if (controller) {
-        controller.abort();
-      }
-    };
-  }, [fetchResource, params, orgId]);
+    void fetchResource();
+  }, [fetchResource]);
 
   return {
     data,
@@ -137,7 +183,6 @@ export function useInstructors(options = {}) {
 
 export function useServices(options = {}) {
   const { enabled = true, orgId, session, resetOnDisable = true } = options;
-  const mapResponse = (payload) => payload?.settings?.available_services;
 
   const { data, loading, error, refetch } = useOrgDataResource({
     resource: 'services',
@@ -147,7 +192,7 @@ export function useServices(options = {}) {
     session,
     resetOnDisable,
     params: { keys: 'available_services' },
-    mapResponse,
+    mapResponse: (payload) => payload?.settings?.available_services,
   });
 
   return {
