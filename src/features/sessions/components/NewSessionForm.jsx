@@ -594,10 +594,10 @@ export default function NewSessionForm({
                   )}
                 </div>
                 {nameSuggestions && nameSuggestions.length > 0 && (
-                  <div className="rounded-md border border-primary/20 bg-primary/5 p-2 space-y-1">
+                  <div className="rounded-md border border-primary/20 bg-primary/5 p-2 space-y-2">
                     <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
                       <UserCheck className="h-3 w-3" />
-                      <span>נמצאו תלמידים קיימים:</span>
+                      <span>נמצאו תלמידים קיימים - לחצו כדי לעבור לדיווח עבור התלמיד:</span>
                     </div>
                     <div className="space-y-1">
                       {nameSuggestions.map((student) => (
@@ -608,6 +608,7 @@ export default function NewSessionForm({
                           className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-primary/10 transition-colors text-right"
                           disabled={isSubmitting}
                         >
+                          <span className="font-medium">{student.name}</span>
                           <div className="flex items-center gap-2">
                             {student.is_active ? (
                               <span className="text-xs text-success">פעיל</span>
@@ -615,9 +616,11 @@ export default function NewSessionForm({
                               <span className="text-xs text-muted-foreground">לא פעיל</span>
                             )}
                           </div>
-                          <span className="font-medium">{student.name}</span>
                         </button>
                       ))}
+                    </div>
+                    <div className="px-2 py-1 text-xs text-muted-foreground text-right">
+                      התשובות בטופס ישמרו
                     </div>
                   </div>
                 )}
