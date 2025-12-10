@@ -3,6 +3,7 @@ import { resolveBearerAuthorization } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
   ensureMembership,
+  isAdminRole,
   normalizeString,
   readEnv,
   respond,
