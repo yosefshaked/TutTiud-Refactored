@@ -248,12 +248,6 @@ export default function NewSessionModal({
   const canAdmin = isAdminRole(membershipRole);
   const userId = user?.id || null;
   
-  // Check if the logged-in user is an instructor
-  const userIsInstructor = useMemo(() => {
-    if (!userId || !instructors || instructors.length === 0) return false;
-    return instructors.some(inst => inst.id === userId);
-  }, [userId, instructors]);
-  
   const canFetchStudents = useMemo(() => {
     return (
       open &&
@@ -273,6 +267,12 @@ export default function NewSessionModal({
     enabled: open && canFetchStudents,
     orgId: activeOrgId,
   });
+
+  // Check if the logged-in user is an instructor (must be after instructors is defined)
+  const userIsInstructor = useMemo(() => {
+    if (!userId || !instructors || instructors.length === 0) return false;
+    return instructors.some(inst => inst.id === userId);
+  }, [userId, instructors]);
 
   useEffect(() => {
     if (!open) {
