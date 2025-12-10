@@ -156,6 +156,13 @@
       - Backend returns `admin_must_specify_instructor` if non-instructor admin tries to submit without selecting an instructor
       - Backend returns `members_cannot_specify_instructor` if non-admin member tries to specify a different instructor
       - Helps with data attribution while maintaining strict role-based access control
+    - **Duplicate Detection (2025-12)**: Name input includes real-time duplicate checker:
+      - Hook: `useLooseReportNameSuggestions(unassignedName, looseMode)` with 300ms debounce
+      - API: `/api/students-search?query=...` with role-based filtering (members see only assigned students, admins see all)
+      - UI: Shows matching students below name input with status indicators (active/inactive)
+      - Action: Click suggestion switches from loose mode to regular mode while preserving form data (service, time, answers, date)
+      - Permission: Members only see students assigned to them; admins see all matches
+      - UX: Helps prevent duplicate submissions by suggesting existing students as you type
 - Legacy import UI: `StudentDetailPage.jsx` shows an "Import Legacy Reports" button for admin/owner users only. The button disables when a legacy import already exists unless `can_reupload_legacy_reports` is true. The modal (`src/features/students/components/LegacyImportModal.jsx`) walks through backup warning → structure choice → CSV mapping (dropdowns vs. custom labels, session date required) → confirmation with re-upload warning.
 - Legacy import backend: `/api/students/{id}/legacy-import` accepts JSON (`csv_text`, `structure_choice`, `session_date_column`, and either `column_mappings` or `custom_labels`), enforces admin/owner role + `can_reupload_legacy_reports`, deletes prior `is_legacy` rows for the student, and writes new `SessionRecords` with `is_legacy=true`.
 - Legacy importer normalizes session dates from `YYYY-MM-DD`, `DD/MM/YYYY`, `DD.MM.YYYY`, or Excel serial numbers before writing rows. Invalid dates return `invalid_session_date` with the 1-based row index.

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Loader2, ListChecks, RotateCcw, ChevronDown } from 'lucide-react';
+import { Loader2, ListChecks, RotateCcw, ChevronDown, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { sortStudentsBySchedule } from '@/features/students/utils/sorting.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
+import { useLooseReportNameSuggestions } from '@/features/sessions/hooks/useLooseReportNameSuggestions.js';
 
 export default function NewSessionForm({
   students = [],
@@ -58,6 +59,12 @@ export default function NewSessionForm({
   const [activeQuestionKey, setActiveQuestionKey] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
   const formRef = useRef(null);
+  
+  // Loose report name duplicate checker
+  const { suggestions: nameSuggestions, loading: loadingNameSuggestions } = useLooseReportNameSuggestions(
+    unassignedName,
+    looseMode // Only enabled when in loose mode
+  );
   
   // Use controlled state from parent, or local state as fallback
   const showAdvancedFilters = externalShowAdvancedFilters ?? false;
@@ -231,6 +238,19 @@ export default function NewSessionForm({
     const value = event.target.value;
     updateAnswer(questionKey, value);
   }, [updateAnswer]);
+
+  // Handler to switch from loose mode to regular mode when selecting an existing student
+  const handleSelectExistingStudent = useCallback((student) => {
+    // Switch to regular mode
+    setLooseMode(false);
+    // Select the student
+    setSelectedStudentId(student.id);
+    // Clear loose mode fields
+    setUnassignedName('');
+    setUnassignedReason('');
+    setUnassignedReasonOther('');
+    // Keep service, time, answers, and date - they're preserved automatically
+  }, []);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -558,14 +578,49 @@ export default function NewSessionForm({
             <div className="grid gap-md sm:grid-cols-2">
               <div className="space-y-sm">
                 <Label htmlFor="unassigned-name" className="block text-right">שם התלמיד *</Label>
-                <Input
-                  id="unassigned-name"
-                  value={unassignedName}
-                  onChange={(e) => setUnassignedName(e.target.value)}
-                  required={looseMode}
-                  disabled={isSubmitting}
-                  placeholder="הקלידו שם"
-                />
+                <div className="relative">
+                  <Input
+                    id="unassigned-name"
+                    value={unassignedName}
+                    onChange={(e) => setUnassignedName(e.target.value)}
+                    required={looseMode}
+                    disabled={isSubmitting}
+                    placeholder="הקלידו שם"
+                  />
+                  {loadingNameSuggestions && (
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                {nameSuggestions && nameSuggestions.length > 0 && (
+                  <div className="rounded-md border border-primary/20 bg-primary/5 p-2 space-y-1">
+                    <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
+                      <UserCheck className="h-3 w-3" />
+                      <span>נמצאו תלמידים קיימים:</span>
+                    </div>
+                    <div className="space-y-1">
+                      {nameSuggestions.map((student) => (
+                        <button
+                          key={student.id}
+                          type="button"
+                          onClick={() => handleSelectExistingStudent(student)}
+                          className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-primary/10 transition-colors text-right"
+                          disabled={isSubmitting}
+                        >
+                          <div className="flex items-center gap-2">
+                            {student.is_active ? (
+                              <span className="text-xs text-success">פעיל</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">לא פעיל</span>
+                            )}
+                          </div>
+                          <span className="font-medium">{student.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="space-y-sm">
                 <Label htmlFor="unassigned-reason" className="block text-right">סיבת הדיווח *</Label>
