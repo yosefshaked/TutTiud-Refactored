@@ -1,12 +1,20 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter, Eye, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { fetchLooseSessions, rejectLooseSession } from '@/features/sessions/api/loose-sessions.js';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -60,6 +68,8 @@ export default function PendingReportsPage() {
   const [toDate, setToDate] = useState('');
   const [selectedReportIds, setSelectedReportIds] = useState(new Set());
   const [showFilters, setShowFilters] = useState(false);
+  const [reportViewOpen, setReportViewOpen] = useState(false);
+  const [reportToView, setReportToView] = useState(null);
 
   const activeOrgId = activeOrg?.id || null;
 
@@ -200,6 +210,11 @@ export default function PendingReportsPage() {
     } else {
       toast.warning(`${successCount} דיווחים נדחו בהצלחה, ${failCount} נכשלו.`);
     }
+  };
+
+  const handleViewReport = (report) => {
+    setReportToView(report);
+    setReportViewOpen(true);
   };
 
   const isLoading = state === REQUEST_STATE.loading;
@@ -557,48 +572,49 @@ export default function PendingReportsPage() {
                           </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 w-full sm:w-auto sm:shrink-0">
+                        <div className="flex justify-end">
                           {isAdminMember ? (
-                            <>
-                              <Button
-                                onClick={() => handleResolve(report)}
-                                className="gap-2 w-full sm:w-auto"
-                                size="sm"
-                              >
-                                <UserCheck className="h-4 w-4" />
-                                <span className="hidden sm:inline">שיוך קיים</span>
-                                <span className="sm:hidden">שיוך</span>
-                              </Button>
-                              <Button
-                                onClick={() => handleResolve(report)}
-                                variant="outline"
-                                className="gap-2 w-full sm:w-auto"
-                                size="sm"
-                              >
-                                <UserPlus className="h-4 w-4" />
-                                <span className="hidden sm:inline">יצירה ושיוך</span>
-                                <span className="sm:hidden">חדש</span>
-                              </Button>
-                              <Button
-                                onClick={() => handleReject(report)}
-                                variant="destructive"
-                                className="gap-2 w-full sm:w-auto"
-                                size="sm"
-                              >
-                                <XCircle className="h-4 w-4" />
-                                דחה
-                              </Button>
-                            </>
+                            <DropdownMenu dir="rtl">
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-full h-10 w-10 p-0"
+                                  title="אפשרויות"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => handleViewReport(report)} className="gap-2 cursor-pointer">
+                                  <Eye className="h-4 w-4" />
+                                  <span>צפייה בתוכן הדיווח</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleResolve(report)} className="gap-2 cursor-pointer">
+                                  <UserCheck className="h-4 w-4" />
+                                  <span>שיוך קיים</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleResolve(report)} className="gap-2 cursor-pointer">
+                                  <UserPlus className="h-4 w-4" />
+                                  <span>יצירה ושיוך</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleReject(report)} className="gap-2 cursor-pointer text-red-600 hover:text-red-700">
+                                  <XCircle className="h-4 w-4" />
+                                  <span>דחה</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           ) : (
                             <Button
                               disabled
                               variant="outline"
-                              className="gap-2 w-full sm:w-auto"
                               size="sm"
+                              className="rounded-full h-10 w-10 p-0"
                               title="רק מנהלים יכולים לטפל בדיווחים"
                             >
                               <AlertCircle className="h-4 w-4" />
-                              לא זמין
                             </Button>
                           )}
                         </div>
@@ -638,6 +654,57 @@ export default function PendingReportsPage() {
         isBulk={true}
       />
 
+      {/* Report Content Viewer Dialog */}
+      <Dialog open={reportViewOpen} onOpenChange={setReportViewOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>תוכן הדיווח</DialogTitle>
+          </DialogHeader>
+          {reportToView && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-neutral-50 p-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-neutral-900">שם התלמיד:</span>
+                    <span>{reportToView?.metadata?.unassigned_details?.name || 'לא צוין'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-neutral-900">מדריך:</span>
+                    <span>{reportToView?.Instructors?.name || reportToView?.Instructors?.email || 'לא ידוע'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-neutral-900">תאריך:</span>
+                    <span>{formatDate(reportToView?.date)}</span>
+                  </div>
+                  {reportToView?.metadata?.unassigned_details?.time && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-neutral-900">שעה:</span>
+                      <span>{formatTime(reportToView?.metadata?.unassigned_details?.time)}</span>
+                    </div>
+                  )}
+                  {reportToView?.service_context && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-neutral-900">שירות:</span>
+                      <span>{reportToView?.service_context}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-neutral-900">סיבה:</span>
+                    <span>{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="font-semibold text-neutral-900">תוכן הדיווח:</h3>
+                <div className="rounded-lg bg-neutral-50 p-4 whitespace-pre-wrap text-sm text-neutral-700 max-h-96 overflow-y-auto">
+                  {reportToView?.content || 'לא הוזן תוכן'}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <BulkResolvePendingReportsDialog
         open={bulkResolveDialogOpen}
         onClose={handleBulkResolveDialogClose}
