@@ -389,12 +389,12 @@ export default function PendingReportsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Select value={serviceFilter} onValueChange={setServiceFilter}>
+            <Select value={serviceFilter || 'all'} onValueChange={(val) => setServiceFilter(val === 'all' ? '' : val)}>
               <SelectTrigger>
                 <SelectValue placeholder="סינון לפי שירות" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">כל השירותים</SelectItem>
+                <SelectItem value="all">כל השירותים</SelectItem>
                 {serviceOptions.map((service) => (
                   <SelectItem key={service} value={service}>
                     {service}
@@ -402,12 +402,12 @@ export default function PendingReportsPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={reasonFilter} onValueChange={setReasonFilter}>
+            <Select value={reasonFilter || 'all'} onValueChange={(val) => setReasonFilter(val === 'all' ? '' : val)}>
               <SelectTrigger>
                 <SelectValue placeholder="סינון לפי סיבה" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">כל הסיבות</SelectItem>
+                <SelectItem value="all">כל הסיבות</SelectItem>
                 {reasonOptions.map((reason) => (
                   <SelectItem key={reason} value={reason}>
                     {getReasonLabel(reason)}
