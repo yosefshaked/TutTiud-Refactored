@@ -698,7 +698,11 @@ export default function PendingReportsPage() {
               <div className="space-y-2">
                 <h3 className="font-semibold text-neutral-900">תוכן הדיווח:</h3>
                 <div className="rounded-lg bg-neutral-50 p-4 whitespace-pre-wrap text-sm text-neutral-700 max-h-96 overflow-y-auto">
-                  {reportToView?.content || 'לא הוזן תוכן'}
+                  {typeof reportToView?.content === 'string'
+                    ? reportToView.content
+                    : typeof reportToView?.content === 'object' && reportToView.content
+                      ? JSON.stringify(reportToView.content, null, 2)
+                      : 'לא הוזן תוכן'}
                 </div>
               </div>
             </div>
