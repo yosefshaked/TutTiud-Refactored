@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle } from 'lucide-react';
+import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,6 +59,7 @@ export default function PendingReportsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [selectedReportIds, setSelectedReportIds] = useState(new Set());
+  const [showFilters, setShowFilters] = useState(false);
 
   const activeOrgId = activeOrg?.id || null;
 
@@ -228,11 +229,11 @@ export default function PendingReportsPage() {
       const reason = report?.metadata?.unassigned_details?.reason || '';
       const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
       const service = report?.service_context || '';
-      const createdBy = report?.metadata?.created_by || '';
+      const instructorName = report?.Instructors?.name || report?.Instructors?.email || '';
       const query = searchQuery.trim().toLowerCase();
 
       if (query) {
-        const haystack = `${name} ${reason} ${reasonOther} ${service} ${createdBy}`.toLowerCase();
+        const haystack = `${name} ${reason} ${reasonOther} ${service} ${instructorName}`.toLowerCase();
         if (!haystack.includes(query)) {
           return false;
         }
@@ -383,58 +384,95 @@ export default function PendingReportsPage() {
               )}
             </div>
           )}
-          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4" dir="rtl">
+          
+          {/* Search bar - always visible */}
+          <div className="mb-3">
             <Input
-              placeholder="חיפוש לפי שם/סיבה/שירות/יוצר"
+              placeholder="חיפוש לפי שם/סיבה/שירות/מדריך"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              dir="rtl"
             />
-            <Select value={serviceFilter || 'all'} onValueChange={(val) => setServiceFilter(val === 'all' ? '' : val)}>
-              <SelectTrigger>
-                <SelectValue placeholder="סינון לפי שירות" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">כל השירותים</SelectItem>
-                {serviceOptions.map((service) => (
-                  <SelectItem key={service} value={service}>
-                    {service}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={reasonFilter || 'all'} onValueChange={(val) => setReasonFilter(val === 'all' ? '' : val)}>
-              <SelectTrigger>
-                <SelectValue placeholder="סינון לפי סיבה" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">כל הסיבות</SelectItem>
-                {reasonOptions.map((reason) => (
-                  <SelectItem key={reason} value={reason}>
-                    {getReasonLabel(reason)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                placeholder="מתאריך"
-              />
-              <Input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                placeholder="עד תאריך"
-              />
-            </div>
-            {(searchQuery || serviceFilter || reasonFilter || fromDate || toDate) && (
-              <Button variant="outline" size="sm" className="w-full md:w-auto" onClick={handleResetFilters}>
-                איפוס סינונים
-              </Button>
-            )}
           </div>
+
+          {/* Filter toggle button */}
+          <div className="mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              <span>סינון מתקדם</span>
+              {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {(serviceFilter || reasonFilter || fromDate || toDate) && (
+                <Badge variant="secondary" className="mr-2">פעיל</Badge>
+              )}
+            </Button>
+          </div>
+
+          {/* Collapsible filter section */}
+          {showFilters && (
+            <div className="mb-4 space-y-3 animate-in fade-in slide-in-from-top-2" dir="rtl">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Select value={serviceFilter || 'all'} onValueChange={(val) => setServiceFilter(val === 'all' ? '' : val)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="סינון לפי שירות" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל השירותים</SelectItem>
+                    {serviceOptions.map((service) => (
+                      <SelectItem key={service} value={service}>
+                        {service}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={reasonFilter || 'all'} onValueChange={(val) => setReasonFilter(val === 'all' ? '' : val)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="סינון לפי סיבה" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל הסיבות</SelectItem>
+                    {reasonOptions.map((reason) => (
+                      <SelectItem key={reason} value={reason}>
+                        {getReasonLabel(reason)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-700">מתאריך</label>
+                  <Input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-700">עד תאריך</label>
+                  <Input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
+              {(serviceFilter || reasonFilter || fromDate || toDate) && (
+                <Button variant="outline" size="sm" className="w-full" onClick={handleResetFilters}>
+                  איפוס סינונים
+                </Button>
+              )}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-neutral-600">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -458,7 +496,7 @@ export default function PendingReportsPage() {
                 const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
                 const time = report?.metadata?.unassigned_details?.time || '';
                 const service = report?.service_context || '';
-                const createdBy = report?.metadata?.created_by || '';
+                const instructorName = report?.Instructors?.name || report?.Instructors?.email || 'לא ידוע';
 
                 const isSelected = selectedReportIds.has(report.id);
 
@@ -513,38 +551,38 @@ export default function PendingReportsPage() {
                             </div>
                           </div>
 
-                          {createdBy && (
-                            <p className="text-xs text-neutral-500">
-                              נוצר על ידי: {createdBy}
-                            </p>
-                          )}
+                          <p className="text-xs text-neutral-500">
+                            נוצר על ידי: {instructorName}
+                          </p>
                           </div>
                         </div>
 
-                        <div className="flex flex-row sm:flex-col gap-2 sm:shrink-0">
+                        <div className="flex flex-col gap-2 w-full sm:w-auto sm:shrink-0">
                           {isAdminMember ? (
                             <>
                               <Button
                                 onClick={() => handleResolve(report)}
-                                className="gap-2 flex-1 sm:flex-none"
+                                className="gap-2 w-full sm:w-auto"
                                 size="sm"
                               >
                                 <UserCheck className="h-4 w-4" />
-                                שיוך קיים
+                                <span className="hidden sm:inline">שיוך קיים</span>
+                                <span className="sm:hidden">שיוך</span>
                               </Button>
                               <Button
                                 onClick={() => handleResolve(report)}
                                 variant="outline"
-                                className="gap-2 flex-1 sm:flex-none"
+                                className="gap-2 w-full sm:w-auto"
                                 size="sm"
                               >
                                 <UserPlus className="h-4 w-4" />
-                                יצירה ושיוך
+                                <span className="hidden sm:inline">יצירה ושיוך</span>
+                                <span className="sm:hidden">חדש</span>
                               </Button>
                               <Button
                                 onClick={() => handleReject(report)}
                                 variant="destructive"
-                                className="gap-2 flex-1 sm:flex-none"
+                                className="gap-2 w-full sm:w-auto"
                                 size="sm"
                               >
                                 <XCircle className="h-4 w-4" />
@@ -555,7 +593,7 @@ export default function PendingReportsPage() {
                             <Button
                               disabled
                               variant="outline"
-                              className="gap-2 flex-1 sm:flex-none"
+                              className="gap-2 w-full sm:w-auto"
                               size="sm"
                               title="רק מנהלים יכולים לטפל בדיווחים"
                             >

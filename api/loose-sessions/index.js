@@ -95,7 +95,19 @@ export default async function (context, req) {
   if (method === 'GET') {
     let query = tenantClient
       .from('SessionRecords')
-      .select('id, date, content, service_context, instructor_id, metadata, created_at, updated_at, student_id, deleted')
+      .select(`
+        id, 
+        date, 
+        content, 
+        service_context, 
+        instructor_id, 
+        metadata, 
+        created_at, 
+        updated_at, 
+        student_id, 
+        deleted,
+        Instructors!SessionRecords_instructor_id_fkey(name, email)
+      `)
       .is('student_id', null)
       .eq('deleted', false)
       .order('date', { ascending: true }); // Oldest session dates first
@@ -161,8 +173,9 @@ export default async function (context, req) {
       return respond(context, 400, { message: 'missing_reject_reason' });
     }
 
+    // Keep all metadata intact, just add rejection info
     const rejectionMetadata = {
-      ...cleanedMetadata,
+      ...sessionRow.metadata,
       rejection: {
         reason: rejectReason,
         rejected_by: userId,
@@ -170,9 +183,10 @@ export default async function (context, req) {
       },
     };
 
+    const now = new Date().toISOString();
     const { error: deleteError } = await tenantClient
       .from('SessionRecords')
-      .update({ deleted: true, metadata: rejectionMetadata })
+      .update({ deleted: true, deleted_at: now, metadata: rejectionMetadata })
       .eq('id', sessionId);
 
     if (deleteError) {
