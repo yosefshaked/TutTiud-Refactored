@@ -628,7 +628,7 @@ export default function PendingReportsPage() {
                             </Badge>
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               className="h-6 text-xs"
                               onClick={() => handleSelectAllWithSameName(name)}
                             >
