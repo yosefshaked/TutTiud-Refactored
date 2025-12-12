@@ -758,119 +758,45 @@ export default function PendingReportsPage() {
           </DialogHeader>
           {reportToView && (
             <div className="space-y-6 max-h-[70vh] overflow-y-auto">
-              {/* 
-                DESIGN OPTION 1: Card-based with Color Accents
-                - Each metadata field in its own card
-                - Color-coded left border
-                - More spacing, modern feel
-              
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-neutral-900 mb-2">מידע כללי</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-lg border-r-4 border-r-primary bg-white p-3 shadow-sm border border-neutral-200">
-                    <div className="text-xs text-neutral-500 mb-1">שם התלמיד</div>
-                    <div className="text-lg font-bold text-neutral-900">{reportToView?.metadata?.unassigned_details?.name || 'לא צוין'}</div>
-                  </div>
-                  <div className="rounded-lg border-r-4 border-r-blue-500 bg-white p-3 shadow-sm border border-neutral-200">
-                    <div className="text-xs text-neutral-500 mb-1">מדריך</div>
-                    <div className="text-lg font-bold text-neutral-900">{reportToView?.Instructors?.name || reportToView?.Instructors?.email || 'לא ידוע'}</div>
-                  </div>
-                  <div className="rounded-lg border-r-4 border-r-green-500 bg-white p-3 shadow-sm border border-neutral-200">
-                    <div className="text-xs text-neutral-500 mb-1">תאריך</div>
-                    <div className="text-lg font-bold text-neutral-900">{formatDate(reportToView?.date)}</div>
-                  </div>
-                  {reportToView?.metadata?.unassigned_details?.time && (
-                    <div className="rounded-lg border-r-4 border-r-amber-500 bg-white p-3 shadow-sm border border-neutral-200">
-                      <div className="text-xs text-neutral-500 mb-1">שעה</div>
-                      <div className="text-lg font-bold text-neutral-900">{formatTime(reportToView?.metadata?.unassigned_details?.time)}</div>
-                    </div>
-                  )}
-                  {reportToView?.service_context && (
-                    <div className="rounded-lg border-r-4 border-r-purple-500 bg-white p-3 shadow-sm border border-neutral-200">
-                      <div className="text-xs text-neutral-500 mb-1">שירות</div>
-                      <div className="text-lg font-bold text-neutral-900">{reportToView?.service_context}</div>
-                    </div>
-                  )}
-                  <div className="rounded-lg border-r-4 border-r-rose-500 bg-white p-3 shadow-sm border border-neutral-200">
-                    <div className="text-xs text-neutral-500 mb-1">סיבה</div>
-                    <div className="text-lg font-bold text-neutral-900">{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</div>
-                  </div>
-                </div>
-              </div>
-                    */}
-              {/* 
-                DESIGN OPTION 2: Table-like with Zebra Striping (commented out)
-                Uncomment and comment out Option 1 to try this design
-              
-              <div className="rounded-lg border border-neutral-200 overflow-hidden">
-                <div className="bg-neutral-800 px-4 py-3">
-                  <h3 className="text-sm font-semibold text-white">מידע כללי</h3>
-                </div>
-                <div className="divide-y divide-neutral-200">
-                  <div className="grid grid-cols-2 p-4 bg-white">
-                    <div className="text-xs font-semibold text-neutral-600">שם התלמיד</div>
-                    <div className="text-sm font-medium text-neutral-900 text-left">{reportToView?.metadata?.unassigned_details?.name || 'לא צוין'}</div>
-                  </div>
-                  <div className="grid grid-cols-2 p-4 bg-neutral-50">
-                    <div className="text-xs font-semibold text-neutral-600">מדריך</div>
-                    <div className="text-sm font-medium text-neutral-900 text-left">{reportToView?.Instructors?.name || reportToView?.Instructors?.email || 'לא ידוע'}</div>
-                  </div>
-                  <div className="grid grid-cols-2 p-4 bg-white">
-                    <div className="text-xs font-semibold text-neutral-600">תאריך</div>
-                    <div className="text-sm font-medium text-neutral-900 text-left">{formatDate(reportToView?.date)}</div>
-                  </div>
-                  {reportToView?.metadata?.unassigned_details?.time && (
-                    <div className="grid grid-cols-2 p-4 bg-neutral-50">
-                      <div className="text-xs font-semibold text-neutral-600">שעה</div>
-                      <div className="text-sm font-medium text-neutral-900 text-left">{formatTime(reportToView?.metadata?.unassigned_details?.time)}</div>
-                    </div>
-                  )}
-                  {reportToView?.service_context && (
-                    <div className="grid grid-cols-2 p-4 bg-white">
-                      <div className="text-xs font-semibold text-neutral-600">שירות</div>
-                      <div className="text-sm font-medium text-neutral-900 text-left">{reportToView?.service_context}</div>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 p-4 bg-neutral-50">
-                    <div className="text-xs font-semibold text-neutral-600">סיבה</div>
-                    <div className="text-sm font-medium text-neutral-900 text-left">{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</div>
-                  </div>
-                </div>
-              </div>
-              */}
-
-              {/* 
-                DESIGN OPTION 3: Minimalist Two-Column (commented out)
-                Uncomment and comment out Option 1 to try this design
-              */}
               <div className="space-y-1">
-                <div className="grid grid-cols-[140px_1fr] gap-4 py-3 border-b border-neutral-200">
-                  <div className="text-sm font-semibold text-neutral-700">שם התלמיד</div>
-                  <div className="text-sm text-neutral-900">{reportToView?.metadata?.unassigned_details?.name || 'לא צוין'}</div>
-                </div>
-                <div className="grid grid-cols-[140px_1fr] gap-4 py-3 border-b border-neutral-200">
-                  <div className="text-sm font-semibold text-neutral-700">מדריך</div>
-                  <div className="text-sm text-neutral-900">{reportToView?.Instructors?.name || reportToView?.Instructors?.email || 'לא ידוע'}</div>
-                </div>
-                <div className="grid grid-cols-[140px_1fr] gap-4 py-3 border-b border-neutral-200">
-                  <div className="text-sm font-semibold text-neutral-700">תאריך</div>
-                  <div className="text-sm text-neutral-900">{formatDate(reportToView?.date)}</div>
-                </div>
-                {reportToView?.metadata?.unassigned_details?.time && (
-                  <div className="grid grid-cols-[140px_1fr] gap-4 py-3 border-b border-neutral-200">
-                    <div className="text-sm font-semibold text-neutral-700">שעה</div>
-                    <div className="text-sm text-neutral-900">{formatTime(reportToView?.metadata?.unassigned_details?.time)}</div>
+                {/* Who section */}
+                <div className="grid grid-cols-2 gap-8 py-4 border-b border-neutral-200">
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-600 mb-1">שם התלמיד</div>
+                    <div className="text-sm text-neutral-900">{reportToView?.metadata?.unassigned_details?.name || 'לא צוין'}</div>
                   </div>
-                )}
-                {reportToView?.service_context && (
-                  <div className="grid grid-cols-[140px_1fr] gap-4 py-3 border-b border-neutral-200">
-                    <div className="text-sm font-semibold text-neutral-700">שירות</div>
-                    <div className="text-sm text-neutral-900">{reportToView?.service_context}</div>
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-600 mb-1">מדריך</div>
+                    <div className="text-sm text-neutral-900">{reportToView?.Instructors?.name || reportToView?.Instructors?.email || 'לא ידוע'}</div>
                   </div>
-                )}
-                <div className="grid grid-cols-[140px_1fr] gap-4 py-3 border-b border-neutral-200">
-                  <div className="text-sm font-semibold text-neutral-700">סיבה</div>
-                  <div className="text-sm text-neutral-900">{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</div>
+                </div>
+
+                {/* When section */}
+                <div className="grid grid-cols-2 gap-8 py-4 border-b border-neutral-200">
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-600 mb-1">תאריך</div>
+                    <div className="text-sm text-neutral-900">{formatDate(reportToView?.date)}</div>
+                  </div>
+                  {reportToView?.metadata?.unassigned_details?.time && (
+                    <div>
+                      <div className="text-xs font-semibold text-neutral-600 mb-1">שעה</div>
+                      <div className="text-sm text-neutral-900">{formatTime(reportToView?.metadata?.unassigned_details?.time)}</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* What & Why section */}
+                <div className="grid grid-cols-2 gap-8 py-4 border-b border-neutral-200">
+                  {reportToView?.service_context && (
+                    <div>
+                      <div className="text-xs font-semibold text-neutral-600 mb-1">שירות</div>
+                      <div className="text-sm text-neutral-900">{reportToView?.service_context}</div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs font-semibold text-neutral-600 mb-1">סיבה</div>
+                    <div className="text-sm text-neutral-900">{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</div>
+                  </div>
                 </div>
               </div>
               
