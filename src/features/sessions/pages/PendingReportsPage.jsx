@@ -763,7 +763,7 @@ export default function PendingReportsPage() {
                 - Each metadata field in its own card
                 - Color-coded left border
                 - More spacing, modern feel
-              */}
+              
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold text-neutral-900 mb-2">מידע כללי</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -797,11 +797,11 @@ export default function PendingReportsPage() {
                   </div>
                 </div>
               </div>
-
+                    */}
               {/* 
                 DESIGN OPTION 2: Table-like with Zebra Striping (commented out)
                 Uncomment and comment out Option 1 to try this design
-              
+              */}
               <div className="rounded-lg border border-neutral-200 overflow-hidden">
                 <div className="bg-neutral-800 px-4 py-3">
                   <h3 className="text-sm font-semibold text-white">מידע כללי</h3>
@@ -837,7 +837,7 @@ export default function PendingReportsPage() {
                   </div>
                 </div>
               </div>
-              */}
+              
 
               {/* 
                 DESIGN OPTION 3: Minimalist Two-Column (commented out)
