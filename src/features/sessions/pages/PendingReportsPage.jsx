@@ -801,7 +801,7 @@ export default function PendingReportsPage() {
               {/* 
                 DESIGN OPTION 2: Table-like with Zebra Striping (commented out)
                 Uncomment and comment out Option 1 to try this design
-              */}
+              
               <div className="rounded-lg border border-neutral-200 overflow-hidden">
                 <div className="bg-neutral-800 px-4 py-3">
                   <h3 className="text-sm font-semibold text-white">מידע כללי</h3>
@@ -837,12 +837,12 @@ export default function PendingReportsPage() {
                   </div>
                 </div>
               </div>
-              
+              */}
 
               {/* 
                 DESIGN OPTION 3: Minimalist Two-Column (commented out)
                 Uncomment and comment out Option 1 to try this design
-              
+              */}
               <div className="space-y-1">
                 <div className="grid grid-cols-[140px_1fr] gap-4 py-3 border-b border-neutral-200">
                   <div className="text-sm font-semibold text-neutral-700">שם התלמיד</div>
@@ -873,7 +873,7 @@ export default function PendingReportsPage() {
                   <div className="text-sm text-neutral-900">{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</div>
                 </div>
               </div>
-              */}
+              
 
               {/* Content Section */}
               <div className="space-y-3">
