@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter, Eye, MoreVertical } from 'lucide-react';
+import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter, Eye, MoreVertical, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,8 @@ import BulkResolvePendingReportsDialog from '../components/BulkResolvePendingRep
 import { RejectReportDialog } from '../components/RejectReportDialog.jsx';
 import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 import { mapLooseSessionError } from '@/lib/error-mapping.js';
+import { authenticatedFetch } from '@/lib/api-client.js';
+import { parseSessionFormConfig, ensureSessionFormFallback } from '@/features/sessions/utils/form-config.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -50,6 +53,75 @@ function getReasonLabel(reason, reasonOther) {
   return labels[reason] || reason || 'לא צוין';
 }
 
+function parseSessionContent(raw) {
+  if (!raw) {
+    return null;
+  }
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function toKey(label) {
+  return String(label).toLowerCase().trim().replace(/\s+/g, '_');
+}
+
+function extractQuestionLabelRaw(question) {
+  if (!question || typeof question !== 'object') return '';
+  return String(question.label || question.question || question.key || '');
+}
+
+function buildAnswerList(content, questions) {
+  const answers = parseSessionContent(content);
+  const entries = [];
+  const seenKeys = new Set();
+
+  if (answers && typeof answers === 'object' && !Array.isArray(answers)) {
+    const questionMap = new Map();
+    for (const question of questions) {
+      const qLabel = extractQuestionLabelRaw(question);
+      const qId = typeof question.id === 'string' ? question.id : '';
+      const qKey = typeof question.key === 'string' ? question.key : '';
+
+      if (qLabel) {
+        questionMap.set(qLabel, qLabel);
+        questionMap.set(toKey(qLabel), qLabel);
+      }
+      if (qId) {
+        questionMap.set(qId, qLabel || qId);
+        questionMap.set(toKey(qId), qLabel || qId);
+      }
+      if (qKey) {
+        questionMap.set(qKey, qLabel || qKey);
+        questionMap.set(toKey(qKey), qLabel || qKey);
+      }
+    }
+
+    for (const [answerKey, answerValue] of Object.entries(answers)) {
+      if (answerValue === undefined || answerValue === null || answerValue === '') {
+        continue;
+      }
+      const rawKey = String(answerKey);
+      if (seenKeys.has(rawKey)) {
+        continue;
+      }
+
+      const label = questionMap.get(rawKey) || questionMap.get(toKey(rawKey)) || rawKey;
+      entries.push({ label, value: String(answerValue) });
+      seenKeys.add(rawKey);
+    }
+  } else if (typeof answers === 'string' && answers.trim()) {
+    entries.push({ label: 'תוכן המפגש', value: answers.trim() });
+  }
+
+  return entries;
+}
+
 export default function PendingReportsPage() {
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
   const [state, setState] = useState(REQUEST_STATE.idle);
@@ -70,6 +142,7 @@ export default function PendingReportsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [reportViewOpen, setReportViewOpen] = useState(false);
   const [reportToView, setReportToView] = useState(null);
+  const [questions, setQuestions] = useState([]);
 
   const activeOrgId = activeOrg?.id || null;
 
@@ -79,6 +152,24 @@ export default function PendingReportsPage() {
   const isAdminMember = isAdminRole(normalizedRole);
 
   const canFetch = Boolean(activeOrgId && activeOrgHasConnection && tenantClientReady);
+
+  const loadQuestions = useCallback(async () => {
+    if (!canFetch) return;
+
+    try {
+      const searchParams = new URLSearchParams({ keys: 'session_form_config' });
+      if (activeOrgId) {
+        searchParams.set('org_id', activeOrgId);
+      }
+      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
+      const settingsValue = payload?.settings?.session_form_config ?? null;
+      const normalized = ensureSessionFormFallback(parseSessionFormConfig(settingsValue));
+      setQuestions(normalized);
+    } catch (error) {
+      console.error('Failed to load session form configuration', error);
+      setQuestions(ensureSessionFormFallback([]));
+    }
+  }, [canFetch, activeOrgId]);
 
   const loadReports = useCallback(async (options = {}) => {
     if (!canFetch) return;
@@ -106,16 +197,18 @@ export default function PendingReportsPage() {
       setState(REQUEST_STATE.idle);
       setError('');
       setReports([]);
+      setQuestions([]);
       return;
     }
 
+    void loadQuestions();
     const abortController = new AbortController();
     void loadReports({ signal: abortController.signal });
 
     return () => {
       abortController.abort();
     };
-  }, [canFetch, loadReports]);
+  }, [canFetch, loadReports, loadQuestions]);
 
   const handleResolved = useCallback(() => {
     setDialogOpen(false);
@@ -656,54 +749,75 @@ export default function PendingReportsPage() {
 
       {/* Report Content Viewer Dialog */}
       <Dialog open={reportViewOpen} onOpenChange={setReportViewOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>תוכן הדיווח</DialogTitle>
+        <DialogContent className="max-w-3xl" dir="rtl">
+          <DialogHeader className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              <DialogTitle className="text-xl">פרטי הדיווח</DialogTitle>
+            </div>
           </DialogHeader>
           {reportToView && (
-            <div className="space-y-4">
-              <div className="rounded-lg bg-neutral-50 p-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-neutral-900">שם התלמיד:</span>
-                    <span>{reportToView?.metadata?.unassigned_details?.name || 'לא צוין'}</span>
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+              {/* Metadata Section */}
+              <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4">
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3">מידע כללי</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-neutral-500">שם התלמיד</div>
+                    <div className="text-sm text-neutral-900">{reportToView?.metadata?.unassigned_details?.name || 'לא צוין'}</div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-neutral-900">מדריך:</span>
-                    <span>{reportToView?.Instructors?.name || reportToView?.Instructors?.email || 'לא ידוע'}</span>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-neutral-500">מדריך</div>
+                    <div className="text-sm text-neutral-900">{reportToView?.Instructors?.name || reportToView?.Instructors?.email || 'לא ידוע'}</div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-neutral-900">תאריך:</span>
-                    <span>{formatDate(reportToView?.date)}</span>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-neutral-500">תאריך</div>
+                    <div className="text-sm text-neutral-900">{formatDate(reportToView?.date)}</div>
                   </div>
                   {reportToView?.metadata?.unassigned_details?.time && (
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-neutral-900">שעה:</span>
-                      <span>{formatTime(reportToView?.metadata?.unassigned_details?.time)}</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium text-neutral-500">שעה</div>
+                      <div className="text-sm text-neutral-900">{formatTime(reportToView?.metadata?.unassigned_details?.time)}</div>
                     </div>
                   )}
                   {reportToView?.service_context && (
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-neutral-900">שירות:</span>
-                      <span>{reportToView?.service_context}</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium text-neutral-500">שירות</div>
+                      <div className="text-sm text-neutral-900">{reportToView?.service_context}</div>
                     </div>
                   )}
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-neutral-900">סיבה:</span>
-                    <span>{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</span>
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-neutral-500">סיבה</div>
+                    <div className="text-sm text-neutral-900">{getReasonLabel(reportToView?.metadata?.unassigned_details?.reason, reportToView?.metadata?.unassigned_details?.reason_other)}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <h3 className="font-semibold text-neutral-900">תוכן הדיווח:</h3>
-                <div className="rounded-lg bg-neutral-50 p-4 whitespace-pre-wrap text-sm text-neutral-700 max-h-96 overflow-y-auto">
-                  {typeof reportToView?.content === 'string'
-                    ? reportToView.content
-                    : typeof reportToView?.content === 'object' && reportToView.content
-                      ? JSON.stringify(reportToView.content, null, 2)
-                      : 'לא הוזן תוכן'}
-                </div>
+              {/* Content Section */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-neutral-900">תוכן המפגש</h3>
+                {(() => {
+                  const answers = buildAnswerList(reportToView?.content, questions);
+                  if (answers.length === 0) {
+                    return (
+                      <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4 text-center text-sm text-neutral-500">
+                        לא הוזן תוכן
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="rounded-lg border border-neutral-200 bg-white">
+                      <dl className="divide-y divide-neutral-200">
+                        {answers.map((entry, index) => (
+                          <div key={`${reportToView.id}-${entry.label}-${index}`} className="p-4 space-y-2">
+                            <dt className="text-xs font-medium text-neutral-600">{entry.label}</dt>
+                            <dd className="text-sm text-neutral-900 whitespace-pre-wrap break-words">{entry.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
