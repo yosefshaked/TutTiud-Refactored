@@ -1031,6 +1031,7 @@ export default function StudentDetailPage() {
                         </CardTitle>
                         <p className="text-xs text-neutral-500 sm:text-sm">
                           {record.service_context ? `שירות: ${record.service_context}` : 'ללא שירות מוגדר'}
+                          {record.Instructors?.name && ` • ${record.Instructors.name}`}
                         </p>
                       </div>
                       {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}

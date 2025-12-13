@@ -106,7 +106,7 @@ export default async function (context, req) {
 
   const { data, error } = await tenantClient
     .from('SessionRecords')
-    .select('*')
+    .select('*, Instructors:instructor_id(id, name, email)')
     .eq('student_id', studentId)
     .order('date', { ascending: false });
 

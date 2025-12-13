@@ -202,6 +202,7 @@ function generatePdfHtml(student, sessions, formConfig, logoUrl, customLogoUrl) 
       </div>
     `).join('') : '<p class="no-data">לא תועדו תשובות עבור מפגש זה.</p>';
 
+    // NOTE: Instructor name is displayed in the web UI but intentionally NOT exported to PDF
     return `
       <div class="session-card">
         <div class="session-header">
