@@ -12,7 +12,7 @@ import { authenticatedFetch } from '@/lib/api-client.js';
 import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 import { describeSchedule, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
-import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 import { useSessionModal } from '@/features/sessions/context/SessionModalContext.jsx';
 import { getQuestionsForVersion } from '@/features/sessions/utils/version-helpers.js';
 import { format, parseISO } from 'date-fns';
@@ -218,13 +218,22 @@ export default function StudentDetailPage() {
     setStudentError('');
 
     try {
-      const endpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: 'all' });
+      // Use unified students-list endpoint with 'all' status for admins
+      const searchParams = new URLSearchParams();
+      if (activeOrgId) searchParams.set('org_id', activeOrgId);
+      searchParams.set('status', 'all');
+      const endpoint = searchParams.toString() ? `students-list?${searchParams}` : 'students-list';
+      
       let payload = await authenticatedFetch(endpoint);
       let roster = Array.isArray(payload) ? payload : [];
       let match = roster.find((entry) => entry?.id === studentId) || null;
 
       if (!match && !isAdminRole(membershipRole)) {
-        const fallbackEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: 'active' });
+        // Fallback to 'active' status for non-admins
+        const fallbackParams = new URLSearchParams();
+        if (activeOrgId) fallbackParams.set('org_id', activeOrgId);
+        fallbackParams.set('status', 'active');
+        const fallbackEndpoint = fallbackParams.toString() ? `students-list?${fallbackParams}` : 'students-list';
         payload = await authenticatedFetch(fallbackEndpoint);
         roster = Array.isArray(payload) ? payload : [];
         match = roster.find((entry) => entry?.id === studentId) || null;

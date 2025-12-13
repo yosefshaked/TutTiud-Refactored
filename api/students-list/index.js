@@ -402,6 +402,10 @@ export default async function handler(context, req) {
       // Admins can optionally filter by instructor
       const assignedInstructorId = normalizeString(req?.query?.assigned_instructor_id);
       if (assignedInstructorId) {
+        // Validate UUID format to prevent information disclosure
+        if (!UUID_PATTERN.test(assignedInstructorId)) {
+          return respond(context, 400, { message: 'invalid_instructor_id_format' });
+        }
         builder = builder.eq('assigned_instructor_id', assignedInstructorId);
       }
     }

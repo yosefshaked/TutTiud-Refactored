@@ -9,7 +9,7 @@ import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import NewSessionForm, { NewSessionFormFooter } from './NewSessionForm.jsx';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
-import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
 import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 
 const REQUEST_STATE = Object.freeze({
@@ -365,28 +365,21 @@ export default function NewSessionModal({
     setStudentsError('');
 
     try {
-      // Determine endpoint and optional server-side filter based on scope and role
+      // Use unified students-list endpoint for all scenarios
       const overrideStatus = typeof options.status === 'string' ? options.status : null;
       const statusParam = canViewInactive ? (overrideStatus || statusFilter) : 'active';
-      const baseEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: statusParam });
-      let endpoint = baseEndpoint;
-      if (canAdmin) {
-        if (studentScope === 'mine') {
-          // Admin viewing their own assigned students -> use my-students
-          const searchParams = new URLSearchParams();
-          if (activeOrgId) searchParams.set('org_id', activeOrgId);
-          if (statusParam) searchParams.set('status', statusParam);
-          endpoint = searchParams.toString() ? `my-students?${searchParams}` : 'my-students';
-        } else if (studentScope.startsWith('inst:')) {
-          const instructorId = studentScope.slice(5);
-          const searchParams = new URLSearchParams();
-          if (activeOrgId) searchParams.set('org_id', activeOrgId);
-          if (instructorId) searchParams.set('assigned_instructor_id', instructorId);
-          if (statusParam) searchParams.set('status', statusParam);
-          endpoint = searchParams.toString() ? `students?${searchParams}` : 'students';
-        }
+      
+      const searchParams = new URLSearchParams();
+      if (activeOrgId) searchParams.set('org_id', activeOrgId);
+      if (statusParam) searchParams.set('status', statusParam);
+      
+      // Admin can filter by instructor via assigned_instructor_id parameter
+      if (canAdmin && studentScope.startsWith('inst:')) {
+        const instructorId = studentScope.slice(5);
+        if (instructorId) searchParams.set('assigned_instructor_id', instructorId);
       }
-
+      
+      const endpoint = searchParams.toString() ? `students-list?${searchParams}` : 'students-list';
       const payload = await authenticatedFetch(endpoint);
       setStudents(Array.isArray(payload) ? payload : []);
       setStudentsState(REQUEST_STATE.idle);
@@ -396,7 +389,7 @@ export default function NewSessionModal({
       setStudentsState(REQUEST_STATE.error);
       setStudentsError(error?.message || 'טעינת רשימת התלמידים נכשלה.');
     }
-  }, [activeOrgId, canFetchStudents, membershipRole, studentScope, statusFilter, canViewInactive, canAdmin]);
+  }, [activeOrgId, canFetchStudents, studentScope, statusFilter, canViewInactive, canAdmin]);
 
   const loadQuestions = useCallback(async () => {
     if (!open || !canFetchStudents) {
