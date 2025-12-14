@@ -229,7 +229,7 @@ export default function ResubmitRejectedReportDialog({
         },
       };
 
-      const response = await authenticatedFetch('/api/sessions', {
+      const response = await authenticatedFetch('sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
