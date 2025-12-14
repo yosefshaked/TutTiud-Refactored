@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Calendar, Clock, RotateCcw, Loader2 } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { Calendar, Clock, RotateCcw, Loader2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
+import { fetchSettingsValue } from '@/features/settings/api/settings.js';
+import { parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
 
 const REASON_OPTIONS = [
   { value: 'substitute', label: 'מחליף זמני' },
@@ -28,6 +30,19 @@ function formatDateForDisplay(dateStr) {
   return `${day}/${month}/${year}`;
 }
 
+function parseSessionContent(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === 'object') return raw;
+  return {};
+}
+
 export default function ResubmitRejectedReportDialog({
   isOpen,
   onClose,
@@ -37,21 +52,70 @@ export default function ResubmitRejectedReportDialog({
   const { activeOrg } = useOrg();
   const { session } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [questions, setQuestions] = useState([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
   
   const unassignedDetails = report?.metadata?.unassigned_details || {};
   const rejectionInfo = report?.metadata?.rejection || {};
+  const originalContent = useMemo(() => parseSessionContent(report?.content), [report?.content]);
   
   const [formData, setFormData] = useState({
-    name: unassignedDetails.name || '',
-    reason: unassignedDetails.reason || 'other',
-    reasonOther: unassignedDetails.reason_other || '',
-    date: report?.date || '',
-    time: unassignedDetails.time || '',
-    service: report?.service_context || '',
+    name: '',
+    reason: 'other',
+    reasonOther: '',
+    date: '',
+    time: '',
+    service: '',
+    adminNotes: '',
   });
+  
+  const [answers, setAnswers] = useState({});
+
+  // Load questions from settings
+  useEffect(() => {
+    if (!isOpen || !activeOrg?.id) return;
+
+    const loadQuestions = async () => {
+      setLoadingQuestions(true);
+      try {
+        const config = await fetchSettingsValue('session_form_config', { orgId: activeOrg.id, session });
+        const parsed = parseSessionFormConfig(config);
+        setQuestions(parsed || []);
+      } catch (error) {
+        console.error('Failed to load questions', error);
+        setQuestions([]);
+      } finally {
+        setLoadingQuestions(false);
+      }
+    };
+
+    void loadQuestions();
+  }, [isOpen, activeOrg?.id, session]);
+
+  // Initialize form data when report changes
+  useEffect(() => {
+    if (!report) return;
+
+    setFormData({
+      name: unassignedDetails.name || '',
+      reason: unassignedDetails.reason || 'other',
+      reasonOther: unassignedDetails.reason_other || '',
+      date: report.date || '',
+      time: unassignedDetails.time || '',
+      service: report.service_context || '',
+      adminNotes: '',
+    });
+
+    // Initialize answers from original content
+    setAnswers(originalContent || {});
+  }, [report, unassignedDetails, originalContent]);
 
   const handleInputChange = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleAnswerChange = useCallback((questionKey, value) => {
+    setAnswers(prev => ({ ...prev, [questionKey]: value }));
   }, []);
 
   const handleSubmit = useCallback(async (e) => {
@@ -79,7 +143,7 @@ export default function ResubmitRejectedReportDialog({
         org_id: activeOrg?.id,
         date: formData.date,
         service_context: formData.service || null,
-        content: report?.content || '',
+        content: JSON.stringify(answers),
         metadata: {
           unassigned_details: {
             name: formData.name.trim(),
@@ -89,6 +153,7 @@ export default function ResubmitRejectedReportDialog({
           },
           resubmitted_from: report?.id,
           original_rejection: rejectionInfo,
+          instructor_notes: formData.adminNotes.trim() || undefined,
         },
       };
 
@@ -113,7 +178,7 @@ export default function ResubmitRejectedReportDialog({
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, report, activeOrg, session, rejectionInfo, onSuccess]);
+  }, [formData, answers, report, activeOrg, session, rejectionInfo, onSuccess]);
 
   if (!report) return null;
 
@@ -235,6 +300,85 @@ export default function ResubmitRejectedReportDialog({
                 placeholder="שם השירות (אופציונלי)"
               />
             </div>
+          </div>
+
+          {/* Session Content (Questions) */}
+          {loadingQuestions ? (
+            <div className="flex items-center justify-center gap-2 py-4 text-neutral-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">טוען שאלות...</span>
+            </div>
+          ) : questions.length > 0 ? (
+            <div className="space-y-3 pt-4 border-t">
+              <h3 className="font-semibold text-sm text-right">תוכן הדיווח</h3>
+              {questions.map((question) => {
+                const questionKey = question.key || question.id;
+                const questionLabel = question.label || question.question || questionKey;
+                const currentValue = answers[questionKey] || '';
+
+                return (
+                  <div key={questionKey}>
+                    <Label htmlFor={`q-${questionKey}`} className="block text-right mb-1">
+                      {questionLabel}
+                    </Label>
+                    {question.type === 'textarea' ? (
+                      <Textarea
+                        id={`q-${questionKey}`}
+                        dir="rtl"
+                        value={currentValue}
+                        onChange={(e) => handleAnswerChange(questionKey, e.target.value)}
+                        placeholder="הזן תשובה"
+                        rows={3}
+                      />
+                    ) : question.type === 'select' || question.type === 'radio' || question.type === 'buttons' ? (
+                      <Select
+                        value={currentValue}
+                        onValueChange={(value) => handleAnswerChange(questionKey, value)}
+                      >
+                        <SelectTrigger id={`q-${questionKey}`} dir="rtl">
+                          <SelectValue placeholder="בחר תשובה" />
+                        </SelectTrigger>
+                        <SelectContent dir="rtl">
+                          {(question.options || []).map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id={`q-${questionKey}`}
+                        type={question.type === 'number' ? 'number' : question.type === 'date' ? 'date' : 'text'}
+                        dir="rtl"
+                        value={currentValue}
+                        onChange={(e) => handleAnswerChange(questionKey, e.target.value)}
+                        placeholder="הזן תשובה"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {/* Admin Notes */}
+          <div className="space-y-2 pt-4 border-t">
+            <Label htmlFor="adminNotes" className="block text-right flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              הערות למנהל
+            </Label>
+            <p className="text-xs text-muted-foreground text-right">
+              הערות אלו יהיו נראות רק למנהל בדף הדיווחים הממתינים ולא יופיעו בפרופיל התלמיד
+            </p>
+            <Textarea
+              id="adminNotes"
+              dir="rtl"
+              value={formData.adminNotes}
+              onChange={(e) => handleInputChange('adminNotes', e.target.value)}
+              placeholder="הוסף הערות למנהל (אופציונלי)"
+              rows={3}
+            />
           </div>
 
           {/* Footer */}

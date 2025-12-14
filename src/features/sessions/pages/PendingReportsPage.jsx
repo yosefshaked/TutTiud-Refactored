@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter, Eye, MoreVertical, FileText } from 'lucide-react';
+import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter, Eye, MoreVertical, FileText, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -642,6 +642,12 @@ export default function PendingReportsPage() {
                             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 shrink-0">
                               ממתין לשיוך
                             </Badge>
+                            {report?.metadata?.instructor_notes && (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 shrink-0 gap-1">
+                                <MessageSquare className="h-3 w-3" />
+                                הערות
+                              </Badge>
+                            )}
                           </div>
                           <Button
                             size="sm"
@@ -817,6 +823,19 @@ export default function PendingReportsPage() {
                 </div>
               </div>
               
+
+              {/* Instructor Notes (if present) */}
+              {reportToView?.metadata?.instructor_notes && (
+                <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+                  <div className="flex items-start gap-2">
+                    <MessageSquare className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-blue-900 mb-2">הערות מהמדריך</h3>
+                      <p className="text-sm text-blue-800 whitespace-pre-wrap">{reportToView.metadata.instructor_notes}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Content Section */}
               <div className="space-y-3">

@@ -148,8 +148,14 @@
       - Badge counts in header show both pending and rejected report totals
     - `ResubmitRejectedReportDialog.jsx`: Dialog for resubmitting rejected reports with pre-filled data
       - Shows original rejection reason in red banner
-      - Allows editing all fields (name, reason, date, time, service) before resubmission
-      - Creates new loose report with `metadata.resubmitted_from` and `metadata.original_rejection` for audit trail
+      - Automatically loads and pre-fills all original data: name, reason, date, time, service, AND session content (questions/answers)
+      - Allows editing all fields including full session content before resubmission
+      - Includes optional "הערות למנהל" (Admin Notes) field - notes visible only to admins on pending reports page, not shown in student profile
+      - Creates new loose report with `metadata.resubmitted_from`, `metadata.original_rejection`, and optional `metadata.instructor_notes` for audit trail
+    - `PendingReportsPage.jsx` admin view enhancements:
+      - Blue "הערות" badge displayed on reports that include instructor notes
+      - Instructor notes shown in blue banner within report detail dialog
+      - Helps admins understand instructor's context or corrections when reviewing resubmitted reports
     - `MyStudentsPage.jsx`: Instructor access button in CardHeader showing pending reports count badge; click opens dialog with `MyPendingReportsCard`
     - Bulk operations use sequential processing with real-time feedback
   - **Form Changes (2025-12)**:
