@@ -93,59 +93,80 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
-    // For instructors: return both pending (student_id=null, deleted=false) 
-    // AND rejected (deleted=true with rejection metadata) reports
-    // For admins: return only pending reports (not rejected)
-    let query = tenantClient
-      .from('SessionRecords')
-      .select(`
-        id, 
-        date, 
-        content, 
-        service_context, 
-        instructor_id, 
-        metadata, 
-        created_at, 
-        updated_at, 
-        student_id, 
-        deleted,
-        deleted_at,
-        Instructors!SessionRecords_instructor_id_fkey(name, email)
-      `)
-      .is('student_id', null)
-      .order('date', { ascending: true }); // Oldest session dates first
-
-    // Non-admin instructors can see their own pending and rejected reports
-    if (!isAdmin) {
-      query = query.eq('instructor_id', userId);
-      // No deleted filter - we want both pending and rejected for instructors
-    } else {
-      // Admins only see pending reports (not rejected)
-      query = query.eq('deleted', false);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      context.log?.error?.('loose-sessions failed to list pending records', { message: error.message });
-      return respond(context, 500, { message: 'failed_to_load_sessions' });
-    }
-
-    // For non-admin instructors, separate pending from rejected
-    // Rejected = deleted:true AND has metadata.rejection
-    // Pending = deleted:false
-    let finalData = Array.isArray(data) ? data : [];
+    // For instructors: return pending, rejected, AND accepted reports (all loose reports history)
+    // For admins: return only pending unassigned reports (not rejected, not accepted)
     
     if (!isAdmin) {
-      // Return both pending and rejected, let frontend separate them
+      // Instructors: fetch all loose reports (originally submitted without student_id)
+      // This includes: pending (student_id=null, deleted=false), 
+      //                rejected (deleted=true with rejection metadata),
+      //                accepted (student_id set by admin)
+      // Filter by metadata.unassigned_details existence to identify loose reports
+      const query = tenantClient
+        .from('SessionRecords')
+        .select(`
+          id, 
+          date, 
+          content, 
+          service_context, 
+          instructor_id, 
+          metadata, 
+          created_at, 
+          updated_at, 
+          student_id, 
+          deleted,
+          deleted_at,
+          Instructors!SessionRecords_instructor_id_fkey(name, email)
+        `)
+        .eq('instructor_id', userId)
+        .not('metadata->unassigned_details', 'is', null) // Only loose reports
+        .order('date', { ascending: false }); // Most recent first
+
+      const { data, error } = await query;
+
+      if (error) {
+        context.log?.error?.('loose-sessions failed to list instructor records', { message: error.message });
+        return respond(context, 500, { message: 'failed_to_load_sessions' });
+      }
+
       // Mark rejected reports for easy identification
-      finalData = finalData.map(report => ({
+      const finalData = (Array.isArray(data) ? data : []).map(report => ({
         ...report,
         isRejected: report.deleted && report.metadata?.rejection ? true : false,
       }));
-    }
 
-    return respond(context, 200, finalData);
+      return respond(context, 200, finalData);
+    } else {
+      // Admins: only see pending unassigned reports (not rejected, not accepted)
+      const query = tenantClient
+        .from('SessionRecords')
+        .select(`
+          id, 
+          date, 
+          content, 
+          service_context, 
+          instructor_id, 
+          metadata, 
+          created_at, 
+          updated_at, 
+          student_id, 
+          deleted,
+          deleted_at,
+          Instructors!SessionRecords_instructor_id_fkey(name, email)
+        `)
+        .is('student_id', null)
+        .eq('deleted', false)
+        .order('date', { ascending: true }); // Oldest session dates first
+
+      const { data, error } = await query;
+
+      if (error) {
+        context.log?.error?.('loose-sessions failed to list pending records', { message: error.message });
+        return respond(context, 500, { message: 'failed_to_load_sessions' });
+      }
+
+      return respond(context, 200, Array.isArray(data) ? data : []);
+    }
   }
 
   if (method !== 'POST') {

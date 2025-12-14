@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -78,7 +79,8 @@ export default function ResubmitRejectedReportDialog({
     const loadQuestions = async () => {
       setLoadingQuestions(true);
       try {
-        const config = await fetchSettingsValue('session_form_config', { orgId: activeOrg.id, session });
+        const result = await fetchSettingsValue({ key: 'session_form_config', orgId: activeOrg.id, session });
+        const config = result?.value || result; // Handle both wrapped and unwrapped responses
         const parsed = parseSessionFormConfig(config);
         setQuestions(parsed || []);
       } catch (error) {
@@ -190,6 +192,9 @@ export default function ResubmitRejectedReportDialog({
             <RotateCcw className="h-5 w-5" />
             שליחה מחדש של דיווח שנדחה
           </DialogTitle>
+          <DialogDescription className="text-right">
+            תוכל לערוך את כל פרטי הדיווח ותוכן המפגש לפני שליחה מחדש
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
