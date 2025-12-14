@@ -980,7 +980,7 @@
   - High-contrast theme toggle (adds `a11y-hc` class on `html`).
   - Text spacing toggle (adds `a11y-text-spacing` class; increases letter/word spacing and line-height).
   - Underline links toggle (adds `a11y-underline-links` class; underlines all anchors with offset + thickness).
-  - Dyslexia-friendly font toggle (adds `a11y-dyslexia-font` class; uses `'OpenDyslexic', 'Atkinson Hyperlegible', Nunito, system-ui` stack; bundle a font file later if needed).
+  - Dyslexia-friendly font toggle (adds `a11y-dyslexia-font` class; uses Atkinson Hyperlegible font loaded from Google Fonts with Comic Sans MS fallback; includes extra letter-spacing and word-spacing for improved readability).
 - Styles are injected once at runtime by `AccessibilityProvider` (style tag `#a11y-dynamic-styles`) to avoid global CSS churn. If we later prefer static CSS, move the rules into `src/index.css` under `@layer base` and remove the injector.
 - Persistence uses localStorage keys `a11y:*`. The provider exposes `useAccessibility()` for UI wiring.
 
