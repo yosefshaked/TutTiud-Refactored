@@ -129,6 +129,7 @@ export default function PendingReportsPage() {
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [resolveMode, setResolveMode] = useState('assign'); // 'assign' | 'create'
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [reportToReject, setReportToReject] = useState(null);
   const [bulkRejectDialogOpen, setBulkRejectDialogOpen] = useState(false);
@@ -213,18 +214,21 @@ export default function PendingReportsPage() {
   const handleResolved = useCallback(() => {
     setDialogOpen(false);
     setSelectedReport(null);
+    setResolveMode('assign');
     toast.success('הדיווח שוייך בהצלחה.');
     void loadReports();
   }, [loadReports]);
 
-  const handleResolve = (report) => {
+  const handleResolve = (report, mode = 'assign') => {
     setSelectedReport(report);
+    setResolveMode(mode);
     setDialogOpen(true);
   };
 
   const handleDialogClose = () => {
     setDialogOpen(false);
     setSelectedReport(null);
+    setResolveMode('assign');
   };
 
   const handleReject = (report) => {
@@ -684,11 +688,11 @@ export default function PendingReportsPage() {
                                   <span>צפייה בתוכן הדיווח</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleResolve(report)} className="gap-2 cursor-pointer">
+                                <DropdownMenuItem onClick={() => handleResolve(report, 'assign')} className="gap-2 cursor-pointer">
                                   <UserCheck className="h-4 w-4" />
                                   <span>שיוך קיים</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleResolve(report)} className="gap-2 cursor-pointer">
+                                <DropdownMenuItem onClick={() => handleResolve(report, 'create')} className="gap-2 cursor-pointer">
                                   <UserPlus className="h-4 w-4" />
                                   <span>יצירה ושיוך</span>
                                 </DropdownMenuItem>
@@ -726,6 +730,7 @@ export default function PendingReportsPage() {
           open={dialogOpen}
           onClose={handleDialogClose}
           report={selectedReport}
+          mode={resolveMode}
           onResolved={handleResolved}
         />
       )}

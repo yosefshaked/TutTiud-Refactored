@@ -115,8 +115,8 @@ export default function BulkResolvePendingReportsDialog({
           sessionId: report.id,
           name: studentData.name,
           nationalId: studentData.nationalId,
-          assignedInstructorId: studentData.assigned_instructor_id,
-          defaultService: studentData.default_service || null,
+          assignedInstructorId: studentData.assignedInstructorId,
+          defaultService: studentData.defaultService || null,
           orgId: activeOrgId,
         });
         
@@ -162,6 +162,23 @@ export default function BulkResolvePendingReportsDialog({
   }, [reports]);
 
   const hasMultipleNames = reportNames.length > 1;
+
+  // Extract instructor IDs from reports for auto-assignment
+  const suggestedInstructorId = useMemo(() => {
+    const instructorIds = new Set();
+    reports.forEach((r) => {
+      if (r?.instructor_id) {
+        instructorIds.add(r.instructor_id);
+      }
+    });
+    
+    // If only one instructor, return it for auto-fill
+    // If multiple instructors or none, return empty
+    if (instructorIds.size === 1) {
+      return Array.from(instructorIds)[0];
+    }
+    return '';
+  }, [reports]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -277,6 +294,7 @@ export default function BulkResolvePendingReportsDialog({
                 submitLabel={`צור ושייך ${reports.length} דיווחים`}
                 submitDisabled={isProcessing}
                 renderFooterOutside={false}
+                initialValues={suggestedInstructorId ? { assignedInstructorId: suggestedInstructorId } : {}}
               />
             </div>
           )}

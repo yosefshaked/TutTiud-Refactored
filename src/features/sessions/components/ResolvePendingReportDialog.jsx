@@ -18,10 +18,10 @@ const REQUEST_STATE = Object.freeze({
   error: 'error',
 });
 
-export default function ResolvePendingReportDialog({ open, onClose, report, onResolved }) {
+export default function ResolvePendingReportDialog({ open, onClose, report, mode = 'assign', onResolved }) {
   const { activeOrg } = useOrg();
   const activeOrgId = activeOrg?.id || null;
-  const [mode, setMode] = useState('assign'); // 'assign' | 'create'
+  const [currentMode, setCurrentMode] = useState(mode); // 'assign' | 'create'
   const [state, setState] = useState(REQUEST_STATE.idle);
   const [error, setError] = useState('');
   
@@ -30,7 +30,7 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const { students, loadingStudents } = useStudents({
     status: 'all',
-    enabled: open && mode === 'assign' && Boolean(activeOrgId),
+    enabled: open && currentMode === 'assign' && Boolean(activeOrgId),
     orgId: activeOrgId,
   });
   const unassignedName = report?.metadata?.unassigned_details?.name || '';
@@ -42,16 +42,19 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
 
   // Data loading handled by shared hooks above based on open/mode/org
 
-  // Reset state when dialog closes
+  // Reset state when dialog closes or mode prop changes
   useEffect(() => {
     if (!open) {
-      setMode('assign');
+      setCurrentMode(mode);
       setState(REQUEST_STATE.idle);
       setError('');
       setStudentQuery('');
       setSelectedStudentId('');
+    } else {
+      // Update to passed mode when dialog opens
+      setCurrentMode(mode);
     }
-  }, [open]);
+  }, [open, mode]);
 
   const filteredStudents = useMemo(() => {
     const query = studentQuery.trim().toLowerCase();
@@ -142,8 +145,8 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
 
           <div className="flex gap-2">
             <Button
-              variant={mode === 'assign' ? 'default' : 'outline'}
-              onClick={() => setMode('assign')}
+              variant={currentMode === 'assign' ? 'default' : 'outline'}
+              onClick={() => setCurrentMode('assign')}
               disabled={isSubmitting}
               className="flex-1 gap-2"
             >
@@ -151,8 +154,8 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
               שיוך לתלמיד קיים
             </Button>
             <Button
-              variant={mode === 'create' ? 'default' : 'outline'}
-              onClick={() => setMode('create')}
+              variant={currentMode === 'create' ? 'default' : 'outline'}
+              onClick={() => setCurrentMode('create')}
               disabled={isSubmitting}
               className="flex-1 gap-2"
             >
@@ -166,7 +169,7 @@ export default function ResolvePendingReportDialog({ open, onClose, report, onRe
               <Loader2 className="h-5 w-5 animate-spin" />
               <span>טוען נתונים...</span>
             </div>
-          ) : mode === 'assign' ? (
+          ) : currentMode === 'assign' ? (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="student-search" className="block text-right">חיפוש תלמיד</Label>
