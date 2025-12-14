@@ -194,7 +194,7 @@ export default async function (context, req) {
     return respond(context, 400, { message: 'session_already_assigned' });
   }
 
-  if (!sessionRow.deleted) {
+  if (sessionRow.deleted) {
     return respond(context, 400, { message: 'session_deleted' });
   }
 
