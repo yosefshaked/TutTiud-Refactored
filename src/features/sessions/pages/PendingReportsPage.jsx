@@ -457,6 +457,11 @@ export default function PendingReportsPage() {
     );
   }
 
+  // Guard: Admin-only access
+  if (!isAdminMember) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return (
     <div className="container mx-auto p-4 sm:p-6 max-w-7xl" dir="rtl">
       <Card>
