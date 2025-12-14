@@ -236,7 +236,7 @@ export default function ResubmitRejectedReportDialog({
                 <SelectTrigger id="reason" dir="rtl">
                   <SelectValue placeholder="בחר סיבה" />
                 </SelectTrigger>
-                <SelectContent dir="rtl">
+                <SelectContent>
                   {REASON_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -343,7 +343,7 @@ export default function ResubmitRejectedReportDialog({
                         <SelectTrigger id={`q-${questionKey}`} dir="rtl">
                           <SelectValue placeholder="בחר תשובה" />
                         </SelectTrigger>
-                        <SelectContent dir="rtl">
+                        <SelectContent>
                           {(question.options || []).map((option) => (
                             <SelectItem key={option} value={option}>
                               {option}

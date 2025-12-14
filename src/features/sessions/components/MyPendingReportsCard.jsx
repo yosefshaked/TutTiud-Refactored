@@ -161,7 +161,7 @@ export default function MyPendingReportsCard() {
             <SelectTrigger id="dateRange" className="w-[200px]" dir="rtl">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent dir="rtl">
+            <SelectContent>
               {DATE_RANGE_OPTIONS.map(option => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -366,10 +366,16 @@ export default function MyPendingReportsCard() {
 
                 {/* Accepted Tab */}
                 <TabsContent value="accepted" className="space-y-3 mt-4">
-                  {resolvedReports.length === 0 ? (
+                  {isLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-8 text-neutral-600">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span className="text-sm">טוען דיווחים שאושרו...</span>
+                    </div>
+                  ) : resolvedReports.length === 0 ? (
                     <div className="text-center py-8 text-neutral-500">
                       <AlertCircle className="h-8 w-8 mx-auto mb-2 text-neutral-400" />
-                      <p className="text-sm">אין דיווחים שאושרו</p>
+                      <p className="text-sm font-medium">אין דיווחים שאושרו עדיין</p>
+                      <p className="text-xs mt-1">כאשר מנהל יאשר דיווח שלך, הוא יופיע כאן</p>
                     </div>
                   ) : (
                     <>
