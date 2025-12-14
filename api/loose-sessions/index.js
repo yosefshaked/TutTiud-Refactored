@@ -239,12 +239,21 @@ export default async function (context, req) {
 
     const newServiceContext = sessionRow.service_context ?? studentRow.default_service ?? null;
 
+    const assignmentMetadata = {
+      ...cleanedMetadata,
+      assignment: {
+        assigned_by: userId,
+        assigned_by_role: role,
+        assigned_at: new Date().toISOString(),
+      },
+    };
+
     const { data: updatedSession, error: updateError } = await tenantClient
       .from('SessionRecords')
       .update({
         student_id: studentRow.id,
         service_context: newServiceContext,
-        metadata: cleanedMetadata,
+        metadata: assignmentMetadata,
       })
       .eq('id', sessionId)
       .select()
@@ -364,12 +373,21 @@ export default async function (context, req) {
 
   const newServiceContext = sessionRow.service_context ?? newStudent.default_service ?? null;
 
+  const assignmentMetadata = {
+    ...cleanedMetadata,
+    assignment: {
+      assigned_by: userId,
+      assigned_by_role: role,
+      assigned_at: new Date().toISOString(),
+    },
+  };
+
   const { data: resolvedSession, error: resolveError } = await tenantClient
     .from('SessionRecords')
     .update({
       student_id: newStudent.id,
       service_context: newServiceContext,
-      metadata: cleanedMetadata,
+      metadata: assignmentMetadata,
     })
     .eq('id', sessionId)
     .select()
