@@ -309,7 +309,16 @@ export default function NewSessionForm({
 
   // Expose reset function to parent via ref
   useImperativeHandle(formResetRef, () => (options = {}) => {
-    const { keepStudent = false, studentId = null, date = null } = options;
+    const { 
+      keepStudent = false, 
+      studentId = null, 
+      date = null,
+      // Loose report metadata to preserve across follow-up reports
+      looseName = null,
+      looseReason = null,
+      looseReasonOther = null,
+      looseService = null,
+    } = options;
     
     // Reset all form fields
     const initialAnswers = {};
@@ -331,18 +340,32 @@ export default function NewSessionForm({
       setSessionDate('');
     }
     setSessionTime('');
-    setLooseMode(false);
-    setUnassignedName('');
-    setUnassignedReason('');
-    setUnassignedReasonOther('');
-    setLooseInstructorId('');
     
-    // Preserve service context when keeping same student
-    if (!keepStudent) {
-      setServiceContext('');
-      setServiceTouched(false);
+    // Preserve loose report metadata if provided (for follow-up reports of same loose report)
+    if (looseName) {
+      setLooseMode(true);
+      setUnassignedName(looseName);
+      setUnassignedReason(looseReason || '');
+      setUnassignedReasonOther(looseReasonOther || '');
+      // Pre-fill service context for loose reports
+      if (looseService) {
+        setServiceContext(looseService);
+        setServiceTouched(true);
+      }
+    } else {
+      setLooseMode(false);
+      setUnassignedName('');
+      setUnassignedReason('');
+      setUnassignedReasonOther('');
+      
+      // Preserve service context when keeping same student (assigned reports)
+      if (!keepStudent) {
+        setServiceContext('');
+        setServiceTouched(false);
+      }
     }
     
+    setLooseInstructorId('');
     setStudentQuery('');
     setStudentDayFilter(null);
     // Keep advanced filters state when creating additional reports (don't reset showAdvancedFilters)

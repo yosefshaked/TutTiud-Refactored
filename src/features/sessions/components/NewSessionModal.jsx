@@ -540,8 +540,20 @@ export default function NewSessionModal({
       const student = students.find(s => s.id === studentId);
       const studentName = isLoose ? (unassignedDetails?.name || 'תלמיד/ה') : (student?.name || 'תלמיד');
       
-      // Show success state instead of closing
-      setSuccessState({ studentId, studentName, date, allowSameStudent: Boolean(studentId) });
+      // Show success state instead of closing, preserving loose report metadata for additional reports
+      setSuccessState({
+        studentId,
+        studentName,
+        date,
+        allowSameStudent: Boolean(studentId),
+        // Preserve loose report metadata if creating a loose report
+        ...(isLoose && {
+          looseName: unassignedDetails?.name,
+          looseReason: unassignedDetails?.reason,
+          looseReasonOther: unassignedDetails?.reason_other,
+          looseService: serviceContext,
+        }),
+      });
       setSubmitState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to save session record', error);
@@ -573,9 +585,11 @@ export default function NewSessionModal({
 
   const handleNewReport = useCallback(({ date = null } = {}) => {
     setSuccessState(null);
-    // Reset form using the ref
+    // Reset form using the ref, clearing student but preserving date selection
     if (formResetRef.current) {
-      formResetRef.current({ date });
+      formResetRef.current({ 
+        date,
+      });
     }
   }, []);
 
@@ -583,11 +597,19 @@ export default function NewSessionModal({
     if (!successState) return;
     setSuccessState(null);
     // Reset form but keep the same student and optionally set date
+    // For loose reports, also preserve name, reason, and service
     if (formResetRef.current) {
       formResetRef.current({ 
         keepStudent: true, 
         studentId: successState.studentId,
-        date: date // Pass the selected date
+        date,
+        // Preserve loose report metadata for follow-up loose reports
+        ...(successState.looseName && {
+          looseName: successState.looseName,
+          looseReason: successState.looseReason,
+          looseReasonOther: successState.looseReasonOther,
+          looseService: successState.looseService,
+        }),
       });
     }
   }, [successState]);
