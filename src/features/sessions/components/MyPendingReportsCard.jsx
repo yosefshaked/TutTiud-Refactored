@@ -3,6 +3,7 @@ import { Calendar, Clock, CheckCircle2, AlertCircle, Loader2, XCircle, RotateCcw
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { fetchLooseSessions } from '@/features/sessions/api/loose-sessions.js';
 import ResubmitRejectedReportDialog from './ResubmitRejectedReportDialog.jsx';
@@ -111,21 +112,7 @@ export default function MyPendingReportsCard() {
   return (
     <Card dir="rtl">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>הדיווחים הממתינים שלי</span>
-          <div className="flex items-center gap-2">
-            {pendingReports.length > 0 && (
-              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
-                ממתינים: {pendingReports.length}
-              </Badge>
-            )}
-            {rejectedReports.length > 0 && (
-              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
-                נדחו: {rejectedReports.length}
-              </Badge>
-            )}
-          </div>
-        </CardTitle>
+        <CardTitle className="text-right">הדיווחים הממתינים שלי</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {isLoading ? (
@@ -151,86 +138,62 @@ export default function MyPendingReportsCard() {
               </div>
             )}
 
-            {/* Pending Reports */}
-            {pendingReports.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm text-right">ממתינים לטיפול מנהל ({pendingReports.length})</h3>
-                {pendingReports.map((report) => {
-                  const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
-                  const reason = report?.metadata?.unassigned_details?.reason || '';
-                  const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
-                  const time = report?.metadata?.unassigned_details?.time || '';
-                  const service = report?.service_context || '';
+            {(pendingReports.length > 0 || rejectedReports.length > 0 || resolvedReports.length > 0) && (
+              <Tabs defaultValue="pending" dir="rtl">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="pending" className="flex items-center gap-2">
+                    ממתינים
+                    {pendingReports.length > 0 && (
+                      <Badge variant="secondary" className="bg-amber-500 text-white">
+                        {pendingReports.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="rejected" className="flex items-center gap-2">
+                    נדחו
+                    {rejectedReports.length > 0 && (
+                      <Badge variant="secondary" className="bg-red-500 text-white">
+                        {rejectedReports.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="accepted" className="flex items-center gap-2">
+                    אושרו
+                    {resolvedReports.length > 0 && (
+                      <Badge variant="secondary" className="bg-green-500 text-white">
+                        {resolvedReports.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
 
-                  return (
-                    <Card key={report.id} className="border-2 border-amber-200 bg-amber-50/30">
-                      <CardContent className="p-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-base font-semibold text-foreground">{name}</h4>
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
-                              ממתין לשיוך
-                            </Badge>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                            <div className="flex items-center gap-2 text-neutral-600">
-                              <Calendar className="h-4 w-4 shrink-0" />
-                              <span>תאריך: {formatDate(report.date)}</span>
-                            </div>
-                            {time && (
-                              <div className="flex items-center gap-2 text-neutral-600">
-                                <Clock className="h-4 w-4 shrink-0" />
-                                <span>שעה: {formatTime(time)}</span>
-                              </div>
-                            )}
-                            {service && (
-                              <div className="flex items-center gap-2 text-neutral-600">
-                                <span className="font-medium">שירות:</span>
-                                <span>{service}</span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2 text-neutral-600">
-                              <span className="font-medium">סיבה:</span>
-                              <span>{getReasonLabel(reason, reasonOther)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                {/* Pending Tab */}
+                <TabsContent value="pending" className="space-y-3 mt-4">
+                  {pendingReports.length === 0 ? (
+                    <div className="text-center py-8 text-neutral-500">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 text-neutral-400" />
+                      <p className="text-sm">אין דיווחים ממתינים</p>
+                    </div>
+                  ) : (
+                    pendingReports.map((report) => {
+                      const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
+                      const reason = report?.metadata?.unassigned_details?.reason || '';
+                      const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
+                      const time = report?.metadata?.unassigned_details?.time || '';
+                      const service = report?.service_context || '';
 
-            {/* Rejected Reports */}
-            {rejectedReports.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm text-right text-red-700">נדחו ({rejectedReports.length})</h3>
-                {rejectedReports.map((report) => {
-                  const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
-                  const reason = report?.metadata?.unassigned_details?.reason || '';
-                  const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
-                  const time = report?.metadata?.unassigned_details?.time || '';
-                  const service = report?.service_context || '';
-                  const rejectionReason = report?.metadata?.rejection?.reason || 'לא צוינה סיבה';
-                  const rejectedAt = report?.metadata?.rejection?.rejected_at || report?.deleted_at || '';
-
-                  return (
-                    <Card key={report.id} className="border-2 border-red-200 bg-red-50/30">
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
+                      return (
+                        <Card key={report.id} className="border-2 border-amber-200 bg-amber-50/30">
+                          <CardContent className="p-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <h4 className="text-base font-semibold text-foreground">{name}</h4>
-                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
-                                  <XCircle className="h-3 w-3 ml-1" />
-                                  נדחה
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
+                                  ממתין לשיוך
                                 </Badge>
                               </div>
                               
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mb-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                                 <div className="flex items-center gap-2 text-neutral-600">
                                   <Calendar className="h-4 w-4 shrink-0" />
                                   <span>תאריך: {formatDate(report.date)}</span>
@@ -252,71 +215,140 @@ export default function MyPendingReportsCard() {
                                   <span>{getReasonLabel(reason, reasonOther)}</span>
                                 </div>
                               </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </TabsContent>
 
-                              <div className="rounded-md bg-red-100 p-3 text-sm">
-                                <p className="font-semibold text-red-900 mb-1">סיבת הדחייה:</p>
-                                <p className="text-red-800">{rejectionReason}</p>
-                                {rejectedAt && (
-                                  <p className="text-xs text-red-600 mt-1">
-                                    נדחה ב-{formatDate(rejectedAt.split('T')[0])}
-                                  </p>
-                                )}
+                {/* Rejected Tab */}
+                <TabsContent value="rejected" className="space-y-3 mt-4">
+                  {rejectedReports.length === 0 ? (
+                    <div className="text-center py-8 text-neutral-500">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 text-neutral-400" />
+                      <p className="text-sm">אין דיווחים שנדחו</p>
+                    </div>
+                  ) : (
+                    rejectedReports.map((report) => {
+                      const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
+                      const reason = report?.metadata?.unassigned_details?.reason || '';
+                      const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
+                      const time = report?.metadata?.unassigned_details?.time || '';
+                      const service = report?.service_context || '';
+                      const rejectionReason = report?.metadata?.rejection?.reason || 'לא צוינה סיבה';
+                      const rejectedAt = report?.metadata?.rejection?.rejected_at || report?.deleted_at || '';
+
+                      return (
+                        <Card key={report.id} className="border-2 border-red-200 bg-red-50/30">
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                                    <h4 className="text-base font-semibold text-foreground">{name}</h4>
+                                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+                                      <XCircle className="h-3 w-3 ml-1" />
+                                      נדחה
+                                    </Badge>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mb-3">
+                                    <div className="flex items-center gap-2 text-neutral-600">
+                                      <Calendar className="h-4 w-4 shrink-0" />
+                                      <span>תאריך: {formatDate(report.date)}</span>
+                                    </div>
+                                    {time && (
+                                      <div className="flex items-center gap-2 text-neutral-600">
+                                        <Clock className="h-4 w-4 shrink-0" />
+                                        <span>שעה: {formatTime(time)}</span>
+                                      </div>
+                                    )}
+                                    {service && (
+                                      <div className="flex items-center gap-2 text-neutral-600">
+                                        <span className="font-medium">שירות:</span>
+                                        <span>{service}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-2 text-neutral-600">
+                                      <span className="font-medium">סיבה:</span>
+                                      <span>{getReasonLabel(reason, reasonOther)}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="rounded-md bg-red-100 p-3 text-sm">
+                                    <p className="font-semibold text-red-900 mb-1">סיבת הדחייה:</p>
+                                    <p className="text-red-800">{rejectionReason}</p>
+                                    {rejectedAt && (
+                                      <p className="text-xs text-red-600 mt-1">
+                                        נדחה ב-{formatDate(rejectedAt.split('T')[0])}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-2"
+                                  onClick={() => handleResubmit(report)}
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                  שלח מחדש
+                                </Button>
                               </div>
                             </div>
-                          </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </TabsContent>
 
-                          <div className="flex justify-end">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-2"
-                              onClick={() => handleResubmit(report)}
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                              שלח מחדש
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                {/* Accepted Tab */}
+                <TabsContent value="accepted" className="space-y-3 mt-4">
+                  {resolvedReports.length === 0 ? (
+                    <div className="text-center py-8 text-neutral-500">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 text-neutral-400" />
+                      <p className="text-sm">אין דיווחים שאושרו</p>
+                    </div>
+                  ) : (
+                    <>
+                      {resolvedReports.slice(0, 5).map((report) => {
+                        const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
+                        const service = report?.service_context || '';
 
-            {/* Resolved Reports */}
-            {resolvedReports.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm text-right text-green-700">טופלו ({resolvedReports.length})</h3>
-                {resolvedReports.slice(0, 3).map((report) => {
-                  const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
-                  const service = report?.service_context || '';
-
-                  return (
-                    <Card key={report.id} className="border-2 border-green-200 bg-green-50/30">
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                          <span className="font-medium">{name}</span>
-                          <span className="text-neutral-600">·</span>
-                          <span className="text-neutral-600">{formatDate(report.date)}</span>
-                          {service && (
-                            <>
-                              <span className="text-neutral-600">·</span>
-                              <span className="text-neutral-600">{service}</span>
-                            </>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                {resolvedReports.length > 3 && (
-                  <p className="text-xs text-neutral-500 text-center">
-                    ועוד {resolvedReports.length - 3} דיווחים שטופלו
-                  </p>
-                )}
-              </div>
+                        return (
+                          <Card key={report.id} className="border-2 border-green-200 bg-green-50/30">
+                            <CardContent className="p-3">
+                              <div className="flex items-center gap-2 text-sm">
+                                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                                <span className="font-medium">{name}</span>
+                                <span className="text-neutral-600">·</span>
+                                <span className="text-neutral-600">{formatDate(report.date)}</span>
+                                {service && (
+                                  <>
+                                    <span className="text-neutral-600">·</span>
+                                    <span className="text-neutral-600">{service}</span>
+                                  </>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                      {resolvedReports.length > 5 && (
+                        <p className="text-xs text-neutral-500 text-center">
+                          ועוד {resolvedReports.length - 5} דיווחים שטופלו
+                        </p>
+                      )}
+                    </>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </>
         )}
