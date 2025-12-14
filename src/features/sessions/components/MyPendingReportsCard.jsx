@@ -405,7 +405,11 @@ export default function MyPendingReportsCard() {
                   ) : (
                     <>
                       {resolvedReports.slice(0, 5).map((report) => {
-                        const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
+                        const submittedName = report?.metadata?.unassigned_details?.name || 'ללא שם';
+                        const actualStudentName = report?.Students?.name;
+                        const displayName = actualStudentName 
+                          ? `${actualStudentName} (${submittedName})`
+                          : submittedName;
                         const service = report?.service_context || '';
 
                         return (
@@ -413,7 +417,7 @@ export default function MyPendingReportsCard() {
                             <CardContent className="p-3">
                               <div className="flex items-center gap-2 text-sm">
                                 <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                                <span className="font-medium">{name}</span>
+                                <span className="font-medium">{displayName}</span>
                                 <span className="text-neutral-600">·</span>
                                 <span className="text-neutral-600">{formatDate(report.date)}</span>
                                 {service && (
