@@ -25,6 +25,56 @@ const REASON_OPTIONS = [
   { value: 'other', label: 'אחר' },
 ];
 
+function normalizeMaybeOptionText(value, fallback = '') {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object') {
+    const label = typeof value.label === 'string' ? value.label : '';
+    const optionValue = typeof value.value === 'string' ? value.value : '';
+    return label || optionValue || fallback;
+  }
+  return fallback;
+}
+
+function normalizeLooseReasonValue(rawReason) {
+  const allowed = new Set(REASON_OPTIONS.map((opt) => opt.value));
+  const labelToValue = new Map(REASON_OPTIONS.map((opt) => [opt.label, opt.value]));
+
+  const candidate = normalizeMaybeOptionText(rawReason, '').trim();
+  if (!candidate) return '';
+  if (allowed.has(candidate)) return candidate;
+  if (labelToValue.has(candidate)) return labelToValue.get(candidate);
+  return candidate;
+}
+
+function normalizeQuestionOptions(rawOptions) {
+  if (!Array.isArray(rawOptions)) return [];
+  return rawOptions
+    .map((entry) => {
+      if (typeof entry === 'string') {
+        const trimmed = entry.trim();
+        if (!trimmed) return null;
+        return { value: trimmed, label: trimmed };
+      }
+      if (!entry || typeof entry !== 'object') return null;
+      const value = typeof entry.value === 'string' ? entry.value.trim() : '';
+      const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+      const resolvedValue = value || label;
+      const resolvedLabel = label || value;
+      if (!resolvedValue || !resolvedLabel) return null;
+      return { value: resolvedValue, label: resolvedLabel };
+    })
+    .filter(Boolean);
+}
+
+function coerceAnswerToOptionValue(answer, options) {
+  if (typeof answer !== 'string' || !answer.trim()) return '';
+  const trimmed = answer.trim();
+  if (!Array.isArray(options) || options.length === 0) return trimmed;
+  if (options.some((opt) => opt.value === trimmed)) return trimmed;
+  const matchByLabel = options.find((opt) => opt.label === trimmed);
+  return matchByLabel ? matchByLabel.value : trimmed;
+}
+
 function formatDateForDisplay(dateStr) {
   if (!dateStr) return '';
   const [year, month, day] = dateStr.split('-');
@@ -56,9 +106,15 @@ export default function ResubmitRejectedReportDialog({
   const [questions, setQuestions] = useState([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   
-  const unassignedDetails = report?.metadata?.unassigned_details || {};
-  const rejectionInfo = report?.metadata?.rejection || {};
+  const unassignedDetails = useMemo(() => report?.metadata?.unassigned_details || {}, [report]);
+  const rejectionInfo = useMemo(() => report?.metadata?.rejection || {}, [report]);
   const originalContent = useMemo(() => parseSessionContent(report?.content), [report?.content]);
+
+  const rejectionReasonText = useMemo(() => {
+    const raw = rejectionInfo?.reason;
+    const normalized = normalizeMaybeOptionText(raw, '').trim();
+    return normalized || 'לא צוינה סיבה';
+  }, [rejectionInfo?.reason]);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -98,10 +154,24 @@ export default function ResubmitRejectedReportDialog({
   useEffect(() => {
     if (!report) return;
 
+    const normalizedLooseReason = normalizeLooseReasonValue(unassignedDetails.reason);
+    const normalizedLooseReasonOther = normalizeMaybeOptionText(unassignedDetails.reason_other, '').trim();
+
+    const allowedReasonValues = new Set(REASON_OPTIONS.map((opt) => opt.value));
+    const initialReason = allowedReasonValues.has(normalizedLooseReason)
+      ? normalizedLooseReason
+      : normalizedLooseReason
+        ? 'other'
+        : 'other';
+
+    const initialReasonOther = initialReason === 'other'
+      ? (normalizedLooseReasonOther || (allowedReasonValues.has(normalizedLooseReason) ? '' : normalizedLooseReason))
+      : '';
+
     setFormData({
       name: unassignedDetails.name || '',
-      reason: unassignedDetails.reason || 'other',
-      reasonOther: unassignedDetails.reason_other || '',
+      reason: initialReason,
+      reasonOther: initialReasonOther,
       date: report.date || '',
       time: unassignedDetails.time || '',
       service: report.service_context || '',
@@ -201,7 +271,7 @@ export default function ResubmitRejectedReportDialog({
           {/* Rejection Info */}
           <div className="rounded-md bg-red-50 p-4 border border-red-200">
             <h3 className="font-semibold text-red-900 mb-2">סיבת הדחייה המקורית:</h3>
-            <p className="text-red-800 text-sm">{rejectionInfo.reason || 'לא צוינה סיבה'}</p>
+            <p className="text-red-800 text-sm">{rejectionReasonText}</p>
             {rejectionInfo.rejected_at && (
               <p className="text-xs text-red-600 mt-1">
                 נדחה ב-{formatDateForDisplay(rejectionInfo.rejected_at.split('T')[0])}
@@ -319,7 +389,9 @@ export default function ResubmitRejectedReportDialog({
               {questions.map((question) => {
                 const questionKey = question.key || question.id;
                 const questionLabel = question.label || question.question || questionKey;
-                const currentValue = answers[questionKey] || '';
+                const rawValue = answers[questionKey] || '';
+                const options = normalizeQuestionOptions(question.options || []);
+                const currentValue = coerceAnswerToOptionValue(rawValue, options);
 
                 return (
                   <div key={questionKey}>
@@ -344,9 +416,9 @@ export default function ResubmitRejectedReportDialog({
                           <SelectValue placeholder="בחר תשובה" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(question.options || []).map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
+                          {options.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
