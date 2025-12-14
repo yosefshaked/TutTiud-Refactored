@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter, Eye, MoreVertical, FileText, MessageSquare } from 'lucide-react';
+import { Loader2, AlertCircle, UserPlus, UserCheck, Calendar, Clock, CheckSquare, Square, XCircle, ChevronDown, ChevronUp, Filter, Eye, MoreVertical, FileText, MessageSquare, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -621,6 +623,9 @@ export default function PendingReportsPage() {
                 const time = report?.metadata?.unassigned_details?.time || '';
                 const service = report?.service_context || '';
                 const instructorName = report?.Instructors?.name || report?.Instructors?.email || 'לא ידוע';
+                const instructorNotes = report?.metadata?.instructor_notes || '';
+                const isResubmission = Boolean(report?.metadata?.resubmitted_from);
+                const notesPreview = instructorNotes.length > 160 ? `${instructorNotes.slice(0, 160)}…` : instructorNotes;
 
                 const isSelected = selectedReportIds.has(report.id);
 
@@ -642,11 +647,42 @@ export default function PendingReportsPage() {
                             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 shrink-0">
                               ממתין לשיוך
                             </Badge>
-                            {report?.metadata?.instructor_notes && (
-                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 shrink-0 gap-1">
-                                <MessageSquare className="h-3 w-3" />
-                                הערות
+                            {isResubmission && (
+                              <Badge variant="outline" className="bg-neutral-50 text-neutral-700 border-neutral-300 shrink-0 gap-1">
+                                <RotateCcw className="h-3 w-3" />
+                                שליחה מחדש
                               </Badge>
+                            )}
+                            {instructorNotes && (
+                              <Popover>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <PopoverTrigger asChild>
+                                      <TooltipTrigger asChild>
+                                        <button type="button" className="shrink-0" aria-label="הצג הערות">
+                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 shrink-0 gap-1 cursor-pointer">
+                                            <MessageSquare className="h-3 w-3" />
+                                            הערות
+                                          </Badge>
+                                        </button>
+                                      </TooltipTrigger>
+                                    </PopoverTrigger>
+                                    <TooltipContent side="bottom" className="max-w-xs text-right">
+                                      <div dir="rtl" className="text-right whitespace-pre-wrap">
+                                        {notesPreview}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <PopoverContent side="bottom" align="start" className="w-80 p-3">
+                                  <div dir="rtl" className="space-y-2">
+                                    <div className="text-xs font-semibold text-neutral-600 text-right">הערות מהמדריך</div>
+                                    <div className="text-sm text-neutral-900 text-right whitespace-pre-wrap break-words">
+                                      {instructorNotes}
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             )}
                           </div>
                           <Button
@@ -777,6 +813,12 @@ export default function PendingReportsPage() {
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
               <DialogTitle className="text-xl">פרטי הדיווח</DialogTitle>
+              {reportToView?.metadata?.resubmitted_from && (
+                <Badge variant="outline" className="bg-neutral-50 text-neutral-700 border-neutral-300 shrink-0 gap-1">
+                  <RotateCcw className="h-3 w-3" />
+                  שליחה מחדש
+                </Badge>
+              )}
             </div>
           </DialogHeader>
           {reportToView && (

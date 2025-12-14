@@ -287,6 +287,48 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_create_session' });
   }
 
+  // If this is a resubmission of a previously rejected loose report, mark the original as resubmitted.
+  // This allows instructor UIs to remove it from the "Rejected" list after a new submission is sent.
+  if (isLoose && clientMetadataAdditions.resubmitted_from) {
+    const originalId = normalizeString(clientMetadataAdditions.resubmitted_from);
+    const now = new Date().toISOString();
+
+    try {
+      const originalResult = await tenantClient
+        .from('SessionRecords')
+        .select('id, instructor_id, deleted, metadata')
+        .eq('id', originalId)
+        .maybeSingle();
+
+      const original = originalResult?.data;
+      const sameInstructor = normalizeString(original?.instructor_id) === normalizeString(sessionInstructorId);
+      const hasRejection = Boolean(original?.metadata?.rejection);
+
+      if (!originalResult.error && original && original.deleted && sameInstructor && hasRejection) {
+        const nextMetadata = mergeMetadata(original.metadata || {}, {
+          rejection: {
+            ...(original.metadata?.rejection || {}),
+            resubmitted_at: now,
+            resubmitted_to: data.id,
+          },
+        });
+
+        const updateResult = await tenantClient
+          .from('SessionRecords')
+          .update({ metadata: nextMetadata })
+          .eq('id', originalId);
+
+        if (updateResult.error) {
+          context.log?.warn?.('sessions failed to mark original rejected report as resubmitted', {
+            message: updateResult.error.message,
+          });
+        }
+      }
+    } catch (markError) {
+      context.log?.warn?.('sessions failed while marking resubmitted_from', { message: markError?.message });
+    }
+  }
+
   try {
     await logAuditEvent(supabase, {
       orgId,

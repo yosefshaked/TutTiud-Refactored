@@ -139,7 +139,13 @@ export default function MyPendingReportsCard() {
   }, [reports, dateRangeDays]);
   
   const pendingReports = filteredReports.filter((r) => !r.student_id && !r.deleted && !r.isRejected);
-  const rejectedReports = filteredReports.filter((r) => r.isRejected === true || (r.deleted && r.metadata?.rejection));
+  const rejectedReports = filteredReports.filter((r) => {
+    const isRejected = r.isRejected === true || (r.deleted && r.metadata?.rejection);
+    if (!isRejected) return false;
+    // Once resubmitted, hide the original rejected item from the instructor view.
+    if (r.metadata?.rejection?.resubmitted_at) return false;
+    return true;
+  });
   const resolvedReports = filteredReports.filter((r) => r.student_id);
   
   // Debug logging for resolved reports
