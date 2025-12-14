@@ -120,9 +120,10 @@ export default function BulkResolvePendingReportsDialog({
     setMode(RESOLUTION_MODE.SELECT);
     setSelectedStudentId('');
     setStudentSearchQuery('');
-    setFilterInstructor('');
-    setFilterDay('');
-    setFilterTag('');
+    setShowAdvancedFilters(false);
+    setFilterInstructor('all');
+    setFilterDay('all');
+    setFilterTag('all');
     setFilterStatus('all');
     setIsProcessing(false);
     onClose();

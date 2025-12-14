@@ -3,6 +3,7 @@ import { Loader2, UserCheck, UserPlus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -66,6 +67,7 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
       setError('');
       setStudentQuery('');
       setSelectedStudentId('');
+      setShowAdvancedFilters(false);
       setFilterInstructor('all');
       setFilterDay('all');
       setFilterTag('all');
