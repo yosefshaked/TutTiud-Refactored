@@ -10,7 +10,7 @@ import {
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
-import { parseJsonBodyWithLimit, validateSessionWrite } from '../_shared/validation.js';
+import { isUUID, parseJsonBodyWithLimit, validateSessionWrite } from '../_shared/validation.js';
 import { buildSessionMetadata } from '../_shared/session-metadata.js';
 import { mergeMetadata } from '../_shared/metadata-utils.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
@@ -241,6 +241,30 @@ export default async function (context, req) {
 
   const mergedMetadata = mergeMetadata(metadata, metadataAdditions);
 
+  // Allow-list user-provided metadata additions for loose report resubmissions.
+  // Never allow overriding server metadata; merge additively.
+  let clientMetadataAdditions = {};
+  const rawClientMetadata = body?.metadata;
+  if (isLoose && rawClientMetadata && typeof rawClientMetadata === 'object' && !Array.isArray(rawClientMetadata)) {
+    const resubmittedFrom = normalizeString(rawClientMetadata.resubmitted_from);
+    if (resubmittedFrom && isUUID(resubmittedFrom)) {
+      clientMetadataAdditions.resubmitted_from = resubmittedFrom;
+    }
+
+    if (rawClientMetadata.original_rejection && typeof rawClientMetadata.original_rejection === 'object') {
+      clientMetadataAdditions.original_rejection = rawClientMetadata.original_rejection;
+    }
+
+    const instructorNotes = normalizeString(rawClientMetadata.instructor_notes);
+    if (instructorNotes) {
+      clientMetadataAdditions.instructor_notes = instructorNotes;
+    }
+  }
+
+  const finalMetadata = Object.keys(clientMetadataAdditions).length
+    ? mergeMetadata(mergedMetadata, clientMetadataAdditions)
+    : mergedMetadata;
+
   const { data, error } = await tenantClient
     .from('SessionRecords')
     .insert([
@@ -252,7 +276,7 @@ export default async function (context, req) {
         service_context: validation.hasExplicitService
           ? validation.serviceContext
           : validation.serviceContext ?? studentRecord?.default_service ?? null,
-        metadata: mergedMetadata,
+        metadata: finalMetadata,
       },
     ])
     .select()

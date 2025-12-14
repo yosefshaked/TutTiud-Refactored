@@ -211,36 +211,30 @@ export default function ResubmitRejectedReportDialog({
     setIsSubmitting(true);
 
     try {
-      const payload = {
+      const body = {
+        student_id: null,
         org_id: activeOrg?.id,
         date: formData.date,
+        time: formData.time,
         service_context: formData.service || null,
-        content: JSON.stringify(answers),
+        content: answers,
+        unassigned_details: {
+          name: formData.name.trim(),
+          reason: formData.reason,
+          ...(formData.reason === 'other' ? { reason_other: formData.reasonOther } : {}),
+          time: formData.time,
+        },
         metadata: {
-          unassigned_details: {
-            name: formData.name.trim(),
-            reason: formData.reason,
-            reason_other: formData.reason === 'other' ? formData.reasonOther : '',
-            time: formData.time,
-          },
           resubmitted_from: report?.id,
           original_rejection: rejectionInfo,
           instructor_notes: formData.adminNotes.trim() || undefined,
         },
       };
 
-      const response = await authenticatedFetch('sessions', {
+      await authenticatedFetch('sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        session,
-        signal: null,
+        body,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData?.message || 'שגיאה בשליחת הדיווח');
-      }
 
       toast.success('הדיווח נשלח מחדש בהצלחה');
       onSuccess?.();
@@ -250,7 +244,7 @@ export default function ResubmitRejectedReportDialog({
     } finally {
       setIsSubmitting(false);
     }
-  }, [formData, answers, report, activeOrg, session, rejectionInfo, onSuccess]);
+  }, [formData, answers, report, activeOrg, rejectionInfo, onSuccess]);
 
   if (!report) return null;
 
