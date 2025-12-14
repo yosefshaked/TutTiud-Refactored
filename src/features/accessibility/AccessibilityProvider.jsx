@@ -35,7 +35,8 @@ const A11Y_CSS = `
 }
 
 /* Dyslexia-friendly font family */
-.a11y-dyslexia-font body {
+.a11y-dyslexia-font,
+.a11y-dyslexia-font * {
   font-family: 'OpenDyslexic', 'Atkinson Hyperlegible', Nunito, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji' !important;
 }
 
