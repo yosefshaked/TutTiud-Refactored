@@ -130,7 +130,11 @@ export default function StudentsPage() {
 
     try {
       const reports = await fetchLooseSessions({ orgId: activeOrgId, session });
-      setPendingReportsCount(Array.isArray(reports) ? reports.length : 0);
+      // Count only pending reports (not rejected, not accepted)
+      const pendingOnly = Array.isArray(reports) 
+        ? reports.filter(r => !r.student_id && !r.deleted && !r.isRejected)
+        : [];
+      setPendingReportsCount(pendingOnly.length);
     } catch (error) {
       console.error('Failed to load pending reports count', error);
       // Don't show error toast - this is supplementary data
@@ -552,7 +556,7 @@ export default function StudentsPage() {
                 {isAdmin ? 'רשימת תלמידים' : 'רשימת התלמידים שלי'}
               </CardTitle>
               <div className="flex items-center gap-2">
-                {pendingReportsCount > 0 && isAdmin && (
+                {isAdmin && (
                   <Button
                     type="button"
                     variant="outline"
@@ -561,12 +565,14 @@ export default function StudentsPage() {
                   >
                     <AlertCircle className="h-4 w-4" aria-hidden="true" />
                     <span>דיווחים ממתינים</span>
-                    <Badge variant="secondary" className="bg-amber-500 text-white hover:bg-amber-600">
-                      {pendingReportsCount}
-                    </Badge>
+                    {pendingReportsCount > 0 && (
+                      <Badge variant="secondary" className="bg-amber-500 text-white hover:bg-amber-600">
+                        {pendingReportsCount}
+                      </Badge>
+                    )}
                   </Button>
                 )}
-                {!isAdmin && pendingReportsCount > 0 && (
+                {!isAdmin && (
                   <Button
                     type="button"
                     variant="outline"
@@ -575,9 +581,11 @@ export default function StudentsPage() {
                   >
                     <FileWarning className="h-4 w-4" />
                     <span>דיווחים ממתינים</span>
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                      {pendingReportsCount}
-                    </Badge>
+                    {pendingReportsCount > 0 && (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                        {pendingReportsCount}
+                      </Badge>
+                    )}
                   </Button>
                 )}
                 {isAdmin && (
