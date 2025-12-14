@@ -42,6 +42,7 @@ export default function BulkResolvePendingReportsDialog({
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Filter states
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filterInstructor, setFilterInstructor] = useState('all');
   const [filterDay, setFilterDay] = useState('all');
   const [filterTag, setFilterTag] = useState('all');
@@ -79,17 +80,17 @@ export default function BulkResolvePendingReportsDialog({
       }
       
       // Instructor filter
-      if (filterInstructor && s.assigned_instructor_id !== filterInstructor) {
+      if (filterInstructor && filterInstructor !== 'all' && s.assigned_instructor_id !== filterInstructor) {
         return false;
       }
       
       // Day filter
-      if (filterDay && String(s.default_day_of_week) !== String(filterDay)) {
+      if (filterDay && filterDay !== 'all' && String(s.default_day_of_week) !== String(filterDay)) {
         return false;
       }
       
       // Tag filter
-      if (filterTag) {
+      if (filterTag && filterTag !== 'all') {
         const studentTags = s.tags || [];
         if (!studentTags.includes(filterTag)) {
           return false;
@@ -129,13 +130,13 @@ export default function BulkResolvePendingReportsDialog({
   
   const handleClearFilters = () => {
     setStudentSearchQuery('');
-    setFilterInstructor('');
-    setFilterDay('');
-    setFilterTag('');
+    setFilterInstructor('all');
+    setFilterDay('all');
+    setFilterTag('all');
     setFilterStatus('all');
   };
   
-  const hasActiveFilters = studentSearchQuery || filterInstructor || filterDay || filterTag || filterStatus !== 'all';
+  const hasActiveFilters = studentSearchQuery || (filterInstructor && filterInstructor !== 'all') || (filterDay && filterDay !== 'all') || (filterTag && filterTag !== 'all') || (filterStatus && filterStatus !== 'all');
 
   const handleModeSelect = (selectedMode) => {
     setMode(selectedMode);
@@ -355,24 +356,51 @@ export default function BulkResolvePendingReportsDialog({
                 />
               </div>
 
-              {/* Filter Controls */}
-              <div className="space-y-3 border-t pt-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">סינון תלמידים</Label>
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleClearFilters}
-                      className="h-7 text-xs gap-1"
-                    >
-                      <X className="h-3 w-3" />
-                      נקה סינון
-                    </Button>
+              {/* Advanced Filters Toggle */}
+              <div className="border-t pt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="w-full justify-between h-8"
+                >
+                  <span className="flex items-center gap-2">
+                    <span>סינון מתקדם</span>
+                    {hasActiveFilters && (
+                      <Badge variant="secondary" className="h-5 min-w-[1.25rem] px-1.5">
+                        {[filterInstructor !== 'all', filterDay !== 'all', filterTag !== 'all', filterStatus !== 'all'].filter(Boolean).length}
+                      </Badge>
+                    )}
+                  </span>
+                  {showAdvancedFilters ? (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   )}
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                </Button>
+
+                {showAdvancedFilters && (
+                  <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">סינון תלמידים</Label>
+                      {hasActiveFilters && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleClearFilters}
+                          className="h-7 text-xs gap-1"
+                        >
+                          <X className="h-3 w-3" />
+                          נקה סינון
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {/* Instructor Filter */}
                   <div className="space-y-1">
                     <Label htmlFor="filter-instructor" className="text-xs">מדריך</Label>
@@ -445,6 +473,8 @@ export default function BulkResolvePendingReportsDialog({
                     </Select>
                   </div>
                 </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 flex-row-reverse">
