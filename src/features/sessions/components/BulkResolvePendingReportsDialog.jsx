@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +18,6 @@ import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
 import { assignLooseSession, createAndAssignLooseSession } from '@/features/sessions/api/loose-sessions.js';
 import { mapLooseSessionError } from '@/lib/error-mapping.js';
 import AddStudentForm from '@/features/admin/components/AddStudentForm.jsx';
-import ComboBoxInput from '@/components/ui/ComboBoxInput.jsx';
 
 const DAY_NAMES = ['', 'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
@@ -59,9 +59,16 @@ export default function BulkResolvePendingReportsDialog({
     enabled: open && mode === RESOLUTION_MODE.ASSIGN_EXISTING,
   });
   
-  const { tags = [] } = useStudentTags({
+  const { tagOptions: tags = [], loadTags } = useStudentTags({
     enabled: open && mode === RESOLUTION_MODE.ASSIGN_EXISTING,
   });
+
+  // Load tags when dialog opens
+  useEffect(() => {
+    if (open && mode === RESOLUTION_MODE.ASSIGN_EXISTING) {
+      void loadTags();
+    }
+  }, [open, mode, loadTags]);
 
   // Filter students by search query and filters
   const filteredStudents = useMemo(() => {
@@ -108,13 +115,6 @@ export default function BulkResolvePendingReportsDialog({
       return true;
     });
   }, [students, studentSearchQuery, filterInstructor, filterDay, filterTag, filterStatus]);
-
-  const studentOptions = useMemo(() => {
-    return filteredStudents.map((s) => ({
-      value: s.id,
-      label: s.name,
-    }));
-  }, [filteredStudents]);
 
   const handleClose = () => {
     setMode(RESOLUTION_MODE.SELECT);
@@ -341,20 +341,43 @@ export default function BulkResolvePendingReportsDialog({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground text-right">
-                  חפש לפי שם תלמיד, שם איש קשר או מספר טלפון
-                </p>
-                <ComboBoxInput
-                  id="student-select"
-                  value={selectedStudentId}
-                  query={studentSearchQuery}
-                  onValueChange={setSelectedStudentId}
-                  onQueryChange={setStudentSearchQuery}
-                  options={studentOptions}
-                  placeholder={studentsLoading ? 'טוען תלמידים...' : 'הקלד לחיפוש תלמיד...'}
-                  emptyMessage={studentSearchQuery ? 'לא נמצאו תלמידים תואמים' : 'לא נמצאו תלמידים במערכת'}
-                  disabled={studentsLoading || isProcessing}
-                />
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Input
+                      id="student-search"
+                      placeholder="חפש לפי שם תלמיד, שם איש קשר או מספר טלפון..."
+                      value={studentSearchQuery}
+                      onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      disabled={studentsLoading || isProcessing}
+                      className="pr-10"
+                    />
+                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <Select
+                    value={selectedStudentId}
+                    onValueChange={setSelectedStudentId}
+                    disabled={studentsLoading || isProcessing || filteredStudents.length === 0}
+                  >
+                    <SelectTrigger id="student-select" className="w-full">
+                      <SelectValue placeholder={studentsLoading ? 'טוען תלמידים...' : 'בחרו תלמיד מהרשימה'} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {filteredStudents.map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          {student.name || 'ללא שם'}
+                          {student.contact_name ? ` (${student.contact_name})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {filteredStudents.length === 0 && !studentsLoading && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      {studentSearchQuery ? 'לא נמצאו תלמידים תואמים' : 'לא נמצאו תלמידים במערכת'}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Advanced Filters Toggle */}

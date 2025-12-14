@@ -46,7 +46,14 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
   });
   
   const { instructors = [] } = useInstructors({ enabled: open && currentMode === 'assign' });
-  const { tags = [] } = useStudentTags({ enabled: open && currentMode === 'assign' });
+  const { tagOptions: tags = [], loadTags } = useStudentTags({ enabled: open && currentMode === 'assign' });
+  
+  // Load tags when dialog opens in assign mode
+  useEffect(() => {
+    if (open && currentMode === 'assign') {
+      void loadTags();
+    }
+  }, [open, currentMode, loadTags]);
   
   const unassignedName = report?.metadata?.unassigned_details?.name || '';
   const reportService = report?.service_context || '';
