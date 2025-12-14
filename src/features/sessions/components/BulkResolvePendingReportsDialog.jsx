@@ -8,14 +8,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Users, UserPlus } from 'lucide-react';
+import { Users, UserPlus, X } from 'lucide-react';
 import { useOrg } from '@/org/OrgContext.jsx';
-import { useStudents } from '@/hooks/useOrgData.js';
+import { useStudents, useInstructors } from '@/hooks/useOrgData.js';
+import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
 import { assignLooseSession, createAndAssignLooseSession } from '@/features/sessions/api/loose-sessions.js';
 import { mapLooseSessionError } from '@/lib/error-mapping.js';
 import AddStudentForm from '@/features/admin/components/AddStudentForm.jsx';
 import ComboBoxInput from '@/components/ui/ComboBoxInput.jsx';
+
+const DAY_NAMES = ['', 'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
 const RESOLUTION_MODE = Object.freeze({
   SELECT: 'select',
@@ -36,27 +40,102 @@ export default function BulkResolvePendingReportsDialog({
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Filter states
+  const [filterInstructor, setFilterInstructor] = useState('all');
+  const [filterDay, setFilterDay] = useState('all');
+  const [filterTag, setFilterTag] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all'); // 'all' | 'active' | 'inactive'
 
   // Fetch students for assignment dropdown (admin sees all, non-admin sees only their own)
-  const { data: students = [], isLoading: studentsLoading } = useStudents({
+  const { students = [], loadingStudents: studentsLoading } = useStudents({
     enabled: open && mode === RESOLUTION_MODE.ASSIGN_EXISTING,
     status: 'all',
   });
 
+  // Fetch instructors and tags for filters
+  const { instructors = [] } = useInstructors({
+    enabled: open && mode === RESOLUTION_MODE.ASSIGN_EXISTING,
+  });
+  
+  const { tags = [] } = useStudentTags({
+    enabled: open && mode === RESOLUTION_MODE.ASSIGN_EXISTING,
+  });
+
+  // Filter students by search query and filters
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      // Search query filter (name, contact name, contact phone)
+      const query = studentSearchQuery.trim().toLowerCase();
+      if (query) {
+        const name = String(s?.name || '').toLowerCase();
+        const contactName = String(s?.contact_name || '').toLowerCase();
+        const contactPhone = String(s?.contact_phone || '').toLowerCase();
+        
+        const matchesQuery = name.includes(query) || 
+                            contactName.includes(query) || 
+                            contactPhone.includes(query);
+        if (!matchesQuery) return false;
+      }
+      
+      // Instructor filter
+      if (filterInstructor && s.assigned_instructor_id !== filterInstructor) {
+        return false;
+      }
+      
+      // Day filter
+      if (filterDay && String(s.default_day_of_week) !== String(filterDay)) {
+        return false;
+      }
+      
+      // Tag filter
+      if (filterTag) {
+        const studentTags = s.tags || [];
+        if (!studentTags.includes(filterTag)) {
+          return false;
+        }
+      }
+      
+      // Status filter
+      if (filterStatus === 'active' && s.is_active === false) {
+        return false;
+      }
+      if (filterStatus === 'inactive' && s.is_active !== false) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [students, studentSearchQuery, filterInstructor, filterDay, filterTag, filterStatus]);
+
   const studentOptions = useMemo(() => {
-    return students.map((s) => ({
+    return filteredStudents.map((s) => ({
       value: s.id,
       label: s.name,
     }));
-  }, [students]);
+  }, [filteredStudents]);
 
   const handleClose = () => {
     setMode(RESOLUTION_MODE.SELECT);
     setSelectedStudentId('');
     setStudentSearchQuery('');
+    setFilterInstructor('');
+    setFilterDay('');
+    setFilterTag('');
+    setFilterStatus('all');
     setIsProcessing(false);
     onClose();
   };
+  
+  const handleClearFilters = () => {
+    setStudentSearchQuery('');
+    setFilterInstructor('');
+    setFilterDay('');
+    setFilterTag('');
+    setFilterStatus('all');
+  };
+  
+  const hasActiveFilters = studentSearchQuery || filterInstructor || filterDay || filterTag || filterStatus !== 'all';
 
   const handleModeSelect = (selectedMode) => {
     setMode(selectedMode);
@@ -250,9 +329,19 @@ export default function BulkResolvePendingReportsDialog({
           {mode === RESOLUTION_MODE.ASSIGN_EXISTING && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="student-select" className="text-right block">
-                  בחר תלמיד <span className="text-destructive">*</span>
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="student-select" className="text-right block">
+                    בחר תלמיד <span className="text-destructive">*</span>
+                  </Label>
+                  {!studentsLoading && (
+                    <span className="text-xs text-muted-foreground">
+                      {filteredStudents.length} תלמידים זמינים
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground text-right">
+                  חפש לפי שם תלמיד, שם איש קשר או מספר טלפון
+                </p>
                 <ComboBoxInput
                   id="student-select"
                   value={selectedStudentId}
@@ -260,10 +349,102 @@ export default function BulkResolvePendingReportsDialog({
                   onValueChange={setSelectedStudentId}
                   onQueryChange={setStudentSearchQuery}
                   options={studentOptions}
-                  placeholder={studentsLoading ? 'טוען תלמידים...' : 'חפש תלמיד...'}
-                  emptyMessage="לא נמצאו תלמידים"
+                  placeholder={studentsLoading ? 'טוען תלמידים...' : 'הקלד לחיפוש תלמיד...'}
+                  emptyMessage={studentSearchQuery ? 'לא נמצאו תלמידים תואמים' : 'לא נמצאו תלמידים במערכת'}
                   disabled={studentsLoading || isProcessing}
                 />
+              </div>
+
+              {/* Filter Controls */}
+              <div className="space-y-3 border-t pt-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">סינון תלמידים</Label>
+                  {hasActiveFilters && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearFilters}
+                      className="h-7 text-xs gap-1"
+                    >
+                      <X className="h-3 w-3" />
+                      נקה סינון
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Instructor Filter */}
+                  <div className="space-y-1">
+                    <Label htmlFor="filter-instructor" className="text-xs">מדריך</Label>
+                    <Select value={filterInstructor} onValueChange={setFilterInstructor}>
+                      <SelectTrigger id="filter-instructor" className="h-9">
+                        <SelectValue placeholder="כל המדריכים" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל המדריכים</SelectItem>
+                        {instructors.map((inst) => (
+                          <SelectItem key={inst.id} value={inst.id}>
+                            {inst.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Day Filter */}
+                  <div className="space-y-1">
+                    <Label htmlFor="filter-day" className="text-xs">יום</Label>
+                    <Select value={filterDay} onValueChange={setFilterDay}>
+                      <SelectTrigger id="filter-day" className="h-9">
+                        <SelectValue placeholder="כל הימים" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל הימים</SelectItem>
+                        {DAY_NAMES.map((day, index) => {
+                          if (index === 0) return null;
+                          return (
+                            <SelectItem key={index} value={String(index)}>
+                              {day}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Tag Filter */}
+                  <div className="space-y-1">
+                    <Label htmlFor="filter-tag" className="text-xs">תגית</Label>
+                    <Select value={filterTag} onValueChange={setFilterTag}>
+                      <SelectTrigger id="filter-tag" className="h-9">
+                        <SelectValue placeholder="כל התגיות" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל התגיות</SelectItem>
+                        {tags.map((tag) => (
+                          <SelectItem key={tag.id} value={tag.id}>
+                            {tag.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="space-y-1">
+                    <Label htmlFor="filter-status" className="text-xs">סטטוס</Label>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                      <SelectTrigger id="filter-status" className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">הכל</SelectItem>
+                        <SelectItem value="active">פעילים</SelectItem>
+                        <SelectItem value="inactive">לא פעילים</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-2 flex-row-reverse">
