@@ -35,10 +35,12 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
   });
   const unassignedName = report?.metadata?.unassigned_details?.name || '';
   const reportService = report?.service_context || '';
+  const reportInstructorId = report?.instructor_id || '';
   const createInitialValues = useMemo(() => ({
     name: unassignedName || '',
     defaultService: reportService || '',
-  }), [unassignedName, reportService]);
+    ...(reportInstructorId && { assignedInstructorId: reportInstructorId }),
+  }), [unassignedName, reportService, reportInstructorId]);
 
   // Data loading handled by shared hooks above based on open/mode/org
 

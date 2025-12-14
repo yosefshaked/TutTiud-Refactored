@@ -37,9 +37,10 @@ export default function BulkResolvePendingReportsDialog({
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Fetch students for assignment dropdown
+  // Fetch students for assignment dropdown (admin sees all, non-admin sees only their own)
   const { data: students = [], isLoading: studentsLoading } = useStudents({
     enabled: open && mode === RESOLUTION_MODE.ASSIGN_EXISTING,
+    status: 'all',
   });
 
   const studentOptions = useMemo(() => {
