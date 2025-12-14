@@ -140,6 +140,20 @@ export default function MyPendingReportsCard() {
   const pendingReports = filteredReports.filter((r) => !r.student_id && !r.deleted && !r.isRejected);
   const rejectedReports = filteredReports.filter((r) => r.isRejected === true || (r.deleted && r.metadata?.rejection));
   const resolvedReports = filteredReports.filter((r) => r.student_id);
+  
+  // Debug logging for resolved reports
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[MyPendingReportsCard Debug]', {
+        totalReports: reports.length,
+        filteredReports: filteredReports.length,
+        pendingCount: pendingReports.length,
+        rejectedCount: rejectedReports.length,
+        resolvedCount: resolvedReports.length,
+        sampleResolved: resolvedReports.slice(0, 2).map(r => ({ id: r.id, name: r.metadata?.unassigned_details?.name, student_id: r.student_id, date: r.date })),
+      });
+    }
+  }, [reports, filteredReports, pendingReports, rejectedReports, resolvedReports]);
 
   if (!canFetch) {
     return null;
