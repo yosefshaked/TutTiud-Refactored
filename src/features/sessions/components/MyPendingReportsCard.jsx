@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Calendar, Clock, CheckCircle2, AlertCircle, Loader2, XCircle, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { Calendar, Clock, CheckCircle2, AlertCircle, Loader2, XCircle, RotateCcw, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { fetchLooseSessions } from '@/features/sessions/api/loose-sessions.js';
 import ResubmitRejectedReportDialog from './ResubmitRejectedReportDialog.jsx';
@@ -34,6 +36,28 @@ function getReasonLabel(reason, reasonOther) {
   return labels[reason] || reason || 'לא צוין';
 }
 
+const DATE_RANGE_OPTIONS = [
+  { value: 'all', label: 'הכל', days: null },
+  { value: '1day', label: 'יום אחרון', days: 1 },
+  { value: '7days', label: '7 ימים אחרונים', days: 7 },
+  { value: '14days', label: '14 ימים אחרונים', days: 14 },
+  { value: '1month', label: 'חודש אחרון', days: 30 },
+  { value: '2months', label: 'חודשיים אחרונים', days: 60 },
+  { value: '3months', label: '3 חודשים אחרונים', days: 90 },
+  { value: '6months', label: '6 חודשים אחרונים', days: 180 },
+  { value: '1year', label: 'שנה אחרונה', days: 365 },
+];
+
+function filterReportsByDateRange(reports, dateRangeDays) {
+  if (!dateRangeDays) return reports; // 'all' selected
+  
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - dateRangeDays);
+  const cutoffStr = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  return reports.filter(report => report.date >= cutoffStr);
+}
+
 export default function MyPendingReportsCard() {
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
   const [state, setState] = useState(REQUEST_STATE.idle);
@@ -41,6 +65,7 @@ export default function MyPendingReportsCard() {
   const [reports, setReports] = useState([]);
   const [resubmitModalOpen, setResubmitModalOpen] = useState(false);
   const [resubmitReport, setResubmitReport] = useState(null);
+  const [dateRange, setDateRange] = useState('3months'); // Default to 3 months
 
   const activeOrgId = activeOrg?.id || null;
   const canFetch = Boolean(activeOrgId && activeOrgHasConnection && tenantClientReady);
@@ -101,9 +126,20 @@ export default function MyPendingReportsCard() {
 
   const isLoading = state === REQUEST_STATE.loading;
   const hasError = state === REQUEST_STATE.error;
-  const pendingReports = reports.filter((r) => !r.student_id && !r.deleted && !r.isRejected);
-  const rejectedReports = reports.filter((r) => r.isRejected === true || (r.deleted && r.metadata?.rejection));
-  const resolvedReports = reports.filter((r) => r.student_id);
+  
+  // Apply date range filter
+  const dateRangeDays = useMemo(() => {
+    const option = DATE_RANGE_OPTIONS.find(opt => opt.value === dateRange);
+    return option?.days ?? null;
+  }, [dateRange]);
+  
+  const filteredReports = useMemo(() => {
+    return filterReportsByDateRange(reports, dateRangeDays);
+  }, [reports, dateRangeDays]);
+  
+  const pendingReports = filteredReports.filter((r) => !r.student_id && !r.deleted && !r.isRejected);
+  const rejectedReports = filteredReports.filter((r) => r.isRejected === true || (r.deleted && r.metadata?.rejection));
+  const resolvedReports = filteredReports.filter((r) => r.student_id);
 
   if (!canFetch) {
     return null;
@@ -115,6 +151,26 @@ export default function MyPendingReportsCard() {
         <CardTitle className="text-right">הדיווחים הממתינים שלי</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Date Range Filter */}
+        <div className="flex items-center gap-3 pb-2 border-b">
+          <Label htmlFor="dateRange" className="flex items-center gap-2 text-sm font-medium shrink-0">
+            <Filter className="h-4 w-4" />
+            טווח תאריכים:
+          </Label>
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger id="dateRange" className="w-[200px]" dir="rtl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent dir="rtl">
+              {DATE_RANGE_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center gap-2 py-8 text-neutral-600">
             <Loader2 className="h-5 w-5 animate-spin" />
