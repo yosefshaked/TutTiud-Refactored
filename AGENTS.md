@@ -130,17 +130,26 @@
   - SessionRecords `student_id` is now nullable to support unassigned ("loose") session reports. When creating loose reports, write `metadata.unassigned_details` additively (do not clobber existing metadata) and ensure downstream queries tolerate `student_id` being NULL.
   - **Backend Endpoint** (`/api/loose-sessions`):
     - `GET`: Lists pending `student_id IS NULL` records with role-based filtering:
-      - **Admin/Owner**: See all pending loose reports for the organization
-      - **Instructor (non-admin)**: Only see their own submitted loose reports (filtered by `instructor_id`)
+      - **Admin/Owner**: See all pending loose reports for the organization (only non-deleted)
+      - **Instructor (non-admin)**: See their own submitted loose reports (filtered by `instructor_id`) including both pending AND rejected reports
+      - Rejected reports marked with `isRejected: true` flag and include `metadata.rejection` with reason, rejected_by, rejected_at
     - `POST`: Admin-only resolution operations with three action types:
       - `action=assign_existing` (`student_id`): Assign pending report to existing student
       - `action=create_and_assign` (`name`, `assigned_instructor_id`, optional `default_service`): Create new student and assign report
       - `action=reject` (`reason`, optional `reason_other` for custom text): Reject pending report with predefined or custom reason
     - Resolution removes only `metadata.unassigned_details`, preserves other metadata, and updates `service_context` using the session payload or student default
+    - Rejection marks report as `deleted: true` while preserving all original metadata plus `metadata.rejection` details
     - Audit logging uses `SESSION_RESOLVED`/`SESSION_REJECTED` actions in `AUDIT_CATEGORIES.SESSIONS`
   - **Frontend Components**:
     - `PendingReportsPage.jsx`: Admin interface with search/filter UI (free text, service, reason, date range), bulk selection with checkboxes, individual/bulk reject via `RejectReportDialog`, bulk assign/create via `BulkResolvePendingReportsDialog`
-    - `MyPendingReportsCard.jsx`: Instructor read-only view of own pending and recently resolved reports
+    - `MyPendingReportsCard.jsx`: Instructor view of own pending, rejected, and recently resolved reports with resubmit capability
+      - Shows three sections: Pending (amber), Rejected (red with rejection reason), Resolved (green)
+      - Rejected reports include full rejection details and "שלח מחדש" button
+      - Badge counts in header show both pending and rejected report totals
+    - `ResubmitRejectedReportDialog.jsx`: Dialog for resubmitting rejected reports with pre-filled data
+      - Shows original rejection reason in red banner
+      - Allows editing all fields (name, reason, date, time, service) before resubmission
+      - Creates new loose report with `metadata.resubmitted_from` and `metadata.original_rejection` for audit trail
     - `MyStudentsPage.jsx`: Instructor access button in CardHeader showing pending reports count badge; click opens dialog with `MyPendingReportsCard`
     - Bulk operations use sequential processing with real-time feedback
   - **Form Changes (2025-12)**:

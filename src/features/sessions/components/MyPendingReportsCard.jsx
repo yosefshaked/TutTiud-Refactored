@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Calendar, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, AlertCircle, Loader2, XCircle, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { fetchLooseSessions } from '@/features/sessions/api/loose-sessions.js';
+import ResubmitRejectedReportDialog from './ResubmitRejectedReportDialog.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -36,6 +38,8 @@ export default function MyPendingReportsCard() {
   const [state, setState] = useState(REQUEST_STATE.idle);
   const [error, setError] = useState('');
   const [reports, setReports] = useState([]);
+  const [resubmitModalOpen, setResubmitModalOpen] = useState(false);
+  const [resubmitReport, setResubmitReport] = useState(null);
 
   const activeOrgId = activeOrg?.id || null;
   const canFetch = Boolean(activeOrgId && activeOrgHasConnection && tenantClientReady);
@@ -77,9 +81,27 @@ export default function MyPendingReportsCard() {
     };
   }, [canFetch, loadReports]);
 
+  const handleResubmit = useCallback((report) => {
+    setResubmitReport(report);
+    setResubmitModalOpen(true);
+  }, []);
+
+  const handleResubmitSuccess = useCallback(() => {
+    setResubmitModalOpen(false);
+    setResubmitReport(null);
+    // Reload reports to update the list
+    void loadReports();
+  }, [loadReports]);
+
+  const handleResubmitClose = useCallback(() => {
+    setResubmitModalOpen(false);
+    setResubmitReport(null);
+  }, []);
+
   const isLoading = state === REQUEST_STATE.loading;
   const hasError = state === REQUEST_STATE.error;
-  const pendingReports = reports.filter((r) => !r.student_id && !r.deleted);
+  const pendingReports = reports.filter((r) => !r.student_id && !r.deleted && !r.isRejected);
+  const rejectedReports = reports.filter((r) => r.isRejected === true || (r.deleted && r.metadata?.rejection));
   const resolvedReports = reports.filter((r) => r.student_id);
 
   if (!canFetch) {
@@ -91,11 +113,18 @@ export default function MyPendingReportsCard() {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>הדיווחים הממתינים שלי</span>
-          {pendingReports.length > 0 && (
-            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
-              {pendingReports.length}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {pendingReports.length > 0 && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
+                ממתינים: {pendingReports.length}
+              </Badge>
+            )}
+            {rejectedReports.length > 0 && (
+              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+                נדחו: {rejectedReports.length}
+              </Badge>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -114,7 +143,7 @@ export default function MyPendingReportsCard() {
               דיווחים שהגשת ללא שיוך תלמיד. רק מנהל יכול לשייך דיווחים אלה לתלמידים.
             </div>
 
-            {pendingReports.length === 0 && resolvedReports.length === 0 && (
+            {pendingReports.length === 0 && rejectedReports.length === 0 && resolvedReports.length === 0 && (
               <div className="text-center py-8 text-neutral-500">
                 <AlertCircle className="h-12 w-12 mx-auto mb-4 text-neutral-400" />
                 <p className="text-lg font-medium">אין דיווחים ממתינים</p>
@@ -174,6 +203,87 @@ export default function MyPendingReportsCard() {
               </div>
             )}
 
+            {/* Rejected Reports */}
+            {rejectedReports.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-right text-red-700">נדחו ({rejectedReports.length})</h3>
+                {rejectedReports.map((report) => {
+                  const name = report?.metadata?.unassigned_details?.name || 'ללא שם';
+                  const reason = report?.metadata?.unassigned_details?.reason || '';
+                  const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
+                  const time = report?.metadata?.unassigned_details?.time || '';
+                  const service = report?.service_context || '';
+                  const rejectionReason = report?.metadata?.rejection?.reason || 'לא צוינה סיבה';
+                  const rejectedAt = report?.metadata?.rejection?.rejected_at || report?.deleted_at || '';
+
+                  return (
+                    <Card key={report.id} className="border-2 border-red-200 bg-red-50/30">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-2">
+                                <h4 className="text-base font-semibold text-foreground">{name}</h4>
+                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+                                  <XCircle className="h-3 w-3 ml-1" />
+                                  נדחה
+                                </Badge>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mb-3">
+                                <div className="flex items-center gap-2 text-neutral-600">
+                                  <Calendar className="h-4 w-4 shrink-0" />
+                                  <span>תאריך: {formatDate(report.date)}</span>
+                                </div>
+                                {time && (
+                                  <div className="flex items-center gap-2 text-neutral-600">
+                                    <Clock className="h-4 w-4 shrink-0" />
+                                    <span>שעה: {formatTime(time)}</span>
+                                  </div>
+                                )}
+                                {service && (
+                                  <div className="flex items-center gap-2 text-neutral-600">
+                                    <span className="font-medium">שירות:</span>
+                                    <span>{service}</span>
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 text-neutral-600">
+                                  <span className="font-medium">סיבה:</span>
+                                  <span>{getReasonLabel(reason, reasonOther)}</span>
+                                </div>
+                              </div>
+
+                              <div className="rounded-md bg-red-100 p-3 text-sm">
+                                <p className="font-semibold text-red-900 mb-1">סיבת הדחייה:</p>
+                                <p className="text-red-800">{rejectionReason}</p>
+                                {rejectedAt && (
+                                  <p className="text-xs text-red-600 mt-1">
+                                    נדחה ב-{formatDate(rejectedAt.split('T')[0])}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => handleResubmit(report)}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              שלח מחדש
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Resolved Reports */}
             {resolvedReports.length > 0 && (
               <div className="space-y-3">
@@ -211,6 +321,14 @@ export default function MyPendingReportsCard() {
           </>
         )}
       </CardContent>
+
+      {/* Resubmit Modal */}
+      <ResubmitRejectedReportDialog
+        isOpen={resubmitModalOpen}
+        onClose={handleResubmitClose}
+        report={resubmitReport}
+        onSuccess={handleResubmitSuccess}
+      />
     </Card>
   );
 }

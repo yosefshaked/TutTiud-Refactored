@@ -93,6 +93,9 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
+    // For instructors: return both pending (student_id=null, deleted=false) 
+    // AND rejected (deleted=true with rejection metadata) reports
+    // For admins: return only pending reports (not rejected)
     let query = tenantClient
       .from('SessionRecords')
       .select(`
@@ -106,15 +109,19 @@ export default async function (context, req) {
         updated_at, 
         student_id, 
         deleted,
+        deleted_at,
         Instructors!SessionRecords_instructor_id_fkey(name, email)
       `)
       .is('student_id', null)
-      .eq('deleted', false)
       .order('date', { ascending: true }); // Oldest session dates first
 
-    // Non-admin instructors can only see their own loose reports
+    // Non-admin instructors can see their own pending and rejected reports
     if (!isAdmin) {
       query = query.eq('instructor_id', userId);
+      // No deleted filter - we want both pending and rejected for instructors
+    } else {
+      // Admins only see pending reports (not rejected)
+      query = query.eq('deleted', false);
     }
 
     const { data, error } = await query;
@@ -124,7 +131,21 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_load_sessions' });
     }
 
-    return respond(context, 200, Array.isArray(data) ? data : []);
+    // For non-admin instructors, separate pending from rejected
+    // Rejected = deleted:true AND has metadata.rejection
+    // Pending = deleted:false
+    let finalData = Array.isArray(data) ? data : [];
+    
+    if (!isAdmin) {
+      // Return both pending and rejected, let frontend separate them
+      // Mark rejected reports for easy identification
+      finalData = finalData.map(report => ({
+        ...report,
+        isRejected: report.deleted && report.metadata?.rejection ? true : false,
+      }));
+    }
+
+    return respond(context, 200, finalData);
   }
 
   if (method !== 'POST') {
