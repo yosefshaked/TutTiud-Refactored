@@ -44,6 +44,14 @@ function formatTime(timeStr) {
   return timeStr.substring(0, 5); // HH:MM from HH:MM:SS
 }
 
+function getDayOfWeekName(dateStr) {
+  if (!dateStr) return '';
+  const dayNames = ['יום ראשון', 'יום שני', 'יום שלישי', 'יום רביעי', 'יום חמישי', 'יום שישי', 'יום שבת'];
+  const date = new Date(dateStr + 'T00:00:00'); // Add time to avoid timezone issues
+  const dayIndex = date.getDay(); // 0 (Sunday) to 6 (Saturday)
+  return dayNames[dayIndex] || '';
+}
+
 function getReasonLabel(reason, reasonOther) {
   const labels = {
     substitute: 'מחליף זמני',
@@ -465,34 +473,38 @@ export default function PendingReportsPage() {
         </CardHeader>
         <CardContent>
           {filteredReports.length > 0 && (
-            <div className="mb-4 flex items-center gap-3 p-3 border rounded-lg bg-muted/30" dir="rtl">
-              <Checkbox
-                checked={selectedReportIds.size === filteredReports.length && filteredReports.length > 0}
-                onCheckedChange={handleToggleAll}
-                id="select-all"
-              />
-              <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
-                {selectedReportIds.size === filteredReports.length && filteredReports.length > 0
-                  ? 'בטל בחירת הכל'
-                  : 'בחר הכל'}
-              </label>
-              {selectedReportIds.size > 0 && (
-                <>
+            <div className="mb-4 p-3 border rounded-lg bg-muted/30" dir="rtl">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Checkbox
+                  checked={selectedReportIds.size === filteredReports.length && filteredReports.length > 0}
+                  onCheckedChange={handleToggleAll}
+                  id="select-all"
+                />
+                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                  {selectedReportIds.size === filteredReports.length && filteredReports.length > 0
+                    ? 'בטל בחירת הכל'
+                    : 'בחר הכל'}
+                </label>
+                {selectedReportIds.size > 0 && (
                   <span className="text-sm text-neutral-600">({selectedReportIds.size} נבחרו)</span>
-                  <Button size="sm" variant="outline" onClick={handleClearSelection}>
+                )}
+              </div>
+              {selectedReportIds.size > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Button size="sm" variant="outline" onClick={handleClearSelection} className="flex-1 sm:flex-none min-w-[100px]">
                     נקה בחירה
                   </Button>
                   {isAdminMember && (
                     <>
-                      <Button size="sm" onClick={handleBulkResolve}>
+                      <Button size="sm" onClick={handleBulkResolve} className="flex-1 sm:flex-none min-w-[100px]">
                         שיוך מרובה
                       </Button>
-                      <Button size="sm" variant="destructive" onClick={handleBulkReject}>
+                      <Button size="sm" variant="destructive" onClick={handleBulkReject} className="flex-1 sm:flex-none min-w-[100px]">
                         דחה מרובה
                       </Button>
                     </>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}
@@ -625,25 +637,25 @@ export default function PendingReportsPage() {
                             className="mt-1"
                           />
                           <div className="flex-1 space-y-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="text-lg font-semibold text-foreground">{name}</h3>
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
+                          <div className="flex items-start gap-2 flex-wrap">
+                            <h3 className="text-lg font-semibold text-foreground break-words">{name}</h3>
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 shrink-0">
                               ממתין לשיוך
                             </Badge>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 text-xs"
-                              onClick={() => handleSelectAllWithSameName(name)}
-                            >
-                              בחר כל "{name}"
-                            </Button>
                           </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs w-full sm:w-auto"
+                            onClick={() => handleSelectAllWithSameName(name)}
+                          >
+                            בחר כל "{name}"
+                          </Button>
                           
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                          <div className="grid grid-cols-1 gap-2 text-sm">
                             <div className="flex items-center gap-2 text-neutral-600">
                               <Calendar className="h-4 w-4 shrink-0" />
-                              <span>תאריך: {formatDate(report.date)}</span>
+                              <span className="break-words">תאריך: {formatDate(report.date)} ({getDayOfWeekName(report.date)})</span>
                             </div>
                             {time && (
                               <div className="flex items-center gap-2 text-neutral-600">
@@ -653,30 +665,30 @@ export default function PendingReportsPage() {
                             )}
                             {service && (
                               <div className="flex items-center gap-2 text-neutral-600">
-                                <span className="font-medium">שירות:</span>
-                                <span>{service}</span>
+                                <span className="font-medium shrink-0">שירות:</span>
+                                <span className="break-words">{service}</span>
                               </div>
                             )}
                             <div className="flex items-center gap-2 text-neutral-600">
-                              <span className="font-medium">סיבה:</span>
-                              <span>{getReasonLabel(reason, reasonOther)}</span>
+                              <span className="font-medium shrink-0">סיבה:</span>
+                              <span className="break-words">{getReasonLabel(reason, reasonOther)}</span>
                             </div>
                           </div>
 
-                          <p className="text-xs text-neutral-500">
+                          <p className="text-xs text-neutral-500 break-words">
                             נוצר על ידי: {instructorName}
                           </p>
                           </div>
                         </div>
 
-                        <div className="flex justify-end">
+                        <div className="flex justify-end shrink-0 self-start">
                           {isAdminMember ? (
                             <DropdownMenu dir="rtl">
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="rounded-full h-10 w-10 p-0"
+                                  className="rounded-full h-10 w-10 p-0 shrink-0"
                                   title="אפשרויות"
                                 >
                                   <MoreVertical className="h-4 w-4" />

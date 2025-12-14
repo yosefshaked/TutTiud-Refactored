@@ -199,36 +199,36 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose?.(); }}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>שיוך דיווח ממתין</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4" dir="rtl">
+        <div className="space-y-4 overflow-y-auto max-h-[calc(90vh-8rem)]" dir="rtl">
           <div className="rounded-lg bg-neutral-50 p-3 text-sm">
             <p className="font-medium text-foreground">פרטי הדיווח:</p>
-            <p className="text-neutral-600 mt-1">שם: {unassignedName}</p>
-            {reportService && <p className="text-neutral-600">שירות: {reportService}</p>}
+            <p className="text-neutral-600 mt-1 break-words">שם: {unassignedName}</p>
+            {reportService && <p className="text-neutral-600 break-words">שירות: {reportService}</p>}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               variant={currentMode === 'assign' ? 'default' : 'outline'}
               onClick={() => setCurrentMode('assign')}
               disabled={isSubmitting}
-              className="flex-1 gap-2"
+              className="flex-1 gap-2 justify-center"
             >
-              <UserCheck className="h-4 w-4" />
-              שיוך לתלמיד קיים
+              <UserCheck className="h-4 w-4 shrink-0" />
+              <span>שיוך לתלמיד קיים</span>
             </Button>
             <Button
               variant={currentMode === 'create' ? 'default' : 'outline'}
               onClick={() => setCurrentMode('create')}
               disabled={isSubmitting}
-              className="flex-1 gap-2"
+              className="flex-1 gap-2 justify-center"
             >
-              <UserPlus className="h-4 w-4" />
-              יצירת תלמיד חדש
+              <UserPlus className="h-4 w-4 shrink-0" />
+              <span>יצירת תלמיד חדש</span>
             </Button>
           </div>
 
@@ -298,12 +298,12 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
                       )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Instructor Filter */}
                   <div className="space-y-1">
                     <Label htmlFor="filter-instructor" className="text-xs">מדריך</Label>
                     <Select value={filterInstructor} onValueChange={setFilterInstructor}>
-                      <SelectTrigger id="filter-instructor" className="h-9">
+                      <SelectTrigger id="filter-instructor" className="h-9 w-full">
                         <SelectValue placeholder="כל המדריכים" />
                       </SelectTrigger>
                       <SelectContent>
@@ -321,7 +321,7 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
                   <div className="space-y-1">
                     <Label htmlFor="filter-day" className="text-xs">יום</Label>
                     <Select value={filterDay} onValueChange={setFilterDay}>
-                      <SelectTrigger id="filter-day" className="h-9">
+                      <SelectTrigger id="filter-day" className="h-9 w-full">
                         <SelectValue placeholder="כל הימים" />
                       </SelectTrigger>
                       <SelectContent>
@@ -339,7 +339,7 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
                   <div className="space-y-1">
                     <Label htmlFor="filter-tag" className="text-xs">תגית</Label>
                     <Select value={filterTag} onValueChange={setFilterTag}>
-                      <SelectTrigger id="filter-tag" className="h-9">
+                      <SelectTrigger id="filter-tag" className="h-9 w-full">
                         <SelectValue placeholder="כל התגיות" />
                       </SelectTrigger>
                       <SelectContent>
@@ -357,7 +357,7 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
                   <div className="space-y-1">
                     <Label htmlFor="filter-status" className="text-xs">סטטוס</Label>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger id="filter-status" className="h-9">
+                      <SelectTrigger id="filter-status" className="h-9 w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -382,11 +382,11 @@ export default function ResolvePendingReportDialog({ open, onClose, report, mode
                   <SelectTrigger id="student-select" className="w-full">
                     <SelectValue placeholder="בחרו תלמיד מהרשימה" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
+                  <SelectContent className="max-h-[250px] sm:max-h-[300px]">
                     {filteredStudents.map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.name || 'ללא שם'}
-                        {student.contact_name ? ` (${student.contact_name})` : ''}
+                      <SelectItem key={student.id} value={student.id} className="text-right">
+                        <span className="block truncate">{student.name || 'ללא שם'}</span>
+                        {student.contact_name && <span className="text-xs text-neutral-500"> ({student.contact_name})</span>}
                       </SelectItem>
                     ))}
                   </SelectContent>

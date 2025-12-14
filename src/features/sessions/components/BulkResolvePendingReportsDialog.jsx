@@ -271,8 +271,8 @@ export default function BulkResolvePendingReportsDialog({
 
         <div className="space-y-4 py-4">
           {/* Summary */}
-          <div className="rounded-lg bg-muted p-3 space-y-2">
-            <p className="text-sm font-medium text-right">דיווחים נבחרים:</p>
+          <div className="rounded-lg bg-neutral-50 p-3 space-y-2">
+            <p className="text-sm font-medium text-foreground text-right">דיווחים נבחרים:</p>
             <div className="flex flex-wrap gap-2">
               {reportNames.map((name) => (
                 <Badge key={name} variant="outline">
@@ -281,7 +281,7 @@ export default function BulkResolvePendingReportsDialog({
               ))}
             </div>
             {hasMultipleNames && (
-              <p className="text-xs text-amber-700 dark:text-amber-400 text-right">
+              <p className="text-xs text-neutral-600 text-right">
                 ⚠️ שים לב: נבחרו דיווחים עם שמות שונים. כל הדיווחים ישוייכו לאותו תלמיד.
               </p>
             )}
@@ -363,11 +363,11 @@ export default function BulkResolvePendingReportsDialog({
                     <SelectTrigger id="student-select" className="w-full">
                       <SelectValue placeholder={studentsLoading ? 'טוען תלמידים...' : 'בחרו תלמיד מהרשימה'} />
                     </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
+                    <SelectContent className="max-h-[250px] sm:max-h-[300px]">
                       {filteredStudents.map((student) => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.name || 'ללא שם'}
-                          {student.contact_name ? ` (${student.contact_name})` : ''}
+                        <SelectItem key={student.id} value={student.id} className="text-right">
+                          <span className="block truncate">{student.name || 'ללא שם'}</span>
+                          {student.contact_name && <span className="text-xs text-neutral-500"> ({student.contact_name})</span>}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -424,12 +424,12 @@ export default function BulkResolvePendingReportsDialog({
                       )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Instructor Filter */}
                   <div className="space-y-1">
                     <Label htmlFor="filter-instructor" className="text-xs">מדריך</Label>
                     <Select value={filterInstructor} onValueChange={setFilterInstructor}>
-                      <SelectTrigger id="filter-instructor" className="h-9">
+                      <SelectTrigger id="filter-instructor" className="h-9 w-full">
                         <SelectValue placeholder="כל המדריכים" />
                       </SelectTrigger>
                       <SelectContent>
@@ -447,7 +447,7 @@ export default function BulkResolvePendingReportsDialog({
                   <div className="space-y-1">
                     <Label htmlFor="filter-day" className="text-xs">יום</Label>
                     <Select value={filterDay} onValueChange={setFilterDay}>
-                      <SelectTrigger id="filter-day" className="h-9">
+                      <SelectTrigger id="filter-day" className="h-9 w-full">
                         <SelectValue placeholder="כל הימים" />
                       </SelectTrigger>
                       <SelectContent>
@@ -468,7 +468,7 @@ export default function BulkResolvePendingReportsDialog({
                   <div className="space-y-1">
                     <Label htmlFor="filter-tag" className="text-xs">תגית</Label>
                     <Select value={filterTag} onValueChange={setFilterTag}>
-                      <SelectTrigger id="filter-tag" className="h-9">
+                      <SelectTrigger id="filter-tag" className="h-9 w-full">
                         <SelectValue placeholder="כל התגיות" />
                       </SelectTrigger>
                       <SelectContent>
@@ -486,7 +486,7 @@ export default function BulkResolvePendingReportsDialog({
                   <div className="space-y-1">
                     <Label htmlFor="filter-status" className="text-xs">סטטוס</Label>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger id="filter-status" className="h-9">
+                      <SelectTrigger id="filter-status" className="h-9 w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -501,14 +501,15 @@ export default function BulkResolvePendingReportsDialog({
                 )}
               </div>
 
-              <div className="flex gap-2 flex-row-reverse">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:flex-row-reverse">
                 <Button
                   onClick={handleAssignExisting}
                   disabled={!selectedStudentId || isProcessing}
+                  className="w-full sm:w-auto"
                 >
                   {isProcessing ? 'משייך...' : `שייך ${reports.length} דיווחים`}
                 </Button>
-                <Button variant="outline" onClick={() => setMode(RESOLUTION_MODE.SELECT)} disabled={isProcessing}>
+                <Button variant="outline" onClick={() => setMode(RESOLUTION_MODE.SELECT)} disabled={isProcessing} className="w-full sm:w-auto">
                   חזור
                 </Button>
               </div>
@@ -518,8 +519,8 @@ export default function BulkResolvePendingReportsDialog({
           {/* Create New Student */}
           {mode === RESOLUTION_MODE.CREATE_NEW && (
             <div className="space-y-4">
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-3 border border-blue-200 dark:border-blue-900">
-                <p className="text-sm text-blue-900 dark:text-blue-200 text-right">
+              <div className="rounded-lg bg-neutral-50 p-3">
+                <p className="text-sm text-neutral-600 text-right">
                   תלמיד חדש ייווצר ו-{reports.length} דיווחים ישוייכו אליו.
                 </p>
               </div>
