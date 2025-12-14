@@ -15,15 +15,6 @@ import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit
 
 const MAX_BODY_BYTES = 64 * 1024; // observe-only
 
-function stripUnassignedDetails(metadata) {
-  if (!metadata || typeof metadata !== 'object') {
-    return {};
-  }
-  const clone = { ...metadata };
-  delete clone.unassigned_details;
-  return clone;
-}
-
 export default async function (context, req) {
   const method = String(req.method || 'GET').toUpperCase();
   const env = readEnv(context);
@@ -203,11 +194,12 @@ export default async function (context, req) {
     return respond(context, 400, { message: 'session_already_assigned' });
   }
 
-  if (sessionRow.deleted) {
+  if (!sessionRow.deleted) {
     return respond(context, 400, { message: 'session_deleted' });
   }
 
-  const cleanedMetadata = stripUnassignedDetails(sessionRow.metadata);
+  // For assignment: preserve all metadata including unassigned_details for tracking
+  // For rejection: start fresh from the original metadata
 
   if (action === 'reject') {
     const rejectReason = normalizeString(body?.reject_reason || body?.rejectReason || '');
@@ -281,8 +273,9 @@ export default async function (context, req) {
 
     const newServiceContext = sessionRow.service_context ?? studentRow.default_service ?? null;
 
+    // Preserve all metadata including unassigned_details for tracking purposes
     const assignmentMetadata = {
-      ...cleanedMetadata,
+      ...sessionRow.metadata,
       assignment: {
         assigned_by: userId,
         assigned_by_role: role,
@@ -415,8 +408,9 @@ export default async function (context, req) {
 
   const newServiceContext = sessionRow.service_context ?? newStudent.default_service ?? null;
 
+  // Preserve all metadata including unassigned_details for tracking purposes
   const assignmentMetadata = {
-    ...cleanedMetadata,
+    ...sessionRow.metadata,
     assignment: {
       assigned_by: userId,
       assigned_by_role: role,
