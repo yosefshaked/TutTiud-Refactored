@@ -72,10 +72,10 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | Route | Method | Audience | Purpose |
 | :---- | :----- | :------- | :------ |
 | `/api/instructors` | GET | Admin/Owner | Reads `tuttiud."Instructors"` (defaulting to active rows) and returns instructor records keyed by their Supabase auth user ID (`id`). |
-| `/api/students` | GET | Admin/Owner | Returns active students by default (`status=active`), with `status=inactive` and `status=all` options plus `include_inactive=true` for legacy callers. Responses echo the `is_active` flag so the UI can render lifecycle state. |
-| `/api/students` | POST | Admin/Owner | Inserts a student (name + optional contact data, scheduling defaults, instructor assignment) and echoes the created row. |
-| `/api/students/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor, `is_active`) and returns the refreshed row or 404. |
-| `/api/students/check-id` | GET | Admin/Owner | Validates a national ID for uniqueness, optionally excluding a student ID during edits. Returns `{ exists, student }` so the UI can block duplicates and deep-link to the profile. |
+| `/api/students-list` | GET | All Users | Unified endpoint; admins see all students, non-admins filtered by `assigned_instructor_id`. Returns active students by default (`status=active`), with `status=inactive` and `status=all` options plus `include_inactive=true` for legacy callers. Responses echo the `is_active` flag so the UI can render lifecycle state. Replaces legacy `/api/students` and `/api/my-students` endpoints. |
+| `/api/students-list` | POST | Admin/Owner | Inserts a student (name + optional contact data, scheduling defaults, instructor assignment) and echoes the created row. |
+| `/api/students-list/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor, `is_active`, tags, notes) and returns the refreshed row or 404. |
+| `/api/students-check-id` | GET | All Users | Validates a national ID for uniqueness, optionally excluding a student ID during edits. Returns `{ exists, student }` so the UI can block duplicates and deep-link to the profile. |
 | `/api/students-search` | GET | Admin/Owner | Fuzzy name search that surfaces `{ id, name, national_id, is_active }` for quick deduplication hints beneath the name input. |
 | `/api/students/maintenance-export` | GET | Admin/Owner | Returns a CSV with `system_uuid`, name, national ID, contact info, assigned instructor, schedule defaults, tags, and `is_active` for bulk cleanup. |
 | `/api/loose-sessions` | GET/POST | Admin/Owner | Lists unassigned session records (`student_id IS NULL`) and resolves them by assigning to an existing student or creating a new student; strips only `metadata.unassigned_details` on resolution and preserves other metadata. |
@@ -127,9 +127,9 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 | User Story | Implementation Notes |
 | :--------- | :------------------- |
 | **Instructor creates & manages session records** | `/api/sessions` writes into `SessionRecords` after verifying (for members) that the student belongs to them. Future endpoints can extend to edit/delete using the same helper. |
-| **Instructor sees only assigned students** | `/api/my-students` scopes the roster by `assigned_instructor_id = caller.id`, so instructors never receive other students even before frontend filtering. |
-| **Administrator manages roster & assignments** | `/api/students` (POST/PUT) plus `/api/instructors` give admins the CRUD surface to create students and assign them to instructors. |
-| **Administrator views full roster + instructor pairing** | `/api/students` (GET) returns the entire roster and includes assignments, allowing the admin UI to render organization-wide dashboards. |
+| **Instructor sees only assigned students** | `/api/students-list` automatically scopes the roster by `assigned_instructor_id = caller.id` for non-admin users, so instructors never receive other students even before frontend filtering. |
+| **Administrator manages roster & assignments** | `/api/students-list` (POST/PUT) plus `/api/instructors` give admins the CRUD surface to create students and assign them to instructors. |
+| **Administrator views full roster + instructor pairing** | `/api/students-list` (GET) returns the entire roster and includes assignments, allowing the admin UI to render organization-wide dashboards. |
 
 ## 8. Developer Notes
 
@@ -153,10 +153,10 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 ## 9. Admin Student Management UI
 
 - **Feature slice** – all admin-only UI now lives in `src/features/admin/`. Components scoped to this feature sit under `components/` while page-level containers are housed in `pages/`.
-- **StudentManagementPage.jsx** – renders the `/admin/students` route. It reads the active organization from `OrgContext`, fetches `/api/students` on mount (defaulting to `status=active`), surfaces loading/error/empty states, and keeps an instructor map in memory for display. Dialog state is managed locally for add/edit flows, while a sessionStorage-persisted filter control toggles between Active/Inactive/All states and badges inactive rows inline.
-- **DataMaintenanceModal.jsx** – available from the roster actions to download the maintenance CSV (`/api/students/maintenance-export`) covering all editable fields (UUID, national ID, phone, instructor, tags, schedule defaults, notes, activity) and re-import edited CSVs (`/api/students/maintenance-import`). The importer updates only changed fields, enforces national ID uniqueness per row and against the database, reports per-row failures, and refreshes the roster + instructor list.
-- **AddStudentForm.jsx** – collects contact details, scheduling defaults, tag selection, and free-form notes; enforces client-side validation, and raises `onSubmit` with trimmed values so notes persist through `/api/students`. The form is rendered inside a dialog launched from the Student Management page.
-- **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
+- **StudentManagementPage.jsx** – renders the `/admin/students` route. It reads the active organization from `OrgContext`, fetches `/api/students-list` on mount (defaulting to `status=active`), surfaces loading/error/empty states, and keeps an instructor map in memory for display. Dialog state is managed locally for add/edit flows, while a sessionStorage-persisted filter control toggles between Active/Inactive/All states and badges inactive rows inline.
+- **DataMaintenanceModal.jsx** – available from the roster actions to download the maintenance CSV (`/api/students-maintenance-export`) covering all editable fields (UUID, national ID, phone, instructor, tags, schedule defaults, notes, activity) and re-import edited CSVs (`/api/students-maintenance-import`). The importer updates only changed fields, enforces national ID uniqueness per row and against the database, reports per-row failures, and refreshes the roster + instructor list.
+- **AddStudentForm.jsx** – collects contact details, scheduling defaults, tag selection, and free-form notes; enforces client-side validation, and raises `onSubmit` with trimmed values so notes persist through `/api/students-list`. The form is rendered inside a dialog launched from the Student Management page.
+- **AssignInstructorModal.jsx** – opens from each roster row, requests `/api/instructors` when displayed, and submits the chosen instructor through `PUT /api/students-list/{id}`. It blocks dismissals while saving and emits `onAssigned` so the page can refresh the roster.
 - **EditStudentForm.jsx** – exposes an Active/Inactive toggle guarded with confirmation copy, and lets admins update the same contact, scheduling, tag, and notes fields while ensuring the trimmed notes propagate to the API.
 - **Roster deep links** – student names now link to `/students/:id`, sending admins directly into the dedicated detail page without leaving the management workflow.
 - **App shell & routing** – `src/main.jsx` redirects `/Employees` to `/admin/students` and wraps authenticated routes with `src/components/layout/AppShell.jsx`. The shell renders a bottom tab bar + FAB on mobile and a left sidebar on desktop while keeping the student management view front and center.
@@ -255,7 +255,7 @@ This tool is essential for validating backups before restore or for compliance c
 
 - **Setting key** – `instructors_can_view_inactive_students` lives in the tenant `tuttiud."Settings"` row and defaults to `false` so instructors never see inactive roster entries unless an admin opts in.
 - **Settings UI** – `StudentVisibilitySettings.jsx` adds a dedicated card (eye-off icon) to `Settings.jsx`. Admins/owners can review the current value, read the guard copy, and toggle the permission through `upsertSetting` while instructors only see the status if they have manage rights.
-- **API integration** – `/api/my-students` checks the setting server-side and only includes inactive rows when the flag is enabled or the caller holds admin privileges. Query parameters (`status=active|inactive|all`) stay aligned with `/api/students` so both dashboards share a single filtering model.
+- **API integration** – `/api/students-list` checks the setting server-side and only includes inactive rows when the flag is enabled or the caller holds admin privileges. Query parameters (`status=active|inactive|all`) apply to all user roles with a unified filtering model.
 - **Frontend consumers** – `MyStudentsPage.jsx`, `NewSessionModal.jsx`, and `NewSessionForm.jsx` load the setting via `fetchSettingsValue` and adjust local filters + UI affordances accordingly. The preference for showing inactive students in admin lists persists per tab via `sessionStorage`.
 
 ## 17. Legacy Import Wizard UI polish (2025-12)

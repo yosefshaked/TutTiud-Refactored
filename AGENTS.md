@@ -53,7 +53,7 @@
   return { status: 200, body: { data: results } };
   ```
   - Without setting `context.res`, Azure returns HTTP 200 with an **empty body**, causing `JSON.parse()` errors in frontend.
-  - Use existing endpoints like `/api/students`, `/api/instructors`, `/api/settings`, `/api/documents`, `/api/documents-download` as reference for correct patterns.
+  - Use existing endpoints like `/api/students-list`, `/api/instructors`, `/api/settings`, `/api/documents`, `/api/documents-download` as reference for correct patterns.
 - **Bearer Token Extraction (CRITICAL)**: Always use `resolveBearerAuthorization()` helper from `http.js` to extract JWT tokens:
   ```javascript
   // ✅ CORRECT (checks all header variations):
@@ -709,9 +709,9 @@
 - **Student metadata tracking**: Students now automatically track creator and updater information in the `metadata` jsonb column:
   - On creation (POST): `{ created_by: userId, created_at: ISO timestamp, created_role: role }`
   - On update (PUT): Preserves existing metadata and adds `{ updated_by: userId, updated_at: ISO timestamp, updated_role: role }`
-  - Metadata is populated server-side in `/api/students` endpoint, frontend doesn't need to send these fields
-- `/api/students` defaults to `status=active`; pass `status=inactive`, `status=all`, or `include_inactive=true` (legacy) when maintenance flows need archived rows. `PUT` handlers accept `is_active` alongside the existing roster fields.
-- `/api/my-students` respects the org setting `instructors_can_view_inactive_students`. Instructors only see inactive records when the flag is enabled; admins/owners always see them when requesting `status=all`.
+  - Metadata is populated server-side in `/api/students-list` endpoint, frontend doesn't need to send these fields
+- `/api/students-list` defaults to `status=active`; pass `status=inactive`, `status=all`, or `include_inactive=true` (legacy) when maintenance flows need archived rows. `PUT` handlers accept `is_active` alongside the existing roster fields.
+- `/api/students-list` respects the org setting `instructors_can_view_inactive_students`. Instructors only see inactive records when the flag is enabled; admins/owners always see them when requesting `status=all` (replaced legacy `/api/my-students` endpoint).
 - Admin UI (`StudentManagementPage.jsx`) persists the Active/Inactive/All filter in `sessionStorage`, badges inactive rows, and exposes the toggle in `EditStudentForm.jsx`. Instructor surfaces (`MyStudentsPage.jsx`, `NewSessionModal.jsx`, `NewSessionForm.jsx`) automatically hide inactive students unless the setting is on.
 - Settings page adds `StudentVisibilitySettings.jsx` (eye-off card) so admins control the instructor flag through `fetchSettingsValue`/`upsertSetting`. Keep the copy bilingual and honor API permission checks when extending the card.
 

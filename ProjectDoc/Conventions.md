@@ -123,8 +123,7 @@ api/<route-base>/
 **Examples:**
 - `POST /api/sessions` – Create a SessionRecords entry
 - `GET /api/session-records?student_id=<uuid>` – Fetch session history for a student
-- `GET /api/students` – Admin roster endpoint
-- `GET /api/my-students` – Member-specific roster endpoint
+- `GET /api/students-list` – Unified roster endpoint (role-based filtering; replaces legacy `/api/students` and `/api/my-students`)
 
 ### Shared Server Helpers
 Located in `api/_shared/`:
