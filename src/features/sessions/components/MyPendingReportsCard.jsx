@@ -79,6 +79,7 @@ export default function MyPendingReportsCard() {
     try {
       const data = await fetchLooseSessions({ 
         orgId: activeOrgId,
+        view: 'mine', // Always fetch user's own reports
         signal: options.signal,
       });
       setReports(Array.isArray(data) ? data : []);
@@ -143,7 +144,7 @@ export default function MyPendingReportsCard() {
   
   // Debug logging for resolved reports
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log('[MyPendingReportsCard Debug]', {
         totalReports: reports.length,
         filteredReports: filteredReports.length,
@@ -307,7 +308,11 @@ export default function MyPendingReportsCard() {
                       const reasonOther = report?.metadata?.unassigned_details?.reason_other || '';
                       const time = report?.metadata?.unassigned_details?.time || '';
                       const service = report?.service_context || '';
-                      const rejectionReason = report?.metadata?.rejection?.reason || 'לא צוינה סיבה';
+                      // Handle rejection reason - ensure it's a string
+                      const rejectionReasonRaw = report?.metadata?.rejection?.reason;
+                      const rejectionReason = typeof rejectionReasonRaw === 'string' 
+                        ? rejectionReasonRaw 
+                        : rejectionReasonRaw?.label || rejectionReasonRaw?.value || 'לא צוינה סיבה';
                       const rejectedAt = report?.metadata?.rejection?.rejected_at || report?.deleted_at || '';
 
                       return (

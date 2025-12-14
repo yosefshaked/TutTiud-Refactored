@@ -84,11 +84,14 @@ export default async function (context, req) {
   }
 
   if (method === 'GET') {
-    // For instructors: return pending, rejected, AND accepted reports (all loose reports history)
-    // For admins: return only pending unassigned reports (not rejected, not accepted)
+    // Two modes controlled by query parameter:
+    // 1. ?view=mine (default for non-admin, available to all): User's own loose reports (pending, rejected, accepted)
+    // 2. ?view=pending (default for admin, admin-only): All pending unassigned reports
     
-    if (!isAdmin) {
-      // Instructors: fetch all loose reports (originally submitted without student_id)
+    const viewMode = req.query?.view || (isAdmin ? 'pending' : 'mine');
+    
+    if (viewMode === 'mine') {
+      // Fetch user's own loose reports (originally submitted without student_id)
       // This includes: pending (student_id=null, deleted=false), 
       //                rejected (deleted=true with rejection metadata),
       //                accepted (student_id set by admin)
@@ -127,8 +130,12 @@ export default async function (context, req) {
       }));
 
       return respond(context, 200, finalData);
-    } else {
-      // Admins: only see pending unassigned reports (not rejected, not accepted)
+    } else if (viewMode === 'pending') {
+      // Admin-only: see all pending unassigned reports (not rejected, not accepted)
+      if (!isAdmin) {
+        return respond(context, 403, { message: 'forbidden' });
+      }
+      
       const query = tenantClient
         .from('SessionRecords')
         .select(`

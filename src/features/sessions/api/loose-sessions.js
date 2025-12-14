@@ -1,8 +1,9 @@
 import { authenticatedFetch } from '@/lib/api-client.js';
 
-export async function fetchLooseSessions({ orgId, signal } = {}) {
+export async function fetchLooseSessions({ orgId, view, signal } = {}) {
   const params = new URLSearchParams();
   if (orgId) params.set('org_id', orgId);
+  if (view) params.set('view', view); // 'mine' or 'pending'
   
   const endpoint = params.toString() ? `loose-sessions?${params}` : 'loose-sessions';
   return authenticatedFetch(endpoint, { signal });
