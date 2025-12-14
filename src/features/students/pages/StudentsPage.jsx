@@ -435,7 +435,7 @@ export default function StudentsPage() {
     };
 
     try {
-      await authenticatedFetch('students', {
+      await authenticatedFetch('students-list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -484,7 +484,7 @@ export default function StudentsPage() {
     };
 
     try {
-      await authenticatedFetch(`students/${studentId}`, {
+      await authenticatedFetch(`students-list/${studentId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

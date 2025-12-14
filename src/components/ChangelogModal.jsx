@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.7.0': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.8.0': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,120 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.8.0 - Loose Reports (Unassigned Sessions), Resubmissions, Advanced Filtering */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.8.0')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.8.0'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.8.0'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.8.0
+                    </span>
+                    <time dateTime="2025-12-14" style={{ color: '#64748b', fontSize: '14px' }}>
+                      14 בדצמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.8.0'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  📋 דיווחים ממתינים, שליחה מחדש וסינון מתקדם
+                </h3>
+              </header>
+
+              {expandedVersions['1.8.0'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  למדריכים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '0 0 12px 0',
+                  color: '#475569',
+                  fontSize: 15,
+                  lineHeight: 1.8
+                }}>
+                  <li><strong>דיווח על תלמידים שאינם ברשימה:</strong> כעת ניתן ליצור דיווח מפגש גם אם התלמיד עדיין לא במערכת (הזנת שם ידנית). הדיווחים מופיעים כ"דיווחים ממתינים".</li>
+                  <li><strong>שליחה מחדש של דיווחים שנדחו:</strong> אם מנהל דוחה דיווח ממתין שלכם, כעת תוכלו לתקן אותו ולשלוח אותו מחדש ישירות מהדשבורד שלכם.</li>
+                  <li><strong>הוספת הערות לשליחה מחדש:</strong> בעת שליחה מחדש של דיווח שנדחה, ניתן להוסיף הערה למנהל המסבירה את השינוי.</li>
+                  <li><strong>מעקב אחר סטטוס הדיווחים:</strong> ממשק חדש עם כרטיסיות מראה בדיוק אילו דיווחים שלכם ממתינים, נדחו או אושרו.</li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  למנהלים ובעלים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '0 0 12px 0',
+                  color: '#475569',
+                  fontSize: 15,
+                  lineHeight: 1.8
+                }}>
+                  <li><strong>דשבורד דיווחים ממתינים:</strong> חלק ייעודי חדש לניהול "דיווחים ללא שיוך" (מפגשים שטרם שויכו לתלמיד). ניתן:
+                    <ul style={{ paddingRight: '24px', marginTop: '8px' }}>
+                      <li>לשייך אותם לתלמיד קיים</li>
+                      <li>ליצור תלמיד חדש מנתוני הדיווח</li>
+                      <li>לדחות את הדיווח (שליחה חזרה למדריך)</li>
+                    </ul>
+                  </li>
+                  <li><strong>הגשה בשם מדריכים:</strong> מנהלים יכולים כעת ליצור "דיווחים ממתינים" ולבחור במפורש איזה מדריך ביצע את המפגש (במקום שיקבע כברירת מחדל למנהל).</li>
+                  <li><strong>סינון מתקדם:</strong> כרטיס הדיווחים הממתינים תומך בסינון לפי טווח תאריכים (לדוגמה, "3 חודשים אחרונים") ומאורגן בכרטיסיות (ממתינים/נדחו/אושרו).</li>
+                  <li><strong>אזהרת כפילויות תלמידים:</strong> בעת מילוי דיווח מפגש ידנית, המערכת מזהירה בזמן אמת אם השם שהוקלד דומה לתלמיד קיים (מונע כפילויות).</li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים כלליים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '0 0 12px 0',
+                  color: '#475569',
+                  fontSize: 15,
+                  lineHeight: 1.8
+                }}>
+                  <li><strong>תצוגת "התלמידים שלי" חכמה:</strong> מדריכים שהם גם מנהלים יראו כעת תחילה את "התלמידים שלי" כברירת מחדל, אך יוכלו בקלות לעבור ל"כל התלמידים".</li>
+                  <li><strong>ביצועים:</strong> תוקן באג שבו רשימת התלמידים נטענה לפעמים ריקה או הבהבה נתונים שגויים (תיקון Race Condition).</li>
+                  <li><strong>תיקוני באגים ושיפורי ביצועים כלליים:</strong> תיקון ושיפור בעיות טכניות מאחורי הקלעים.</li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.7.0 - Student data management, CSV import/export, national ID, deduplication */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>

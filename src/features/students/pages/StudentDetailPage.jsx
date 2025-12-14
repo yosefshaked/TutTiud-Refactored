@@ -626,7 +626,7 @@ export default function StudentDetailPage() {
         tags: normalizedTags,
         is_active: payload.isActive,
       };
-      await authenticatedFetch(`students/${payload.id}`, { method: 'PUT', body, session });
+      await authenticatedFetch(`students-list/${payload.id}`, { method: 'PUT', body, session });
       setStudentForEdit(null);
       // Refresh the header info
       await loadStudent();
