@@ -44,7 +44,7 @@ function buildDetailSummary(summary) {
 export function ComplianceHeatmap() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
-  const { activeOrg, session } = useOrg()
+  const { activeOrg } = useOrg()
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -75,8 +75,7 @@ export function ComplianceHeatmap() {
 
   // Fetch instructors list for admin users
   const { instructors, loadingInstructors } = useInstructors({
-    enabled: Boolean(isAdmin && session),
-    session,
+    enabled: Boolean(isAdmin && activeOrg?.id),
   })
 
   // Map instructors list to ensure it's always an array
