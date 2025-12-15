@@ -5,9 +5,13 @@ import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance'
 import { fetchDailyCompliance } from '@/api/daily-compliance.js'
 import { useIsMobile } from '@/hooks/use-mobile.jsx'
+import { useOrg } from '@/org/OrgContext.jsx'
+import { useInstructors } from '@/hooks/useOrgData.js'
+import { isAdminRole, normalizeMembershipRole } from '@/features/students/utils/endpoints.js'
 import SessionCardList from './SessionCardList.jsx'
 import { SessionListDrawer } from './SessionListDrawer'
 import NewSessionModal from '@/features/sessions/components/NewSessionModal'
@@ -40,6 +44,7 @@ function buildDetailSummary(summary) {
 export function ComplianceHeatmap({ orgId }) {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+  const { activeOrg, session } = useOrg()
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -56,6 +61,19 @@ export function ComplianceHeatmap({ orgId }) {
     format(new Date(), 'yyyy-MM-dd')
   )
   const [detailQuickDoc, setDetailQuickDoc] = useState(null)
+  const [selectedInstructorId, setSelectedInstructorId] = useState('all')
+
+  // Check if user is admin/owner
+  const membershipRole = activeOrg?.membership?.role
+  const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole])
+  const isAdmin = isAdminRole(normalizedRole)
+
+  // Fetch instructors list for admin users
+  const { instructors } = useInstructors({
+    enabled: Boolean(isAdmin && orgId && session),
+    orgId,
+    session,
+  })
 
   useEffect(() => {
     const now = new Date()
@@ -78,6 +96,7 @@ export function ComplianceHeatmap({ orgId }) {
         const result = await fetchWeeklyComplianceView({
           orgId,
           weekStart: format(currentWeekStart, 'yyyy-MM-dd'),
+          instructorId: selectedInstructorId === 'all' ? undefined : selectedInstructorId,
         })
         setData(result)
       } catch (err) {
@@ -87,7 +106,7 @@ export function ComplianceHeatmap({ orgId }) {
         setIsLoading(false)
       }
     })()
-  }, [orgId, currentWeekStart])
+  }, [orgId, currentWeekStart, selectedInstructorId])
 
   useEffect(() => {
     if (!isMobile) {
@@ -283,16 +302,40 @@ export function ComplianceHeatmap({ orgId }) {
           </div>
           {viewMode === 'heatmap' ? (
             isMobile ? (
-              <div className="w-full max-w-xs text-right">
-                <label htmlFor="heatmap-date-picker" className="mb-2 block text-sm font-medium text-foreground">
-                  בחר יום להצגה
-                </label>
-                <Input
-                  id="heatmap-date-picker"
-                  type="date"
-                  value={mobileSelectedDate}
-                  onChange={event => setMobileSelectedDate(event.target.value || format(new Date(), 'yyyy-MM-dd'))}
-                />
+              <div className="flex flex-col gap-3 w-full max-w-xs text-right">
+                <div>
+                  <label htmlFor="heatmap-date-picker" className="mb-2 block text-sm font-medium text-foreground">
+                    בחר יום להצגה
+                  </label>
+                  <Input
+                    id="heatmap-date-picker"
+                    type="date"
+                    value={mobileSelectedDate}
+                    onChange={event => setMobileSelectedDate(event.target.value || format(new Date(), 'yyyy-MM-dd'))}
+                  />
+                </div>
+                {isAdmin && instructors && instructors.length > 0 && (
+                  <div dir="rtl">
+                    <label htmlFor="instructor-filter" className="mb-2 block text-sm font-medium text-foreground">
+                      סינון לפי מדריך
+                    </label>
+                    <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId}>
+                      <SelectTrigger id="instructor-filter">
+                        <SelectValue placeholder="בחר מדריך" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל המדריכים</SelectItem>
+                        {instructors
+                          .filter(instructor => instructor.is_active !== false)
+                          .map(instructor => (
+                            <SelectItem key={instructor.id} value={instructor.id}>
+                              {instructor.name || instructor.email || instructor.id}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex gap-2">
@@ -320,6 +363,25 @@ export function ComplianceHeatmap({ orgId }) {
               </div>
             )
           ) : null}
+          {viewMode === 'heatmap' && isAdmin && !isMobile && instructors && instructors.length > 0 && (
+            <div className="w-48" dir="rtl">
+              <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="בחר מדריך" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">כל המדריכים</SelectItem>
+                  {instructors
+                    .filter(instructor => instructor.is_active !== false)
+                    .map(instructor => (
+                      <SelectItem key={instructor.id} value={instructor.id}>
+                        {instructor.name || instructor.email || instructor.id}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {viewMode === 'heatmap' ? (
