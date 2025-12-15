@@ -189,7 +189,7 @@ export default function DashboardPage() {
 
           {/* Weekly compliance - mobile */}
           {tenantClientReady && activeOrgHasConnection ? (
-          <ComplianceHeatmap orgId={activeOrgId} />
+          <ComplianceHeatmap />
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">
@@ -246,7 +246,7 @@ export default function DashboardPage() {
           </div>
 
           {tenantClientReady && activeOrgHasConnection ? (
-          <ComplianceHeatmap orgId={activeOrgId} />
+          <ComplianceHeatmap />
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">

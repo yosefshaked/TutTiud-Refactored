@@ -41,7 +41,7 @@ function buildDetailSummary(summary) {
   return `${documented} תלמידים מתוך ${summary.totalSessions} מפגשים מתועדים`
 }
 
-export function ComplianceHeatmap({ orgId }) {
+export function ComplianceHeatmap() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const { activeOrg, session } = useOrg()
@@ -75,10 +75,18 @@ export function ComplianceHeatmap({ orgId }) {
 
   // Fetch instructors list for admin users
   const { instructors, loadingInstructors } = useInstructors({
-    enabled: Boolean(isAdmin && orgId && session),
-    orgId,
+    enabled: Boolean(isAdmin && session),
     session,
   })
+
+  // Map instructors list to ensure it's always an array
+  const normalizedInstructors = useMemo(() => {
+    if (!instructors) return []
+    if (Array.isArray(instructors)) return instructors
+    if (Array.isArray(instructors?.instructors)) return instructors.instructors
+    if (Array.isArray(instructors?.data)) return instructors.data
+    return []
+  }, [instructors])
 
   useEffect(() => {
     const now = new Date()
@@ -99,7 +107,7 @@ export function ComplianceHeatmap({ orgId }) {
       setError(null)
       try {
         const result = await fetchWeeklyComplianceView({
-          orgId,
+          orgId: activeOrg?.id,
           weekStart: format(currentWeekStart, 'yyyy-MM-dd'),
           instructorId: selectedInstructorId === 'all' ? undefined : selectedInstructorId,
         })
@@ -111,7 +119,7 @@ export function ComplianceHeatmap({ orgId }) {
         setIsLoading(false)
       }
     })()
-  }, [orgId, currentWeekStart, selectedInstructorId])
+  }, [activeOrg?.id, currentWeekStart, selectedInstructorId])
 
   useEffect(() => {
     if (!isMobile) {
@@ -219,7 +227,7 @@ export function ComplianceHeatmap({ orgId }) {
   }
 
   const loadDetailDay = useCallback(async (date, { preserveView = false, keepData = false } = {}) => {
-    if (!date || !orgId) {
+    if (!date || !activeOrg?.id) {
       return
     }
     if (!keepData) {
@@ -230,7 +238,7 @@ export function ComplianceHeatmap({ orgId }) {
     setDetailError(null)
     setIsDetailLoading(true)
     try {
-      const result = await fetchDailyCompliance({ orgId, date })
+      const result = await fetchDailyCompliance({ orgId: activeOrg?.id, date })
       setDetailedDayData(result)
     } catch (detailErr) {
       console.error('Failed to load detailed day view:', detailErr)
@@ -238,7 +246,7 @@ export function ComplianceHeatmap({ orgId }) {
     } finally {
       setIsDetailLoading(false)
     }
-  }, [orgId])
+  }, [activeOrg?.id])
 
   function handleShowDetailedDay(date) {
     loadDetailDay(date)
@@ -271,12 +279,12 @@ export function ComplianceHeatmap({ orgId }) {
 
   const handleDrawerSessionCreated = useCallback(async () => {
     // Refetch the heatmap data when a session is created through the drawer
-    if (!orgId) return
+    if (!activeOrg?.id) return
     setIsLoading(true)
     setError(null)
     try {
       const result = await fetchWeeklyComplianceView({
-        orgId,
+        orgId: activeOrg?.id,
         weekStart: format(currentWeekStart, 'yyyy-MM-dd'),
       })
       setData(result)
@@ -286,7 +294,7 @@ export function ComplianceHeatmap({ orgId }) {
     } finally {
       setIsLoading(false)
     }
-  }, [orgId, currentWeekStart])
+  }, [activeOrg?.id, currentWeekStart])
 
   function handleDetailDocCreated() {
     // Modal now stays open with success state - refresh data but don't close modal
@@ -319,7 +327,7 @@ export function ComplianceHeatmap({ orgId }) {
                     onChange={event => setMobileSelectedDate(event.target.value || format(new Date(), 'yyyy-MM-dd'))}
                   />
                 </div>
-                {isAdmin && (loadingInstructors || instructors) && (
+                {isAdmin && (loadingInstructors || normalizedInstructors) && (
                   <div dir="rtl">
                     <label htmlFor="instructor-filter" className="mb-2 block text-sm font-medium text-foreground">
                       סינון לפי מדריך
@@ -330,7 +338,7 @@ export function ComplianceHeatmap({ orgId }) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">כל המדריכים</SelectItem>
-                        {instructors
+                        {normalizedInstructors
                           ?.filter(instructor => instructor.is_active !== false)
                           .map(instructor => (
                             <SelectItem key={instructor.id} value={instructor.id}>
@@ -368,7 +376,7 @@ export function ComplianceHeatmap({ orgId }) {
               </div>
             )
           ) : null}
-          {viewMode === 'heatmap' && isAdmin && !isMobile && (loadingInstructors || instructors) && (
+          {viewMode === 'heatmap' && isAdmin && !isMobile && (loadingInstructors || normalizedInstructors) && (
             <div className="w-48" dir="rtl">
               <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId} disabled={loadingInstructors}>
                 <SelectTrigger>
@@ -376,7 +384,7 @@ export function ComplianceHeatmap({ orgId }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">כל המדריכים</SelectItem>
-                  {instructors
+                  {normalizedInstructors
                     ?.filter(instructor => instructor.is_active !== false)
                     .map(instructor => (
                       <SelectItem key={instructor.id} value={instructor.id}>
@@ -587,7 +595,7 @@ export function ComplianceHeatmap({ orgId }) {
           isOpen={!!selectedCell}
           onClose={() => setSelectedCell(null)}
           cellData={selectedCell}
-          orgId={orgId}
+          orgId={activeOrg?.id}
           onSessionCreated={handleDrawerSessionCreated}
         />
       )}
