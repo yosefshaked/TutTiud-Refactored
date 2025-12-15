@@ -171,6 +171,13 @@ export function useInstructors(options = {}) {
     session,
     resetOnDisable,
     params,
+    mapResponse: (payload) => {
+      if (!payload) return [];
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.instructors)) return payload.instructors;
+      if (Array.isArray(payload?.data)) return payload.data;
+      return [];
+    },
   });
 
   return {
