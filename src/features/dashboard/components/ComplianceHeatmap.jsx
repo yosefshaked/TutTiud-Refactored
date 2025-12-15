@@ -64,12 +64,17 @@ export function ComplianceHeatmap({ orgId }) {
   const [selectedInstructorId, setSelectedInstructorId] = useState('all')
 
   // Check if user is admin/owner
-  const membershipRole = activeOrg?.membership?.role
+  // Membership role can come from the nested membership object or legacy shape on activeOrg
+  const membershipRole =
+    activeOrg?.membership?.role ??
+    activeOrg?.membership_role ??
+    activeOrg?.role ??
+    null
   const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole])
   const isAdmin = isAdminRole(normalizedRole)
 
   // Fetch instructors list for admin users
-  const { instructors } = useInstructors({
+  const { instructors, loadingInstructors } = useInstructors({
     enabled: Boolean(isAdmin && orgId && session),
     orgId,
     session,
@@ -314,19 +319,19 @@ export function ComplianceHeatmap({ orgId }) {
                     onChange={event => setMobileSelectedDate(event.target.value || format(new Date(), 'yyyy-MM-dd'))}
                   />
                 </div>
-                {isAdmin && instructors && instructors.length > 0 && (
+                {isAdmin && (loadingInstructors || instructors) && (
                   <div dir="rtl">
                     <label htmlFor="instructor-filter" className="mb-2 block text-sm font-medium text-foreground">
                       סינון לפי מדריך
                     </label>
-                    <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId}>
+                    <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId} disabled={loadingInstructors}>
                       <SelectTrigger id="instructor-filter">
                         <SelectValue placeholder="בחר מדריך" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">כל המדריכים</SelectItem>
                         {instructors
-                          .filter(instructor => instructor.is_active !== false)
+                          ?.filter(instructor => instructor.is_active !== false)
                           .map(instructor => (
                             <SelectItem key={instructor.id} value={instructor.id}>
                               {instructor.name || instructor.email || instructor.id}
@@ -363,16 +368,16 @@ export function ComplianceHeatmap({ orgId }) {
               </div>
             )
           ) : null}
-          {viewMode === 'heatmap' && isAdmin && !isMobile && instructors && instructors.length > 0 && (
+          {viewMode === 'heatmap' && isAdmin && !isMobile && (loadingInstructors || instructors) && (
             <div className="w-48" dir="rtl">
-              <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId}>
+              <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId} disabled={loadingInstructors}>
                 <SelectTrigger>
                   <SelectValue placeholder="בחר מדריך" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">כל המדריכים</SelectItem>
                   {instructors
-                    .filter(instructor => instructor.is_active !== false)
+                    ?.filter(instructor => instructor.is_active !== false)
                     .map(instructor => (
                       <SelectItem key={instructor.id} value={instructor.id}>
                         {instructor.name || instructor.email || instructor.id}
