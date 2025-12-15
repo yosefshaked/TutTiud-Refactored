@@ -5,9 +5,13 @@ import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fetchWeeklyComplianceView } from '@/api/weekly-compliance'
 import { fetchDailyCompliance } from '@/api/daily-compliance.js'
 import { useIsMobile } from '@/hooks/use-mobile.jsx'
+import { useOrg } from '@/org/OrgContext.jsx'
+import { useInstructors } from '@/hooks/useOrgData.js'
+import { isAdminRole, normalizeMembershipRole } from '@/features/students/utils/endpoints.js'
 import SessionCardList from './SessionCardList.jsx'
 import { SessionListDrawer } from './SessionListDrawer'
 import NewSessionModal from '@/features/sessions/components/NewSessionModal'
@@ -37,9 +41,10 @@ function buildDetailSummary(summary) {
   return `${documented} תלמידים מתוך ${summary.totalSessions} מפגשים מתועדים`
 }
 
-export function ComplianceHeatmap({ orgId }) {
+export function ComplianceHeatmap() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+  const { activeOrg } = useOrg()
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -56,6 +61,31 @@ export function ComplianceHeatmap({ orgId }) {
     format(new Date(), 'yyyy-MM-dd')
   )
   const [detailQuickDoc, setDetailQuickDoc] = useState(null)
+  const [selectedInstructorId, setSelectedInstructorId] = useState('all')
+
+  // Check if user is admin/owner
+  // Membership role can come from the nested membership object or legacy shape on activeOrg
+  const membershipRole =
+    activeOrg?.membership?.role ??
+    activeOrg?.membership_role ??
+    activeOrg?.role ??
+    null
+  const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole])
+  const isAdmin = isAdminRole(normalizedRole)
+
+  // Fetch instructors list for admin users
+  const { instructors, loadingInstructors } = useInstructors({
+    enabled: Boolean(isAdmin && activeOrg?.id),
+  })
+
+  // Map instructors list to ensure it's always an array
+  const normalizedInstructors = useMemo(() => {
+    if (!instructors) return []
+    if (Array.isArray(instructors)) return instructors
+    if (Array.isArray(instructors?.instructors)) return instructors.instructors
+    if (Array.isArray(instructors?.data)) return instructors.data
+    return []
+  }, [instructors])
 
   useEffect(() => {
     const now = new Date()
@@ -76,8 +106,9 @@ export function ComplianceHeatmap({ orgId }) {
       setError(null)
       try {
         const result = await fetchWeeklyComplianceView({
-          orgId,
+          orgId: activeOrg?.id,
           weekStart: format(currentWeekStart, 'yyyy-MM-dd'),
+          instructorId: selectedInstructorId === 'all' ? undefined : selectedInstructorId,
         })
         setData(result)
       } catch (err) {
@@ -87,7 +118,7 @@ export function ComplianceHeatmap({ orgId }) {
         setIsLoading(false)
       }
     })()
-  }, [orgId, currentWeekStart])
+  }, [activeOrg?.id, currentWeekStart, selectedInstructorId])
 
   useEffect(() => {
     if (!isMobile) {
@@ -195,7 +226,7 @@ export function ComplianceHeatmap({ orgId }) {
   }
 
   const loadDetailDay = useCallback(async (date, { preserveView = false, keepData = false } = {}) => {
-    if (!date || !orgId) {
+    if (!date || !activeOrg?.id) {
       return
     }
     if (!keepData) {
@@ -206,7 +237,7 @@ export function ComplianceHeatmap({ orgId }) {
     setDetailError(null)
     setIsDetailLoading(true)
     try {
-      const result = await fetchDailyCompliance({ orgId, date })
+      const result = await fetchDailyCompliance({ orgId: activeOrg?.id, date })
       setDetailedDayData(result)
     } catch (detailErr) {
       console.error('Failed to load detailed day view:', detailErr)
@@ -214,7 +245,7 @@ export function ComplianceHeatmap({ orgId }) {
     } finally {
       setIsDetailLoading(false)
     }
-  }, [orgId])
+  }, [activeOrg?.id])
 
   function handleShowDetailedDay(date) {
     loadDetailDay(date)
@@ -247,12 +278,12 @@ export function ComplianceHeatmap({ orgId }) {
 
   const handleDrawerSessionCreated = useCallback(async () => {
     // Refetch the heatmap data when a session is created through the drawer
-    if (!orgId) return
+    if (!activeOrg?.id) return
     setIsLoading(true)
     setError(null)
     try {
       const result = await fetchWeeklyComplianceView({
-        orgId,
+        orgId: activeOrg?.id,
         weekStart: format(currentWeekStart, 'yyyy-MM-dd'),
       })
       setData(result)
@@ -262,7 +293,7 @@ export function ComplianceHeatmap({ orgId }) {
     } finally {
       setIsLoading(false)
     }
-  }, [orgId, currentWeekStart])
+  }, [activeOrg?.id, currentWeekStart])
 
   function handleDetailDocCreated() {
     // Modal now stays open with success state - refresh data but don't close modal
@@ -283,16 +314,40 @@ export function ComplianceHeatmap({ orgId }) {
           </div>
           {viewMode === 'heatmap' ? (
             isMobile ? (
-              <div className="w-full max-w-xs text-right">
-                <label htmlFor="heatmap-date-picker" className="mb-2 block text-sm font-medium text-foreground">
-                  בחר יום להצגה
-                </label>
-                <Input
-                  id="heatmap-date-picker"
-                  type="date"
-                  value={mobileSelectedDate}
-                  onChange={event => setMobileSelectedDate(event.target.value || format(new Date(), 'yyyy-MM-dd'))}
-                />
+              <div className="flex flex-col gap-3 w-full max-w-xs text-right">
+                <div>
+                  <label htmlFor="heatmap-date-picker" className="mb-2 block text-sm font-medium text-foreground">
+                    בחר יום להצגה
+                  </label>
+                  <Input
+                    id="heatmap-date-picker"
+                    type="date"
+                    value={mobileSelectedDate}
+                    onChange={event => setMobileSelectedDate(event.target.value || format(new Date(), 'yyyy-MM-dd'))}
+                  />
+                </div>
+                {isAdmin && (loadingInstructors || normalizedInstructors) && (
+                  <div dir="rtl">
+                    <label htmlFor="instructor-filter" className="mb-2 block text-sm font-medium text-foreground">
+                      סינון לפי מדריך
+                    </label>
+                    <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId} disabled={loadingInstructors}>
+                      <SelectTrigger id="instructor-filter">
+                        <SelectValue placeholder="בחר מדריך" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל המדריכים</SelectItem>
+                        {normalizedInstructors
+                          ?.filter(instructor => instructor.is_active !== false)
+                          .map(instructor => (
+                            <SelectItem key={instructor.id} value={instructor.id}>
+                              {instructor.name || instructor.email || instructor.id}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex gap-2">
@@ -320,6 +375,25 @@ export function ComplianceHeatmap({ orgId }) {
               </div>
             )
           ) : null}
+          {viewMode === 'heatmap' && isAdmin && !isMobile && (loadingInstructors || normalizedInstructors) && (
+            <div className="w-48" dir="rtl">
+              <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId} disabled={loadingInstructors}>
+                <SelectTrigger>
+                  <SelectValue placeholder="בחר מדריך" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">כל המדריכים</SelectItem>
+                  {normalizedInstructors
+                    ?.filter(instructor => instructor.is_active !== false)
+                    .map(instructor => (
+                      <SelectItem key={instructor.id} value={instructor.id}>
+                        {instructor.name || instructor.email || instructor.id}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {viewMode === 'heatmap' ? (
@@ -520,7 +594,7 @@ export function ComplianceHeatmap({ orgId }) {
           isOpen={!!selectedCell}
           onClose={() => setSelectedCell(null)}
           cellData={selectedCell}
-          orgId={orgId}
+          orgId={activeOrg?.id}
           onSessionCreated={handleDrawerSessionCreated}
         />
       )}

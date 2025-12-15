@@ -36,7 +36,7 @@ export async function authenticatedFetch(path, { session: _session, accessToken:
   const token = await resolveBearerToken();
   const bearer = `Bearer ${token}`;
 
-  const { headers: customHeaders = {}, body, ...rest } = options;
+  const { headers: customHeaders = {}, body, params, ...rest } = options;
   const headers = createAuthorizationHeaders(customHeaders, bearer, { includeJsonContentType: true });
 
   let requestBody = body;
@@ -44,8 +44,32 @@ export async function authenticatedFetch(path, { session: _session, accessToken:
     requestBody = JSON.stringify(requestBody);
   }
 
-  const normalizedPath = String(path || '').replace(/^\/+/, '');
-  const response = await fetch(`/api/${normalizedPath}`, {
+  const normalizedPath = String(path || '')
+    .replace(/^\/+/, '')
+    .replace(/^api\//, '');
+
+  let url = `/api/${normalizedPath}`;
+  if (params && typeof params === 'object') {
+    const searchParams = new URLSearchParams();
+    for (const [key, rawValue] of Object.entries(params)) {
+      if (!key) continue;
+      if (rawValue === null || typeof rawValue === 'undefined') continue;
+      if (Array.isArray(rawValue)) {
+        for (const entry of rawValue) {
+          if (entry === null || typeof entry === 'undefined') continue;
+          searchParams.append(key, String(entry));
+        }
+        continue;
+      }
+      searchParams.set(key, String(rawValue));
+    }
+    const query = searchParams.toString();
+    if (query) {
+      url += (url.includes('?') ? '&' : '?') + query;
+    }
+  }
+
+  const response = await fetch(url, {
     ...rest,
     headers,
     body: requestBody,
@@ -80,11 +104,35 @@ export async function authenticatedFetchBlob(path, { session: _session, accessTo
   const token = await resolveBearerToken();
   const bearer = `Bearer ${token}`;
 
-  const { headers: customHeaders = {}, ...rest } = options;
+  const { headers: customHeaders = {}, params, ...rest } = options;
   const headers = createAuthorizationHeaders(customHeaders, bearer, { includeJsonContentType: false });
 
-  const normalizedPath = String(path || '').replace(/^\/+/, '');
-  const response = await fetch(`/api/${normalizedPath}`, {
+  const normalizedPath = String(path || '')
+    .replace(/^\/+/, '')
+    .replace(/^api\//, '');
+
+  let url = `/api/${normalizedPath}`;
+  if (params && typeof params === 'object') {
+    const searchParams = new URLSearchParams();
+    for (const [key, rawValue] of Object.entries(params)) {
+      if (!key) continue;
+      if (rawValue === null || typeof rawValue === 'undefined') continue;
+      if (Array.isArray(rawValue)) {
+        for (const entry of rawValue) {
+          if (entry === null || typeof entry === 'undefined') continue;
+          searchParams.append(key, String(entry));
+        }
+        continue;
+      }
+      searchParams.set(key, String(rawValue));
+    }
+    const query = searchParams.toString();
+    if (query) {
+      url += (url.includes('?') ? '&' : '?') + query;
+    }
+  }
+
+  const response = await fetch(url, {
     ...rest,
     headers,
   });
@@ -113,11 +161,35 @@ export async function authenticatedFetchText(path, { session: _session, accessTo
   const token = await resolveBearerToken();
   const bearer = `Bearer ${token}`;
 
-  const { headers: customHeaders = {}, ...rest } = options;
+  const { headers: customHeaders = {}, params, ...rest } = options;
   const headers = createAuthorizationHeaders(customHeaders, bearer, { includeJsonContentType: false });
 
-  const normalizedPath = String(path || '').replace(/^\/+/, '');
-  const response = await fetch(`/api/${normalizedPath}`, {
+  const normalizedPath = String(path || '')
+    .replace(/^\/+/, '')
+    .replace(/^api\//, '');
+
+  let url = `/api/${normalizedPath}`;
+  if (params && typeof params === 'object') {
+    const searchParams = new URLSearchParams();
+    for (const [key, rawValue] of Object.entries(params)) {
+      if (!key) continue;
+      if (rawValue === null || typeof rawValue === 'undefined') continue;
+      if (Array.isArray(rawValue)) {
+        for (const entry of rawValue) {
+          if (entry === null || typeof entry === 'undefined') continue;
+          searchParams.append(key, String(entry));
+        }
+        continue;
+      }
+      searchParams.set(key, String(rawValue));
+    }
+    const query = searchParams.toString();
+    if (query) {
+      url += (url.includes('?') ? '&' : '?') + query;
+    }
+  }
+
+  const response = await fetch(url, {
     ...rest,
     headers,
   });

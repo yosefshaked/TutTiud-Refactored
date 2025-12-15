@@ -268,7 +268,7 @@ export function OrgProvider({ children }) {
     setError(null);
 
     try {
-      const payload = await authenticatedFetch('/api/user-context');
+      const payload = await authenticatedFetch('user-context');
 
       const connectionEntries = payload?.connections && typeof payload.connections === 'object'
         ? Object.entries(payload.connections)
@@ -332,7 +332,7 @@ export function OrgProvider({ children }) {
       }
 
       try {
-        const directoryData = await authenticatedFetch('/api/directory', {
+        const directoryData = await authenticatedFetch('directory', {
           params: { orgId },
           signal,
         });

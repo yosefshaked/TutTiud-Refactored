@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.7.0': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.8.0': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,114 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.8.0 - Loose Reports (Unassigned Sessions), Resubmissions, Advanced Filtering */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.8.0')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.8.0'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.8.0'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.8.0
+                    </span>
+                    <time dateTime="2025-12-15" style={{ color: '#64748b', fontSize: '14px' }}>
+                      15 בדצמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.8.0'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  📋 דיווחים ממתינים, שליחה מחדש וסינון מתקדם
+                </h3>
+              </header>
+
+              {expandedVersions['1.8.0'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  למדריכים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '0 0 12px 0',
+                  color: '#475569',
+                  fontSize: 15,
+                  lineHeight: 1.8
+                }}>
+                  <li><strong>דיווח על תלמידים חדשים:</strong> אפשר כעת לדווח על מפגשים גם כאשר התלמיד טרם נוסף למערכת.</li>
+                  <li><strong>ממשק ניהול דיווחים:</strong> תצוגה חדשה עם כרטיסיות המציגה את סטטוס כל הדיווחים שלכם (ממתינים, נדחו, אושרו).</li>
+                  <li><strong>שליחה מחדש:</strong> דיווחים שנדחו ניתן לערוך ולשלוח מחדש, כולל אפשרות להוסיף הערה למנהל.</li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  למנהלים ובעלים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '0 0 12px 0',
+                  color: '#475569',
+                  fontSize: 15,
+                  lineHeight: 1.8
+                }}>
+                  <li><strong>עמוד דיווחים ממתינים:</strong> ממשק ייעודי לטיפול בדיווחים ללא שיוך - שיוך לתלמיד קיים, יצירת תלמיד חדש, או דחייה עם הסבר.</li>
+                  <li><strong>דיווח בשם מדריכים:</strong> מנהלים יכולים ליצור דיווחים ולבחור מדריך ספציפי כיוצר.</li>
+                  <li><strong>סינון וחיפוש מתקדם:</strong> חיפוש דיווחים לפי טווח תאריכים, סטטוס, שם תלמיד וסיבת הדיווח.</li>
+                  <li><strong>זיהוי כפילויות:</strong> התראה בזמן אמת בעת הזנת שם תלמיד חדש אם קיימים תלמידים בשמות דומים.</li>
+                  <li><strong>סינון במפת החום:</strong> אפשרות לסינון הדיווחים במפת החום לפי מדריך ספציפי.</li>
+                </ul>
+
+                <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
+                  שיפורים נוספים:
+                </h4>
+                <ul style={{
+                  listStyle: 'disc',
+                  paddingRight: '24px',
+                  margin: '0 0 12px 0',
+                  color: '#475569',
+                  fontSize: 15,
+                  lineHeight: 1.8
+                }}>
+                  <li>מדריכים-מנהלים רואים תחילה "התלמידים שלי" עם אפשרות מהירה למעבר לכל התלמידים.</li>
+                  <li>תיקון בעיית טעינה כפולה ברשימת התלמידים.</li>
+                  <li>שיפורי ביצועים ותיקוני באגים נוספים.</li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.7.0 - Student data management, CSV import/export, national ID, deduplication */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>

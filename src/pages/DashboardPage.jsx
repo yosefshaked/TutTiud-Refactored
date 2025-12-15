@@ -6,7 +6,7 @@ import { useAuth } from "@/auth/AuthContext.jsx"
 import { useOrg } from "@/org/OrgContext.jsx"
 import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
-import { authenticatedFetch } from "@/lib/api-client.js"
+import { useInstructors } from "@/hooks/useOrgData.js"
 import { ComplianceHeatmap } from "@/features/dashboard/components/ComplianceHeatmap.jsx"
 
 /**
@@ -57,6 +57,12 @@ export default function DashboardPage() {
   const [instructorName, setInstructorName] = useState(null)
   const [profileName, setProfileName] = useState(null)
 
+  const { instructors } = useInstructors({
+    enabled: Boolean(user?.id && activeOrgId && tenantClientReady && activeOrgHasConnection && session),
+    orgId: activeOrgId,
+    session,
+  })
+
   const membershipRole = activeOrg?.membership?.role
   const { studentsLink, studentsTitle, studentsDescription } = useMemo(() => {
     const normalizedRole = typeof membershipRole === "string" ? membershipRole.toLowerCase() : "member"
@@ -77,39 +83,15 @@ export default function DashboardPage() {
     }
   }, [membershipRole])
 
-  // Fetch instructor name from tenant DB Instructors table
+  // Resolve instructor name from hook data
   useEffect(() => {
-    if (!user?.id || !activeOrgId || !tenantClientReady || !activeOrgHasConnection || !session) {
-      return
+    if (!user?.id) return
+    if (!Array.isArray(instructors)) return
+    const instructor = instructors.find((i) => i?.id === user.id)
+    if (instructor?.name) {
+      setInstructorName(instructor.name)
     }
-
-    let isMounted = true
-
-    async function fetchInstructorName() {
-      try {
-        const searchParams = new URLSearchParams({ org_id: activeOrgId })
-        const instructors = await authenticatedFetch(`instructors?${searchParams.toString()}`, { session })
-        
-        if (!isMounted) return
-
-        if (Array.isArray(instructors)) {
-          const instructor = instructors.find(i => i.id === user.id)
-          if (instructor?.name) {
-            setInstructorName(instructor.name)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch instructor name:', error)
-        // Silently fail - will fall back to profile/auth name
-      }
-    }
-
-    fetchInstructorName()
-
-    return () => {
-      isMounted = false
-    }
-  }, [user?.id, activeOrgId, tenantClientReady, activeOrgHasConnection, session])
+  }, [user?.id, instructors])
 
   // Fetch profile name from control DB profiles table
   useEffect(() => {
@@ -207,7 +189,7 @@ export default function DashboardPage() {
 
           {/* Weekly compliance - mobile */}
           {tenantClientReady && activeOrgHasConnection ? (
-          <ComplianceHeatmap orgId={activeOrgId} />
+          <ComplianceHeatmap />
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">
@@ -264,7 +246,7 @@ export default function DashboardPage() {
           </div>
 
           {tenantClientReady && activeOrgHasConnection ? (
-          <ComplianceHeatmap orgId={activeOrgId} />
+          <ComplianceHeatmap />
           ) : (
             <Card className="rounded-2xl border border-border bg-surface p-lg shadow-sm">
               <p className="text-sm text-muted-foreground">

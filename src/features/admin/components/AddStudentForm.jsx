@@ -12,13 +12,11 @@ import {
   TimeField
 } from '@/components/ui/forms-ui';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
-import { useAuth } from '@/auth/AuthContext';
-import { useOrg } from '@/org/OrgContext';
-import { authenticatedFetch } from '@/lib/api-client';
 import StudentTagsField from './StudentTagsField.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { createStudentFormState } from '@/features/students/utils/form-state.js';
 import { useStudentNameSuggestions, useNationalIdGuard } from '@/features/admin/hooks/useStudentDeduplication.js';
+import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 
 export default function AddStudentForm({ 
   onSubmit, 
@@ -28,15 +26,13 @@ export default function AddStudentForm({
   renderFooterOutside = false,
   onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
   onSubmitDisabledChange = () => {},
+  initialValues = {},
 }) {
-  const [values, setValues] = useState(() => createStudentFormState());
+  const initialState = useMemo(() => ({ ...createStudentFormState(), ...initialValues }), [initialValues]);
+  const [values, setValues] = useState(() => initialState);
   const [touched, setTouched] = useState({});
-  const [services, setServices] = useState([]);
-  const [loadingServices, setLoadingServices] = useState(true);
-  const [instructors, setInstructors] = useState([]);
-  const [loadingInstructors, setLoadingInstructors] = useState(true);
-  const { session } = useAuth();
-  const { activeOrgId } = useOrg();
+  const { services, loadingServices } = useServices();
+  const { instructors, loadingInstructors } = useInstructors();
 
   const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId);
@@ -52,53 +48,16 @@ export default function AddStudentForm({
   }, [preventSubmitReason, isSubmitting, onSubmitDisabledChange]);
 
   useEffect(() => {
-    if (!isSubmitting && !error) {
-      setValues(createStudentFormState());
-      setTouched({});
-    }
-  }, [isSubmitting, error]);
+    setValues(initialState);
+    setTouched({});
+  }, [initialState]);
 
   useEffect(() => {
-    async function loadServices() {
-      if (!session || !activeOrgId) return;
-      
-      try {
-        setLoadingServices(true);
-        const searchParams = new URLSearchParams({ keys: 'available_services', org_id: activeOrgId });
-        const payload = await authenticatedFetch(`settings?${searchParams.toString()}`, { session });
-        const settingsValue = payload?.settings?.available_services;
-        
-        if (Array.isArray(settingsValue)) {
-          setServices(settingsValue);
-        } else {
-          setServices([]);
-        }
-      } catch (err) {
-        console.error('Failed to load services', err);
-        setServices([]);
-      } finally {
-        setLoadingServices(false);
-      }
+    if (!isSubmitting && !error) {
+      setValues(initialState);
+      setTouched({});
     }
-    async function loadInstructors() {
-      if (!session || !activeOrgId) return;
-      try {
-        setLoadingInstructors(true);
-        const searchParams = new URLSearchParams({ org_id: activeOrgId });
-        const roster = await authenticatedFetch(`instructors?${searchParams.toString()}`, { session });
-        // API returns only active instructors by default
-        setInstructors(Array.isArray(roster) ? roster : []);
-      } catch (err) {
-        console.error('Failed to load instructors', err);
-        setInstructors([]);
-      } finally {
-        setLoadingInstructors(false);
-      }
-    }
-
-    loadServices();
-    loadInstructors();
-  }, [session, activeOrgId]);
+  }, [isSubmitting, error, initialState]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;

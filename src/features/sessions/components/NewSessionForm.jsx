@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { Loader2, ListChecks, RotateCcw, ChevronDown } from 'lucide-react';
+import { Loader2, ListChecks, RotateCcw, ChevronDown, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { sortStudentsBySchedule } from '@/features/students/utils/sorting.js';
 import { cn } from '@/lib/utils.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
+import { useLooseReportNameSuggestions } from '@/features/sessions/hooks/useLooseReportNameSuggestions.js';
 
 export default function NewSessionForm({
   students = [],
@@ -19,6 +20,7 @@ export default function NewSessionForm({
   services = [],
   instructors = [],
   canFilterByInstructor = false,
+  userIsInstructor = false, // Whether the logged-in user is an instructor
   studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
   onScopeChange,
   statusFilter = 'active',
@@ -47,10 +49,22 @@ export default function NewSessionForm({
   const [sessionDate, setSessionDate] = useState(initialDate || '');
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
+  const [sessionTime, setSessionTime] = useState('');
+  const [looseMode, setLooseMode] = useState(false);
+  const [unassignedName, setUnassignedName] = useState('');
+  const [unassignedReason, setUnassignedReason] = useState('');
+  const [unassignedReasonOther, setUnassignedReasonOther] = useState('');
+  const [looseInstructorId, setLooseInstructorId] = useState(''); // For admin selecting which instructor submits loose report
   const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
   const [activeQuestionKey, setActiveQuestionKey] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
   const formRef = useRef(null);
+  
+  // Loose report name duplicate checker
+  const { suggestions: nameSuggestions, loading: loadingNameSuggestions } = useLooseReportNameSuggestions(
+    unassignedName,
+    looseMode // Only enabled when in loose mode
+  );
   
   // Use controlled state from parent, or local state as fallback
   const showAdvancedFilters = externalShowAdvancedFilters ?? false;
@@ -189,6 +203,7 @@ export default function NewSessionForm({
 
   const handleStudentChange = (value) => {
     setSelectedStudentId(value);
+    setLooseMode(false);
     onSelectedStudentChange?.(value); // Notify parent
     setServiceTouched(false);
     const nextStudent = students.find((student) => student?.id === value);
@@ -224,6 +239,19 @@ export default function NewSessionForm({
     updateAnswer(questionKey, value);
   }, [updateAnswer]);
 
+  // Handler to switch from loose mode to regular mode when selecting an existing student
+  const handleSelectExistingStudent = useCallback((student) => {
+    // Switch to regular mode
+    setLooseMode(false);
+    // Select the student
+    setSelectedStudentId(student.id);
+    // Clear loose mode fields
+    setUnassignedName('');
+    setUnassignedReason('');
+    setUnassignedReasonOther('');
+    // Keep service, time, answers, and date - they're preserved automatically
+  }, []);
+
   const handleSubmit = (event) => {
     event.preventDefault();
 
@@ -233,7 +261,15 @@ export default function NewSessionForm({
       return;
     }
 
-    if (!selectedStudentId) {
+    if (!selectedStudentId && !looseMode) {
+      return;
+    }
+
+    if (looseMode && !unassignedName.trim()) return;
+    if (looseMode && !sessionTime.trim()) return;
+    // Non-instructor admins must specify which instructor is submitting
+    if (looseMode && canFilterByInstructor && !userIsInstructor && !looseInstructorId.trim()) {
+      alert('נדרש לבחור מדריך מגיש. כמנהל ללא הרשאות מדריך, עליך לציין איזה מדריך מגיש את הדיווח.');
       return;
     }
 
@@ -253,10 +289,19 @@ export default function NewSessionForm({
       });
 
     const payload = {
-      studentId: selectedStudentId,
+      studentId: looseMode ? null : selectedStudentId,
       date: sessionDate,
+      time: looseMode ? sessionTime : sessionTime || null,
       serviceContext: trimmedService || null,
       answers: Object.fromEntries(answerEntries),
+      instructorId: looseMode && looseInstructorId ? looseInstructorId : undefined,
+      unassignedDetails: looseMode
+        ? {
+            name: unassignedName.trim(),
+            reason: unassignedReason,
+            ...(unassignedReason === 'other' ? { reason_other: unassignedReasonOther.trim() } : {}),
+          }
+        : null,
     };
 
     onSubmit?.(payload);
@@ -264,7 +309,16 @@ export default function NewSessionForm({
 
   // Expose reset function to parent via ref
   useImperativeHandle(formResetRef, () => (options = {}) => {
-    const { keepStudent = false, studentId = null, date = null } = options;
+    const { 
+      keepStudent = false, 
+      studentId = null, 
+      date = null,
+      // Loose report metadata to preserve across follow-up reports
+      looseName = null,
+      looseReason = null,
+      looseReasonOther = null,
+      looseService = null,
+    } = options;
     
     // Reset all form fields
     const initialAnswers = {};
@@ -285,13 +339,33 @@ export default function NewSessionForm({
     } else {
       setSessionDate('');
     }
+    setSessionTime('');
     
-    // Preserve service context when keeping same student
-    if (!keepStudent) {
-      setServiceContext('');
-      setServiceTouched(false);
+    // Preserve loose report metadata if provided (for follow-up reports of same loose report)
+    if (looseName) {
+      setLooseMode(true);
+      setUnassignedName(looseName);
+      setUnassignedReason(looseReason || '');
+      setUnassignedReasonOther(looseReasonOther || '');
+      // Pre-fill service context for loose reports
+      if (looseService) {
+        setServiceContext(looseService);
+        setServiceTouched(true);
+      }
+    } else {
+      setLooseMode(false);
+      setUnassignedName('');
+      setUnassignedReason('');
+      setUnassignedReasonOther('');
+      
+      // Preserve service context when keeping same student (assigned reports)
+      if (!keepStudent) {
+        setServiceContext('');
+        setServiceTouched(false);
+      }
     }
     
+    setLooseInstructorId('');
     setStudentQuery('');
     setStudentDayFilter(null);
     // Keep advanced filters state when creating additional reports (don't reset showAdvancedFilters)
@@ -316,7 +390,7 @@ export default function NewSessionForm({
       setIsFormValid(nextIsValid);
     }
     onFormValidityChange?.(nextIsValid);
-  }, [selectedStudentId, sessionDate, answers, questions, onFormValidityChange, isFormValid]);
+  }, [selectedStudentId, sessionDate, sessionTime, serviceContext, looseMode, unassignedName, unassignedReason, unassignedReasonOther, looseInstructorId, answers, questions, onFormValidityChange, isFormValid]);
 
   return (
     <form
@@ -339,8 +413,35 @@ export default function NewSessionForm({
       {!successState && (
       <>
       <div className="space-y-sm">
-        <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
-        <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <Label htmlFor="session-student" className="block text-right text-base font-semibold">בחרו תלמיד *</Label>
+            <p className="text-xs text-neutral-500 text-right mb-3">השתמשו במסננים למטה כדי לצמצם את הרשימה</p>
+          </div>
+          <Button
+            type="button"
+            variant={looseMode ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setLooseMode((prev) => {
+                const next = !prev;
+                if (next) {
+                  setSelectedStudentId('');
+                  onSelectedStudentChange?.('');
+                  setServiceContext('');
+                  setServiceTouched(true);
+                } else {
+                  setServiceTouched(false);
+                }
+                return next;
+              });
+            }}
+            disabled={isSubmitting}
+            className="whitespace-nowrap"
+          >
+            תלמיד לא ברשימה?
+          </Button>
+        </div>
         
         {/* Search Box with Collapsible Advanced Filters */}
         <div className="mb-3 space-y-2 p-3 bg-neutral-50 rounded-lg border border-neutral-200">
@@ -466,11 +567,11 @@ export default function NewSessionForm({
             value={selectedStudentId}
             onValueChange={handleStudentChange}
             onOpenChange={onSelectOpenChange}
-            disabled={isSubmitting || filteredStudents.length === 0}
-            required
+            disabled={isSubmitting || filteredStudents.length === 0 || looseMode}
+            required={!looseMode}
           >
             <SelectTrigger id="session-student" className="w-full border-2 border-primary/30 bg-white shadow-sm hover:border-primary/50 focus:border-primary">
-              <SelectValue placeholder="בחרו תלמיד מהרשימה" />
+              <SelectValue placeholder={looseMode ? 'דיווח לא משויך' : 'בחרו תלמיד מהרשימה'} />
             </SelectTrigger>
             <SelectContent className="max-h-[300px]">
               {filteredStudents.map((student) => {
@@ -484,11 +585,138 @@ export default function NewSessionForm({
             </SelectContent>
           </Select>
         </div>
-        {students.length === 0 ? (
+        {looseMode ? (
+          <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-right text-sm text-amber-800">
+            <p className="font-semibold">דיווח לא משויך</p>
+            <p>הדיווח יישלח לאישור מנהל לפני שיוצמד לתלמיד קיים או חדש.</p>
+          </div>
+        ) : students.length === 0 ? (
           <p className="text-xs text-neutral-500 text-right">אין תלמידים זמינים לשיוך מפגש חדש.</p>
         ) : filteredStudents.length === 0 ? (
           <p className="text-xs text-neutral-500 text-right">לא נמצאו תלמידים התואמים את החיפוש.</p>
         ) : null}
+
+        {looseMode && (
+          <div className="space-y-md">
+            <div className="grid gap-md sm:grid-cols-2">
+              <div className="space-y-sm">
+                <Label htmlFor="unassigned-name" className="block text-right">שם התלמיד *</Label>
+                <div className="relative">
+                  <Input
+                    id="unassigned-name"
+                    value={unassignedName}
+                    onChange={(e) => setUnassignedName(e.target.value)}
+                    required={looseMode}
+                    disabled={isSubmitting}
+                    placeholder="הקלידו שם"
+                  />
+                  {loadingNameSuggestions && (
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                {nameSuggestions && nameSuggestions.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 overflow-hidden">
+                    <div className="px-3 py-2 bg-amber-100/50 border-b border-amber-200">
+                      <div className="flex items-center gap-2 text-sm font-medium text-amber-900">
+                        <UserCheck className="h-4 w-4" />
+                        <span>תלמידים קיימים נמצאו במערכת</span>
+                      </div>
+                    </div>
+                    <div className="p-2 space-y-1">
+                      {nameSuggestions.map((student) => (
+                        <button
+                          key={student.id}
+                          type="button"
+                          onClick={() => handleSelectExistingStudent(student)}
+                          className="w-full flex items-center justify-between px-3 py-2.5 text-sm rounded-md bg-white hover:bg-muted border border-transparent hover:border-border transition-all text-right group"
+                          disabled={isSubmitting}
+                        >
+                          <span className="font-medium text-foreground group-hover:text-primary">{student.name}</span>
+                          <div className="flex items-center gap-2">
+                            {student.is_active ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20">
+                                פעיל
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border">
+                                לא פעיל
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="px-3 py-2 bg-amber-50/30 border-t border-amber-200 text-xs text-amber-800 text-right">
+                      💡 לחיצה על תלמיד תעביר לדיווח רגיל תוך שמירת כל התשובות
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="space-y-sm">
+                <Label htmlFor="unassigned-reason" className="block text-right">סיבת הדיווח *</Label>
+                <Select
+                  value={unassignedReason}
+                  onValueChange={setUnassignedReason}
+                  onOpenChange={onSelectOpenChange}
+                  disabled={isSubmitting}
+                  required={looseMode}
+                >
+                  <SelectTrigger id="unassigned-reason" className="w-full">
+                    <SelectValue placeholder="בחרו סיבה" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="substitute">מחליף זמני</SelectItem>
+                    <SelectItem value="new_student">תלמיד חדש</SelectItem>
+                    <SelectItem value="other">אחר</SelectItem>
+                  </SelectContent>
+                </Select>
+                {unassignedReason === 'other' ? (
+                  <Input
+                    id="unassigned-reason-other"
+                    className="mt-2"
+                    placeholder="פרטו את הסיבה"
+                    value={unassignedReasonOther}
+                    onChange={(e) => setUnassignedReasonOther(e.target.value)}
+                    required={looseMode}
+                    disabled={isSubmitting}
+                  />
+                ) : null}
+              </div>
+            </div>
+            {canFilterByInstructor && instructors.length > 0 && (
+              <div className="space-y-sm">
+                <Label htmlFor="loose-instructor" className="block text-right">
+                  מדריך מגיש {!userIsInstructor && '*'}
+                </Label>
+                <Select
+                  value={looseInstructorId}
+                  onValueChange={setLooseInstructorId}
+                  onOpenChange={onSelectOpenChange}
+                  disabled={isSubmitting}
+                  required={!userIsInstructor}
+                >
+                  <SelectTrigger id="loose-instructor" className="w-full">
+                    <SelectValue placeholder={userIsInstructor ? "בחרו מדריך (אופציונלי)" : "בחרו מדריך *"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {instructors.map((inst) => (
+                      <SelectItem key={inst.id} value={inst.id}>
+                        {inst.name || inst.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-neutral-500 text-right">
+                  {userIsInstructor 
+                    ? "ללא בחירה, הדיווח יוצמד אליך כמגיש"
+                    : "נדרש לבחור מדריך - אין לך הרשאות מדריך"}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-md sm:grid-cols-2">
@@ -503,10 +731,23 @@ export default function NewSessionForm({
             disabled={isSubmitting}
           />
         </div>
+        {looseMode && (
+          <div className="space-y-sm">
+            <Label htmlFor="session-time" className="block text-right">שעת המפגש *</Label>
+            <TimeField
+              id="session-time"
+              value={sessionTime}
+              onChange={setSessionTime}
+              disabled={isSubmitting}
+              required
+              placeholder="HH:MM"
+            />
+          </div>
+        )}
         <ComboBoxField
           id="session-service"
           name="service"
-          label="שירות ברירת מחדל"
+          label="שירות"
           value={serviceContext}
           onChange={setServiceContext}
           options={services}
@@ -514,7 +755,8 @@ export default function NewSessionForm({
           disabled={isSubmitting}
           dir="rtl"
           emptyMessage="לא נמצאו שירותים תואמים"
-          description="הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה."
+          description={looseMode ? 'חובה לבחור שירות לדיווח לא משויך.' : 'הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה.'}
+          required={looseMode}
         />
       </div>
 

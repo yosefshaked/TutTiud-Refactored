@@ -14,13 +14,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { validateIsraeliPhone } from '@/components/ui/helpers/phone';
-import { useAuth } from '@/auth/AuthContext';
-import { useOrg } from '@/org/OrgContext';
-import { authenticatedFetch } from '@/lib/api-client';
 import StudentTagsField from './StudentTagsField.jsx';
 import { normalizeTagIdsForWrite } from '@/features/students/utils/tags.js';
 import { createStudentFormState } from '@/features/students/utils/form-state.js';
 import { useStudentNameSuggestions, useNationalIdGuard } from '@/features/admin/hooks/useStudentDeduplication.js';
+import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 
 export default function EditStudentForm({ 
   student, 
@@ -34,12 +32,8 @@ export default function EditStudentForm({
 }) {
   const [values, setValues] = useState(() => createStudentFormState(student));
   const [touched, setTouched] = useState({});
-  const [services, setServices] = useState([]);
-  const [loadingServices, setLoadingServices] = useState(true);
-  const [instructors, setInstructors] = useState([]);
-  const [loadingInstructors, setLoadingInstructors] = useState(true);
-  const { session } = useAuth();
-  const { activeOrgId } = useOrg();
+  const { services, loadingServices } = useServices();
+  const { instructors, loadingInstructors } = useInstructors();
   
   // Track the ID of the student currently being edited
   const currentStudentIdRef = useRef(student?.id);
@@ -73,41 +67,6 @@ export default function EditStudentForm({
       setTouched({});
     }
   }, [student]);
-
-  useEffect(() => {
-    async function loadServices() {
-      if (!session || !activeOrgId) return;
-      try {
-        setLoadingServices(true);
-        const searchParams = new URLSearchParams({ keys: 'available_services', org_id: activeOrgId });
-        const payload = await authenticatedFetch(`settings?${searchParams.toString()}`, { session });
-        const settingsValue = payload?.settings?.available_services;
-        setServices(Array.isArray(settingsValue) ? settingsValue : []);
-      } catch (err) {
-        console.error('Failed to load services', err);
-        setServices([]);
-      } finally {
-        setLoadingServices(false);
-      }
-    }
-    async function loadInstructors() {
-      if (!session || !activeOrgId) return;
-      try {
-        setLoadingInstructors(true);
-        const searchParams = new URLSearchParams({ org_id: activeOrgId });
-        const roster = await authenticatedFetch(`instructors?${searchParams.toString()}`, { session });
-        setInstructors(Array.isArray(roster) ? roster : []);
-      } catch (err) {
-        console.error('Failed to load instructors', err);
-        setInstructors([]);
-      } finally {
-        setLoadingInstructors(false);
-      }
-    }
-
-    loadServices();
-    loadInstructors();
-  }, [session, activeOrgId]);
 
   const handleChange = useCallback((event) => {
     const { name, value } = event.target;

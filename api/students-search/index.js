@@ -68,7 +68,12 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_verify_membership' });
   }
 
-  if (!role || !isAdminRole(role)) {
+  if (!role) {
+    context.log?.error?.('students-search failed to verify membership', {
+      message: 'No membership role found',
+      orgId,
+      userId,
+    });
     return respond(context, 403, { message: 'forbidden' });
   }
 
@@ -82,9 +87,18 @@ export default async function (context, req) {
     return respond(context, 200, []);
   }
 
-  const { data, error } = await tenantClient
+  // Build query with role-based filtering
+  let builder = tenantClient
     .from('Students')
-    .select('id, name, national_id, is_active')
+    .select('id, name, national_id, is_active, assigned_instructor_id');
+
+  // Member instructors can only see their assigned students
+  if (!isAdminRole(role)) {
+    builder = builder.eq('assigned_instructor_id', userId);
+  }
+  // Admins see all students (no filter needed)
+
+  const { data, error } = await builder
     .ilike('name', `%${query}%`)
     .order('name', { ascending: true })
     .limit(8);

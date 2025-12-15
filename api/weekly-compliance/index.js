@@ -267,8 +267,12 @@ export default async function (context, req) {
 
   studentQuery = studentQuery.eq('is_active', true);
 
+  // Filter by instructor: non-admins see only their students, admins can filter by specific instructor
+  const instructorIdFilter = normalizeString(req.query?.instructor_id);
   if (!isAdminRole(role)) {
     studentQuery = studentQuery.eq('assigned_instructor_id', userId);
+  } else if (instructorIdFilter) {
+    studentQuery = studentQuery.eq('assigned_instructor_id', instructorIdFilter);
   }
 
   const { data: studentRows, error: studentError } = await studentQuery;

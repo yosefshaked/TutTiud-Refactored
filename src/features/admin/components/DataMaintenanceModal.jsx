@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { authenticatedFetch, authenticatedFetchBlob } from '@/lib/api-client.js';
+import { useInstructors } from '@/hooks/useOrgData.js';
 import DataMaintenancePreview from './DataMaintenancePreview.jsx';
 import { DataMaintenanceHelpContent } from './DataMaintenanceHelpContent.jsx';
 
@@ -35,9 +36,13 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
   
   // Preview state
   const [previewData, setPreviewData] = useState(null);
-  const [instructors, setInstructors] = useState([]);
   const [isApplying, setIsApplying] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+
+  const { instructors } = useInstructors({
+    enabled: open && Boolean(orgId),
+    orgId,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -51,27 +56,10 @@ export default function DataMaintenanceModal({ open, onClose, orgId, onRefresh }
       setTagMappings({});
       setCsvText('');
       setPreviewData(null);
-      setInstructors([]);
       setIsApplying(false);
       setShowHelp(false);
     }
   }, [open]);
-
-  // Load instructors when modal opens (needed for preview display)
-  useEffect(() => {
-    async function loadInstructors() {
-      if (!open || !orgId) return;
-      try {
-        const searchParams = new URLSearchParams({ org_id: orgId });
-        const roster = await authenticatedFetch(`instructors?${searchParams.toString()}`);
-        setInstructors(Array.isArray(roster) ? roster : []);
-      } catch (error) {
-        console.error('Failed to load instructors for preview', error);
-        setInstructors([]);
-      }
-    }
-    loadInstructors();
-  }, [open, orgId]);
 
   const failureEntries = useMemo(() => {
     return Array.isArray(summary?.failed) ? summary.failed : [];

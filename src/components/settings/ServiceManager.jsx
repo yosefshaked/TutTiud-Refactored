@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,13 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { upsertSetting } from '@/features/settings/api/settings.js';
-import { authenticatedFetch } from '@/lib/api-client';
-
-const REQUEST_STATE = {
-  idle: 'idle',
-  loading: 'loading',
-  error: 'error',
-};
+import { useServices } from '@/hooks/useOrgData.js';
 
 const SAVE_STATE = {
   idle: 'idle',
@@ -21,47 +15,25 @@ const SAVE_STATE = {
 };
 
 export default function ServiceManager({ session, orgId, activeOrgHasConnection, tenantClientReady }) {
+  const { services: hookServices, loadingServices, servicesError, refetchServices } = useServices({
+    orgId,
+    session,
+    enabled: Boolean(session && orgId && activeOrgHasConnection && tenantClientReady),
+  });
   const [services, setServices] = useState([]);
   const [newService, setNewService] = useState('');
-  const [loadState, setLoadState] = useState(REQUEST_STATE.idle);
   const [saveState, setSaveState] = useState(SAVE_STATE.idle);
-  const [loadError, setLoadError] = useState('');
   const [saveError, setSaveError] = useState('');
 
   const canLoad = Boolean(session && orgId && activeOrgHasConnection && tenantClientReady);
 
-  const loadServices = useCallback(async () => {
-    if (!canLoad) {
-      setServices([]);
-      return;
-    }
-
-    setLoadState(REQUEST_STATE.loading);
-    setLoadError('');
-
-    try {
-      const searchParams = new URLSearchParams({ keys: 'available_services', org_id: orgId });
-      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`, { session });
-      const settingsValue = payload?.settings?.available_services;
-
-      if (Array.isArray(settingsValue)) {
-        setServices(settingsValue);
-      } else {
-        setServices([]);
-      }
-
-      setLoadState(REQUEST_STATE.idle);
-    } catch (error) {
-      console.error('Failed to load services', error);
-      setServices([]);
-      setLoadState(REQUEST_STATE.error);
-      setLoadError(error?.message || 'טעינת השירותים נכשלה.');
-    }
-  }, [canLoad, session, orgId]);
-
   useEffect(() => {
-    loadServices();
-  }, [loadServices]);
+    if (canLoad && Array.isArray(hookServices)) {
+      setServices(hookServices);
+    } else if (!canLoad) {
+      setServices([]);
+    }
+  }, [canLoad, hookServices]);
 
   const handleAddService = () => {
     const trimmed = newService.trim();
@@ -100,6 +72,7 @@ export default function ServiceManager({ session, orgId, activeOrgHasConnection,
       });
       setSaveState(SAVE_STATE.idle);
       toast.success('השירותים נשמרו בהצלחה.');
+      await refetchServices();
     } catch (error) {
       console.error('Failed to save services', error);
       setSaveError(error?.message || 'שמירת השירותים נכשלה.');
@@ -123,8 +96,9 @@ export default function ServiceManager({ session, orgId, activeOrgHasConnection,
     );
   }
 
-  const isLoading = loadState === REQUEST_STATE.loading;
+  const isLoading = loadingServices;
   const isSaving = saveState === SAVE_STATE.saving;
+  const loadError = servicesError;
 
   return (
     <Card className="w-full border-0 shadow-lg bg-white/80">

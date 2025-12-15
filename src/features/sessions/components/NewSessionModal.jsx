@@ -3,12 +3,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Loader2, Calendar, CalendarCheck, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import NewSessionForm, { NewSessionFormFooter } from './NewSessionForm.jsx';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
-import { buildStudentsEndpoint, normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
+import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -36,9 +38,9 @@ function getTodayDate() {
   return `${year}-${month}-${day}`;
 }
 
-function DateChoiceFooter({ lastReportDate, studentName, onClose, onNewReport, onNewReportSameStudent }) {
+function DateChoiceFooter({ lastReportDate, studentName, onClose, onNewReport, onNewReportSameStudent, allowSameStudent = true }) {
   const [selectedDate, setSelectedDate] = useState(null);
-  const [mode, setMode] = useState('choose'); // 'choose' | 'same-student' | 'other-student'
+  const [mode, setMode] = useState(allowSameStudent ? 'choose' : 'other-student'); // 'choose' | 'same-student' | 'other-student'
   const todayDate = getTodayDate();
   const showSameDate = lastReportDate && lastReportDate !== todayDate;
 
@@ -160,13 +162,15 @@ function DateChoiceFooter({ lastReportDate, studentName, onClose, onNewReport, o
         >
           המשך לדיווח
         </Button>
-        <Button 
-          onClick={handleBack}
-          variant="outline"
-          className="flex-1"
-        >
-          חזור
-        </Button>
+        {allowSameStudent ? (
+          <Button 
+            onClick={handleBack}
+            variant="outline"
+            className="flex-1"
+          >
+            חזור
+          </Button>
+        ) : null}
         <Button 
           onClick={onClose}
           variant="outline"
@@ -191,7 +195,6 @@ function SuccessFooter({ studentName, onClose, onNewReport, onNewReportSameStude
         </Button>
         <Button 
           onClick={onNewReport}
-          className="gap-xs shadow-md hover:shadow-lg transition-shadow"
         >
           דיווח נוסף - תלמיד אחר
         </Button>
@@ -216,6 +219,7 @@ export default function NewSessionModal({
   onCreated,
 }) {
   const { loading: supabaseLoading } = useSupabase();
+  const { user } = useAuth();
   const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
   const [studentsState, setStudentsState] = useState(REQUEST_STATE.idle);
   const [studentsError, setStudentsError] = useState('');
@@ -224,10 +228,8 @@ export default function NewSessionModal({
   const [questionError, setQuestionError] = useState('');
   const [questions, setQuestions] = useState([]);
   const [suggestions, setSuggestions] = useState({});
-  const [services, setServices] = useState([]);
   const [submitState, setSubmitState] = useState(REQUEST_STATE.idle);
   const [submitError, setSubmitError] = useState('');
-  const [instructors, setInstructors] = useState([]);
   const [studentScope, setStudentScope] = useState('all'); // 'all' | 'mine' | `inst:<id>`
   const [statusFilter, setStatusFilter] = useState('active'); // 'active' | 'inactive' | 'all'
   const [canViewInactive, setCanViewInactive] = useState(false);
@@ -243,6 +245,9 @@ export default function NewSessionModal({
 
   const activeOrgId = activeOrg?.id || null;
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
+  const canAdmin = isAdminRole(membershipRole);
+  const userId = user?.id || null;
+  
   const canFetchStudents = useMemo(() => {
     return (
       open &&
@@ -253,17 +258,32 @@ export default function NewSessionModal({
     );
   }, [open, activeOrgId, activeOrgHasConnection, tenantClientReady, supabaseLoading]);
 
+  const { instructors } = useInstructors({
+    enabled: open && canFetchStudents && canAdmin,
+    orgId: activeOrgId,
+  });
+
+  const { services } = useServices({
+    enabled: open && canFetchStudents,
+    orgId: activeOrgId,
+  });
+
+  // Check if the logged-in user is an instructor (must be after instructors is defined)
+  const userIsInstructor = useMemo(() => {
+    if (!userId || !instructors || instructors.length === 0) return false;
+    return instructors.some(inst => inst.id === userId);
+  }, [userId, instructors]);
+
   useEffect(() => {
-    const isAdmin = isAdminRole(membershipRole);
     if (!open) {
       setStatusFilter('active');
-      setCanViewInactive(isAdmin);
+      setCanViewInactive(canAdmin);
       setVisibilityLoaded(false);
       setInitialStatusApplied(false);
       return;
     }
 
-    if (isAdmin) {
+    if (canAdmin) {
       setCanViewInactive(true);
       setVisibilityLoaded(true);
       return;
@@ -325,7 +345,7 @@ export default function NewSessionModal({
       cancelled = true;
       abortController.abort();
     };
-  }, [open, membershipRole, activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter]);
+  }, [open, membershipRole, activeOrgId, activeOrgHasConnection, tenantClientReady, statusFilter, canAdmin]);
 
   useEffect(() => {
     if (!open) {
@@ -345,29 +365,21 @@ export default function NewSessionModal({
     setStudentsError('');
 
     try {
-      // Determine endpoint and optional server-side filter based on scope and role
+      // Use unified students-list endpoint for all scenarios
       const overrideStatus = typeof options.status === 'string' ? options.status : null;
       const statusParam = canViewInactive ? (overrideStatus || statusFilter) : 'active';
-      const baseEndpoint = buildStudentsEndpoint(activeOrgId, membershipRole, { status: statusParam });
-      let endpoint = baseEndpoint;
-      const isAdmin = isAdminRole(membershipRole);
-      if (isAdmin) {
-        if (studentScope === 'mine') {
-          // Admin viewing their own assigned students -> use my-students
-          const searchParams = new URLSearchParams();
-          if (activeOrgId) searchParams.set('org_id', activeOrgId);
-          if (statusParam) searchParams.set('status', statusParam);
-          endpoint = searchParams.toString() ? `my-students?${searchParams}` : 'my-students';
-        } else if (studentScope.startsWith('inst:')) {
-          const instructorId = studentScope.slice(5);
-          const searchParams = new URLSearchParams();
-          if (activeOrgId) searchParams.set('org_id', activeOrgId);
-          if (instructorId) searchParams.set('assigned_instructor_id', instructorId);
-          if (statusParam) searchParams.set('status', statusParam);
-          endpoint = searchParams.toString() ? `students?${searchParams}` : 'students';
-        }
+      
+      const searchParams = new URLSearchParams();
+      if (activeOrgId) searchParams.set('org_id', activeOrgId);
+      if (statusParam) searchParams.set('status', statusParam);
+      
+      // Admin can filter by instructor via assigned_instructor_id parameter
+      if (canAdmin && studentScope.startsWith('inst:')) {
+        const instructorId = studentScope.slice(5);
+        if (instructorId) searchParams.set('assigned_instructor_id', instructorId);
       }
-
+      
+      const endpoint = searchParams.toString() ? `students-list?${searchParams}` : 'students-list';
       const payload = await authenticatedFetch(endpoint);
       setStudents(Array.isArray(payload) ? payload : []);
       setStudentsState(REQUEST_STATE.idle);
@@ -377,21 +389,7 @@ export default function NewSessionModal({
       setStudentsState(REQUEST_STATE.error);
       setStudentsError(error?.message || 'טעינת רשימת התלמידים נכשלה.');
     }
-  }, [activeOrgId, canFetchStudents, membershipRole, studentScope, statusFilter, canViewInactive]);
-
-  const loadInstructors = useCallback(async () => {
-    if (!open || !canFetchStudents) return;
-    if (!isAdminRole(membershipRole)) return;
-    try {
-      const searchParams = new URLSearchParams();
-      if (activeOrgId) searchParams.set('org_id', activeOrgId);
-      const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`);
-      setInstructors(Array.isArray(payload) ? payload : []);
-    } catch (error) {
-      console.error('Failed to load instructors', error);
-      setInstructors([]);
-    }
-  }, [open, canFetchStudents, membershipRole, activeOrgId]);
+  }, [activeOrgId, canFetchStudents, studentScope, statusFilter, canViewInactive, canAdmin]);
 
   const loadQuestions = useCallback(async () => {
     if (!open || !canFetchStudents) {
@@ -425,25 +423,9 @@ export default function NewSessionModal({
     }
   }, [open, canFetchStudents, activeOrgId]);
 
-  const loadServices = useCallback(async () => {
-    if (!open || !canFetchStudents) return;
-    try {
-      const searchParams = new URLSearchParams({ keys: 'available_services' });
-      if (activeOrgId) searchParams.set('org_id', activeOrgId);
-      const payload = await authenticatedFetch(`settings?${searchParams.toString()}`);
-      const settingsValue = payload?.settings?.available_services;
-      setServices(Array.isArray(settingsValue) ? settingsValue : []);
-    } catch (error) {
-      console.error('Failed to load available services', error);
-      setServices([]);
-    }
-  }, [open, canFetchStudents, activeOrgId]);
-
   useEffect(() => {
     if (open) {
       void loadQuestions();
-      void loadServices();
-      void loadInstructors();
     } else {
       setStudentsState(REQUEST_STATE.idle);
       setStudentsError('');
@@ -453,11 +435,9 @@ export default function NewSessionModal({
       setQuestionError('');
       setQuestions([]);
       setSuggestions({});
-      setServices([]);
-      setInstructors([]);
       setStudentScope('all');
     }
-  }, [open, loadQuestions, loadServices, loadInstructors]);
+  }, [open, loadQuestions]);
 
   useEffect(() => {
     if (!open || !canFetchStudents) {
@@ -523,7 +503,7 @@ export default function NewSessionModal({
     }
   }, []);
 
-  const handleSubmit = async ({ studentId, date, serviceContext, answers }) => {
+  const handleSubmit = async ({ studentId, date, time, serviceContext, answers, unassignedDetails, instructorId }) => {
     setSubmitState(REQUEST_STATE.loading);
     setSubmitError('');
 
@@ -531,9 +511,12 @@ export default function NewSessionModal({
       const body = {
         student_id: studentId,
         date,
+        time,
         service_context: serviceContext,
         content: answers,
         org_id: activeOrgId,
+        ...(unassignedDetails ? { unassigned_details: unassignedDetails } : {}),
+        ...(instructorId ? { instructor_id: instructorId } : {}),
       };
       const record = await authenticatedFetch('sessions', {
         method: 'POST',
@@ -550,12 +533,27 @@ export default function NewSessionModal({
       // This ensures any data refresh in the parent component completes
       await Promise.resolve(onCreated?.(record));
       
-      // Find student name for success message
-      const student = students.find(s => s.id === studentId);
-      const studentName = student?.name || 'תלמיד';
+      // Dispatch global event for pages that need to refetch data
+      window.dispatchEvent(new CustomEvent('session-created', { detail: { record } }));
       
-      // Show success state instead of closing
-      setSuccessState({ studentId, studentName, date });
+      const isLoose = !studentId;
+      const student = students.find(s => s.id === studentId);
+      const studentName = isLoose ? (unassignedDetails?.name || 'תלמיד/ה') : (student?.name || 'תלמיד');
+      
+      // Show success state instead of closing, preserving loose report metadata for additional reports
+      setSuccessState({
+        studentId,
+        studentName,
+        date,
+        allowSameStudent: Boolean(studentId),
+        // Preserve loose report metadata if creating a loose report
+        ...(isLoose && {
+          looseName: unassignedDetails?.name,
+          looseReason: unassignedDetails?.reason,
+          looseReasonOther: unassignedDetails?.reason_other,
+          looseService: serviceContext,
+        }),
+      });
       setSubmitState(REQUEST_STATE.idle);
     } catch (error) {
       console.error('Failed to save session record', error);
@@ -567,6 +565,14 @@ export default function NewSessionModal({
         friendly = 'לא ניתן לתעד מפגש: לתלמיד זה לא משויך מדריך פעיל. נא לשייך מדריך תחילה.';
       } else if (serverMessage === 'student_not_assigned_to_user') {
         friendly = 'לא ניתן לתעד: תלמיד זה לא משויך אליך.';
+      } else if (serverMessage === 'missing_unassigned_name') {
+        friendly = 'יש למלא שם תלמיד עבור דיווח לא משויך.';
+      } else if (serverMessage === 'missing_unassigned_reason') {
+        friendly = 'בחרו סיבת דיווח לא משויך.';
+      } else if (serverMessage === 'missing_unassigned_reason_detail') {
+        friendly = 'השלימו פירוט עבור סיבת "אחר".';
+      } else if (serverMessage === 'missing_time') {
+        friendly = 'יש להזין שעה עבור דיווח לא משויך.';
       }
       setSubmitError(friendly);
     }
@@ -579,9 +585,11 @@ export default function NewSessionModal({
 
   const handleNewReport = useCallback(({ date = null } = {}) => {
     setSuccessState(null);
-    // Reset form using the ref
+    // Reset form using the ref, clearing student but preserving date selection
     if (formResetRef.current) {
-      formResetRef.current({ date });
+      formResetRef.current({ 
+        date,
+      });
     }
   }, []);
 
@@ -589,11 +597,19 @@ export default function NewSessionModal({
     if (!successState) return;
     setSuccessState(null);
     // Reset form but keep the same student and optionally set date
+    // For loose reports, also preserve name, reason, and service
     if (formResetRef.current) {
       formResetRef.current({ 
         keepStudent: true, 
         studentId: successState.studentId,
-        date: date // Pass the selected date
+        date,
+        // Preserve loose report metadata for follow-up loose reports
+        ...(successState.looseName && {
+          looseName: successState.looseName,
+          looseReason: successState.looseReason,
+          looseReasonOther: successState.looseReasonOther,
+          looseService: successState.looseService,
+        }),
       });
     }
   }, [successState]);
@@ -662,6 +678,7 @@ export default function NewSessionModal({
             services={services}
             instructors={instructors}
             canFilterByInstructor={isAdminRole(membershipRole)}
+            userIsInstructor={userIsInstructor}
             studentScope={studentScope}
             onScopeChange={(next) => setStudentScope(next)}
             statusFilter={statusFilter}

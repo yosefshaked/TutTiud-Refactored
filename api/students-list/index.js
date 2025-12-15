@@ -57,12 +57,6 @@ function buildStudentPayload(body) {
     return { error: 'missing_name' };
   }
 
-  const contactInfo = typeof body?.contact_info === 'string'
-    ? body.contact_info.trim()
-    : typeof body?.contactInfo === 'string'
-      ? body.contactInfo.trim()
-      : '';
-
   const rawInstructor = body?.assigned_instructor_id ?? body?.assignedInstructorId ?? null;
   const { value: instructorId, valid } = validateAssignedInstructor(rawInstructor);
 
@@ -126,7 +120,6 @@ function buildStudentPayload(body) {
     payload: {
       name,
       national_id: nationalIdResult.value,
-      contact_info: contactInfo || null,
       contact_name: contactNameResult.value,
       contact_phone: contactPhoneResult.value,
       assigned_instructor_id: instructorId,
@@ -145,23 +138,11 @@ function buildStudentUpdates(body) {
   let hasAny = false;
 
   if (Object.prototype.hasOwnProperty.call(body, 'name')) {
-    const name = normalizeString(body.name);
-    if (!name) {
+    const studentName = normalizeString(body.name);
+    if (!studentName) {
       return { error: 'invalid_name' };
     }
-    updates['name'] = name;
-    hasAny = true;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(body, 'contact_info') || Object.prototype.hasOwnProperty.call(body, 'contactInfo')) {
-    const source = Object.prototype.hasOwnProperty.call(body, 'contact_info') ? body.contact_info : body.contactInfo;
-    if (source === null || source === undefined) {
-      updates.contact_info = null;
-    } else if (typeof source === 'string') {
-      updates.contact_info = source.trim() || null;
-    } else {
-      return { error: 'invalid_contact_info' };
-    }
+    updates['name'] = studentName;
     hasAny = true;
   }
 
@@ -299,23 +280,25 @@ function buildStudentUpdates(body) {
   return { updates };
 }
 
-function determineStatusFilter(query) {
+function determineStatusFilter(query, canViewInactive = true) {
   const status = normalizeString(query?.status);
-  if (status === 'inactive') {
+  if (canViewInactive && status === 'inactive') {
     return 'inactive';
   }
-  if (status === 'all') {
+  if (canViewInactive && status === 'all') {
     return 'all';
   }
-  const includeInactive = query?.include_inactive ?? query?.includeInactive;
-  const includeFlag = coerceBooleanFlag(includeInactive, { defaultValue: false, allowUndefined: true });
-  if (includeFlag.valid && includeFlag.value) {
-    return 'all';
+  if (canViewInactive) {
+    const includeInactive = query?.include_inactive ?? query?.includeInactive;
+    const includeFlag = coerceBooleanFlag(includeInactive, { defaultValue: false, allowUndefined: true });
+    if (includeFlag.valid && includeFlag.value) {
+      return 'all';
+    }
   }
   return 'active';
 }
 
-export default async function (context, req) {
+export default async function handler(context, req) {
   const method = String(req.method || 'GET').toUpperCase();
   if (!['GET', 'POST', 'PUT'].includes(method)) {
     return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'GET,POST,PUT' });
@@ -325,13 +308,13 @@ export default async function (context, req) {
   const adminConfig = readSupabaseAdminConfig(env);
 
   if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
-    context.log?.error?.('students missing Supabase admin credentials');
+    context.log?.error?.('students-list missing Supabase admin credentials');
     return respond(context, 500, { message: 'server_misconfigured' });
   }
 
   const authorization = resolveBearerAuthorization(req);
   if (!authorization?.token) {
-    context.log?.warn?.('students missing bearer token');
+    context.log?.warn?.('students-list missing bearer token');
     return respond(context, 401, { message: 'missing bearer' });
   }
 
@@ -341,7 +324,7 @@ export default async function (context, req) {
   try {
     authResult = await supabase.auth.getUser(authorization.token);
   } catch (error) {
-    context.log?.error?.('students failed to validate token', { message: error?.message });
+    context.log?.error?.('students-list failed to validate token', { message: error?.message });
     return respond(context, 401, { message: 'invalid or expired token' });
   }
 
@@ -361,7 +344,7 @@ export default async function (context, req) {
   try {
     role = await ensureMembership(supabase, orgId, userId);
   } catch (membershipError) {
-    context.log?.error?.('students failed to verify membership', {
+    context.log?.error?.('students-list failed to verify membership', {
       message: membershipError?.message,
       orgId,
       userId,
@@ -369,29 +352,66 @@ export default async function (context, req) {
     return respond(context, 500, { message: 'failed_to_verify_membership' });
   }
 
-  if (!role || !isAdminRole(role)) {
+  if (!role) {
     return respond(context, 403, { message: 'forbidden' });
   }
+
+  const isAdmin = isAdminRole(role);
 
   const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
   if (tenantError) {
     return respond(context, tenantError.status, tenantError.body);
   }
 
+  // GET: Fetch students list with role-based filtering
   if (method === 'GET') {
-    // Optional server-side filter: assigned_instructor_id (admins only)
-    const assignedInstructorId = normalizeString(req?.query?.assigned_instructor_id);
+    let instructorsCanViewInactive = true; // Default for admins
+    
+    // Non-admin users need to check the setting
+    if (!isAdmin) {
+      try {
+        const { data: settingRow, error: settingError } = await tenantClient
+          .from('Settings')
+          .select('settings_value')
+          .eq('key', 'instructors_can_view_inactive_students')
+          .maybeSingle();
+
+        if (!settingError && settingRow && typeof settingRow.settings_value === 'boolean') {
+          instructorsCanViewInactive = settingRow.settings_value === true;
+        } else {
+          instructorsCanViewInactive = false;
+        }
+      } catch (settingsError) {
+        context.log?.warn?.('students-list failed to read inactive visibility setting', {
+          message: settingsError?.message,
+          orgId,
+        });
+        instructorsCanViewInactive = false;
+      }
+    }
 
     let builder = tenantClient
       .from('Students')
       .select('*')
       .order('name', { ascending: true });
 
-    if (assignedInstructorId) {
-      builder = builder.eq('assigned_instructor_id', assignedInstructorId);
+    // Non-admin users (instructors) can only see their assigned students
+    if (!isAdmin) {
+      builder = builder.eq('assigned_instructor_id', userId);
+    } else {
+      // Admins can optionally filter by instructor
+      const assignedInstructorId = normalizeString(req?.query?.assigned_instructor_id);
+      if (assignedInstructorId) {
+        // Validate UUID format to prevent information disclosure
+        if (!UUID_PATTERN.test(assignedInstructorId)) {
+          return respond(context, 400, { message: 'invalid_instructor_id_format' });
+        }
+        builder = builder.eq('assigned_instructor_id', assignedInstructorId);
+      }
     }
 
-    const statusFilter = determineStatusFilter(req?.query);
+    // Status filter
+    const statusFilter = determineStatusFilter(req?.query, instructorsCanViewInactive);
     if (statusFilter === 'active') {
       builder = builder.eq('is_active', true);
     } else if (statusFilter === 'inactive') {
@@ -401,13 +421,19 @@ export default async function (context, req) {
     const { data, error } = await builder;
 
     if (error) {
-      context.log?.error?.('students failed to fetch roster', { message: error.message });
+      context.log?.error?.('students-list failed to fetch roster', { message: error.message });
       return respond(context, 500, { message: 'failed_to_load_students' });
     }
 
     return respond(context, 200, Array.isArray(data) ? data : []);
   }
 
+  // POST and PUT require admin role
+  if (!isAdmin) {
+    return respond(context, 403, { message: 'forbidden' });
+  }
+
+  // POST: Create new student
   if (method === 'POST') {
     const normalized = buildStudentPayload(body);
     if (normalized.error) {
@@ -418,16 +444,16 @@ export default async function (context, req) {
             ? 'missing national id'
           : normalized.error === 'invalid_national_id'
             ? 'invalid national id'
-          : normalized.error === 'invalid_assigned_instructor'
-            ? 'invalid assigned instructor id'
-            : normalized.error === 'invalid_contact_name'
-              ? 'invalid contact name'
-              : normalized.error === 'invalid_contact_phone'
-                ? 'invalid contact phone'
-                : normalized.error === 'invalid_default_service'
-                  ? 'invalid default service'
-                  : normalized.error === 'invalid_default_day'
-                    ? 'invalid default day of week'
+            : normalized.error === 'invalid_assigned_instructor'
+              ? 'invalid assigned instructor id'
+              : normalized.error === 'invalid_contact_name'
+                ? 'invalid contact name'
+                : normalized.error === 'invalid_contact_phone'
+                  ? 'invalid contact phone'
+                  : normalized.error === 'invalid_default_service'
+                    ? 'invalid default service'
+                    : normalized.error === 'invalid_default_day'
+                      ? 'invalid default day of week'
           : normalized.error === 'invalid_default_session_time'
             ? 'invalid default session time'
             : normalized.error === 'invalid_notes'
@@ -447,7 +473,7 @@ export default async function (context, req) {
       );
 
       if (nationalIdLookupError) {
-        context.log?.error?.('students failed to check national id uniqueness', { message: nationalIdLookupError.message });
+        context.log?.error?.('students-list failed to check national id uniqueness', { message: nationalIdLookupError.message });
         return respond(context, 500, { message: 'failed_to_validate_national_id' });
       }
 
@@ -475,7 +501,7 @@ export default async function (context, req) {
       .single();
 
     if (error) {
-      context.log?.error?.('students failed to create student', { message: error.message });
+      context.log?.error?.('students-list failed to create student', { message: error.message });
       return respond(context, 500, { message: 'failed_to_create_student' });
     }
 
@@ -498,6 +524,7 @@ export default async function (context, req) {
     return respond(context, 201, data);
   }
 
+  // PUT: Update existing student
   const studentId = extractStudentId(context, req, body);
   if (!studentId) {
     return respond(context, 400, { message: 'invalid student id' });
@@ -512,9 +539,7 @@ export default async function (context, req) {
           ? 'invalid national id'
         : normalizedUpdates.error === 'invalid_name'
           ? 'invalid name'
-          : normalizedUpdates.error === 'invalid_contact_info'
-            ? 'invalid contact info'
-            : normalizedUpdates.error === 'invalid_assigned_instructor'
+          : normalizedUpdates.error === 'invalid_assigned_instructor'
               ? 'invalid assigned instructor id'
               : normalizedUpdates.error === 'invalid_contact_name'
                 ? 'invalid contact name'
@@ -544,7 +569,7 @@ export default async function (context, req) {
     .maybeSingle();
 
   if (fetchError) {
-    context.log?.error?.('students failed to fetch existing student', { message: fetchError.message, studentId });
+    context.log?.error?.('students-list failed to fetch existing student', { message: fetchError.message, studentId });
     return respond(context, 500, { message: 'failed_to_fetch_student' });
   }
 
@@ -561,7 +586,7 @@ export default async function (context, req) {
       });
 
       if (lookupError) {
-        context.log?.error?.('students failed to validate national id on update', {
+        context.log?.error?.('students-list failed to validate national id on update', {
           message: lookupError.message,
           studentId,
         });
@@ -610,7 +635,7 @@ export default async function (context, req) {
     .maybeSingle();
 
   if (error) {
-    context.log?.error?.('students failed to update student', { message: error.message, studentId });
+    context.log?.error?.('students-list failed to update student', { message: error.message, studentId });
     return respond(context, 500, { message: 'failed_to_update_student' });
   }
 

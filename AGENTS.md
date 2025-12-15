@@ -53,7 +53,7 @@
   return { status: 200, body: { data: results } };
   ```
   - Without setting `context.res`, Azure returns HTTP 200 with an **empty body**, causing `JSON.parse()` errors in frontend.
-  - Use existing endpoints like `/api/students`, `/api/instructors`, `/api/settings`, `/api/documents`, `/api/documents-download` as reference for correct patterns.
+  - Use existing endpoints like `/api/students-list`, `/api/instructors`, `/api/settings`, `/api/documents`, `/api/documents-download` as reference for correct patterns.
 - **Bearer Token Extraction (CRITICAL)**: Always use `resolveBearerAuthorization()` helper from `http.js` to extract JWT tokens:
   ```javascript
   // ✅ CORRECT (checks all header variations):
@@ -126,6 +126,58 @@
 - Use ProjectDoc/Eng.md to understand the overall project.
 - **Refer to [ProjectDoc/Conventions.md](ProjectDoc/Conventions.md)** for folder structure, naming conventions, API patterns, and feature organization. Update it when adding new patterns or changing structure (with approval).
 - SessionRecords now includes `is_legacy boolean NOT NULL DEFAULT false` for marking imported historical session rows. Control DB registry adds `can_reupload_legacy_reports` (default false) to gate repeated legacy imports per organization.
+- **Loose Reports Feature** (2025-12, Phase 6 Complete):
+  - SessionRecords `student_id` is now nullable to support unassigned ("loose") session reports. When creating loose reports, write `metadata.unassigned_details` additively (do not clobber existing metadata) and ensure downstream queries tolerate `student_id` being NULL.
+  - **Backend Endpoint** (`/api/loose-sessions`):
+    - `GET`: Lists pending `student_id IS NULL` records with role-based filtering:
+      - **Admin/Owner**: See all pending loose reports for the organization (only non-deleted)
+      - **Instructor (non-admin)**: See their own submitted loose reports (filtered by `instructor_id`) including both pending AND rejected reports
+      - Rejected reports marked with `isRejected: true` flag and include `metadata.rejection` with reason, rejected_by, rejected_at
+    - `POST`: Admin-only resolution operations with three action types:
+      - `action=assign_existing` (`student_id`): Assign pending report to existing student
+      - `action=create_and_assign` (`name`, `assigned_instructor_id`, optional `default_service`): Create new student and assign report
+      - `action=reject` (`reason`, optional `reason_other` for custom text): Reject pending report with predefined or custom reason
+    - Resolution removes only `metadata.unassigned_details`, preserves other metadata, and updates `service_context` using the session payload or student default
+    - Rejection marks report as `deleted: true` while preserving all original metadata plus `metadata.rejection` details
+    - Audit logging uses `SESSION_RESOLVED`/`SESSION_REJECTED` actions in `AUDIT_CATEGORIES.SESSIONS`
+  - **Frontend Components**:
+    - `PendingReportsPage.jsx`: Admin interface with search/filter UI (free text, service, reason, date range), bulk selection with checkboxes, individual/bulk reject via `RejectReportDialog`, bulk assign/create via `BulkResolvePendingReportsDialog`
+    - `MyPendingReportsCard.jsx`: Instructor view of own pending, rejected, and recently resolved reports with resubmit capability
+      - Shows three sections: Pending (amber), Rejected (red with rejection reason), Resolved (green)
+      - Rejected reports include full rejection details and "שלח מחדש" button
+      - Badge counts in header show both pending and rejected report totals
+    - `ResubmitRejectedReportDialog.jsx`: Dialog for resubmitting rejected reports with pre-filled data
+      - Shows original rejection reason in red banner
+      - Automatically loads and pre-fills all original data: name, reason, date, time, service, AND session content (questions/answers)
+      - Allows editing all fields including full session content before resubmission
+      - Includes optional "הערות למנהל" (Admin Notes) field - notes visible only to admins on pending reports page, not shown in student profile
+      - Creates new loose report with `metadata.resubmitted_from`, `metadata.original_rejection`, and optional `metadata.instructor_notes` for audit trail
+    - `PendingReportsPage.jsx` admin view enhancements:
+      - Blue "הערות" badge displayed on reports that include instructor notes
+      - Instructor notes shown in blue banner within report detail dialog
+      - Helps admins understand instructor's context or corrections when reviewing resubmitted reports
+    - `MyStudentsPage.jsx`: Instructor access button in CardHeader showing pending reports count badge; click opens dialog with `MyPendingReportsCard`
+    - Bulk operations use sequential processing with real-time feedback
+  - **Form Changes (2025-12)**:
+    - Loose session form requires: name, reason (predefined + custom), service, date, **time** (new for loose only)
+    - Regular session form: no time input required (field is hidden when not in loose mode)
+    - Time field only renders when `looseMode === true` with `required` attribute
+    - Backend validation: `if (looseMode && !sessionTime.trim()) return;` blocks submission without time for loose reports
+    - **Admin instructor selection (2025-12)**: When admin has `canFilterByInstructor` permission, loose report form shows instructor selector with strict permission rules:
+      - **Non-instructor admins**: REQUIRED field - must specify which instructor is submitting (cannot submit in their own name)
+      - **Instructor admins**: OPTIONAL field - can submit as themselves OR on behalf of other instructors
+      - **Member instructors**: No selector shown - can only submit in their own name
+      - Frontend validates selection before submission; backend enforces permission boundaries
+      - Backend returns `admin_must_specify_instructor` if non-instructor admin tries to submit without selecting an instructor
+      - Backend returns `members_cannot_specify_instructor` if non-admin member tries to specify a different instructor
+      - Helps with data attribution while maintaining strict role-based access control
+    - **Duplicate Detection (2025-12)**: Name input includes real-time duplicate checker:
+      - Hook: `useLooseReportNameSuggestions(unassignedName, looseMode)` with 300ms debounce
+      - API: `/api/students-search?query=...` with role-based filtering (members see only assigned students, admins see all)
+      - UI: Shows matching students below name input with status indicators (active/inactive)
+      - Action: Click suggestion switches from loose mode to regular mode while preserving form data (service, time, answers, date)
+      - Permission: Members only see students assigned to them; admins see all matches
+      - UX: Helps prevent duplicate submissions by suggesting existing students as you type
 - Legacy import UI: `StudentDetailPage.jsx` shows an "Import Legacy Reports" button for admin/owner users only. The button disables when a legacy import already exists unless `can_reupload_legacy_reports` is true. The modal (`src/features/students/components/LegacyImportModal.jsx`) walks through backup warning → structure choice → CSV mapping (dropdowns vs. custom labels, session date required) → confirmation with re-upload warning.
 - Legacy import backend: `/api/students/{id}/legacy-import` accepts JSON (`csv_text`, `structure_choice`, `session_date_column`, and either `column_mappings` or `custom_labels`), enforces admin/owner role + `can_reupload_legacy_reports`, deletes prior `is_legacy` rows for the student, and writes new `SessionRecords` with `is_legacy=true`.
 - Legacy importer normalizes session dates from `YYYY-MM-DD`, `DD/MM/YYYY`, `DD.MM.YYYY`, or Excel serial numbers before writing rows. Invalid dates return `invalid_session_date` with the 1-based row index.
@@ -657,9 +709,9 @@
 - **Student metadata tracking**: Students now automatically track creator and updater information in the `metadata` jsonb column:
   - On creation (POST): `{ created_by: userId, created_at: ISO timestamp, created_role: role }`
   - On update (PUT): Preserves existing metadata and adds `{ updated_by: userId, updated_at: ISO timestamp, updated_role: role }`
-  - Metadata is populated server-side in `/api/students` endpoint, frontend doesn't need to send these fields
-- `/api/students` defaults to `status=active`; pass `status=inactive`, `status=all`, or `include_inactive=true` (legacy) when maintenance flows need archived rows. `PUT` handlers accept `is_active` alongside the existing roster fields.
-- `/api/my-students` respects the org setting `instructors_can_view_inactive_students`. Instructors only see inactive records when the flag is enabled; admins/owners always see them when requesting `status=all`.
+  - Metadata is populated server-side in `/api/students-list` endpoint, frontend doesn't need to send these fields
+- `/api/students-list` defaults to `status=active`; pass `status=inactive`, `status=all`, or `include_inactive=true` (legacy) when maintenance flows need archived rows. `PUT` handlers accept `is_active` alongside the existing roster fields.
+- `/api/students-list` respects the org setting `instructors_can_view_inactive_students`. Instructors only see inactive records when the flag is enabled; admins/owners always see them when requesting `status=all` (replaced legacy `/api/my-students` endpoint).
 - Admin UI (`StudentManagementPage.jsx`) persists the Active/Inactive/All filter in `sessionStorage`, badges inactive rows, and exposes the toggle in `EditStudentForm.jsx`. Instructor surfaces (`MyStudentsPage.jsx`, `NewSessionModal.jsx`, `NewSessionForm.jsx`) automatically hide inactive students unless the setting is on.
 - Settings page adds `StudentVisibilitySettings.jsx` (eye-off card) so admins control the instructor flag through `fetchSettingsValue`/`upsertSetting`. Keep the copy bilingual and honor API permission checks when extending the card.
 
@@ -822,49 +874,84 @@
   - Controlled state pattern: `showAdvancedFilters` state managed in `NewSessionModal` and passed to `NewSessionForm` via props
   - Implementation uses `animate-in fade-in slide-in-from-top-2` classes for smooth expansion animation
 
-- **Student Management Filtering Refactor (2025-11)**:
-  - **StudentFilterSection** (`src/features/students/components/StudentFilterSection.jsx`): New unified filter component consolidating all filtering UI
-    - Shared component (not admin-only) - supports both admin and instructor views
-    - `showInstructorFilter` prop (default true) allows hiding instructor filter for instructor/non-admin views
-    - Basic search (always visible): Searches name/phone/national_id with RTL support
-    - Advanced filters toggle: Collapsible section with "סינון מתקדם" label and dot indicator when active but collapsed
-    - Advanced filter controls: status (active/inactive/all), day of week, instructor (optional), sort option, reset button
+- **Unified Student Management Page (2025-12)**:
+  - **StudentsPage** (`src/features/students/pages/StudentsPage.jsx`): Single component for both admin and instructor views
+    - **Role-based rendering**: Uses `isAdminRole()` to determine admin vs instructor mode
+    - **Unified API**: All users use `/api/students-list` endpoint with server-side role filtering
+    - **Admin features**:
+      - Full student roster with instructor assignment column
+      - Add new students, edit existing students, data maintenance tools
+      - Instructor filter to view specific instructor's students
+      - Status filter (active/inactive/all) always available
+      - Compliance summary and expired documents tracking
+      - Pending reports management for loose session assignments
+    - **Instructor features**:
+      - View only assigned students (enforced server-side via `/api/my-students`)
+      - Cannot add/edit students or access data maintenance
+      - No instructor filter (only sees own students)
+      - Status filter conditional on `instructors_can_view_inactive_students` setting
+      - Pending reports dialog showing own submitted loose reports
+    - **Shared features**:
+      - Search by name/phone/national_id with RTL support
+      - Filter by day of week, tags, and sort options
+      - Filter state persistence (separate for admin/instructor modes)
+      - Session creation event listener for real-time pending reports updates
+      - Compliance badges and document expiration warnings
+    - **Security boundaries**:
+      - Server-side enforcement: API automatically filters by `assigned_instructor_id` for non-admin users
+      - Filter mode separation: `filterMode = isAdmin ? 'admin' : 'instructor'`
+      - Permission checks for visibility settings and admin-only features
+      - No data leakage between admin and instructor contexts
+      - Trust boundary at API layer - frontend cannot bypass role restrictions
+  - **StudentFilterSection** (`src/features/students/components/StudentFilterSection.jsx`): Unified filter component
+    - Shared component supporting both admin and instructor views
+    - `showInstructorFilter` prop controls instructor filter visibility (admins only)
+    - Basic search (always visible): name/phone/national_id with RTL support
+    - Advanced filters toggle: Collapsible section with "סינון מתקדם" label
+    - Advanced controls: status (conditional), day of week, instructor (conditional), sort, reset
     - Smooth animations: `animate-in fade-in slide-in-from-top-2` on expand/collapse
-    - RTL-first design: All text right-aligned, flex-row-reverse buttons
-  - **Smart Fetching Strategy (2025-11)** - Fixes blank state bug with optimized server calls:
+  - **Smart Fetching Strategy (2025-11)** - Optimized server calls:
     - **Server-side filtering**: Status parameter sent to API (`status='active'` | `'inactive'` | `'all'`)
-    - **Only fetches needed data**: If admin filters to active, fetches only active; if admin filters to all, fetches all
-    - **Client-side filtering**: Remaining filters (search, day, instructor) applied client-side on fetched results
-    - **No spam**: Only one request per statusFilter change (not every keystroke/action)
-    - **Refetch trigger**: When statusFilter changes, `fetchStudents` is called via dependency in useEffect
-    - **Benefits**: 
-      - Reduces network traffic (doesn't fetch unnecessary data)
-      - No race conditions (one request at a time)
-      - Instant filtering for client-side filters (no server latency)
-      - No blank state issues (server returns correct subset, client filters it)
-  - **StudentManagementPage** (admin roster view):
-    - **Access control (2025-12)**: Admin/owner only - redirects non-admin users to `/my-students` automatically
-    - Uses `normalizeMembershipRole` and `isAdminRole` from endpoints utils to validate access
-    - Redirect happens before any data fetching to prevent unauthorized API calls
-    - Imports `StudentFilterSection` from `@/features/students/components/StudentFilterSection.jsx`
-    - Uses smart fetching with `status` parameter in fetchStudents
-    - Client-side filtering with 6 filter types: status, search, day, instructor, mode, sort
-    - Dependency on `statusFilter` in useEffect ensures refetch when status changes
-    - `displayedStudents` uses `filteredStudents` directly (no additional client-side filtering)
-    - `showInstructorFilter={true}` (default) displays full instructor filter for admins
-  - **MyStudentsPage** (instructor roster view):
-    - Imports same `StudentFilterSection` component
-    - Uses smart fetching with conditional `status` parameter (respects `canViewInactive` setting)
-    - Client-side filtering with 4 filter types: status (if canViewInactive), search, day, sort
-    - `showInstructorFilter={false}` hides instructor filter (instructor sees only their students)
-    - Respects `instructors_can_view_inactive_students` setting to hide status filter option
-  - **Rules preserved from original implementations**:
-    - Status filter: 'active' (is_active !== false) / 'inactive' (is_active === false) / 'all' (both)
-    - Day filter: Searches student.schedule array for matching day_of_week
-    - Instructor filter: Exact match on assigned_instructor_id, 'mine' mode for instructors
-    - Search: Case-insensitive substring on name/phone/national_id
-    - Sort: By schedule (day+time) or by name via getStudentComparator
-    - Filter state persistence: Via filter-state.js utility (survives page refreshes)
+    - **Only fetches needed data**: Admin filters control server query, reducing unnecessary data transfer
+    - **Client-side filtering**: Search, day, instructor (admin), tags applied client-side
+    - **No spam**: Only one request per statusFilter change
+    - **Refetch trigger**: When statusFilter changes, `fetchStudents` called via useEffect dependency
+    - **Benefits**: Reduces network traffic, no race conditions, instant client-side filtering
+  - **Unified API Endpoint** (`/api/students-list`):
+    - **Single endpoint replaces** `/api/students` and `/api/my-students` (eliminated 801 lines of duplicate code)
+    - **Full CRUD operations**: GET (all users), POST (admin only), PUT (admin only)
+    - **GET handler**:
+      - Server-side role-based filtering: non-admin users automatically filtered to assigned students only
+      - Admins can optionally filter by instructor via `assigned_instructor_id` query parameter
+      - Status filter (`active`/`inactive`/`all`) supported for all users
+    - **POST handler** (admin/owner only):
+      - Creates new student with full validation via `buildStudentPayload()`
+      - National ID uniqueness check via `findStudentByNationalId()`
+      - Metadata tracking: `created_by`, `created_at`, `created_role`
+      - Audit logging: `AUDIT_ACTIONS.STUDENT_CREATED`
+    - **PUT handler** (admin/owner only):
+      - Updates existing student with partial updates via `buildStudentUpdates()`
+      - National ID conflict detection (excludes current student)
+      - Changed fields detection for audit log
+      - Metadata preservation and update: `updated_by`, `updated_at`, `updated_role`
+      - Audit logging: `AUDIT_ACTIONS.STUDENT_UPDATED` with `changed_fields` detail
+    - **Validation**: Uses shared helpers from `api/_shared/student-validation.js`
+      - `coerceDayOfWeek`, `coerceSessionTime`, `validateIsraeliPhone`, `coerceNationalId`, `coerceTags`, `validateAssignedInstructor`
+    - **Permission model**:
+      - GET: All authenticated org members (non-admin filtered by `assigned_instructor_id`)
+      - POST/PUT: Admin/owner only (403 Forbidden for non-admin)
+    - **Benefits**: No code duplication, consistent caching, simpler maintenance, complete feature parity with original endpoints
+  - **Routing**:
+    - Primary route: `/students-list` → `StudentsPage` (role-based rendering)
+    - Legacy redirects: `/admin/students` → `/students-list`, `/my-students` → `/students-list`
+    - Pending reports: `/pending-reports` (accessible to all users)
+    - Legacy redirect: `/admin/pending-reports` → `/pending-reports`
+  - **Migration from separate pages**:
+    - Replaced `StudentManagementPage.jsx` (755 lines) and `MyStudentsPage.jsx` (442 lines)
+    - Replaced two API endpoints with single unified endpoint
+    - Eliminated code duplication while maintaining all features from both pages
+    - Filter state preserved separately for admin/instructor modes
+    - Automatic redirects ensure existing bookmarks/links continue working
 
 ### Tenant schema policy
 - All tenant database access must use the `tuttiud` schema. Do not query the `public` schema from this app.
@@ -899,7 +986,7 @@
   - High-contrast theme toggle (adds `a11y-hc` class on `html`).
   - Text spacing toggle (adds `a11y-text-spacing` class; increases letter/word spacing and line-height).
   - Underline links toggle (adds `a11y-underline-links` class; underlines all anchors with offset + thickness).
-  - Dyslexia-friendly font toggle (adds `a11y-dyslexia-font` class; uses `'OpenDyslexic', 'Atkinson Hyperlegible', Nunito, system-ui` stack; bundle a font file later if needed).
+  - Dyslexia-friendly font toggle (adds `a11y-dyslexia-font` class; uses Atkinson Hyperlegible font loaded from Google Fonts with Comic Sans MS fallback; includes extra letter-spacing and word-spacing for improved readability).
 - Styles are injected once at runtime by `AccessibilityProvider` (style tag `#a11y-dynamic-styles`) to avoid global CSS churn. If we later prefer static CSS, move the rules into `src/index.css` under `@layer base` and remove the injector.
 - Persistence uses localStorage keys `a11y:*`. The provider exposes `useAccessibility()` for UI wiring.
 

@@ -35,8 +35,11 @@ const A11Y_CSS = `
 }
 
 /* Dyslexia-friendly font family */
-.a11y-dyslexia-font body {
-  font-family: 'OpenDyslexic', 'Atkinson Hyperlegible', Nunito, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji' !important;
+.a11y-dyslexia-font,
+.a11y-dyslexia-font * {
+  font-family: 'Atkinson Hyperlegible', 'Comic Sans MS', 'Arial', system-ui, sans-serif !important;
+  letter-spacing: 0.02em !important;
+  word-spacing: 0.1em !important;
 }
 
 /* Highlight interactive elements (buttons, links, controls) */

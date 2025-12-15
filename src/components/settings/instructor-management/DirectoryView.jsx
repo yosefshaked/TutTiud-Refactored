@@ -14,51 +14,54 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { useInstructors } from '@/hooks/useOrgData.js';
 
 const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 const SAVE = { idle: 'idle', saving: 'saving', error: 'error' };
 
 export default function DirectoryView({ session, orgId, canLoad }) {
   const [members, setMembers] = useState([]);
-  const [instructors, setInstructors] = useState([]);
   const [loadState, setLoadState] = useState(REQUEST.idle);
   const [loadError, setLoadError] = useState('');
   const [saveState, setSaveState] = useState(SAVE.idle);
 
   const { typeOptions, loadTypes } = useInstructorTypes();
+  const { instructors, loadingInstructors, instructorsError, refetchInstructors } = useInstructors({
+    includeInactive: true,
+    orgId,
+    session,
+    enabled: canLoad,
+  });
 
-  const loadAll = useCallback(async () => {
+  const loadDirectory = useCallback(async () => {
     if (!canLoad) {
       setMembers([]);
-      setInstructors([]);
       return;
     }
     setLoadState(REQUEST.loading);
     setLoadError('');
     try {
       const params = new URLSearchParams({ org_id: orgId });
-      const [dir, roster] = await Promise.all([
-        authenticatedFetch(`directory?${params.toString()}`, { session }),
-        authenticatedFetch(`instructors?${params.toString()}&include_inactive=true`, { session }),
-      ]);
-      
-      await loadTypes();
-      
+      const dir = await authenticatedFetch(`directory?${params.toString()}`, { session });
       setMembers(Array.isArray(dir?.members) ? dir.members : []);
-      setInstructors(Array.isArray(roster) ? roster : []);
       setLoadState(REQUEST.idle);
     } catch (error) {
       console.error('Failed to load instructors/members', error);
       setLoadError(error?.message || 'טעינת המדריכים נכשלה.');
       setLoadState(REQUEST.error);
       setMembers([]);
-      setInstructors([]);
     }
-  }, [canLoad, orgId, session, loadTypes]);
+  }, [canLoad, orgId, session]);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    if (canLoad) {
+      loadTypes();
+      void refetchInstructors();
+      void loadDirectory();
+    } else {
+      setMembers([]);
+    }
+  }, [canLoad, loadTypes, loadDirectory, refetchInstructors]);
 
   const handlePromoteToInstructor = async (user) => {
     if (!canLoad || !user?.user_id) return;
@@ -75,7 +78,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
         },
       });
       toast.success('המדריך נוסף בהצלחה.');
-      await loadAll();
+      await Promise.all([refetchInstructors(), loadDirectory()]);
     } catch (error) {
       console.error('Failed to add instructor', error);
       toast.error('הוספת המדריך נכשלה.');
@@ -94,7 +97,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
         body: { org_id: orgId, instructor_id: instructor.id },
       });
       toast.success('המדריך הושבת.');
-      await loadAll();
+      await Promise.all([refetchInstructors(), loadDirectory()]);
     } catch (error) {
       console.error('Failed to disable instructor', error);
       toast.error('ההשבתה נכשלה.');
@@ -113,7 +116,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
         body: { org_id: orgId, instructor_id: instructor.id, is_active: true },
       });
       toast.success('המדריך הופעל מחדש.');
-      await loadAll();
+      await Promise.all([refetchInstructors(), loadDirectory()]);
     } catch (error) {
       console.error('Failed to enable instructor', error);
       toast.error('ההפעלה נכשלה.');
@@ -142,7 +145,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
         body: { org_id: orgId, instructor_id: instructor.id, instructor_types: typesToSave },
       });
       toast.success('סוגי המדריך עודכנו.');
-      await loadAll();
+      await Promise.all([refetchInstructors(), loadDirectory()]);
     } catch (error) {
       console.error('Failed to update instructor types', error);
       toast.error('עדכון סוגי המדריך נכשל.');
@@ -151,7 +154,7 @@ export default function DirectoryView({ session, orgId, canLoad }) {
     }
   };
 
-  const isLoading = loadState === REQUEST.loading;
+  const isLoading = loadState === REQUEST.loading || loadingInstructors;
   const isSaving = saveState === SAVE.saving;
 
   const activeInstructors = instructors.filter((i) => i.is_active);
@@ -177,10 +180,10 @@ export default function DirectoryView({ session, orgId, canLoad }) {
     );
   }
 
-  if (loadError) {
+  if (loadError || instructorsError) {
     return (
       <div className="rounded-md bg-red-50 p-4 text-sm text-red-700">
-        {loadError}
+        {loadError || instructorsError}
       </div>
     );
   }
