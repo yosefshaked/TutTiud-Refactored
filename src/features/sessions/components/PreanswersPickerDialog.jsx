@@ -106,27 +106,50 @@ export default function PreanswersPickerDialog({
 
         <div className="space-y-4" dir="rtl">
           {showPersonalTab ? (
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={activeTab === TAB_ORG ? 'default' : 'outline'}
-                size="sm"
-                className="flex-1"
-                onClick={() => setActiveTab(TAB_ORG)}
-              >
-                תשובות ארגוניות
-              </Button>
-              <Button
-                type="button"
-                variant={activeTab === TAB_PERSONAL ? 'default' : 'outline'}
-                size="sm"
-                className="flex-1"
-                onClick={() => setActiveTab(TAB_PERSONAL)}
-              >
-                תשובות אישיות
-              </Button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={activeTab === TAB_ORG ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setActiveTab(TAB_ORG)}
+                >
+                  תשובות ארגוניות
+                </Button>
+                <Button
+                  type="button"
+                  variant={activeTab === TAB_PERSONAL ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setActiveTab(TAB_PERSONAL)}
+                >
+                  תשובות אישיות
+                </Button>
+              </div>
+              <div className="text-center">
+                <span className="text-sm font-medium text-neutral-600">
+                  {activeTab === TAB_PERSONAL ? draftPersonal.length : answers.length}
+                  <span className="mx-1 text-neutral-400">/</span>
+                  <span className={cn(
+                    activeTab === TAB_PERSONAL && draftPersonal.length >= preanswersCapLimit 
+                      ? 'text-amber-600 font-semibold' 
+                      : 'text-neutral-500'
+                  )}>
+                    {preanswersCapLimit}
+                  </span>
+                </span>
+              </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="text-center pb-2">
+              <span className="text-sm font-medium text-neutral-600">
+                {answers.length}
+                <span className="mx-1 text-neutral-400">/</span>
+                <span className="text-neutral-500">{preanswersCapLimit}</span>
+              </span>
+            </div>
+          )}
 
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
