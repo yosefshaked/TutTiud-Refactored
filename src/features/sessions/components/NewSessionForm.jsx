@@ -790,15 +790,9 @@ export default function NewSessionForm({
                 const byId = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
                 return byKey.length > 0 ? byKey : byId;
               })();
-              const personalPreanswersForQuestion = (() => {
-                const byKey = Array.isArray(personalPreanswers?.[question.key]) ? personalPreanswers[question.key] : [];
-                const byId = Array.isArray(personalPreanswers?.[question.id]) ? personalPreanswers[question.id] : [];
-                return byKey.length > 0 ? byKey : byId;
-              })();
-              const hasAnyPreanswers =
-                orgPreanswers.length > 0 || personalPreanswersForQuestion.length > 0 || canEditPersonalPreanswers;
-              const showButton = hasAnyPreanswers;
-              const showHelpMessage = orgPreanswers.length === 0 && personalPreanswersForQuestion.length === 0 && !canEditPersonalPreanswers;
+              // Show button if user is an instructor (can add personal answers) OR there are org answers to pick from
+              const showButton = canEditPersonalPreanswers || orgPreanswers.length > 0;
+              const showHelpMessage = !canEditPersonalPreanswers && orgPreanswers.length === 0;
 
               if (question.type === 'textarea') {
                 
