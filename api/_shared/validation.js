@@ -249,7 +249,7 @@ export function validateInstructorCreate(body) {
   };
 }
 
-export function validateInstructorUpdate(body) {
+export function validateInstructorUpdate(body, orgPermissions = {}) {
   const instructorId = normalizeString(body?.id || body?.instructor_id || body?.instructorId);
   if (!isUUID(instructorId)) {
     return { error: 'missing_instructor_id' };
@@ -258,8 +258,9 @@ export function validateInstructorUpdate(body) {
   const updates = {};
   const metadataUpdates = {};
 
-  const normalizePreanswersMap = (raw) => {
-    const cap = 50;
+  const normalizePreanswersMap = (raw, orgPermissions) => {
+    const capRaw = orgPermissions?.session_form_preanswers_cap;
+    const cap = typeof capRaw === 'number' && capRaw > 0 ? capRaw : 50;
     if (!raw || typeof raw !== 'object') return {};
     const normalized = {};
     for (const [key, list] of Object.entries(raw)) {
@@ -324,14 +325,14 @@ export function validateInstructorUpdate(body) {
       ? rawMeta.custom_preanswers
       : null;
     if (rawCustom) {
-      metadataUpdates.custom_preanswers = normalizePreanswersMap(rawCustom);
+      metadataUpdates.custom_preanswers = normalizePreanswersMap(rawCustom, orgPermissions);
     }
 
     const rawAlias = body.custom_preanswers && typeof body.custom_preanswers === 'object'
       ? body.custom_preanswers
       : null;
     if (rawAlias) {
-      metadataUpdates.custom_preanswers = normalizePreanswersMap(rawAlias);
+      metadataUpdates.custom_preanswers = normalizePreanswersMap(rawAlias, orgPermissions);
     }
   }
 

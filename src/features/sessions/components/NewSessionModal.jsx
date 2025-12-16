@@ -284,6 +284,15 @@ export default function NewSessionModal({
 
   const canEditPersonalPreanswers = userIsInstructor; // Only instructors can maintain personal snippets
 
+  // Extract preanswers cap from permissions (default 50)
+  const preanswersCapLimit = useMemo(() => {
+    const perms = activeOrg?.connection?.permissions;
+    if (!perms || typeof perms !== 'object') return 50;
+    const capRaw = perms.session_form_preanswers_cap;
+    if (typeof capRaw === 'number' && capRaw > 0) return capRaw;
+    return 50;
+  }, [activeOrg]);
+
   useEffect(() => {
     if (!open) {
       setStatusFilter('active');
@@ -687,7 +696,7 @@ export default function NewSessionModal({
         if (!trimmed || seen.has(trimmed)) continue;
         seen.add(trimmed);
         unique.push(trimmed);
-        if (unique.length >= 50) break;
+        if (unique.length >= preanswersCapLimit) break;
       }
       return unique;
     };
@@ -715,7 +724,7 @@ export default function NewSessionModal({
       console.error('Failed to save personal preanswers', error);
       toast.error('שמירת התשובות האישיות נכשלה');
     }
-  }, [activeOrgId, personalPreanswers, questions, userId]);
+  }, [activeOrgId, personalPreanswers, questions, userId, preanswersCapLimit]);
 
   const dialogTitle = canFetchStudents
     ? 'רישום מפגש חדש'
@@ -781,6 +790,7 @@ export default function NewSessionModal({
             personalPreanswers={personalPreanswers}
             onSavePersonalPreanswers={handleSavePersonalPreanswers}
             canEditPersonalPreanswers={canEditPersonalPreanswers}
+            preanswersCapLimit={preanswersCapLimit}
             services={services}
             instructors={instructors}
             canFilterByInstructor={isAdminRole(membershipRole)}

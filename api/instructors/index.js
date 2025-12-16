@@ -201,7 +201,23 @@ export default async function (context, req) {
   }
 
   if (method === 'PUT') {
-    const validation = validateInstructorUpdate(body);
+    // Fetch org permissions for preanswers cap enforcement
+    const { data: orgSettings, error: permError } = await supabase
+      .from('org_settings')
+      .select('permissions')
+      .eq('org_id', orgId)
+      .maybeSingle();
+
+    if (permError) {
+      context.log?.error?.('instructors failed to load permissions', { message: permError.message });
+      return respond(context, 500, { message: 'failed_to_load_permissions' });
+    }
+
+    const permissions = typeof orgSettings?.permissions === 'string'
+      ? JSON.parse(orgSettings.permissions)
+      : orgSettings?.permissions || {};
+
+    const validation = validateInstructorUpdate(body, permissions);
     if (validation.error) {
       return respond(context, 400, { message: validation.error });
     }

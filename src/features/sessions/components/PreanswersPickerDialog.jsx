@@ -20,6 +20,7 @@ export default function PreanswersPickerDialog({
   onSavePersonal,
   canEditPersonal = false,
   questionLabel = 'שאלה',
+  preanswersCapLimit = 50,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -58,7 +59,7 @@ export default function PreanswersPickerDialog({
     if (!trimmed) return;
     const nextList = draftPersonal.includes(trimmed) 
       ? draftPersonal 
-      : [...draftPersonal, trimmed].slice(0, 50);
+      : [...draftPersonal, trimmed].slice(0, preanswersCapLimit);
     if (nextList === draftPersonal) return;
     
     setDraftPersonal(nextList);
