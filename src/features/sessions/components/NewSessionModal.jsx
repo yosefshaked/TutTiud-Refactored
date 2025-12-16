@@ -280,7 +280,7 @@ export default function NewSessionModal({
     return roleFromMembership === 'instructor';
   }, [userId, instructors, activeOrg]);
 
-  const canEditPersonalPreanswers = Boolean(userId); // Allow all authenticated users to keep personal snippets
+  const canEditPersonalPreanswers = userIsInstructor; // Only instructors can maintain personal snippets
 
   useEffect(() => {
     if (!open) {
