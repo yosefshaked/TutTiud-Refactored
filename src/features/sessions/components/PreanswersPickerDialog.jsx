@@ -53,30 +53,41 @@ export default function PreanswersPickerDialog({
     }
   };
 
-  const handleAddPersonal = () => {
+  const handleAddPersonal = async () => {
     const trimmed = newEntry.trim();
     if (!trimmed) return;
-    setDraftPersonal((prev) => {
-      if (prev.includes(trimmed)) return prev;
-      return [...prev, trimmed].slice(0, 50);
-    });
+    const nextList = draftPersonal.includes(trimmed) 
+      ? draftPersonal 
+      : [...draftPersonal, trimmed].slice(0, 50);
+    if (nextList === draftPersonal) return;
+    
+    setDraftPersonal(nextList);
     setNewEntry('');
-  };
-
-  const handleRemovePersonal = (value) => {
-    setDraftPersonal((prev) => prev.filter((item) => item !== value));
-    if (selectedAnswer === value) {
-      setSelectedAnswer(null);
+    
+    if (canEditPersonal && onSavePersonal) {
+      try {
+        setSaving(true);
+        await onSavePersonal(nextList);
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
-  const handleSavePersonal = async () => {
-    if (!canEditPersonal || !onSavePersonal) return;
-    try {
-      setSaving(true);
-      await onSavePersonal(draftPersonal);
-    } finally {
-      setSaving(false);
+  const handleRemovePersonal = async (value) => {
+    const nextList = draftPersonal.filter((item) => item !== value);
+    setDraftPersonal(nextList);
+    if (selectedAnswer === value) {
+      setSelectedAnswer(null);
+    }
+    
+    if (canEditPersonal && onSavePersonal) {
+      try {
+        setSaving(true);
+        await onSavePersonal(nextList);
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -129,37 +140,24 @@ export default function PreanswersPickerDialog({
           </div>
 
           {activeTab === TAB_PERSONAL && canEditPersonal ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="הוסיפו תשובה אישית"
-                  value={newEntry}
-                  onChange={(e) => setNewEntry(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddPersonal();
-                    }
-                  }}
-                />
-                <Button type="button" onClick={handleAddPersonal} className="whitespace-nowrap" disabled={!newEntry.trim()}>
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">הוספה</span>
-                </Button>
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSavePersonal}
-                  disabled={saving}
-                  className="gap-2"
-                >
-                  {saving ? 'שומר...' : 'שמור תשובות אישיות'}
-                </Button>
-              </div>
+            <div className="flex gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+              <Input
+                type="text"
+                placeholder="הוסיפו תשובה אישית"
+                value={newEntry}
+                onChange={(e) => setNewEntry(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddPersonal();
+                  }
+                }}
+                disabled={saving}
+              />
+              <Button type="button" onClick={handleAddPersonal} className="whitespace-nowrap" disabled={!newEntry.trim() || saving}>
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">{saving ? 'שומר...' : 'הוספה'}</span>
+              </Button>
             </div>
           ) : null}
 
@@ -201,6 +199,7 @@ export default function PreanswersPickerDialog({
                           e.stopPropagation();
                           handleRemovePersonal(answer);
                         }}
+                        disabled={saving}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

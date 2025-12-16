@@ -692,11 +692,11 @@ export default function NewSessionModal({
 
     const normalizedList = normalizeList(list);
     const nextMap = { ...personalPreanswers };
-    nextMap[questionKey] = normalizedList;
+    
+    // Find the question and use its id if available, otherwise use the key
     const question = questions.find((q) => q?.key === questionKey);
-    if (question?.id) {
-      nextMap[question.id] = normalizedList;
-    }
+    const storageKey = question?.id || questionKey;
+    nextMap[storageKey] = normalizedList;
 
     setPersonalPreanswers(nextMap);
     try {
