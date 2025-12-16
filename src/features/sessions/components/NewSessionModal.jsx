@@ -276,8 +276,11 @@ export default function NewSessionModal({
     if (Array.isArray(instructors) && instructors.length > 0) {
       return instructors.some((inst) => inst.id === userId);
     }
-    return normalizeMembershipRole(activeOrg?.membership?.role) === 'instructor';
+    const roleFromMembership = normalizeMembershipRole(activeOrg?.membership?.role);
+    return roleFromMembership === 'instructor';
   }, [userId, instructors, activeOrg]);
+
+  const canEditPersonalPreanswers = Boolean(userId); // Allow all authenticated users to keep personal snippets
 
   useEffect(() => {
     if (!open) {
@@ -671,7 +674,23 @@ export default function NewSessionModal({
 
   const handleSavePersonalPreanswers = useCallback(async (questionKey, list) => {
     if (!questionKey || !userId || !activeOrgId) return;
-    const normalizedList = Array.isArray(list) ? list : [];
+
+    const normalizeList = (raw) => {
+      if (!Array.isArray(raw)) return [];
+      const unique = [];
+      const seen = new Set();
+      for (const entry of raw) {
+        if (typeof entry !== 'string') continue;
+        const trimmed = entry.trim();
+        if (!trimmed || seen.has(trimmed)) continue;
+        seen.add(trimmed);
+        unique.push(trimmed);
+        if (unique.length >= 50) break;
+      }
+      return unique;
+    };
+
+    const normalizedList = normalizeList(list);
     const nextMap = { ...personalPreanswers };
     nextMap[questionKey] = normalizedList;
     const question = questions.find((q) => q?.key === questionKey);
@@ -759,7 +778,7 @@ export default function NewSessionModal({
             suggestions={suggestions}
             personalPreanswers={personalPreanswers}
             onSavePersonalPreanswers={handleSavePersonalPreanswers}
-            canEditPersonalPreanswers={userIsInstructor}
+            canEditPersonalPreanswers={canEditPersonalPreanswers}
             services={services}
             instructors={instructors}
             canFilterByInstructor={isAdminRole(membershipRole)}
