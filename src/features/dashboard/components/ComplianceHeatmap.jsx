@@ -149,12 +149,6 @@ export function ComplianceHeatmap() {
           instructorId: selectedInstructorId === 'all' ? undefined : selectedInstructorId,
         })
         setData(result)
-
-        // If drawer is open, refresh its cell data from the new payload
-        if (selectedCell && result?.days) {
-          const refreshed = rebuildSelectedCell(result.days, selectedCell.date, selectedCell.timeSlot)
-          setSelectedCell(refreshed)
-        }
       } catch (err) {
         console.error('Failed to load compliance data:', err)
         setError(err.message)
@@ -162,7 +156,17 @@ export function ComplianceHeatmap() {
         setIsLoading(false)
       }
     })()
-  }, [activeOrg?.id, currentWeekStart, selectedInstructorId, selectedCell, rebuildSelectedCell])
+  }, [activeOrg?.id, currentWeekStart, selectedInstructorId])
+
+  // Separate effect: rebuild selected cell when data changes (but drawer is still open)
+  useEffect(() => {
+    if (selectedCell && data?.days && selectedCell.date && selectedCell.timeSlot) {
+      const refreshed = rebuildSelectedCell(data.days, selectedCell.date, selectedCell.timeSlot)
+      if (refreshed && JSON.stringify(refreshed) !== JSON.stringify(selectedCell)) {
+        setSelectedCell(refreshed)
+      }
+    }
+  }, [data, selectedCell, rebuildSelectedCell])
 
   useEffect(() => {
     if (!isMobile) {

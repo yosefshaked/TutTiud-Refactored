@@ -797,6 +797,8 @@ export default function NewSessionForm({
               })();
               const hasAnyPreanswers =
                 orgPreanswers.length > 0 || personalPreanswersForQuestion.length > 0 || canEditPersonalPreanswers;
+              const showButton = hasAnyPreanswers;
+              const showHelpMessage = orgPreanswers.length === 0 && personalPreanswersForQuestion.length === 0 && !canEditPersonalPreanswers;
 
               if (question.type === 'textarea') {
                 
@@ -815,9 +817,9 @@ export default function NewSessionForm({
                         disabled={isSubmitting}
                         placeholder={placeholder}
                         required={required}
-                        className={hasAnyPreanswers ? 'pl-12' : ''}
+                        className={showButton ? 'pl-12' : ''}
                       />
-                      {hasAnyPreanswers && (
+                      {showButton && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -834,7 +836,7 @@ export default function NewSessionForm({
                         </Button>
                       )}
                     </div>
-                    {!hasAnyPreanswers && (
+                    {showHelpMessage && (
                       <p className="text-xs text-neutral-500 text-right">
                         אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
                       </p>
@@ -858,9 +860,9 @@ export default function NewSessionForm({
                         disabled={isSubmitting}
                         placeholder={placeholder}
                         required={required}
-                        className={hasAnyPreanswers ? 'pl-12' : ''}
+                        className={showButton ? 'pl-12' : ''}
                       />
-                      {hasAnyPreanswers && (
+                      {showButton && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -877,7 +879,7 @@ export default function NewSessionForm({
                         </Button>
                       )}
                     </div>
-                    {!hasAnyPreanswers && (
+                    {showHelpMessage && (
                       <p className="text-xs text-neutral-500 text-right">
                         אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
                       </p>
