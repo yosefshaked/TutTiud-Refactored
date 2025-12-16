@@ -260,8 +260,10 @@ export default function NewSessionModal({
     );
   }, [open, activeOrgId, activeOrgHasConnection, tenantClientReady, supabaseLoading]);
 
+  // Fetch instructors for BOTH admins and non-admin instructors.
+  // Backend enforces: non-admin users only receive their own instructor record.
   const { instructors } = useInstructors({
-    enabled: open && canFetchStudents && canAdmin,
+    enabled: open && Boolean(activeOrgId),
     orgId: activeOrgId,
   });
 
