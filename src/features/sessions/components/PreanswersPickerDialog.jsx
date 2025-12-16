@@ -1,41 +1,50 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, CheckCircle2 } from 'lucide-react';
+import { Search, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils.js';
+
+const TAB_ORG = 'org';
+const TAB_PERSONAL = 'personal';
 
 /**
  * PreanswersPickerDialog - Dialog for searching and selecting preconfigured answers
- * 
- * @param {boolean} open - Whether dialog is open
- * @param {function} onClose - Callback when dialog closes
- * @param {Array<string>} answers - List of preconfigured answer strings
- * @param {function} onSelect - Callback when user selects an answer (receives string)
- * @param {string} questionLabel - Label of the question being answered
  */
 export default function PreanswersPickerDialog({
   open,
   onClose,
   answers = [],
+  personalAnswers = [],
   onSelect,
+  onSavePersonal,
+  canEditPersonal = false,
   questionLabel = 'שאלה',
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [activeTab, setActiveTab] = useState(TAB_ORG);
+  const [draftPersonal, setDraftPersonal] = useState([]);
+  const [newEntry, setNewEntry] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  // Reset selection when dialog opens
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       setSelectedAnswer(null);
       setSearchQuery('');
+      setNewEntry('');
+      setDraftPersonal(Array.isArray(personalAnswers) ? personalAnswers : []);
+      const shouldShowPersonal = (personalAnswers && personalAnswers.length > 0) || canEditPersonal;
+      setActiveTab(shouldShowPersonal ? TAB_PERSONAL : TAB_ORG);
     }
-  }, [open]);
+  }, [open, personalAnswers, canEditPersonal]);
 
   const filteredAnswers = useMemo(() => {
+    const source = activeTab === TAB_PERSONAL ? draftPersonal : answers;
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return answers;
-    return answers.filter((ans) => String(ans).toLowerCase().includes(q));
-  }, [answers, searchQuery]);
+    if (!q) return source;
+    return source.filter((ans) => String(ans).toLowerCase().includes(q));
+  }, [activeTab, answers, draftPersonal, searchQuery]);
 
   const handleInsert = () => {
     if (selectedAnswer) {
@@ -44,18 +53,38 @@ export default function PreanswersPickerDialog({
     }
   };
 
-  const handleAnswerClick = (answer) => {
-    setSelectedAnswer(answer);
+  const handleAddPersonal = () => {
+    const trimmed = newEntry.trim();
+    if (!trimmed) return;
+    setDraftPersonal((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      return [...prev, trimmed].slice(0, 50);
+    });
+    setNewEntry('');
   };
 
-  const handleAnswerDoubleClick = (answer) => {
-    onSelect?.(answer);
-    onClose?.();
+  const handleRemovePersonal = (value) => {
+    setDraftPersonal((prev) => prev.filter((item) => item !== value));
+    if (selectedAnswer === value) {
+      setSelectedAnswer(null);
+    }
   };
+
+  const handleSavePersonal = async () => {
+    if (!canEditPersonal || !onSavePersonal) return;
+    try {
+      setSaving(true);
+      await onSavePersonal(draftPersonal);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const showPersonalTab = (personalAnswers && personalAnswers.length > 0) || canEditPersonal;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-right">בחירת תשובה מוכנה</DialogTitle>
           <p className="text-sm text-neutral-600 text-right mt-2">
@@ -64,7 +93,29 @@ export default function PreanswersPickerDialog({
         </DialogHeader>
 
         <div className="space-y-4" dir="rtl">
-          {/* Search Input */}
+          {showPersonalTab ? (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={activeTab === TAB_ORG ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1"
+                onClick={() => setActiveTab(TAB_ORG)}
+              >
+                תשובות ארגוניות
+              </Button>
+              <Button
+                type="button"
+                variant={activeTab === TAB_PERSONAL ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1"
+                onClick={() => setActiveTab(TAB_PERSONAL)}
+              >
+                תשובות אישיות
+              </Button>
+            </div>
+          ) : null}
+
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
             <Input
@@ -77,42 +128,89 @@ export default function PreanswersPickerDialog({
             />
           </div>
 
-          {/* Answers List */}
-          <div className="border rounded-lg max-h-[300px] overflow-y-auto">
+          {activeTab === TAB_PERSONAL && canEditPersonal ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder="הוסיפו תשובה אישית"
+                  value={newEntry}
+                  onChange={(e) => setNewEntry(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddPersonal();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={handleAddPersonal} className="whitespace-nowrap" disabled={!newEntry.trim()}>
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">הוספה</span>
+                </Button>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSavePersonal}
+                  disabled={saving}
+                  className="gap-2"
+                >
+                  {saving ? 'שומר...' : 'שמור תשובות אישיות'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="border rounded-lg max-h-[320px] overflow-y-auto">
             {filteredAnswers.length === 0 ? (
               <div className="p-8 text-center text-sm text-neutral-500">
-                {answers.length === 0
-                  ? 'אין תשובות מוכנות זמינות. בקשו ממנהלי המערכת להוסיף תשובות מוכנות.'
+                {(activeTab === TAB_ORG ? answers.length === 0 : draftPersonal.length === 0)
+                  ? 'אין תשובות מוכנות זמינות.'
                   : 'לא נמצאו תשובות התואמות את החיפוש.'}
               </div>
             ) : (
               <ul className="divide-y" role="listbox">
                 {filteredAnswers.map((answer, index) => (
                   <li
-                    key={index}
+                    key={`${activeTab}-${index}-${answer}`}
                     role="option"
                     aria-selected={selectedAnswer === answer}
-                    className={`p-3 cursor-pointer transition-colors hover:bg-primary/5 ${
-                      selectedAnswer === answer
-                        ? 'bg-primary/10 border-r-4 border-primary'
-                        : ''
-                    }`}
-                    onClick={() => handleAnswerClick(answer)}
-                    onDoubleClick={() => handleAnswerDoubleClick(answer)}
+                    className={cn(
+                      'p-3 cursor-pointer transition-colors hover:bg-primary/5 flex items-start gap-2 text-right',
+                      selectedAnswer === answer ? 'bg-primary/10 border-r-4 border-primary' : ''
+                    )}
+                    onClick={() => setSelectedAnswer(answer)}
+                    onDoubleClick={() => {
+                      onSelect?.(answer);
+                      onClose?.();
+                    }}
                   >
-                    <div className="flex items-start gap-2 text-right">
-                      {selectedAnswer === answer && (
-                        <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                      )}
-                      <span className="text-sm flex-1">{answer}</span>
-                    </div>
+                    {selectedAnswer === answer && (
+                      <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    )}
+                    <span className="text-sm flex-1">{answer}</span>
+                    {activeTab === TAB_PERSONAL && canEditPersonal ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePersonal(answer);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          {/* Footer Actions */}
           <div className="flex flex-col-reverse gap-2 sm:flex-row-reverse sm:justify-start">
             <Button
               onClick={handleInsert}

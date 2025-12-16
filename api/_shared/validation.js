@@ -256,6 +256,28 @@ export function validateInstructorUpdate(body) {
   }
 
   const updates = {};
+  const metadataUpdates = {};
+
+  const normalizePreanswersMap = (raw) => {
+    const cap = 50;
+    if (!raw || typeof raw !== 'object') return {};
+    const normalized = {};
+    for (const [key, list] of Object.entries(raw)) {
+      if (!key || !Array.isArray(list)) continue;
+      const unique = [];
+      const seen = new Set();
+      for (const rawEntry of list) {
+        if (typeof rawEntry !== 'string') continue;
+        const trimmed = rawEntry.trim();
+        if (!trimmed || seen.has(trimmed)) continue;
+        seen.add(trimmed);
+        unique.push(trimmed);
+        if (unique.length >= cap) break;
+      }
+      normalized[key] = unique;
+    }
+    return normalized;
+  };
 
   if (Object.prototype.hasOwnProperty.call(body, 'name')) {
     const v = normalizeString(body.name);
@@ -294,6 +316,27 @@ export function validateInstructorUpdate(body) {
     } else {
       updates.instructor_types = null;
     }
+  }
+
+  if (body && typeof body === 'object') {
+    const rawMeta = body.metadata && typeof body.metadata === 'object' ? body.metadata : null;
+    const rawCustom = rawMeta && typeof rawMeta.custom_preanswers === 'object'
+      ? rawMeta.custom_preanswers
+      : null;
+    if (rawCustom) {
+      metadataUpdates.custom_preanswers = normalizePreanswersMap(rawCustom);
+    }
+
+    const rawAlias = body.custom_preanswers && typeof body.custom_preanswers === 'object'
+      ? body.custom_preanswers
+      : null;
+    if (rawAlias) {
+      metadataUpdates.custom_preanswers = normalizePreanswersMap(rawAlias);
+    }
+  }
+
+  if (Object.keys(metadataUpdates).length > 0) {
+    updates.__metadata_custom_preanswers = metadataUpdates.custom_preanswers || {};
   }
 
   return { instructorId, updates };

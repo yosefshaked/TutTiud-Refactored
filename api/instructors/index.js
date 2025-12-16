@@ -201,11 +201,6 @@ export default async function (context, req) {
   }
 
   if (method === 'PUT') {
-    // Only admins can update instructors
-    if (!isAdmin) {
-      return respond(context, 403, { message: 'forbidden' });
-    }
-
     const validation = validateInstructorUpdate(body);
     if (validation.error) {
       return respond(context, 400, { message: validation.error });
@@ -213,6 +208,15 @@ export default async function (context, req) {
 
     const instructorId = validation.instructorId;
     const updates = validation.updates;
+
+    const isSelf = instructorId === userId;
+    if (!isAdmin) {
+      const allowedKeys = ['__metadata_custom_preanswers'];
+      const disallowed = Object.keys(updates).filter((key) => !allowedKeys.includes(key));
+      if (disallowed.length || !isSelf) {
+        return respond(context, 403, { message: 'forbidden' });
+      }
+    }
 
     if (Object.keys(updates).length === 0) {
       return respond(context, 400, { message: 'no updates provided' });
@@ -234,15 +238,22 @@ export default async function (context, req) {
       return respond(context, 404, { message: 'instructor_not_found' });
     }
 
+    const metadataPatch = updates.__metadata_custom_preanswers;
+    if (metadataPatch) {
+      delete updates.__metadata_custom_preanswers;
+      const existingMeta = existingInstructor.metadata && typeof existingInstructor.metadata === 'object'
+        ? existingInstructor.metadata
+        : {};
+      const nextMeta = { ...existingMeta, custom_preanswers: metadataPatch };
+      updates.metadata = nextMeta;
+    }
+
     // Determine which fields actually changed
     const changedFields = [];
     for (const [key, newValue] of Object.entries(updates)) {
       const oldValue = existingInstructor[key];
-      // Handle null/undefined as equivalent
       const normalizedOld = oldValue === null || oldValue === undefined ? null : oldValue;
       const normalizedNew = newValue === null || newValue === undefined ? null : newValue;
-      
-      // Deep comparison for objects/arrays, simple comparison for primitives
       if (JSON.stringify(normalizedOld) !== JSON.stringify(normalizedNew)) {
         changedFields.push(key);
       }

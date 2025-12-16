@@ -236,8 +236,10 @@ export default function NewSessionModal({
   const [visibilityLoaded, setVisibilityLoaded] = useState(false);
   const [initialStatusApplied, setInitialStatusApplied] = useState(false);
   const [successState, setSuccessState] = useState(null); // { studentId, studentName, date }
+  const [personalPreanswers, setPersonalPreanswers] = useState({});
   const formResetRef = useRef(null); // Will hold the form's reset function
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false); // Track advanced filter visibility
+  const personalFetchAbortRef = useRef(null);
 
   // Fix for mobile: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
@@ -270,9 +272,12 @@ export default function NewSessionModal({
 
   // Check if the logged-in user is an instructor (must be after instructors is defined)
   const userIsInstructor = useMemo(() => {
-    if (!userId || !instructors || instructors.length === 0) return false;
-    return instructors.some(inst => inst.id === userId);
-  }, [userId, instructors]);
+    if (!userId) return false;
+    if (Array.isArray(instructors) && instructors.length > 0) {
+      return instructors.some((inst) => inst.id === userId);
+    }
+    return normalizeMembershipRole(activeOrg?.membership?.role) === 'instructor';
+  }, [userId, instructors, activeOrg]);
 
   useEffect(() => {
     if (!open) {
@@ -353,6 +358,11 @@ export default function NewSessionModal({
       setSubmitError('');
       setSuccessState(null);
       setShowAdvancedFilters(false); // Reset advanced filters visibility when modal closes
+      setPersonalPreanswers({});
+      if (personalFetchAbortRef.current) {
+        personalFetchAbortRef.current.abort();
+        personalFetchAbortRef.current = null;
+      }
     }
   }, [open]);
 
@@ -438,6 +448,51 @@ export default function NewSessionModal({
       setStudentScope('all');
     }
   }, [open, loadQuestions]);
+
+  useEffect(() => {
+    if (!open || !canFetchStudents || !userId || !activeOrgId) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    personalFetchAbortRef.current = abortController;
+
+    const extractCustomPreanswers = (record) => {
+      if (!record || typeof record !== 'object') return {};
+      const meta = record.metadata && typeof record.metadata === 'object' ? record.metadata : {};
+      const custom = meta.custom_preanswers && typeof meta.custom_preanswers === 'object' ? meta.custom_preanswers : {};
+      return custom;
+    };
+
+    const loadPersonal = async () => {
+      try {
+        if (canAdmin && Array.isArray(instructors) && instructors.length > 0) {
+          const mine = instructors.find((inst) => inst?.id === userId);
+          if (mine) {
+            setPersonalPreanswers(extractCustomPreanswers(mine));
+            return;
+          }
+        }
+
+        const searchParams = new URLSearchParams({ org_id: activeOrgId });
+        const payload = await authenticatedFetch(`instructors?${searchParams.toString()}`, {
+          signal: abortController.signal,
+        });
+        const record = Array.isArray(payload) ? payload.find((row) => row?.id === userId) || payload[0] : null;
+        setPersonalPreanswers(extractCustomPreanswers(record));
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+        console.error('Failed to load instructor preanswers', error);
+        setPersonalPreanswers({});
+      }
+    };
+
+    void loadPersonal();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [open, canFetchStudents, canAdmin, instructors, userId, activeOrgId]);
 
   useEffect(() => {
     if (!open || !canFetchStudents) {
@@ -614,6 +669,33 @@ export default function NewSessionModal({
     }
   }, [successState]);
 
+  const handleSavePersonalPreanswers = useCallback(async (questionKey, list) => {
+    if (!questionKey || !userId || !activeOrgId) return;
+    const normalizedList = Array.isArray(list) ? list : [];
+    const nextMap = { ...personalPreanswers };
+    nextMap[questionKey] = normalizedList;
+    const question = questions.find((q) => q?.key === questionKey);
+    if (question?.id) {
+      nextMap[question.id] = normalizedList;
+    }
+
+    setPersonalPreanswers(nextMap);
+    try {
+      await authenticatedFetch('instructors', {
+        method: 'PUT',
+        body: {
+          id: userId,
+          org_id: activeOrgId,
+          metadata: { custom_preanswers: nextMap },
+        },
+      });
+      toast.success('התשובות האישיות נשמרו');
+    } catch (error) {
+      console.error('Failed to save personal preanswers', error);
+      toast.error('שמירת התשובות האישיות נכשלה');
+    }
+  }, [activeOrgId, personalPreanswers, questions, userId]);
+
   const dialogTitle = canFetchStudents
     ? 'רישום מפגש חדש'
     : 'לא ניתן ליצור מפגש חדש';
@@ -675,6 +757,9 @@ export default function NewSessionModal({
             students={students}
             questions={questions}
             suggestions={suggestions}
+            personalPreanswers={personalPreanswers}
+            onSavePersonalPreanswers={handleSavePersonalPreanswers}
+            canEditPersonalPreanswers={userIsInstructor}
             services={services}
             instructors={instructors}
             canFilterByInstructor={isAdminRole(membershipRole)}
