@@ -117,8 +117,8 @@ export default function ChangelogModal({ open, onClose }) {
                     }}>
                       גרסה 1.8.1
                     </span>
-                    <time dateTime="2025-12-16" style={{ color: '#64748b', fontSize: '14px' }}>
-                      16 בדצמבר 2025
+                    <time dateTime="2025-12-17" style={{ color: '#64748b', fontSize: '14px' }}>
+                      17 בדצמבר 2025
                     </time>
                   </div>
                   <span style={{
