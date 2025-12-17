@@ -182,7 +182,7 @@ export default function ChangelogModal({ open, onClose }) {
                   fontSize: '14px',
                   color: '#475569'
                 }}>
-                  <strong>💡 טיפ:</strong> התשובות האישיות נשמרות בפרופיל המדריך. מגבלת מספר התשובות לשאלה נקבעת על ידי מנהל המערכת (ברירת מחדל: 50).
+                  <strong>💡 טיפ:</strong> התשובות האישיות נשמרות לכל מדריך בנפרד. מגבלת מספר התשובות לשאלה נקבעת על ידי מנהל המערכת.
                 </div>
               </section>
               )}
