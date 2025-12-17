@@ -220,7 +220,7 @@ export default function NewSessionModal({
 }) {
   const { loading: supabaseLoading } = useSupabase();
   const { user } = useAuth();
-  const { activeOrg, activeOrgHasConnection, tenantClientReady } = useOrg();
+  const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgConnection } = useOrg();
   const [studentsState, setStudentsState] = useState(REQUEST_STATE.idle);
   const [studentsError, setStudentsError] = useState('');
   const [students, setStudents] = useState([]);
@@ -287,7 +287,7 @@ export default function NewSessionModal({
   // Extract preanswers cap from permissions (must come from permission registry). If permissions are
   // stored as a JSON string, parse locally to avoid changing user-context API.
   const preanswersCapLimit = useMemo(() => {
-    const rawPerms = activeOrg?.connection?.permissions;
+    const rawPerms = activeOrgConnection?.permissions ?? activeOrg?.connection?.permissions;
     let perms = null;
 
     if (typeof rawPerms === 'string') {
@@ -312,7 +312,7 @@ export default function NewSessionModal({
 
     console.warn('preanswersCapLimit: session_form_preanswers_cap not found or invalid in permissions', { capRaw, perms });
     return undefined;
-  }, [activeOrg]);
+  }, [activeOrg, activeOrgConnection]);
 
   useEffect(() => {
     if (!open) {
