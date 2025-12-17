@@ -284,13 +284,34 @@ export default function NewSessionModal({
 
   const canEditPersonalPreanswers = userIsInstructor; // Only instructors can maintain personal snippets
 
-  // Extract preanswers cap from permissions (default 50)
+  // Extract preanswers cap from permissions (must come from permission registry). If permissions are
+  // stored as a JSON string, parse locally to avoid changing user-context API.
   const preanswersCapLimit = useMemo(() => {
-    const perms = activeOrg?.connection?.permissions;
-    if (!perms || typeof perms !== 'object') return 50;
+    const rawPerms = activeOrg?.connection?.permissions;
+    let perms = null;
+
+    if (typeof rawPerms === 'string') {
+      try {
+        perms = JSON.parse(rawPerms);
+      } catch (error) {
+        console.warn('preanswersCapLimit: failed to parse permissions string', { rawPerms, error });
+      }
+    } else if (rawPerms && typeof rawPerms === 'object') {
+      perms = rawPerms;
+    }
+
+    if (!perms) {
+      console.warn('preanswersCapLimit: permissions object not found in activeOrg.connection');
+      return undefined;
+    }
+
     const capRaw = perms.session_form_preanswers_cap;
-    if (typeof capRaw === 'number' && capRaw > 0) return capRaw;
-    return 50;
+    if (typeof capRaw === 'number' && capRaw > 0) {
+      return capRaw;
+    }
+
+    console.warn('preanswersCapLimit: session_form_preanswers_cap not found or invalid in permissions', { capRaw, perms });
+    return undefined;
   }, [activeOrg]);
 
   useEffect(() => {

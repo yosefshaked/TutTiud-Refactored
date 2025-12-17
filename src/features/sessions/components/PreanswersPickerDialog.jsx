@@ -20,7 +20,7 @@ export default function PreanswersPickerDialog({
   onSavePersonal,
   canEditPersonal = false,
   questionLabel = 'שאלה',
-  preanswersCapLimit = 50,
+  preanswersCapLimit,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -57,9 +57,17 @@ export default function PreanswersPickerDialog({
   const handleAddPersonal = async () => {
     const trimmed = newEntry.trim();
     if (!trimmed) return;
+    
+    // If no cap defined, still allow adding (but log warning)
+    if (!preanswersCapLimit) {
+      console.warn('preanswersCapLimit not defined - adding without limit enforcement');
+    }
+    
     const nextList = draftPersonal.includes(trimmed) 
       ? draftPersonal 
-      : [...draftPersonal, trimmed].slice(0, preanswersCapLimit);
+      : preanswersCapLimit 
+        ? [...draftPersonal, trimmed].slice(0, preanswersCapLimit)
+        : [...draftPersonal, trimmed];
     if (nextList === draftPersonal) return;
     
     setDraftPersonal(nextList);
@@ -130,14 +138,20 @@ export default function PreanswersPickerDialog({
               <div className="text-center">
                 <span className="text-sm font-medium text-neutral-600">
                   {activeTab === TAB_PERSONAL ? draftPersonal.length : answers.length}
-                  <span className="mx-1 text-neutral-400">/</span>
-                  <span className={cn(
-                    activeTab === TAB_PERSONAL && draftPersonal.length >= preanswersCapLimit 
-                      ? 'text-amber-600 font-semibold' 
-                      : 'text-neutral-500'
-                  )}>
-                    {preanswersCapLimit}
-                  </span>
+                  {preanswersCapLimit ? (
+                    <>
+                      <span className="mx-1 text-neutral-400">/</span>
+                      <span className={cn(
+                        activeTab === TAB_PERSONAL && draftPersonal.length >= preanswersCapLimit 
+                          ? 'text-amber-600 font-semibold' 
+                          : 'text-neutral-500'
+                      )}>
+                        {preanswersCapLimit}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="mr-2 text-xs text-red-600">(מגבלה לא נטענה)</span>
+                  )}
                 </span>
               </div>
             </div>
@@ -145,8 +159,14 @@ export default function PreanswersPickerDialog({
             <div className="text-center pb-2">
               <span className="text-sm font-medium text-neutral-600">
                 {answers.length}
-                <span className="mx-1 text-neutral-400">/</span>
-                <span className="text-neutral-500">{preanswersCapLimit}</span>
+                {preanswersCapLimit ? (
+                  <>
+                    <span className="mx-1 text-neutral-400">/</span>
+                    <span className="text-neutral-500">{preanswersCapLimit}</span>
+                  </>
+                ) : (
+                  <span className="mr-2 text-xs text-red-600">(מגבלה לא נטענה)</span>
+                )}
               </span>
             </div>
           )}

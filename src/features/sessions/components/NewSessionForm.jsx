@@ -22,7 +22,7 @@ export default function NewSessionForm({
   personalPreanswers = {},
   onSavePersonalPreanswers,
   canEditPersonalPreanswers = false,
-  preanswersCapLimit = 50,
+  preanswersCapLimit,
   canFilterByInstructor = false,
   userIsInstructor = false, // Whether the logged-in user is an instructor
   studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
