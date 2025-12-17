@@ -154,11 +154,11 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#475569',
                   lineHeight: 1.8
                 }}>
-                  <li>כעת ניתן להגדיר <strong>תשובות מוכנות אישיות</strong> לשאלות טקסט בטופס דיווח מפגש</li>
-                  <li>לחצו על אייקון הרשימה 📋 ליד שאלת טקסט/טקסט ארוך לפתיחת דיאלוג בחירת תשובות</li>
-                  <li>בטאב "תשובות אישיות" ניתן להוסיף, למחוק ולבחור מתשובות שהגדרתם באופן אישי</li>
+                  <li>כעת ניתן להגדיר <strong>תשובות מוכנות מראש אישיות</strong> לשאלות פתוחות בטופס דיווח מפגש</li>
+                  <li>לחצו על אייקון הרשימה 📋 ליד שאלת טקסט לפתיחת חלונית בחירת תשובות</li>
                   <li>התשובות האישיות נשמרות אוטומטית ונגישות רק לכם בכל דיווח חדש</li>
                   <li>התכונה זמינה במקביל לתשובות הארגוניות שמוגדרות על ידי המנהלים</li>
+                  <li>כעת ליד כל תשובה מוכנה מראש יופיע מספר סידורי להקלה במציאה חוזרת</li>
                 </ul>
 
                 <h4 style={{ fontWeight: 600, fontSize: 16, margin: '16px 0 8px', color: '#334155' }}>
@@ -171,9 +171,7 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#475569',
                   lineHeight: 1.8
                 }}>
-                  <li>תוקן באג שגרם ללולאת אינסוף בבקשות weekly-compliance בדף הבית</li>
-                  <li>תוקן באג שגרם למגירת בחירת תשובות להיפתח מחדש לאחר סגירה</li>
-                  <li>תוקן זיהוי מדריכים שאינם מנהלים כך שהאייקון 📋 יופיע להם תמיד</li>
+                  <li>תוקן באג שגרם לחוסר עדכון תצוגה אם נוצר דיווח דרך מעקב מצב התיעודים</li>
                 </ul>
 
                 <div style={{
