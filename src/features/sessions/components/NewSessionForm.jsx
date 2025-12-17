@@ -19,6 +19,10 @@ export default function NewSessionForm({
   suggestions = {},
   services = [],
   instructors = [],
+  personalPreanswers = {},
+  onSavePersonalPreanswers,
+  canEditPersonalPreanswers = false,
+  preanswersCapLimit,
   canFilterByInstructor = false,
   userIsInstructor = false, // Whether the logged-in user is an instructor
   studentScope = 'all', // 'all' | 'mine' | `inst:<id>`
@@ -782,12 +786,16 @@ export default function NewSessionForm({
               const placeholder = typeof question.placeholder === 'string' ? question.placeholder : '';
               const answerValue = answers[question.key];
 
+              const orgPreanswers = (() => {
+                const byKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
+                const byId = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
+                return byKey.length > 0 ? byKey : byId;
+              })();
+              // Show button if user is an instructor (can add personal answers) OR there are org answers to pick from
+              const showButton = canEditPersonalPreanswers || orgPreanswers.length > 0;
+              const showHelpMessage = !canEditPersonalPreanswers && orgPreanswers.length === 0;
+
               if (question.type === 'textarea') {
-                // Check for preanswers by both key and id
-                const preanswersByKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
-                const preanswersById = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
-                const preanswers = preanswersByKey.length > 0 ? preanswersByKey : preanswersById;
-                const hasPreanswers = preanswers.length > 0;
                 
                 return (
                   <div key={question.key} className="space-y-xs">
@@ -804,9 +812,9 @@ export default function NewSessionForm({
                         disabled={isSubmitting}
                         placeholder={placeholder}
                         required={required}
-                        className={hasPreanswers ? 'pl-12' : ''}
+                        className={showButton ? 'pl-12' : ''}
                       />
-                      {hasPreanswers && (
+                      {showButton && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -823,7 +831,7 @@ export default function NewSessionForm({
                         </Button>
                       )}
                     </div>
-                    {!hasPreanswers && (
+                    {showHelpMessage && (
                       <p className="text-xs text-neutral-500 text-right">
                         אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
                       </p>
@@ -833,11 +841,6 @@ export default function NewSessionForm({
               }
 
               if (question.type === 'text') {
-                // Check for preanswers by both key and id
-                const preanswersByKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
-                const preanswersById = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
-                const preanswers = preanswersByKey.length > 0 ? preanswersByKey : preanswersById;
-                const hasPreanswers = preanswers.length > 0;
                 return (
                   <div key={question.key} className="space-y-xs">
                     <Label htmlFor={questionId} className="block text-right">
@@ -852,9 +855,9 @@ export default function NewSessionForm({
                         disabled={isSubmitting}
                         placeholder={placeholder}
                         required={required}
-                        className={hasPreanswers ? 'pl-12' : ''}
+                        className={showButton ? 'pl-12' : ''}
                       />
-                      {hasPreanswers && (
+                      {showButton && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -871,7 +874,7 @@ export default function NewSessionForm({
                         </Button>
                       )}
                     </div>
-                    {!hasPreanswers && (
+                    {showHelpMessage && (
                       <p className="text-xs text-neutral-500 text-right">
                         אין תשובות מוכנות לשאלה זו. בקשו ממנהלי המערכת להגדיר תשובות מוכנות.
                       </p>
@@ -1101,11 +1104,24 @@ export default function NewSessionForm({
           if (!activeQuestionKey) return [];
           const question = questions.find((q) => q.key === activeQuestionKey);
           if (!question) return [];
-          // Check by both key and id
           const byKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
           const byId = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
           return byKey.length > 0 ? byKey : byId;
         })()}
+        personalAnswers={(() => {
+          if (!activeQuestionKey) return [];
+          const question = questions.find((q) => q.key === activeQuestionKey);
+          if (!question) return [];
+          const byKey = Array.isArray(personalPreanswers?.[question.key]) ? personalPreanswers[question.key] : [];
+          const byId = Array.isArray(personalPreanswers?.[question.id]) ? personalPreanswers[question.id] : [];
+          return byKey.length > 0 ? byKey : byId;
+        })()}
+        onSavePersonal={(list) => {
+          if (!activeQuestionKey) return;
+          onSavePersonalPreanswers?.(activeQuestionKey, list);
+        }}
+        canEditPersonal={canEditPersonalPreanswers}
+        preanswersCapLimit={preanswersCapLimit}
         onSelect={(answer) => {
           if (activeQuestionKey) {
             updateAnswer(activeQuestionKey, answer);
