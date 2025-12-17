@@ -229,6 +229,7 @@ export default function PreanswersPickerDialog({
                       onClose?.();
                     }}
                   >
+                    <span className="text-xs text-neutral-500 leading-6 w-6 text-left">{index + 1}.</span>
                     {selectedAnswer === answer && (
                       <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                     )}
