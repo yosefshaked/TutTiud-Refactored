@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.8.1': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.8.2': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,74 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.8.2 - Student Filter Fix */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.8.2')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.8.2'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.8.2'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.8.2
+                    </span>
+                    <time dateTime="2025-12-18" style={{ color: '#64748b', fontSize: '14px' }}>
+                      18 בדצמבר 2025
+                    </time>
+                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.8.2'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
+                </div>
+                <h3 style={{
+                  fontWeight: 700,
+                  fontSize: 18,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  🔍 תיקון סינון סטטוס תלמידים
+                </h3>
+              </header>
+
+              {expandedVersions['1.8.2'] && (
+              <section style={{ paddingRight: '16px' }}>
+                <ul style={{
+                  listStyleType: 'disc',
+                  paddingRight: '20px',
+                  marginBottom: '16px',
+                  color: '#475569',
+                  lineHeight: 1.8
+                }}>
+                  <li>תוקן מסנן סטטוס תלמידים (פעילים / לא פעילים / הכל) כך שהרשימה מתעדכנת עם התוצאות הנכונות.</li>
+                </ul>
+              </section>
+              )}
+            </article>
+          </li>
 
           {/* 1.8.1 - Instructor Personal Preanswers */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
