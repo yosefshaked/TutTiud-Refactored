@@ -333,12 +333,6 @@ export default function AddStudentForm({
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 text-right" role="alert">
-          {error}
-        </div>
-      )}
-
       {!renderFooterOutside && (
         <div className="border-t -mx-4 sm:-mx-6 mt-6 pt-3 sm:pt-4 px-4 sm:px-6">
           <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
