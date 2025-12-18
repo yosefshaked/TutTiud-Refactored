@@ -31,8 +31,19 @@ export default function AddStudentForm({
   const initialState = useMemo(() => ({ ...createStudentFormState(), ...initialValues }), [initialValues]);
   const [values, setValues] = useState(() => initialState);
   const [touched, setTouched] = useState({});
+  
+  // DEBUG: Check if hooks receive proper context
   const { services = [], loadingServices } = useServices();
   const { instructors = [], loadingInstructors } = useInstructors();
+  
+  useEffect(() => {
+    console.info('[AddStudentForm] Hook data received', {
+      servicesCount: services?.length ?? 0,
+      instructorsCount: instructors?.length ?? 0,
+      loadingServices,
+      loadingInstructors,
+    });
+  }, [services, instructors, loadingServices, loadingInstructors]);
 
   // Normalize instructors to avoid runtime errors when the hook is still initializing
   const safeInstructors = useMemo(() => {
@@ -56,6 +67,11 @@ export default function AddStudentForm({
       console.warn('AddStudentForm instructors is not an array', { instructors });
     }
   }, [instructors, loadingInstructors]);
+
+  // DEBUG: Log auth/org context availability
+  useEffect(() => {
+    console.info('[AddStudentForm] Component mounted/updated');
+  }, []);
 
   const preventSubmitReason = useMemo(() => {
     if (duplicate) return 'duplicate';

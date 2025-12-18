@@ -122,6 +122,13 @@ function useOrgDataResource({
         setError('');
       }
       setLoading(false);
+      // DEBUG: Log why fetch was skipped
+      if (!enabled) {
+        console.warn(`[useOrgDataResource] ${resource} fetch disabled by 'enabled' flag`);
+      }
+      if (!shouldInclude(orgId)) {
+        console.warn(`[useOrgDataResource] ${resource} fetch disabled - orgId missing/invalid`, { orgId });
+      }
       return;
     }
 
@@ -130,6 +137,7 @@ function useOrgDataResource({
 
     try {
       const url = `${path}${queryString ? `?${queryString}` : ''}`;
+      console.info(`[useOrgDataResource] Fetching ${resource} from ${url}`);
       const payload = await authenticatedFetch(url, { session });
       const mapped = stableMapResponse(payload);
       const normalized = Array.isArray(mapped) ? mapped : [];
