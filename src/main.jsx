@@ -37,21 +37,8 @@ class AppErrorBoundary extends React.Component {
     return { hasError: true };
   }
 
-  componentDidCatch(error, info) {
-    try {
-      console.groupCollapsed('[ERROR][React] Uncaught render error');
-      console.error(error);
-      if (error?.stack) {
-        console.log('[ERROR][React] stack:', error.stack);
-      }
-      if (info?.componentStack) {
-        console.log('[ERROR][React] componentStack:', info.componentStack);
-      }
-      console.groupEnd();
-    } catch {
-      // ignore logging failures
-    }
-  }
+  // Intentionally avoid console logging here to prevent accidental data leaks.
+  componentDidCatch() {}
 
   render() {
     // Keep UX minimal; this boundary exists primarily for logging.
@@ -62,46 +49,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-function installGlobalErrorLogging() {
-  if (typeof window === 'undefined') return;
-  if (window.__tuttiudGlobalErrorLoggingInstalled) return;
-  window.__tuttiudGlobalErrorLoggingInstalled = true;
-
-  window.addEventListener('error', (event) => {
-    try {
-      console.groupCollapsed('[ERROR][window] error');
-      if (event?.message) console.log('message:', event.message);
-      if (event?.filename || event?.lineno || event?.colno) {
-        console.log('location:', {
-          filename: event?.filename,
-          lineno: event?.lineno,
-          colno: event?.colno,
-        });
-      }
-      if (event?.error) {
-        console.error(event.error);
-        if (event.error?.stack) console.log('stack:', event.error.stack);
-      }
-      console.groupEnd();
-    } catch {
-      // ignore
-    }
-  });
-
-  window.addEventListener('unhandledrejection', (event) => {
-    try {
-      console.groupCollapsed('[ERROR][window] unhandledrejection');
-      console.log('reason:', event?.reason);
-      if (event?.reason?.stack) console.log('stack:', event.reason.stack);
-      console.groupEnd();
-    } catch {
-      // ignore
-    }
-  });
-}
-
 function App({ config = null }) {
-  console.log('[DEBUG 4] App component rendering.');
   return (
     <RuntimeConfigProvider config={config}>
       <SupabaseProvider>
@@ -145,19 +93,13 @@ function App({ config = null }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function renderApp(config = null) {
-  console.log('[DEBUG 1] Bootstrap: startApp() called.');
-  installGlobalErrorLogging();
   if (!isAuthClientInitialized()) {
     throw new Error(
       'renderApp was invoked before initializeAuthClient completed. Ensure bootstrap initializes Supabase first.'
     );
   }
 
-  console.log('[DEBUG 2] Bootstrap: Config fetched. Initializing auth client...');
-
   const root = ReactDOM.createRoot(document.getElementById('root'));
-
-  console.log('[DEBUG 3] Bootstrap: Auth client initialized. Rendering App...');
 
   root.render(
     <React.StrictMode>

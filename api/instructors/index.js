@@ -213,9 +213,19 @@ export default async function (context, req) {
       return respond(context, 500, { message: 'failed_to_load_permissions' });
     }
 
-    const permissions = typeof orgSettings?.permissions === 'string'
-      ? JSON.parse(orgSettings.permissions)
-      : orgSettings?.permissions || {};
+    let permissions = orgSettings?.permissions;
+    if (typeof permissions === 'string') {
+      try {
+        permissions = JSON.parse(permissions);
+      } catch (parseError) {
+        context.log?.warn?.('instructors permissions JSON parse failed', { message: parseError?.message });
+        permissions = {};
+      }
+    }
+
+    if (!permissions || typeof permissions !== 'object') {
+      permissions = {};
+    }
 
     const validation = validateInstructorUpdate(body, permissions);
     if (validation.error) {

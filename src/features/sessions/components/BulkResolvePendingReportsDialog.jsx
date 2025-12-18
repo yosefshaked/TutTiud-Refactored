@@ -530,7 +530,7 @@ export default function BulkResolvePendingReportsDialog({
                 onCancel={() => setMode(RESOLUTION_MODE.SELECT)}
                 isSubmitting={isProcessing}
                 renderFooterOutside={false}
-                initialValues={suggestedInstructorId ? { assignedInstructorId: suggestedInstructorId } : {}}
+                initialValues={suggestedInstructorId ? { assignedInstructorId: suggestedInstructorId } : undefined}
               />
             </div>
           )}

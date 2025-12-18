@@ -70,20 +70,8 @@ export default function AddStudentForm({
   const [values, setValues] = useState(() => initialState);
   const [touched, setTouched] = useState({});
   
-  // DEBUG: Check if hooks receive proper context
-  const { services = [], loadingServices, servicesError } = useServices();
-  const { instructors = [], loadingInstructors, instructorsError } = useInstructors();
-  
-  useEffect(() => {
-    console.info('[AddStudentForm] Hook data received', {
-      servicesCount: services?.length ?? 0,
-      instructorsCount: instructors?.length ?? 0,
-      loadingServices,
-      loadingInstructors,
-      servicesError: servicesError || null,
-      instructorsError: instructorsError || null,
-    });
-  }, [services, instructors, loadingServices, loadingInstructors, servicesError, instructorsError]);
+  const { services = [], loadingServices } = useServices();
+  const { instructors = [], loadingInstructors } = useInstructors();
 
   // Normalize instructors to avoid runtime errors when the hook is still initializing
   const safeInstructors = useMemo(() => {
@@ -92,26 +80,6 @@ export default function AddStudentForm({
 
   const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId);
-
-  // TEMP DEBUG: surface instructor data to investigate React hydration error
-  useEffect(() => {
-    const normalizedInstructors = Array.isArray(instructors) ? instructors : [];
-    console.info('AddStudentForm instructors snapshot', {
-      count: normalizedInstructors.length,
-      loadingInstructors,
-      sample: normalizedInstructors.slice(0, 3),
-      receivedType: Array.isArray(instructors) ? 'array' : typeof instructors,
-    });
-    if (instructors && !Array.isArray(instructors)) {
-      // Surface unexpected shapes to help track down React #185
-      console.warn('AddStudentForm instructors is not an array', { instructors });
-    }
-  }, [instructors, loadingInstructors]);
-
-  // DEBUG: Log auth/org context availability
-  useEffect(() => {
-    console.info('[AddStudentForm] Component mounted/updated');
-  }, []);
 
   const preventSubmitReason = useMemo(() => {
     if (duplicate) return 'duplicate';
