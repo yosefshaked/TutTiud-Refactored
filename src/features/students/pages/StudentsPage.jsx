@@ -420,18 +420,20 @@ export default function StudentsPage() {
     setIsCreatingStudent(true);
     setCreateError('');
 
+    // AddStudentForm submits camelCase; keep snake_case compatibility as well.
     const body = {
       org_id: activeOrgId,
       name: formData.name,
-      assigned_instructor_id: formData.assigned_instructor_id,
+      assigned_instructor_id: formData.assigned_instructor_id ?? formData.assignedInstructorId,
       tags: normalizeTagIdsForWrite(formData.tags),
-      default_service: formData.default_service || '',
-      default_day_of_week: formData.default_day_of_week,
-      default_session_time: formData.default_session_time || '',
-      national_id: formData.national_id?.trim() || '',
-      contact_name: formData.contact_name?.trim() || '',
-      contact_phone: formData.contact_phone?.trim() || '',
-      notes: formData.notes?.trim() || '',
+      default_service: formData.default_service ?? formData.defaultService ?? '',
+      default_day_of_week: formData.default_day_of_week ?? formData.defaultDayOfWeek,
+      default_session_time: formData.default_session_time ?? formData.defaultSessionTime ?? '',
+      national_id: (formData.national_id ?? formData.nationalId ?? '').trim(),
+      contact_name: (formData.contact_name ?? formData.contactName ?? '').trim(),
+      contact_phone: (formData.contact_phone ?? formData.contactPhone ?? '').trim(),
+      notes: (formData.notes ?? '').trim(),
+      is_active: formData.is_active ?? formData.isActive,
     };
 
     try {
@@ -445,7 +447,11 @@ export default function StudentsPage() {
       await refreshRoster();
       setIsAddDialogOpen(false);
     } catch (error) {
-      console.error('Failed to create student:', error);
+      console.error('[students-list][POST] Failed to create student', {
+        status: error?.status,
+        code: error?.data?.error || error?.data?.code || error?.code,
+        message: error?.message,
+      });
       let message = 'הוספת תלמיד נכשלה.';
       if (error?.code === 'national_id_duplicate') {
         message = 'תעודת זהות קיימת כבר במערכת.';
@@ -494,7 +500,11 @@ export default function StudentsPage() {
       await refreshRoster();
       handleEditModalClose();
     } catch (error) {
-      console.error('Failed to update student:', error);
+      console.error('[students-list][PUT] Failed to update student', {
+        status: error?.status,
+        code: error?.data?.error || error?.data?.code || error?.code,
+        message: error?.message,
+      });
       let message = 'עדכון פרטי התלמיד נכשל.';
       if (error?.code === 'national_id_duplicate') {
         message = 'תעודת זהות קיימת כבר במערכת.';
