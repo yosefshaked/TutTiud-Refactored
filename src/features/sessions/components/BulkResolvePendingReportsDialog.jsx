@@ -501,7 +501,7 @@ export default function BulkResolvePendingReportsDialog({
                 )}
               </div>
 
-              <div className="flex flex-col-reverse sm:flex-row gap-2 sm:flex-row-reverse">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row-reverse">
                 <Button
                   onClick={handleAssignExisting}
                   disabled={!selectedStudentId || isProcessing}
@@ -528,8 +528,7 @@ export default function BulkResolvePendingReportsDialog({
               <AddStudentForm
                 onSubmit={handleCreateAndAssign}
                 onCancel={() => setMode(RESOLUTION_MODE.SELECT)}
-                submitLabel={`צור ושייך ${reports.length} דיווחים`}
-                submitDisabled={isProcessing}
+                isSubmitting={isProcessing}
                 renderFooterOutside={false}
                 initialValues={suggestedInstructorId ? { assignedInstructorId: suggestedInstructorId } : {}}
               />
