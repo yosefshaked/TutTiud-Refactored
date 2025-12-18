@@ -447,15 +447,21 @@ export default function StudentsPage() {
       await refreshRoster();
       setIsAddDialogOpen(false);
     } catch (error) {
+      const apiMessage = error?.data?.message || error?.message;
+      const apiCode = error?.data?.error || error?.data?.code || error?.code;
       console.error('[students-list][POST] Failed to create student', {
         status: error?.status,
-        code: error?.data?.error || error?.data?.code || error?.code,
-        message: error?.message,
+        code: apiCode,
+        message: apiMessage,
       });
       let message = 'הוספת תלמיד נכשלה.';
-      if (error?.code === 'national_id_duplicate') {
+      if (apiCode === 'national_id_duplicate' || apiMessage === 'duplicate_national_id') {
         message = 'תעודת זהות קיימת כבר במערכת.';
-      } else if (error?.code === 'schema_upgrade_required') {
+      } else if (apiMessage === 'missing national id') {
+        message = 'יש להזין מספר זהות.';
+      } else if (apiMessage === 'invalid national id') {
+        message = 'מספר זהות לא תקין. יש להזין 5–12 ספרות.';
+      } else if (apiCode === 'schema_upgrade_required') {
         message = 'נדרשת שדרוג לסכמת מסד הנתונים.';
       }
       setCreateError(message);
@@ -500,15 +506,19 @@ export default function StudentsPage() {
       await refreshRoster();
       handleEditModalClose();
     } catch (error) {
+      const apiMessage = error?.data?.message || error?.message;
+      const apiCode = error?.data?.error || error?.data?.code || error?.code;
       console.error('[students-list][PUT] Failed to update student', {
         status: error?.status,
-        code: error?.data?.error || error?.data?.code || error?.code,
-        message: error?.message,
+        code: apiCode,
+        message: apiMessage,
       });
       let message = 'עדכון פרטי התלמיד נכשל.';
-      if (error?.code === 'national_id_duplicate') {
+      if (apiCode === 'national_id_duplicate' || apiMessage === 'duplicate_national_id') {
         message = 'תעודת זהות קיימת כבר במערכת.';
-      } else if (error?.code === 'schema_upgrade_required') {
+      } else if (apiMessage === 'invalid national id') {
+        message = 'מספר זהות לא תקין. יש להזין 5–12 ספרות.';
+      } else if (apiCode === 'schema_upgrade_required') {
         message = 'נדרשת שדרוג לסכמת מסד הנתונים.';
       }
       setUpdateError(message);

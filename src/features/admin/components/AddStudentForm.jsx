@@ -19,6 +19,7 @@ import { useStudentNameSuggestions, useNationalIdGuard } from '@/features/admin/
 import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 
 const EMPTY_INITIAL_VALUES = Object.freeze({});
+const NATIONAL_ID_PATTERN = /^\d{5,12}$/;
 
 function buildInitialValuesKey(initialValues) {
   const value = initialValues && typeof initialValues === 'object' ? initialValues : EMPTY_INITIAL_VALUES;
@@ -81,11 +82,18 @@ export default function AddStudentForm({
   const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId);
 
+  const trimmedNationalId = values.nationalId.trim();
+  const isNationalIdFormatValid = useMemo(() => {
+    if (!trimmedNationalId) return true;
+    return NATIONAL_ID_PATTERN.test(trimmedNationalId);
+  }, [trimmedNationalId]);
+
   const preventSubmitReason = useMemo(() => {
     if (duplicate) return 'duplicate';
     if (nationalIdError) return 'error';
+    if (!isNationalIdFormatValid) return 'invalid_national_id';
     return '';
-  }, [duplicate, nationalIdError]);
+  }, [duplicate, nationalIdError, isNationalIdFormatValid]);
 
   useEffect(() => {
     onSubmitDisabledChange(Boolean(preventSubmitReason) || isSubmitting);
@@ -150,14 +158,18 @@ export default function AddStudentForm({
     const trimmedName = values.name.trim();
     const trimmedContactName = values.contactName.trim();
     const trimmedContactPhone = values.contactPhone.trim();
-    const trimmedNationalId = values.nationalId.trim();
+    const trimmedNationalIdInner = values.nationalId.trim();
 
     if (duplicate || nationalIdError) {
       return;
     }
 
-    if (!trimmedName || !trimmedNationalId || !trimmedContactName || !trimmedContactPhone ||
+    if (!trimmedName || !trimmedNationalIdInner || !trimmedContactName || !trimmedContactPhone ||
         !values.assignedInstructorId || !values.defaultDayOfWeek || !values.defaultSessionTime) {
+      return;
+    }
+
+    if (!NATIONAL_ID_PATTERN.test(trimmedNationalIdInner)) {
       return;
     }
 
@@ -167,7 +179,7 @@ export default function AddStudentForm({
 
     onSubmit({
       name: trimmedName,
-      nationalId: trimmedNationalId,
+      nationalId: trimmedNationalIdInner,
       contactName: trimmedContactName,
       contactPhone: trimmedContactPhone,
       assignedInstructorId: values.assignedInstructorId,
@@ -180,7 +192,6 @@ export default function AddStudentForm({
     });
   };
 
-  const trimmedNationalId = values.nationalId.trim();
   const showNameError = touched.name && !values.name.trim();
   const nationalIdErrorMessage = (() => {
     // Avoid double-surfacing duplicates; detailed banner handles it
@@ -188,6 +199,9 @@ export default function AddStudentForm({
     if (nationalIdError) return nationalIdError;
     if (error === 'duplicate_national_id') return '';
     if (touched.nationalId && !trimmedNationalId) return 'יש להזין מספר זהות.';
+    if (touched.nationalId && trimmedNationalId && !isNationalIdFormatValid) {
+      return 'מספר זהות לא תקין. יש להזין 5–12 ספרות.';
+    }
     return '';
   })();
   const showContactNameError = touched.contactName && !values.contactName.trim();
