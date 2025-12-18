@@ -171,6 +171,7 @@ export default function AddStudentForm({
   const showInstructorError = touched.assignedInstructorId && !values.assignedInstructorId;
   const showDayError = touched.defaultDayOfWeek && !values.defaultDayOfWeek;
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
+  const noInstructorsAvailable = !loadingInstructors && safeInstructors.length === 0;
 
   return (
     <form id="add-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
@@ -260,12 +261,18 @@ export default function AddStudentForm({
               value: inst.id,
               label: inst.name?.trim() || inst.email?.trim() || inst.id,
             }))}
-            placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'}
+            placeholder={loadingInstructors ? 'טוען...' : noInstructorsAvailable ? 'לא נמצאו מדריכים' : 'בחר מדריך'}
             required
-            disabled={isSubmitting || loadingInstructors}
-            description="מוצגים רק מדריכים פעילים."
-            error={showInstructorError ? 'יש לבחור מדריך.' : ''}
+            disabled={isSubmitting || loadingInstructors || noInstructorsAvailable}
+            description={noInstructorsAvailable ? 'לא קיימים מדריכים פעילים. צרו מדריך חדש ואז הוסיפו תלמיד.' : 'מוצגים רק מדריכים פעילים.'}
+            error={noInstructorsAvailable ? '' : showInstructorError ? 'יש לבחור מדריך.' : ''}
           />
+          {noInstructorsAvailable && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+              <p className="font-semibold">לא נמצאו מדריכים פעילים.</p>
+              <p>יש ליצור מדריך חדש בלשונית צוות/מדריכים ואז לחזור להוספת תלמיד.</p>
+            </div>
+          )}
 
           <TextField
             id="contact-name"

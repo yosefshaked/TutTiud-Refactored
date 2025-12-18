@@ -133,6 +133,13 @@ function useOrgDataResource({
       const payload = await authenticatedFetch(url, { session });
       const mapped = stableMapResponse(payload);
       const normalized = Array.isArray(mapped) ? mapped : [];
+      if (!Array.isArray(mapped) && mapped !== null && mapped !== undefined) {
+        // Surface unexpected shapes to aid debugging (e.g., API returns { data: [] })
+        console.warn(`useOrgDataResource expected array for ${resource} but received`, {
+          receivedType: typeof mapped,
+          keys: mapped && typeof mapped === 'object' ? Object.keys(mapped) : undefined,
+        });
+      }
       setData(normalized);
     } catch (err) {
       if (err?.name === 'AbortError') {
