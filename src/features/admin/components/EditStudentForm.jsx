@@ -244,26 +244,30 @@ export default function EditStudentForm({
             </div>
           )}
 
-          <SelectField
-            key={`instructor-select-${loadingInstructors ? 'loading' : 'loaded'}`}
-            id="assigned-instructor"
-            name="assignedInstructorId"
-            label="מדריך משויך"
-            value={values.assignedInstructorId}
-            onChange={(value) => handleSelectChange('assignedInstructorId', value)}
-            onOpenChange={onSelectOpenChange}
-            options={instructorOptions}
-            placeholder={loadingInstructors ? 'טוען...' : noInstructorsAvailable ? 'לא נמצאו מדריכים' : 'בחר מדריך'}
-            required
-            disabled={isSubmitting || loadingInstructors || noInstructorsAvailable}
-            description={noInstructorsAvailable ? 'לא קיימים מדריכים פעילים. צרו מדריך חדש תחילה.' : 'מוצגים רק מדריכים פעילים.'}
-            error={noInstructorsAvailable ? '' : showInstructorError ? 'יש לבחור מדריך.' : ''}
-          />
-          {noInstructorsAvailable && (
+          {loadingInstructors ? (
+            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700" role="status">
+              טוען רשימת מדריכים...
+            </div>
+          ) : noInstructorsAvailable ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
               <p className="font-semibold">לא נמצאו מדריכים פעילים.</p>
               <p>יש ליצור מדריך חדש בלשונית צוות/מדריכים לפני עריכת תלמידים.</p>
             </div>
+          ) : (
+            <SelectField
+              id="assigned-instructor"
+              name="assignedInstructorId"
+              label="מדריך משויך"
+              value={values.assignedInstructorId}
+              onChange={(value) => handleSelectChange('assignedInstructorId', value)}
+              onOpenChange={onSelectOpenChange}
+              options={instructorOptions}
+              placeholder="בחר מדריך"
+              required
+              disabled={isSubmitting}
+              description="מוצגים רק מדריכים פעילים."
+              error={showInstructorError ? 'יש לבחור מדריך.' : ''}
+            />
           )}
 
           <TextField
