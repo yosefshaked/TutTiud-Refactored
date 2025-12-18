@@ -749,10 +749,10 @@ export default function StudentsPage() {
             }}
             footer={
               <AddStudentFormFooter
-                isCreating={isCreatingStudent}
-                isSubmitDisabled={addSubmitDisabled}
+                isSubmitting={isCreatingStudent}
+                disableSubmit={addSubmitDisabled}
                 onCancel={() => setIsAddDialogOpen(false)}
-                onSubmitClick={() => {
+                onSubmit={() => {
                   document.getElementById('add-student-form')?.requestSubmit();
                 }}
               />
@@ -762,20 +762,24 @@ export default function StudentsPage() {
               <DialogTitle>הוספת תלמיד חדש</DialogTitle>
             </DialogHeader>
             <AddStudentForm
-              formId="add-student-form"
-              instructors={instructors}
-              tagOptions={tagOptions}
               onSubmit={handleAddSubmit}
+              onCancel={() => setIsAddDialogOpen(false)}
+              isSubmitting={isCreatingStudent}
+              error={createError}
               onSubmitDisabledChange={setAddSubmitDisabled}
               renderFooterOutside
-              openSelectCountRef={openSelectCountRef}
-              isClosingSelectRef={isClosingSelectRef}
+              onSelectOpenChange={(open) => {
+                if (open) {
+                  openSelectCountRef.current++;
+                } else {
+                  isClosingSelectRef.current = true;
+                  setTimeout(() => {
+                    openSelectCountRef.current = Math.max(0, openSelectCountRef.current - 1);
+                    isClosingSelectRef.current = false;
+                  }, 100);
+                }
+              }}
             />
-            {createError && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-                {createError}
-              </div>
-            )}
           </DialogContent>
         </Dialog>
       )}
