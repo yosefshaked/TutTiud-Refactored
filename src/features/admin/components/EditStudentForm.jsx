@@ -32,8 +32,8 @@ export default function EditStudentForm({
 }) {
   const [values, setValues] = useState(() => createStudentFormState(student));
   const [touched, setTouched] = useState({});
-  const { services, loadingServices } = useServices();
-  const { instructors, loadingInstructors } = useInstructors();
+  const { services = [], loadingServices } = useServices();
+  const { instructors = [], loadingInstructors } = useInstructors();
 
   // Normalize instructors to avoid runtime errors when the hook is still initializing
   const safeInstructors = useMemo(() => {
