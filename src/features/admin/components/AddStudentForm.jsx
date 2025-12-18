@@ -32,18 +32,29 @@ export default function AddStudentForm({
   const [values, setValues] = useState(() => initialState);
   const [touched, setTouched] = useState({});
   const { services = [], loadingServices } = useServices();
-  const { instructors = [], loadingInstructors } = useInstructors();
+  const { instructors, loadingInstructors } = useInstructors();
+
+  // Normalize instructors to avoid runtime errors when the hook is still initializing
+  const safeInstructors = useMemo(() => {
+    return Array.isArray(instructors) ? instructors : [];
+  }, [instructors]);
 
   const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId);
 
   // TEMP DEBUG: surface instructor data to investigate React hydration error
   useEffect(() => {
+    const normalizedInstructors = Array.isArray(instructors) ? instructors : [];
     console.info('AddStudentForm instructors snapshot', {
-      count: instructors.length,
+      count: normalizedInstructors.length,
       loadingInstructors,
-      sample: instructors.slice(0, 3)
+      sample: normalizedInstructors.slice(0, 3),
+      receivedType: Array.isArray(instructors) ? 'array' : typeof instructors,
     });
+    if (instructors && !Array.isArray(instructors)) {
+      // Surface unexpected shapes to help track down React #185
+      console.warn('AddStudentForm instructors is not an array', { instructors });
+    }
   }, [instructors, loadingInstructors]);
 
   const preventSubmitReason = useMemo(() => {
@@ -245,7 +256,7 @@ export default function AddStudentForm({
             value={values.assignedInstructorId}
             onChange={(value) => handleSelectChange('assignedInstructorId', value)}
             onOpenChange={onSelectOpenChange}
-            options={instructors.filter(inst => inst?.id).map((inst) => ({
+            options={safeInstructors.filter(inst => inst?.id).map((inst) => ({
               value: inst.id,
               label: inst.name?.trim() || inst.email?.trim() || inst.id,
             }))}
