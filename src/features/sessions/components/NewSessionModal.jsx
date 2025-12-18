@@ -18,6 +18,7 @@ const REQUEST_STATE = Object.freeze({
   error: 'error',
 });
 
+
 /**
  * Format date as DD/MM/YYYY for display
  */
@@ -293,15 +294,14 @@ export default function NewSessionModal({
     if (typeof rawPerms === 'string') {
       try {
         perms = JSON.parse(rawPerms);
-      } catch (error) {
-        console.warn('preanswersCapLimit: failed to parse permissions string', { rawPerms, error });
+      } catch {
+        perms = null;
       }
     } else if (rawPerms && typeof rawPerms === 'object') {
       perms = rawPerms;
     }
 
     if (!perms) {
-      console.warn('preanswersCapLimit: permissions object not found in activeOrg.connection');
       return undefined;
     }
 
@@ -309,8 +309,6 @@ export default function NewSessionModal({
     if (typeof capRaw === 'number' && capRaw > 0) {
       return capRaw;
     }
-
-    console.warn('preanswersCapLimit: session_form_preanswers_cap not found or invalid in permissions', { capRaw, perms });
     return undefined;
   }, [activeOrg, activeOrgConnection]);
 

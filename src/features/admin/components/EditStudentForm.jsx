@@ -32,8 +32,13 @@ export default function EditStudentForm({
 }) {
   const [values, setValues] = useState(() => createStudentFormState(student));
   const [touched, setTouched] = useState({});
-  const { services, loadingServices } = useServices();
-  const { instructors, loadingInstructors } = useInstructors();
+  const { services = [], loadingServices } = useServices();
+  const { instructors = [], loadingInstructors } = useInstructors();
+
+  // Normalize instructors to avoid runtime errors when the hook is still initializing
+  const safeInstructors = useMemo(() => {
+    return Array.isArray(instructors) ? instructors : [];
+  }, [instructors]);
   
   // Track the ID of the student currently being edited
   const currentStudentIdRef = useRef(student?.id);
@@ -158,6 +163,15 @@ export default function EditStudentForm({
   const showDayError = touched.defaultDayOfWeek && !values.defaultDayOfWeek;
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
   const isInactive = values.isActive === false;
+  const noInstructorsAvailable = !loadingInstructors && safeInstructors.length === 0;
+
+  // Memoize instructor options to prevent re-render issues with Radix Select
+  const instructorOptions = useMemo(() => {
+    return safeInstructors.filter(inst => inst?.id).map((inst) => ({
+      value: inst.id,
+      label: inst.name?.trim() || inst.email?.trim() || inst.id,
+    }));
+  }, [safeInstructors]);
 
   return (
     <form id="edit-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
@@ -230,20 +244,31 @@ export default function EditStudentForm({
             </div>
           )}
 
-          <SelectField
-            id="assigned-instructor"
-            name="assignedInstructorId"
-            label="מדריך משויך"
-            value={values.assignedInstructorId}
-            onChange={(value) => handleSelectChange('assignedInstructorId', value)}
-            onOpenChange={onSelectOpenChange}
-            options={instructors.map((inst) => ({ value: inst.id, label: inst.name || inst.email || inst.id }))}
-            placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'}
-            required
-            disabled={isSubmitting || loadingInstructors}
-            description="מוצגים רק מדריכים פעילים."
-            error={showInstructorError ? 'יש לבחור מדריך.' : ''}
-          />
+          {loadingInstructors ? (
+            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700" role="status">
+              טוען רשימת מדריכים...
+            </div>
+          ) : noInstructorsAvailable ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+              <p className="font-semibold">לא נמצאו מדריכים פעילים.</p>
+              <p>יש ליצור מדריך חדש בלשונית צוות/מדריכים לפני עריכת תלמידים.</p>
+            </div>
+          ) : (
+            <SelectField
+              id="assigned-instructor"
+              name="assignedInstructorId"
+              label="מדריך משויך"
+              value={values.assignedInstructorId}
+              onChange={(value) => handleSelectChange('assignedInstructorId', value)}
+              onOpenChange={onSelectOpenChange}
+              options={instructorOptions}
+              placeholder="בחר מדריך"
+              required
+              disabled={isSubmitting}
+              description="מוצגים רק מדריכים פעילים."
+              error={showInstructorError ? 'יש לבחור מדריך.' : ''}
+            />
+          )}
 
           <TextField
             id="contact-name"
@@ -390,7 +415,7 @@ export default function EditStudentForm({
 export function EditStudentFormFooter({ onSubmit, onCancel, isSubmitting = false, disableSubmit = false }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
-      <Button onClick={onSubmit} disabled={isSubmitting || disableSubmit} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+      <Button type="button" onClick={onSubmit} disabled={isSubmitting || disableSubmit} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
         {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         שמירת שינויים
       </Button>

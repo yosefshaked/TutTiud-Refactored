@@ -27,8 +27,29 @@ import { bootstrapSupabaseCallback } from './auth/bootstrapSupabaseCallback.js';
 
 bootstrapSupabaseCallback();
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  // Intentionally avoid console logging here to prevent accidental data leaks.
+  componentDidCatch() {}
+
+  render() {
+    // Keep UX minimal; this boundary exists primarily for logging.
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
+
 function App({ config = null }) {
-  console.log('[DEBUG 4] App component rendering.');
   return (
     <RuntimeConfigProvider config={config}>
       <SupabaseProvider>
@@ -72,22 +93,19 @@ function App({ config = null }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function renderApp(config = null) {
-  console.log('[DEBUG 1] Bootstrap: startApp() called.');
   if (!isAuthClientInitialized()) {
     throw new Error(
       'renderApp was invoked before initializeAuthClient completed. Ensure bootstrap initializes Supabase first.'
     );
   }
 
-  console.log('[DEBUG 2] Bootstrap: Config fetched. Initializing auth client...');
-
   const root = ReactDOM.createRoot(document.getElementById('root'));
-
-  console.log('[DEBUG 3] Bootstrap: Auth client initialized. Rendering App...');
 
   root.render(
     <React.StrictMode>
-      <App config={config} />
+      <AppErrorBoundary>
+        <App config={config} />
+      </AppErrorBoundary>
     </React.StrictMode>,
   );
 }
