@@ -245,6 +245,7 @@ export default function EditStudentForm({
           )}
 
           <SelectField
+            key={`instructor-select-${loadingInstructors ? 'loading' : 'loaded'}`}
             id="assigned-instructor"
             name="assignedInstructorId"
             label="מדריך משויך"
