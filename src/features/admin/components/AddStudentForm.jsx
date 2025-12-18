@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
@@ -18,6 +18,25 @@ import { createStudentFormState } from '@/features/students/utils/form-state.js'
 import { useStudentNameSuggestions, useNationalIdGuard } from '@/features/admin/hooks/useStudentDeduplication.js';
 import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 
+const EMPTY_INITIAL_VALUES = Object.freeze({});
+
+function buildInitialValuesKey(initialValues) {
+  const value = initialValues && typeof initialValues === 'object' ? initialValues : EMPTY_INITIAL_VALUES;
+  return [
+    value.name ?? '',
+    value.nationalId ?? '',
+    value.contactName ?? '',
+    value.contactPhone ?? '',
+    value.assignedInstructorId ?? '',
+    value.defaultService ?? '',
+    value.defaultDayOfWeek ?? '',
+    value.defaultSessionTime ?? '',
+    value.notes ?? '',
+    value.tagId ?? '',
+    value.isActive === false ? '0' : '1',
+  ].join('|');
+}
+
 export default function AddStudentForm({ 
   onSubmit, 
   onCancel, 
@@ -26,9 +45,28 @@ export default function AddStudentForm({
   renderFooterOutside = false,
   onSelectOpenChange, // Mobile fix: callback for Select open/close tracking
   onSubmitDisabledChange = () => {},
-  initialValues = {},
+  initialValues = EMPTY_INITIAL_VALUES,
 }) {
-  const initialState = useMemo(() => ({ ...createStudentFormState(), ...initialValues }), [initialValues]);
+  // Avoid infinite rerenders when callers pass a new object literal each render (or when defaulting to `{}`)
+  const initialValuesKey = useMemo(() => buildInitialValuesKey(initialValues), [initialValues]);
+
+  const stableInitialValuesRef = useRef(EMPTY_INITIAL_VALUES);
+  const stableInitialValuesKeyRef = useRef('');
+  if (stableInitialValuesKeyRef.current !== initialValuesKey) {
+    stableInitialValuesKeyRef.current = initialValuesKey;
+    stableInitialValuesRef.current = initialValues && typeof initialValues === 'object'
+      ? initialValues
+      : EMPTY_INITIAL_VALUES;
+  }
+
+  const initialStateRef = useRef(null);
+  const initialStateKeyRef = useRef('');
+  if (initialStateKeyRef.current !== initialValuesKey) {
+    initialStateKeyRef.current = initialValuesKey;
+    initialStateRef.current = { ...createStudentFormState(), ...stableInitialValuesRef.current };
+  }
+
+  const initialState = initialStateRef.current;
   const [values, setValues] = useState(() => initialState);
   const [touched, setTouched] = useState({});
   
