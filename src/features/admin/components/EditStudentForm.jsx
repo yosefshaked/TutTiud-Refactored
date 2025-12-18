@@ -34,6 +34,11 @@ export default function EditStudentForm({
   const [touched, setTouched] = useState({});
   const { services, loadingServices } = useServices();
   const { instructors, loadingInstructors } = useInstructors();
+
+  // Normalize instructors to avoid runtime errors when the hook is still initializing
+  const safeInstructors = useMemo(() => {
+    return Array.isArray(instructors) ? instructors : [];
+  }, [instructors]);
   
   // Track the ID of the student currently being edited
   const currentStudentIdRef = useRef(student?.id);
@@ -158,6 +163,15 @@ export default function EditStudentForm({
   const showDayError = touched.defaultDayOfWeek && !values.defaultDayOfWeek;
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
   const isInactive = values.isActive === false;
+  const noInstructorsAvailable = !loadingInstructors && safeInstructors.length === 0;
+
+  // Memoize instructor options to prevent re-render issues with Radix Select
+  const instructorOptions = useMemo(() => {
+    return safeInstructors.filter(inst => inst?.id).map((inst) => ({
+      value: inst.id,
+      label: inst.name?.trim() || inst.email?.trim() || inst.id,
+    }));
+  }, [safeInstructors]);
 
   return (
     <form id="edit-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
@@ -237,13 +251,19 @@ export default function EditStudentForm({
             value={values.assignedInstructorId}
             onChange={(value) => handleSelectChange('assignedInstructorId', value)}
             onOpenChange={onSelectOpenChange}
-            options={instructors.filter(inst => inst?.id).map((inst) => ({ value: inst.id, label: inst.name?.trim() || inst.email?.trim() || inst.id }))}
-            placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'}
+            options={instructorOptions}
+            placeholder={loadingInstructors ? 'טוען...' : noInstructorsAvailable ? 'לא נמצאו מדריכים' : 'בחר מדריך'}
             required
-            disabled={isSubmitting || loadingInstructors}
-            description="מוצגים רק מדריכים פעילים."
-            error={showInstructorError ? 'יש לבחור מדריך.' : ''}
+            disabled={isSubmitting || loadingInstructors || noInstructorsAvailable}
+            description={noInstructorsAvailable ? 'לא קיימים מדריכים פעילים. צרו מדריך חדש תחילה.' : 'מוצגים רק מדריכים פעילים.'}
+            error={noInstructorsAvailable ? '' : showInstructorError ? 'יש לבחור מדריך.' : ''}
           />
+          {noInstructorsAvailable && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+              <p className="font-semibold">לא נמצאו מדריכים פעילים.</p>
+              <p>יש ליצור מדריך חדש בלשונית צוות/מדריכים לפני עריכת תלמידים.</p>
+            </div>
+          )}
 
           <TextField
             id="contact-name"

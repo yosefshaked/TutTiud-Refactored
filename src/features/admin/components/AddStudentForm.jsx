@@ -173,6 +173,14 @@ export default function AddStudentForm({
   const showTimeError = touched.defaultSessionTime && !values.defaultSessionTime;
   const noInstructorsAvailable = !loadingInstructors && safeInstructors.length === 0;
 
+  // Memoize instructor options to prevent re-render issues with Radix Select
+  const instructorOptions = useMemo(() => {
+    return safeInstructors.filter(inst => inst?.id).map((inst) => ({
+      value: inst.id,
+      label: inst.name?.trim() || inst.email?.trim() || inst.id,
+    }));
+  }, [safeInstructors]);
+
   return (
     <form id="add-student-form" onSubmit={handleSubmit} className="space-y-5" dir="rtl">
       {error && error !== 'duplicate_national_id' && (
@@ -257,10 +265,7 @@ export default function AddStudentForm({
             value={values.assignedInstructorId}
             onChange={(value) => handleSelectChange('assignedInstructorId', value)}
             onOpenChange={onSelectOpenChange}
-            options={safeInstructors.filter(inst => inst?.id).map((inst) => ({
-              value: inst.id,
-              label: inst.name?.trim() || inst.email?.trim() || inst.id,
-            }))}
+            options={instructorOptions}
             placeholder={loadingInstructors ? 'טוען...' : noInstructorsAvailable ? 'לא נמצאו מדריכים' : 'בחר מדריך'}
             required
             disabled={isSubmitting || loadingInstructors || noInstructorsAvailable}
