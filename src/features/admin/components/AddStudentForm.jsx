@@ -31,8 +31,8 @@ export default function AddStudentForm({
   const initialState = useMemo(() => ({ ...createStudentFormState(), ...initialValues }), [initialValues]);
   const [values, setValues] = useState(() => initialState);
   const [touched, setTouched] = useState({});
-  const { services, loadingServices } = useServices();
-  const { instructors, loadingInstructors } = useInstructors();
+  const { services = [], loadingServices } = useServices();
+  const { instructors = [], loadingInstructors } = useInstructors();
 
   const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId);
@@ -357,7 +357,7 @@ export default function AddStudentForm({
 export function AddStudentFormFooter({ onSubmit, onCancel, isSubmitting = false, disableSubmit = false }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
-      <Button onClick={onSubmit} disabled={isSubmitting || disableSubmit} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+      <Button type="button" onClick={onSubmit} disabled={isSubmitting || disableSubmit} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
         {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         שמירת תלמיד חדש
       </Button>

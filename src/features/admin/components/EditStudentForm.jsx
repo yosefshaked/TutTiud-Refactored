@@ -390,7 +390,7 @@ export default function EditStudentForm({
 export function EditStudentFormFooter({ onSubmit, onCancel, isSubmitting = false, disableSubmit = false }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
-      <Button onClick={onSubmit} disabled={isSubmitting || disableSubmit} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
+      <Button type="button" onClick={onSubmit} disabled={isSubmitting || disableSubmit} className="gap-2 shadow-md hover:shadow-lg transition-shadow">
         {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         שמירת שינויים
       </Button>

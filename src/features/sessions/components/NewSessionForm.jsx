@@ -1141,7 +1141,7 @@ export default function NewSessionForm({
 export function NewSessionFormFooter({ onSubmit, onCancel, isSubmitting = false, isFormValid = false }) {
   return (
     <div className="flex flex-col-reverse gap-sm sm:flex-row-reverse sm:justify-end">
-      <Button type="submit" disabled={isSubmitting || !isFormValid} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
+      <Button type="button" disabled={isSubmitting || !isFormValid} className="gap-xs shadow-md hover:shadow-lg transition-shadow" onClick={onSubmit}>
         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
         שמירת מפגש
       </Button>
