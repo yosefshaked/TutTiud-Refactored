@@ -434,7 +434,7 @@ export default function BulkResolvePendingReportsDialog({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">כל המדריכים</SelectItem>
-                        {instructors.map((inst) => (
+                        {instructors.filter(inst => inst?.id).map((inst) => (
                           <SelectItem key={inst.id} value={inst.id}>
                             {inst.name}
                           </SelectItem>

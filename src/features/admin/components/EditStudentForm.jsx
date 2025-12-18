@@ -237,7 +237,7 @@ export default function EditStudentForm({
             value={values.assignedInstructorId}
             onChange={(value) => handleSelectChange('assignedInstructorId', value)}
             onOpenChange={onSelectOpenChange}
-            options={instructors.map((inst) => ({ value: inst.id, label: inst.name || inst.email || inst.id }))}
+            options={instructors.filter(inst => inst?.id).map((inst) => ({ value: inst.id, label: inst.name?.trim() || inst.email?.trim() || inst.id }))}
             placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'}
             required
             disabled={isSubmitting || loadingInstructors}

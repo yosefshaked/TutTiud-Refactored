@@ -503,9 +503,9 @@ export default function NewSessionForm({
                         <SelectItem value="all">כל התלמידים</SelectItem>
                         {/* 'mine' option is still useful for admins who are also instructors */}
                         <SelectItem value="mine">התלמידים שלי</SelectItem>
-                        {instructors.map((inst) => (
+                        {instructors.filter(inst => inst?.id).map((inst) => (
                           <SelectItem key={inst.id} value={`inst:${inst.id}`}>
-                            התלמידים של {inst.name || inst.email || inst.id}
+                            התלמידים של {inst.name?.trim() || inst.email?.trim() || inst.id}
                           </SelectItem>
                         ))}
                       </SelectContent>

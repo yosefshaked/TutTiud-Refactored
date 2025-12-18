@@ -130,7 +130,7 @@ export function StudentFilterSection({
                     <SelectItem value={currentUserId}>התלמידים שלי</SelectItem>
                   )}
                   <SelectItem value="all-instructors">כל המדריכים</SelectItem>
-                  {instructors.map((inst) => (
+                  {instructors.filter(inst => inst?.id).map((inst) => (
                     <SelectItem key={inst.id} value={inst.id}>
                       {inst.name || inst.email}
                     </SelectItem>

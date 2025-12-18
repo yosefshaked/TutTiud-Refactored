@@ -37,6 +37,15 @@ export default function AddStudentForm({
   const { suggestions, loading: searchingNames } = useStudentNameSuggestions(values.name);
   const { duplicate, loading: checkingNationalId, error: nationalIdError } = useNationalIdGuard(values.nationalId);
 
+  // TEMP DEBUG: surface instructor data to investigate React hydration error
+  useEffect(() => {
+    console.info('AddStudentForm instructors snapshot', {
+      count: instructors.length,
+      loadingInstructors,
+      sample: instructors.slice(0, 3)
+    });
+  }, [instructors, loadingInstructors]);
+
   const preventSubmitReason = useMemo(() => {
     if (duplicate) return 'duplicate';
     if (nationalIdError) return 'error';
@@ -236,9 +245,9 @@ export default function AddStudentForm({
             value={values.assignedInstructorId}
             onChange={(value) => handleSelectChange('assignedInstructorId', value)}
             onOpenChange={onSelectOpenChange}
-            options={instructors.map((inst) => ({
+            options={instructors.filter(inst => inst?.id).map((inst) => ({
               value: inst.id,
-              label: inst.name || inst.email || inst.id,
+              label: inst.name?.trim() || inst.email?.trim() || inst.id,
             }))}
             placeholder={loadingInstructors ? 'טוען...' : 'בחר מדריך'}
             required
