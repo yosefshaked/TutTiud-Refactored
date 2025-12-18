@@ -116,6 +116,17 @@ function useOrgDataResource({
   const fetchResource = useCallback(async () => {
     const effectiveEnabled = enabled && shouldInclude(orgId);
 
+    console.info(`[DEBUG-FRONTEND][useOrgDataResource] ${resource} fetch tick`, {
+      enabled,
+      effectiveEnabled,
+      orgIdPresent: shouldInclude(orgId),
+      orgIdSource: orgIdOverride ? 'override' : 'context',
+      sessionPresent: Boolean(session),
+      sessionSource: sessionOverride ? 'override' : 'context',
+      path,
+      paramsKeys: params && typeof params === 'object' ? Object.keys(params) : [],
+    });
+
     if (!effectiveEnabled) {
       if (resetOnDisable) {
         setData([]);
@@ -139,6 +150,11 @@ function useOrgDataResource({
       const url = `${path}${queryString ? `?${queryString}` : ''}`;
       console.info(`[useOrgDataResource] Fetching ${resource} from ${url}`);
       const payload = await authenticatedFetch(url, { session });
+      console.info(`[DEBUG-FRONTEND][useOrgDataResource] ${resource} response received`, {
+        hasPayload: payload !== null && payload !== undefined,
+        payloadType: Array.isArray(payload) ? 'array' : typeof payload,
+        payloadKeys: payload && typeof payload === 'object' && !Array.isArray(payload) ? Object.keys(payload) : undefined,
+      });
       const mapped = stableMapResponse(payload);
       const normalized = Array.isArray(mapped) ? mapped : [];
       if (!Array.isArray(mapped) && mapped !== null && mapped !== undefined) {
@@ -148,6 +164,11 @@ function useOrgDataResource({
           keys: mapped && typeof mapped === 'object' ? Object.keys(mapped) : undefined,
         });
       }
+
+      console.info(`[DEBUG-FRONTEND][useOrgDataResource] ${resource} normalized`, {
+        count: normalized.length,
+        sample: normalized.slice(0, 2),
+      });
       setData(normalized);
     } catch (err) {
       if (err?.name === 'AbortError') {

@@ -33,8 +33,8 @@ export default function AddStudentForm({
   const [touched, setTouched] = useState({});
   
   // DEBUG: Check if hooks receive proper context
-  const { services = [], loadingServices } = useServices();
-  const { instructors = [], loadingInstructors } = useInstructors();
+  const { services = [], loadingServices, servicesError } = useServices();
+  const { instructors = [], loadingInstructors, instructorsError } = useInstructors();
   
   useEffect(() => {
     console.info('[AddStudentForm] Hook data received', {
@@ -42,8 +42,10 @@ export default function AddStudentForm({
       instructorsCount: instructors?.length ?? 0,
       loadingServices,
       loadingInstructors,
+      servicesError: servicesError || null,
+      instructorsError: instructorsError || null,
     });
-  }, [services, instructors, loadingServices, loadingInstructors]);
+  }, [services, instructors, loadingServices, loadingInstructors, servicesError, instructorsError]);
 
   // Normalize instructors to avoid runtime errors when the hook is still initializing
   const safeInstructors = useMemo(() => {

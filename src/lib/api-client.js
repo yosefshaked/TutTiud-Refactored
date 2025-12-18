@@ -17,6 +17,22 @@ async function resolveBearerToken() {
   return token;
 }
 
+function resolveTokenFromOverrides(session, accessToken) {
+  const overrideToken = typeof accessToken === 'string' && accessToken.trim()
+    ? accessToken.trim()
+    : null;
+  if (overrideToken) {
+    return { token: overrideToken, source: 'accessToken' };
+  }
+
+  const sessionToken = session?.access_token;
+  if (typeof sessionToken === 'string' && sessionToken.trim()) {
+    return { token: sessionToken.trim(), source: 'session' };
+  }
+
+  return { token: null, source: 'none' };
+}
+
 function createAuthorizationHeaders(customHeaders = {}, bearer, { includeJsonContentType = false } = {}) {
   const headers = includeJsonContentType
     ? { 'Content-Type': 'application/json', ...customHeaders }
@@ -32,8 +48,8 @@ function createAuthorizationHeaders(customHeaders = {}, bearer, { includeJsonCon
 }
 
 export async function authenticatedFetch(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
-  void _session; void _accessToken;
-  const token = await resolveBearerToken();
+  const resolved = resolveTokenFromOverrides(_session, _accessToken);
+  const token = resolved.token || await resolveBearerToken();
   const bearer = `Bearer ${token}`;
 
   const { headers: customHeaders = {}, body, params, ...rest } = options;
@@ -100,8 +116,8 @@ export async function authenticatedFetch(path, { session: _session, accessToken:
 }
 
 export async function authenticatedFetchBlob(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
-  void _session; void _accessToken;
-  const token = await resolveBearerToken();
+  const resolved = resolveTokenFromOverrides(_session, _accessToken);
+  const token = resolved.token || await resolveBearerToken();
   const bearer = `Bearer ${token}`;
 
   const { headers: customHeaders = {}, params, ...rest } = options;
@@ -157,8 +173,8 @@ export async function authenticatedFetchBlob(path, { session: _session, accessTo
 }
 
 export async function authenticatedFetchText(path, { session: _session, accessToken: _accessToken, ...options } = {}) {
-  void _session; void _accessToken;
-  const token = await resolveBearerToken();
+  const resolved = resolveTokenFromOverrides(_session, _accessToken);
+  const token = resolved.token || await resolveBearerToken();
   const bearer = `Bearer ${token}`;
 
   const { headers: customHeaders = {}, params, ...rest } = options;
