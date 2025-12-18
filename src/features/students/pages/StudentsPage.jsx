@@ -807,11 +807,10 @@ export default function StudentsPage() {
       {/* Admin-only: Edit Student Modal */}
       {isAdmin && studentForEdit && (
         <EditStudentModal
+          open={Boolean(studentForEdit)}
           student={studentForEdit}
-          instructors={instructors}
-          tagOptions={tagOptions}
-          isUpdating={isUpdatingStudent}
-          updateError={updateError}
+          isSubmitting={isUpdatingStudent}
+          error={updateError}
           onClose={handleEditModalClose}
           onSubmit={handleEditSubmit}
         />
