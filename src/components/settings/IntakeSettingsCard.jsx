@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { fetchSettings, upsertSettings } from '@/features/settings/api/settings.js';
 
@@ -58,6 +59,8 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   const [initialMapping, setInitialMapping] = useState({ ...DEFAULT_MAPPING });
   const [initialSecret, setInitialSecret] = useState('');
   const [initialDisplayLabels, setInitialDisplayLabels] = useState({});
+  const [dictionaryInput, setDictionaryInput] = useState('');
+  const [dictionaryError, setDictionaryError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +98,7 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         setMapping(nextMapping);
         setSecret(nextSecret);
         setDisplayLabels(nextDisplayLabels);
+        setDictionaryInput(nextDisplayLabels ? JSON.stringify(nextDisplayLabels, null, 2) : '');
         setInitialMapping(nextMapping);
         setInitialSecret(nextSecret);
         setInitialDisplayLabels(nextDisplayLabels);
@@ -105,6 +109,7 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
           setMapping({ ...DEFAULT_MAPPING });
           setSecret('');
           setDisplayLabels({});
+          setDictionaryInput('');
           setInitialMapping({ ...DEFAULT_MAPPING });
           setInitialSecret('');
           setInitialDisplayLabels({});
@@ -134,12 +139,60 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
     setMapping((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleLabelChange = (key) => (event) => {
-    const value = event.target.value;
-    setDisplayLabels((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+  const handleImportDictionary = async () => {
+    if (!session || !orgId) {
+      toast.error('נדרשת התחברות פעילה כדי לשמור את ההגדרות.');
+      return;
+    }
+    if (!activeOrgHasConnection) {
+      toast.error('יש להשלים חיבור למסד הנתונים לפני שמירה.');
+      return;
+    }
+
+    setDictionaryError('');
+    let parsed;
+    try {
+      parsed = JSON.parse(dictionaryInput || '{}');
+    } catch {
+      setDictionaryError('פורמט JSON לא תקין. ודאו שהדבקתם אובייקט JSON תקין.');
+      return;
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      setDictionaryError('הקלט חייב להיות אובייקט JSON שטוח (מפתח: ערך).');
+      return;
+    }
+
+    const normalized = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      const normalizedKey = String(key || '').trim();
+      const normalizedValue = typeof value === 'string' ? value.trim() : '';
+      if (!normalizedKey || !normalizedValue) {
+        setDictionaryError('כל המפתחות והערכים חייבים להיות מחרוזות לא ריקות.');
+        return;
+      }
+      normalized[normalizedKey] = normalizedValue;
+    }
+
+    setIsSaving(true);
+    try {
+      await upsertSettings({
+        session,
+        orgId,
+        settings: {
+          intake_display_labels: normalized,
+        },
+      });
+      setDisplayLabels(normalized);
+      setInitialDisplayLabels(normalized);
+      toast.success(`${Object.keys(normalized).length} תוויות עודכנו בהצלחה.`);
+    } catch (saveError) {
+      console.error('Failed to save intake display labels', saveError);
+      setDictionaryError('שמירת מילון התוויות נכשלה. נסו שוב.');
+      toast.error('שמירת מילון התוויות נכשלה.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleRegenerateSecret = () => {
@@ -225,43 +278,39 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-900">ניהול תוויות לשאלות</h3>
           <p className="text-sm text-slate-600">
-            טבלת זיהוי השאלות מאפשרת לקצר שמות ארוכים שהגיעו מהטופס.
+            הדביקו אובייקט JSON שממפה מזהי שאלה לשמות קצרים כדי להציג תוויות ידידותיות.
           </p>
+          <div className="space-y-2">
+            <Label htmlFor="intake-labels-dictionary">ייבוא מילון ידני</Label>
+            <Textarea
+              id="intake-labels-dictionary"
+              value={dictionaryInput}
+              onChange={(event) => setDictionaryInput(event.target.value)}
+              placeholder="Paste the JSON from your reference form submission here..."
+              className="min-h-[160px] font-mono text-sm"
+              disabled={isLoading || isSaving}
+            />
+          </div>
+          {dictionaryError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+              {dictionaryError}
+            </div>
+          ) : null}
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleImportDictionary}
+              disabled={isLoading || isSaving}
+            >
+              Import &amp; Save
+            </Button>
+          </div>
           {Object.keys(displayLabels).length ? (
-            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-slate-600">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">מפתח שאלה</th>
-                    <th scope="col" className="px-3 py-2 text-right font-medium">תווית תצוגה</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(displayLabels).map(([key, label]) => (
-                    <tr key={key} className="border-t border-slate-100">
-                      <td className="px-3 py-2 text-slate-700">{key}</td>
-                      <td className="px-3 py-2">
-                        <Label htmlFor={`label-${key}`} className="sr-only">
-                          תווית עבור {key}
-                        </Label>
-                        <Input
-                          id={`label-${key}`}
-                          value={label ?? ''}
-                          onChange={handleLabelChange(key)}
-                          placeholder="הקלידו תווית קצרה"
-                          disabled={isLoading || isSaving}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="text-xs text-slate-500">
+              שמורות כעת {Object.keys(displayLabels).length} תוויות.
             </div>
-          ) : (
-            <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-              לא נמצאו תוויות להצגה. שלחו טופס ראשון כדי למלא את הרשימה.
-            </div>
-          )}
+          ) : null}
         </div>
 
         <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
