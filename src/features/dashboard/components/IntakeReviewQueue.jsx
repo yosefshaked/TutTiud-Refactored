@@ -77,6 +77,7 @@ export default function IntakeReviewQueue() {
   const [importantFields, setImportantFields] = useState([]);
   const [approvingIds, setApprovingIds] = useState(() => new Set());
   const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const [expandedAnswers, setExpandedAnswers] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -176,6 +177,28 @@ export default function IntakeReviewQueue() {
     });
   };
 
+  const toggleAnswer = (answerKey) => {
+    setExpandedAnswers((prev) => {
+      const next = new Set(prev);
+      if (next.has(answerKey)) {
+        next.delete(answerKey);
+      } else {
+        next.add(answerKey);
+      }
+      return next;
+    });
+  };
+
+  const handleAnswerKeyDown = (event, answerKey, canExpand) => {
+    if (!canExpand) {
+      return;
+    }
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleAnswer(answerKey);
+    }
+  };
+
   if (!isLoading && !error && pendingStudents.length === 0) {
     return null;
   }
@@ -257,14 +280,32 @@ export default function IntakeReviewQueue() {
                     </Button>
                   </div>
                   {answers.length ? (
-                    <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                      {answers.map((entry) => (
-                        <li key={`${student.id}-${entry.label}`} className="flex flex-wrap gap-2">
-                          <span className="font-medium">{entry.label}:</span>
-                          <span>{entry.value}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+                      {answers.map((entry, index) => {
+                        const answerKey = `${student.id}-${entry.label}-${index}`;
+                        const isLongAnswer = entry.value.length > 120 || entry.value.includes('\n');
+                        const isExpandedAnswer = expandedAnswers.has(answerKey);
+                        return (
+                          <div key={answerKey} className="rounded-md border border-slate-200 bg-white p-3">
+                            <p className="text-xs font-semibold text-slate-500">{entry.label}</p>
+                            <p
+                              className={`mt-1 text-sm text-slate-700 ${
+                                isLongAnswer ? 'cursor-pointer' : ''
+                              } ${isExpandedAnswer ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
+                              onClick={isLongAnswer ? () => toggleAnswer(answerKey) : undefined}
+                              onKeyDown={(event) => handleAnswerKeyDown(event, answerKey, isLongAnswer)}
+                              role={isLongAnswer ? 'button' : undefined}
+                              tabIndex={isLongAnswer ? 0 : undefined}
+                            >
+                              {entry.value}
+                            </p>
+                            {isLongAnswer && !isExpandedAnswer ? (
+                              <p className="mt-1 text-xs text-slate-400">לחצו להצגה מלאה</p>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
                   ) : (
                     <p className="mt-2 text-sm text-slate-500">
                       {isExpanded ? 'אין תשובות זמינות להצגה.' : 'לא הוגדרו שדות חשובים להצגה.'}

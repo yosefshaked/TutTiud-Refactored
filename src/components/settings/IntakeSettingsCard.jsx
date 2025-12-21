@@ -138,22 +138,62 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
     setSecret(nextSecret);
   };
 
-  const handleAddImportantField = () => {
+  const saveImportantFields = async (nextFields, { successMessage } = {}) => {
+    if (!session || !orgId) {
+      toast.error('נדרשת התחברות פעילה כדי לשמור את ההגדרות.');
+      return false;
+    }
+    if (!activeOrgHasConnection) {
+      toast.error('יש להשלים חיבור למסד הנתונים לפני שמירה.');
+      return false;
+    }
+
+    setIsSaving(true);
+    setError('');
+    try {
+      await upsertSettings({
+        session,
+        orgId,
+        settings: {
+          intake_important_fields: nextFields,
+        },
+      });
+      setImportantFields(nextFields);
+      setInitialImportantFields(nextFields);
+      if (successMessage) {
+        toast.success(successMessage);
+      }
+      return true;
+    } catch (saveError) {
+      console.error('Failed to save important fields', saveError);
+      toast.error('שמירת השדות החשובים נכשלה.');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddImportantField = async () => {
     const trimmed = newImportantField.trim();
     if (!trimmed) {
       return;
     }
-    setImportantFields((prev) => {
-      if (prev.includes(trimmed)) {
-        return prev;
-      }
-      return [...prev, trimmed];
+    const nextFields = importantFields.includes(trimmed)
+      ? importantFields
+      : [...importantFields, trimmed];
+    const saved = await saveImportantFields(nextFields, {
+      successMessage: 'השדה נשמר בהצלחה.',
     });
-    setNewImportantField('');
+    if (saved) {
+      setNewImportantField('');
+    }
   };
 
-  const handleRemoveImportantField = (field) => {
-    setImportantFields((prev) => prev.filter((entry) => entry !== field));
+  const handleRemoveImportantField = async (field) => {
+    const nextFields = importantFields.filter((entry) => entry !== field);
+    await saveImportantFields(nextFields, {
+      successMessage: 'השדה הוסר בהצלחה.',
+    });
   };
 
   const handleSave = async () => {
