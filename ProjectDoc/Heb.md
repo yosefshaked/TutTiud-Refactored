@@ -40,7 +40,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK ששומר את `auth.users.id` ומנוהל ברמת האפליקציה), `name`, פרטי קשר, `is_active`, `metadata` (כולל `instructor_color` עבור צבע קבוע וייחודי) |
 | `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `national_id` (אופציונלי, נאכף ייחודיות באפליקציה), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `is_active` (boolean, ברירת מחדל `true`), `tags`, `notes`, `metadata`, `intake_responses` (היסטוריית קליטה חיצונית), `needs_intake_approval` (דגל לתור הקליטה) |
 | `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK ניתן לריק → `Students.id` עבור דיווחים לא משויכים), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, `is_legacy` (מסמן שורות עבר שיובאו), חותמות זמן, `metadata` (כולל `unassigned_details` עד לפתרון) |
-| `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` (כולל `intake_field_mapping`, `intake_display_labels`, `external_intake_secret` ו-`student_tags`) |
+| `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` (כולל `intake_field_mapping`, `intake_important_fields`, `intake_display_labels`, `external_intake_secret` ו-`student_tags`) |
 
 אינדקסים תומכים:
 

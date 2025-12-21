@@ -15,13 +15,24 @@ function normalizeString(value) {
   return String(value).trim();
 }
 
-function buildIntakeEntries(payload) {
+function normalizeImportantFields(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean);
+}
+
+function buildIntakeEntries(payload, importantFields) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return [];
   }
 
+  const importantSet = new Set(importantFields);
   return Object.entries(payload)
     .filter(([key]) => !EXCLUDED_KEYS.has(key))
+    .filter(([key]) => (importantSet.size ? importantSet.has(key) : true))
     .map(([key, value]) => {
       if (value === null || value === undefined) {
         return null;
@@ -41,14 +52,21 @@ function buildIntakeEntries(payload) {
     .filter(Boolean);
 }
 
-export default function StudentIntakeCard({ intakeResponses }) {
+export default function StudentIntakeCard({ intakeResponses, importantFields }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const currentPayload = intakeResponses?.current && typeof intakeResponses.current === 'object'
     ? intakeResponses.current
     : null;
 
   const htmlSource = normalizeString(currentPayload?.intake_html_source);
-  const entries = useMemo(() => buildIntakeEntries(currentPayload), [currentPayload]);
+  const normalizedImportantFields = useMemo(
+    () => normalizeImportantFields(importantFields),
+    [importantFields],
+  );
+  const entries = useMemo(
+    () => buildIntakeEntries(currentPayload, normalizedImportantFields),
+    [currentPayload, normalizedImportantFields],
+  );
 
   if (!currentPayload) {
     return null;

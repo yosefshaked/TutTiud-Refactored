@@ -1079,6 +1079,7 @@
 ### Intake Bridge (2025-12)
 - **Settings keys** (tenant DB `tuttiud."Settings"`):
   - `intake_field_mapping` stores the Microsoft Forms → Tuttiud field mapping.
+  - `intake_important_fields` stores the Hebrew question labels to surface in quick views.
   - `intake_display_labels` stores the manually imported dictionary for form question IDs (legacy; not used with HTML parsing).
   - `external_intake_secret` stores the shared secret expected in the `x-intake-secret` header.
 - **Database columns** (tenant DB `tuttiud."Students"`):

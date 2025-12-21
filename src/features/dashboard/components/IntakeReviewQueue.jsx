@@ -24,15 +24,26 @@ function normalizeDisplayLabels(raw) {
   return raw;
 }
 
-function formatAnswerEntries(currentAnswers, labelMap) {
+function normalizeImportantFields(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter(Boolean);
+}
+
+function formatAnswerEntries(currentAnswers, labelMap, importantFields) {
   if (!currentAnswers || typeof currentAnswers !== 'object') {
     return [];
   }
 
   const excludedKeys = new Set(['intake_html_source', 'intake_date', 'response_id']);
+  const importantSet = new Set(importantFields);
 
   return Object.entries(currentAnswers)
     .filter(([key]) => !excludedKeys.has(key))
+    .filter(([key]) => (importantSet.size ? importantSet.has(key) : true))
     .map(([key, value]) => {
       if (value === null || value === undefined) {
         return null;
@@ -62,6 +73,7 @@ export default function IntakeReviewQueue() {
   const [error, setError] = useState('');
   const [pendingStudents, setPendingStudents] = useState([]);
   const [displayLabels, setDisplayLabels] = useState({});
+  const [importantFields, setImportantFields] = useState([]);
   const [approvingIds, setApprovingIds] = useState(() => new Set());
 
   useEffect(() => {
@@ -97,6 +109,7 @@ export default function IntakeReviewQueue() {
         const pending = roster.filter((student) => student?.needs_intake_approval === true);
         setPendingStudents(pending);
         setDisplayLabels(normalizeDisplayLabels(settingsResponse?.intake_display_labels));
+        setImportantFields(normalizeImportantFields(settingsResponse?.intake_important_fields));
       } catch (loadError) {
         console.error('Failed to load intake queue', loadError);
         if (!cancelled) {
@@ -173,8 +186,8 @@ export default function IntakeReviewQueue() {
         ) : null}
 
         <div className="space-y-4">
-          {pendingStudents.map((student) => {
-            const answers = formatAnswerEntries(student?.intake_responses?.current, labelMap);
+            {pendingStudents.map((student) => {
+            const answers = formatAnswerEntries(student?.intake_responses?.current, labelMap, importantFields);
             const isApproving = approvingIds.has(student.id);
 
             return (

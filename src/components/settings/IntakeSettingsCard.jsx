@@ -54,8 +54,10 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   const [showSecret, setShowSecret] = useState(false);
   const [mapping, setMapping] = useState({ ...DEFAULT_MAPPING });
   const [secret, setSecret] = useState('');
+  const [importantFieldsInput, setImportantFieldsInput] = useState('');
   const [initialMapping, setInitialMapping] = useState({ ...DEFAULT_MAPPING });
   const [initialSecret, setInitialSecret] = useState('');
+  const [initialImportantFieldsInput, setInitialImportantFieldsInput] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -85,18 +87,29 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         const nextSecret = typeof settings?.external_intake_secret === 'string'
           ? settings.external_intake_secret
           : '';
+        const importantFields = Array.isArray(settings?.intake_important_fields)
+          ? settings.intake_important_fields
+          : [];
+        const importantFieldsText = importantFields
+          .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+          .filter(Boolean)
+          .join('\n');
         setMapping(nextMapping);
         setSecret(nextSecret);
+        setImportantFieldsInput(importantFieldsText);
         setInitialMapping(nextMapping);
         setInitialSecret(nextSecret);
+        setInitialImportantFieldsInput(importantFieldsText);
       } catch (loadError) {
         console.error('Failed to load intake settings', loadError);
         if (!cancelled) {
           setError('טעינת הגדרות קליטת תלמידים נכשלה. נסו שוב.');
           setMapping({ ...DEFAULT_MAPPING });
           setSecret('');
+          setImportantFieldsInput('');
           setInitialMapping({ ...DEFAULT_MAPPING });
           setInitialSecret('');
+          setInitialImportantFieldsInput('');
         }
       } finally {
         if (!cancelled) {
@@ -114,8 +127,9 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
 
   const hasChanges = useMemo(() => {
     return JSON.stringify(mapping) !== JSON.stringify(initialMapping)
-      || secret !== initialSecret;
-  }, [mapping, initialMapping, secret, initialSecret]);
+      || secret !== initialSecret
+      || importantFieldsInput !== initialImportantFieldsInput;
+  }, [mapping, initialMapping, secret, initialSecret, importantFieldsInput, initialImportantFieldsInput]);
 
   const handleFieldChange = (field) => (event) => {
     const value = event.target.value;
@@ -146,16 +160,22 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
     setError('');
 
     try {
+      const importantFields = importantFieldsInput
+        .split('\n')
+        .map((entry) => entry.trim())
+        .filter(Boolean);
       await upsertSettings({
         session,
         orgId,
         settings: {
           intake_field_mapping: mapping,
+          intake_important_fields: importantFields,
           external_intake_secret: secret.trim(),
         },
       });
       setInitialMapping(mapping);
       setInitialSecret(secret.trim());
+      setInitialImportantFieldsInput(importantFieldsInput);
       toast.success('הגדרות הקליטה נשמרו בהצלחה.');
     } catch (saveError) {
       console.error('Failed to save intake settings', saveError);
@@ -197,6 +217,24 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
                 />
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">שדות חשובים לתצוגה מהירה</h3>
+          <p className="text-sm text-slate-600">
+            הזינו את שמות השדות בעברית (שורה לכל שדה) כדי להציג אותם בלוח הבקרה ובפרופיל התלמיד.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="intake-important-fields">שדות חשובים</Label>
+            <textarea
+              id="intake-important-fields"
+              className="min-h-[140px] w-full rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+              placeholder="לדוגמה:\nשם פרטי\nמספר זהות\nטלפון איש קשר"
+              value={importantFieldsInput}
+              onChange={(event) => setImportantFieldsInput(event.target.value)}
+              disabled={isLoading || isSaving}
+            />
           </div>
         </div>
 

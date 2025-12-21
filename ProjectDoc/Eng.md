@@ -40,7 +40,7 @@ Key characteristics:
 | `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` (`instructor_color` stores the permanent palette assignment) |
 | `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `national_id` (optional, uniqueness enforced in app), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata`, `intake_responses` (JSON payload history from external intake), `needs_intake_approval` (boolean flag for the intake inbox) |
 | `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (nullable FK → `Students.id` for loose reports), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, `is_legacy` (marks imported historical rows), timestamps, `metadata` (includes `unassigned_details` for loose reports until resolution) |
-| `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` (includes `intake_field_mapping`, `intake_display_labels`, `external_intake_secret`, and `student_tags`) |
+| `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` (includes `intake_field_mapping`, `intake_important_fields`, `intake_display_labels`, `external_intake_secret`, and `student_tags`) |
 
 Supporting indexes:
 
