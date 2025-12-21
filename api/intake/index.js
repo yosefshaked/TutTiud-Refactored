@@ -5,6 +5,7 @@ import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 import { isValidOrgId, readEnv, respond, resolveTenantClient } from '../_shared/org-bff.js';
 
 const SETTINGS_MAPPING_KEY = 'intake_field_mapping';
+const SETTINGS_LABELS_KEY = 'intake_display_labels';
 const SETTINGS_SECRET_KEY = 'external_intake_secret';
 const SETTINGS_TAGS_KEY = 'student_tags';
 
@@ -29,6 +30,63 @@ function normalizePhone(value) {
     cleaned = `0${cleaned}`;
   }
   return cleaned;
+}
+
+function coerceDefinitionTitle(raw) {
+  if (raw === null || raw === undefined) {
+    return '';
+  }
+  if (typeof raw === 'string') {
+    return raw.trim();
+  }
+  return String(raw).trim();
+}
+
+function extractQuestionEntries(definition) {
+  const results = [];
+  const seen = new Set();
+  const stack = [definition];
+  let iterations = 0;
+
+  while (stack.length && iterations < 2000) {
+    const current = stack.pop();
+    iterations += 1;
+
+    if (!current) {
+      continue;
+    }
+
+    if (Array.isArray(current)) {
+      for (const entry of current) {
+        stack.push(entry);
+      }
+      continue;
+    }
+
+    if (typeof current !== 'object') {
+      continue;
+    }
+
+    const idCandidate = coerceDefinitionTitle(
+      current.id ?? current.questionId ?? current.question_id ?? current.key,
+    );
+    const titleCandidate = coerceDefinitionTitle(
+      current.title ?? current.questionTitle ?? current.text ?? current.label,
+    );
+
+    if (idCandidate && titleCandidate && !seen.has(idCandidate)) {
+      seen.add(idCandidate);
+      results.push({ id: idCandidate, title: titleCandidate });
+    }
+
+    for (const value of Object.values(current)) {
+      if (typeof value === 'object') {
+        stack.push(value);
+      }
+    }
+  }
+
+  return results;
 }
 
 function isSchemaError(error) {
@@ -178,10 +236,12 @@ export default async function handler(context, req) {
 
   let storedSecret;
   let intakeMapping;
+  let displayLabels;
   try {
-    [storedSecret, intakeMapping] = await Promise.all([
+    [storedSecret, intakeMapping, displayLabels] = await Promise.all([
       loadSettingValue(tenantClient, SETTINGS_SECRET_KEY),
       loadSettingValue(tenantClient, SETTINGS_MAPPING_KEY),
+      loadSettingValue(tenantClient, SETTINGS_LABELS_KEY),
     ]);
   } catch (error) {
     context.log?.error?.('intake failed to load settings', { message: error?.message });
@@ -196,20 +256,54 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'missing_intake_mapping' });
   }
 
-  const studentNameRaw = resolveMappedValue(intakeMapping, body, 'student_name');
-  const nationalIdRaw = resolveMappedValue(intakeMapping, body, 'national_id');
-  const contactNameRaw = resolveMappedValue(intakeMapping, body, 'contact_name');
-  const contactPhoneRaw = resolveMappedValue(intakeMapping, body, 'contact_phone');
-  const healthProviderRaw = resolveMappedValue(intakeMapping, body, 'health_provider_tag');
+  const responses = body.responses && typeof body.responses === 'object' ? body.responses : null;
+  const definition = body.definition && typeof body.definition === 'object' ? body.definition : null;
+
+  if (!responses) {
+    return respond(context, 400, { message: 'missing_responses' });
+  }
+
+  const studentNameRaw = resolveMappedValue(intakeMapping, responses, 'student_name');
+  const nationalIdRaw = resolveMappedValue(intakeMapping, responses, 'national_id');
+  const phoneRaw = resolveMappedValue(intakeMapping, responses, 'phone');
+  const parentNameRaw = resolveMappedValue(intakeMapping, responses, 'parent_name');
+  const parentPhoneRaw = resolveMappedValue(intakeMapping, responses, 'parent_phone');
+  const healthProviderRaw = resolveMappedValue(intakeMapping, responses, 'health_provider_tag');
 
   const studentName = normalizeString(studentNameRaw);
   const nationalId = normalizeString(nationalIdRaw);
-  const contactName = normalizeString(contactNameRaw) || null;
-  const contactPhone = normalizePhone(contactPhoneRaw) || null;
+  const studentPhone = normalizePhone(phoneRaw) || null;
+  const contactName = normalizeString(parentNameRaw) || null;
+  const contactPhone = normalizePhone(parentPhoneRaw) || null;
   const healthProviderTag = normalizeString(healthProviderRaw);
 
   if (!nationalId) {
     return respond(context, 400, { message: 'missing_national_id' });
+  }
+
+  if (definition) {
+    const existingLabels = displayLabels && typeof displayLabels === 'object' && !Array.isArray(displayLabels)
+      ? { ...displayLabels }
+      : {};
+    const questionEntries = extractQuestionEntries(definition);
+    let didUpdateLabels = false;
+
+    for (const entry of questionEntries) {
+      if (!Object.prototype.hasOwnProperty.call(existingLabels, entry.id)) {
+        existingLabels[entry.id] = entry.title;
+        didUpdateLabels = true;
+      }
+    }
+
+    if (didUpdateLabels) {
+      const { error: labelsError } = await tenantClient
+        .from('Settings')
+        .upsert({ key: SETTINGS_LABELS_KEY, settings_value: existingLabels }, { onConflict: 'key' });
+
+      if (labelsError) {
+        context.log?.warn?.('intake failed to update display labels', { message: labelsError.message });
+      }
+    }
   }
 
   const { data: existingStudent, error: lookupError } = await tenantClient
@@ -227,7 +321,7 @@ export default async function handler(context, req) {
     return respond(context, 500, { message: 'failed_to_lookup_student' });
   }
 
-  const incomingPayload = body && typeof body === 'object' ? body : {};
+  const incomingPayload = responses;
 
   if (!existingStudent) {
     if (!studentName) {
@@ -250,6 +344,7 @@ export default async function handler(context, req) {
     const recordToInsert = {
       name: studentName,
       national_id: nationalId,
+      contact_info: studentPhone,
       contact_name: contactName,
       contact_phone: contactPhone,
       intake_responses: intakeResponses,

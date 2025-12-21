@@ -17,25 +17,11 @@ function normalizeString(value) {
   return String(value).trim();
 }
 
-function buildLabelMap(mapping) {
-  if (!mapping || typeof mapping !== 'object') {
+function normalizeDisplayLabels(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return {};
   }
-  const labels = {};
-  const pushLabel = (key, label) => {
-    const value = normalizeString(mapping[key]);
-    if (value) {
-      labels[value] = label;
-    }
-  };
-
-  pushLabel('student_name', 'שם תלמיד');
-  pushLabel('national_id', 'מספר זהות');
-  pushLabel('contact_name', 'שם איש קשר');
-  pushLabel('contact_phone', 'טלפון איש קשר');
-  pushLabel('health_provider_tag', 'תג ספק שירות/קופת חולים');
-
-  return labels;
+  return raw;
 }
 
 function formatAnswerEntries(currentAnswers, labelMap) {
@@ -72,7 +58,7 @@ export default function IntakeReviewQueue() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [pendingStudents, setPendingStudents] = useState([]);
-  const [mapping, setMapping] = useState(null);
+  const [displayLabels, setDisplayLabels] = useState({});
   const [approvingIds, setApprovingIds] = useState(() => new Set());
 
   useEffect(() => {
@@ -82,7 +68,6 @@ export default function IntakeReviewQueue() {
       if (!session || !activeOrgId || !activeOrgHasConnection || !tenantClientReady) {
         if (!cancelled) {
           setPendingStudents([]);
-          setMapping(null);
           setError('');
           setIsLoading(false);
         }
@@ -108,7 +93,7 @@ export default function IntakeReviewQueue() {
         const roster = Array.isArray(studentsResponse) ? studentsResponse : [];
         const pending = roster.filter((student) => student?.needs_intake_approval === true);
         setPendingStudents(pending);
-        setMapping(settingsResponse?.intake_field_mapping || null);
+        setDisplayLabels(normalizeDisplayLabels(settingsResponse?.intake_display_labels));
       } catch (loadError) {
         console.error('Failed to load intake queue', loadError);
         if (!cancelled) {
@@ -129,7 +114,7 @@ export default function IntakeReviewQueue() {
     };
   }, [session, activeOrgId, activeOrgHasConnection, tenantClientReady]);
 
-  const labelMap = useMemo(() => buildLabelMap(mapping), [mapping]);
+  const labelMap = useMemo(() => displayLabels, [displayLabels]);
 
   const handleApprove = async (studentId) => {
     if (!session || !activeOrgId) {

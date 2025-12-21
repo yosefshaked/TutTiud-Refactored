@@ -9,16 +9,18 @@ import { fetchSettings, upsertSettings } from '@/features/settings/api/settings.
 const DEFAULT_MAPPING = {
   student_name: '',
   national_id: '',
-  contact_name: '',
-  contact_phone: '',
+  phone: '',
+  parent_name: '',
+  parent_phone: '',
   health_provider_tag: '',
 };
 
 const FIELD_LABELS = {
   student_name: 'שם תלמיד (Source Key)',
   national_id: 'מספר זהות (Source Key)',
-  contact_name: 'שם איש קשר (Source Key)',
-  contact_phone: 'טלפון איש קשר (Source Key)',
+  phone: 'טלפון תלמיד (Source Key)',
+  parent_name: 'שם הורה/איש קשר (Source Key)',
+  parent_phone: 'טלפון הורה/איש קשר (Source Key)',
   health_provider_tag: 'תג ספק שירות/קופת חולים (Source Key)',
 };
 
@@ -29,8 +31,9 @@ function normalizeMapping(value) {
   return {
     student_name: typeof value.student_name === 'string' ? value.student_name : '',
     national_id: typeof value.national_id === 'string' ? value.national_id : '',
-    contact_name: typeof value.contact_name === 'string' ? value.contact_name : '',
-    contact_phone: typeof value.contact_phone === 'string' ? value.contact_phone : '',
+    phone: typeof value.phone === 'string' ? value.phone : '',
+    parent_name: typeof value.parent_name === 'string' ? value.parent_name : '',
+    parent_phone: typeof value.parent_phone === 'string' ? value.parent_phone : '',
     health_provider_tag: typeof value.health_provider_tag === 'string' ? value.health_provider_tag : '',
   };
 }
@@ -51,8 +54,10 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   const [showSecret, setShowSecret] = useState(false);
   const [mapping, setMapping] = useState({ ...DEFAULT_MAPPING });
   const [secret, setSecret] = useState('');
+  const [displayLabels, setDisplayLabels] = useState({});
   const [initialMapping, setInitialMapping] = useState({ ...DEFAULT_MAPPING });
   const [initialSecret, setInitialSecret] = useState('');
+  const [initialDisplayLabels, setInitialDisplayLabels] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -63,8 +68,10 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
           setIsLoading(false);
           setMapping({ ...DEFAULT_MAPPING });
           setSecret('');
+          setDisplayLabels({});
           setInitialMapping({ ...DEFAULT_MAPPING });
           setInitialSecret('');
+          setInitialDisplayLabels({});
           setError('');
         }
         return;
@@ -82,18 +89,25 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         const nextSecret = typeof settings?.external_intake_secret === 'string'
           ? settings.external_intake_secret
           : '';
+        const nextDisplayLabels = settings?.intake_display_labels && typeof settings.intake_display_labels === 'object'
+          ? settings.intake_display_labels
+          : {};
         setMapping(nextMapping);
         setSecret(nextSecret);
+        setDisplayLabels(nextDisplayLabels);
         setInitialMapping(nextMapping);
         setInitialSecret(nextSecret);
+        setInitialDisplayLabels(nextDisplayLabels);
       } catch (loadError) {
         console.error('Failed to load intake settings', loadError);
         if (!cancelled) {
           setError('טעינת הגדרות קליטת תלמידים נכשלה. נסו שוב.');
           setMapping({ ...DEFAULT_MAPPING });
           setSecret('');
+          setDisplayLabels({});
           setInitialMapping({ ...DEFAULT_MAPPING });
           setInitialSecret('');
+          setInitialDisplayLabels({});
         }
       } finally {
         if (!cancelled) {
@@ -110,12 +124,22 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   }, [session, orgId, activeOrgHasConnection]);
 
   const hasChanges = useMemo(() => {
-    return JSON.stringify(mapping) !== JSON.stringify(initialMapping) || secret !== initialSecret;
-  }, [mapping, initialMapping, secret, initialSecret]);
+    return JSON.stringify(mapping) !== JSON.stringify(initialMapping)
+      || secret !== initialSecret
+      || JSON.stringify(displayLabels) !== JSON.stringify(initialDisplayLabels);
+  }, [mapping, initialMapping, secret, initialSecret, displayLabels, initialDisplayLabels]);
 
   const handleFieldChange = (field) => (event) => {
     const value = event.target.value;
     setMapping((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLabelChange = (key) => (event) => {
+    const value = event.target.value;
+    setDisplayLabels((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
   const handleRegenerateSecret = () => {
@@ -147,11 +171,13 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         orgId,
         settings: {
           intake_field_mapping: mapping,
+          intake_display_labels: displayLabels,
           external_intake_secret: secret.trim(),
         },
       });
       setInitialMapping(mapping);
       setInitialSecret(secret.trim());
+      setInitialDisplayLabels(displayLabels);
       toast.success('הגדרות הקליטה נשמרו בהצלחה.');
     } catch (saveError) {
       console.error('Failed to save intake settings', saveError);
@@ -173,23 +199,69 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
             מיפוי שדות טופס Microsoft Forms לשדות המערכת כדי לקלוט בקשות באמצעות Power Automate.
           </p>
           <p>
-            שמרו את הסוד החיצוני והגדירו אותו בכותרת <span className="font-medium">x-intake-secret</span>.
+            הגדירו את הכותרות <span className="font-medium">x-org-id</span> ו-
+            <span className="font-medium"> x-intake-secret</span> בזרימת Power Automate.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {Object.keys(DEFAULT_MAPPING).map((fieldKey) => (
-            <div key={fieldKey} className="space-y-2">
-              <Label htmlFor={`intake-${fieldKey}`}>{FIELD_LABELS[fieldKey]}</Label>
-              <Input
-                id={`intake-${fieldKey}`}
-                value={mapping[fieldKey]}
-                onChange={handleFieldChange(fieldKey)}
-                placeholder="לדוגמה: r459c"
-                disabled={isLoading || isSaving}
-              />
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">מיפוי שדות מערכת</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            {Object.keys(DEFAULT_MAPPING).map((fieldKey) => (
+              <div key={fieldKey} className="space-y-2">
+                <Label htmlFor={`intake-${fieldKey}`}>{FIELD_LABELS[fieldKey]}</Label>
+                <Input
+                  id={`intake-${fieldKey}`}
+                  value={mapping[fieldKey]}
+                  onChange={handleFieldChange(fieldKey)}
+                  placeholder="לדוגמה: r459c"
+                  disabled={isLoading || isSaving}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">ניהול תוויות לשאלות</h3>
+          <p className="text-sm text-slate-600">
+            טבלת זיהוי השאלות מאפשרת לקצר שמות ארוכים שהגיעו מהטופס.
+          </p>
+          {Object.keys(displayLabels).length ? (
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">מפתח שאלה</th>
+                    <th scope="col" className="px-3 py-2 text-right font-medium">תווית תצוגה</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(displayLabels).map(([key, label]) => (
+                    <tr key={key} className="border-t border-slate-100">
+                      <td className="px-3 py-2 text-slate-700">{key}</td>
+                      <td className="px-3 py-2">
+                        <Label htmlFor={`label-${key}`} className="sr-only">
+                          תווית עבור {key}
+                        </Label>
+                        <Input
+                          id={`label-${key}`}
+                          value={label ?? ''}
+                          onChange={handleLabelChange(key)}
+                          placeholder="הקלידו תווית קצרה"
+                          disabled={isLoading || isSaving}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          ) : (
+            <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+              לא נמצאו תוויות להצגה. שלחו טופס ראשון כדי למלא את הרשימה.
+            </div>
+          )}
         </div>
 
         <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">

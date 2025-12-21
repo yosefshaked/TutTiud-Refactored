@@ -40,7 +40,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `tuttiud."Instructors"` | ספר מדריכים ארגוני. | `id` (uuid PK ששומר את `auth.users.id` ומנוהל ברמת האפליקציה), `name`, פרטי קשר, `is_active`, `metadata` (כולל `instructor_color` עבור צבע קבוע וייחודי) |
 | `tuttiud."Students"` | רשימת התלמידים של הארגון. | `id`, `name`, `national_id` (אופציונלי, נאכף ייחודיות באפליקציה), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = יום ראשון, 7 = שבת), `default_session_time`, `default_service`, `is_active` (boolean, ברירת מחדל `true`), `tags`, `notes`, `metadata`, `intake_responses` (היסטוריית קליטה חיצונית), `needs_intake_approval` (דגל לתור הקליטה) |
 | `tuttiud."SessionRecords"` | רישום קנוני של מפגשי הוראה. | `id`, `date`, `student_id` (FK ניתן לריק → `Students.id` עבור דיווחים לא משויכים), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON של תשובות לפי שאלה), `deleted`, `is_legacy` (מסמן שורות עבר שיובאו), חותמות זמן, `metadata` (כולל `unassigned_details` עד לפתרון) |
-| `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` (כולל `intake_field_mapping`, `external_intake_secret` ו-`student_tags`) |
+| `tuttiud."Settings"` | מאגר הגדרות JSON לכל טננט. | `id`, `key` (ייחודי), `settings_value` (כולל `intake_field_mapping`, `intake_display_labels`, `external_intake_secret` ו-`student_tags`) |
 
 אינדקסים תומכים:
 
@@ -77,7 +77,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `/api/students-list/{studentId}` | PUT | מנהל/בעלים | מעדכן שדות תלמיד ניתנים לעריכה (שם, פרטי קשר, הגדרות ברירת מחדל, שיוך מדריך, `is_active`, תגיות, הערות) ומחזיר את הרשומה המעודכנת או 404. |
 | `/api/students-check-id` | GET | כל המשתמשים | בודק ייחודיות של מספר זהות, עם אפשרות להתעלם מתלמיד קיים בעת עריכה. מחזיר `{ exists, student }` כדי לחסום כפילויות ולספק קישור לפרופיל. |
 | `/api/students-search` | GET | מנהל/בעלים | חיפוש מטושטש לפי שם שמחזיר `{ id, name, national_id, is_active }` להצגת רמזי כפילות מתחת לשדה השם בטופס. |
-| `/api/intake` | POST | רובוט חיצוני | נקודת קצה ציבורית לקליטת טפסי Microsoft Forms דרך Power Automate. דורשת את הכותרות `x-org-id` ו-`x-intake-secret` (מאומת מול `external_intake_secret`), ממפה שדות לפי `intake_field_mapping` וכותבת `intake_responses` + `needs_intake_approval`. |
+| `/api/intake` | POST | רובוט חיצוני | נקודת קצה ציבורית לקליטת טפסי Microsoft Forms דרך Power Automate. דורשת את הכותרות `x-org-id` ו-`x-intake-secret` (מאומת מול `external_intake_secret`), לומדת תוויות לשאלות אל `intake_display_labels`, ממפה שדות לפי `intake_field_mapping` וכותבת `intake_responses` + `needs_intake_approval`. |
 | `/api/intake/approve` | POST | מנהל/בעלים/מדריך | מאשר קליטה ממתינה ע\"י `needs_intake_approval=false` ורישום `metadata.last_approval` (זמן + מאשר). מדריכים יכולים לאשר רק תלמידים משויכים. |
 | `/api/students/maintenance-export` | GET | מנהל/בעלים | מחזיר CSV עם `system_uuid`, שם, מספר זהות, פרטי קשר, שיוך מדריך, הגדרות ברירת מחדל, תגיות וסטטוס פעילות לצורך ניקוי נתונים. |
 | `/api/loose-sessions` | GET/POST | מנהל/בעלים | מציג רשימת דיווחים לא משויכים (`student_id IS NULL`) ומאפשר לפתור אותם ע"י שיוך לתלמיד קיים או יצירת תלמיד חדש; מסיר רק את `metadata.unassigned_details` ומשמר מטאדטה אחרת. |
@@ -138,7 +138,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - `SETUP_SQL_SCRIPT` הוא מקור האמת היחיד לסקריפט; ייבאו אותו לכל מקום שבו מציגים את הסקריפט.
 - הסקריפט מוסיף עתה את העמודה `Students.is_active boolean default true` ומשלים ערך `true` ברשומות קיימות. ההרצה חוזרת בטוחה הודות לשימוש עקבי ב-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
-- גשר הקליטה (Intake Bridge) משתמש ב-`intake_field_mapping` וב-`external_intake_secret` מתוך `tuttiud.Settings` כדי לקלוט טפסים חיצוניים, והאישורים מתבצעים דרך `/api/intake/approve` כדי לשמור על בקרה ידנית.
+- גשר הקליטה (Intake Bridge) משתמש ב-`intake_field_mapping` וב-`external_intake_secret` מתוך `tuttiud.Settings`, לומד תוויות ב-`intake_display_labels`, והאישורים מתבצעים דרך `/api/intake/approve` כדי לשמור על בקרה ידנית.
 - `SessionRecords.student_id` הוא כעת NULLABLE כדי לאפשר דיווחי סשן לא משויכים. בעת כתיבה יש להוסיף את `metadata.unassigned_details` באופן אדיטיבי (בלי למחוק מפתחות קיימים) ולוודא שכל השאילתות/נקודות הקצה יודעות להתמודד עם `student_id` שווה NULL.
 - `verifyOrgConnection` (`src/runtime/verification.js`) מקבל כעת לקוח Supabase ומחזיר את מערך התוצאות כדי לרנדר סטטוס.
 - בעת השלמת האשף חובה לקרוא ל-`recordVerification(orgId, timestamp)` כדי לעדכן את `setup_completed` / `verified_at` ב-Control DB.

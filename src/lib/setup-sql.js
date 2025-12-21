@@ -260,6 +260,7 @@ ALTER TABLE tuttiud."Settings"
 INSERT INTO tuttiud."Settings" ("key", "settings_value")
 VALUES
   ('intake_field_mapping', '{}'::jsonb),
+  ('intake_display_labels', '{}'::jsonb),
   ('external_intake_secret', '""'::jsonb)
 ON CONFLICT ("key") DO NOTHING;
 
