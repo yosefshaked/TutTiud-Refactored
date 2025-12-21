@@ -54,10 +54,11 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   const [showSecret, setShowSecret] = useState(false);
   const [mapping, setMapping] = useState({ ...DEFAULT_MAPPING });
   const [secret, setSecret] = useState('');
-  const [importantFieldsInput, setImportantFieldsInput] = useState('');
+  const [importantFields, setImportantFields] = useState([]);
+  const [newImportantField, setNewImportantField] = useState('');
   const [initialMapping, setInitialMapping] = useState({ ...DEFAULT_MAPPING });
   const [initialSecret, setInitialSecret] = useState('');
-  const [initialImportantFieldsInput, setInitialImportantFieldsInput] = useState('');
+  const [initialImportantFields, setInitialImportantFields] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,26 +91,22 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         const importantFields = Array.isArray(settings?.intake_important_fields)
           ? settings.intake_important_fields
           : [];
-        const importantFieldsText = importantFields
-          .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-          .filter(Boolean)
-          .join('\n');
         setMapping(nextMapping);
         setSecret(nextSecret);
-        setImportantFieldsInput(importantFieldsText);
+        setImportantFields(importantFields);
         setInitialMapping(nextMapping);
         setInitialSecret(nextSecret);
-        setInitialImportantFieldsInput(importantFieldsText);
+        setInitialImportantFields(importantFields);
       } catch (loadError) {
         console.error('Failed to load intake settings', loadError);
         if (!cancelled) {
           setError('טעינת הגדרות קליטת תלמידים נכשלה. נסו שוב.');
           setMapping({ ...DEFAULT_MAPPING });
           setSecret('');
-          setImportantFieldsInput('');
+          setImportantFields([]);
           setInitialMapping({ ...DEFAULT_MAPPING });
           setInitialSecret('');
-          setInitialImportantFieldsInput('');
+          setInitialImportantFields([]);
         }
       } finally {
         if (!cancelled) {
@@ -128,8 +125,8 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   const hasChanges = useMemo(() => {
     return JSON.stringify(mapping) !== JSON.stringify(initialMapping)
       || secret !== initialSecret
-      || importantFieldsInput !== initialImportantFieldsInput;
-  }, [mapping, initialMapping, secret, initialSecret, importantFieldsInput, initialImportantFieldsInput]);
+      || JSON.stringify(importantFields) !== JSON.stringify(initialImportantFields);
+  }, [mapping, initialMapping, secret, initialSecret, importantFields, initialImportantFields]);
 
   const handleFieldChange = (field) => (event) => {
     const value = event.target.value;
@@ -139,6 +136,24 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   const handleRegenerateSecret = () => {
     const nextSecret = generateSecretValue();
     setSecret(nextSecret);
+  };
+
+  const handleAddImportantField = () => {
+    const trimmed = newImportantField.trim();
+    if (!trimmed) {
+      return;
+    }
+    setImportantFields((prev) => {
+      if (prev.includes(trimmed)) {
+        return prev;
+      }
+      return [...prev, trimmed];
+    });
+    setNewImportantField('');
+  };
+
+  const handleRemoveImportantField = (field) => {
+    setImportantFields((prev) => prev.filter((entry) => entry !== field));
   };
 
   const handleSave = async () => {
@@ -160,10 +175,6 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
     setError('');
 
     try {
-      const importantFields = importantFieldsInput
-        .split('\n')
-        .map((entry) => entry.trim())
-        .filter(Boolean);
       await upsertSettings({
         session,
         orgId,
@@ -175,7 +186,7 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
       });
       setInitialMapping(mapping);
       setInitialSecret(secret.trim());
-      setInitialImportantFieldsInput(importantFieldsInput);
+      setInitialImportantFields(importantFields);
       toast.success('הגדרות הקליטה נשמרו בהצלחה.');
     } catch (saveError) {
       console.error('Failed to save intake settings', saveError);
@@ -220,23 +231,53 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
           </div>
         </div>
 
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">שדות חשובים לתצוגה מהירה</h3>
+        <details className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+            שדות חשובים לתצוגה מהירה
+          </summary>
           <p className="text-sm text-slate-600">
-            הזינו את שמות השדות בעברית (שורה לכל שדה) כדי להציג אותם בלוח הבקרה ובפרופיל התלמיד.
+            הוסיפו שמות שדות בעברית להצגה בלוח הבקרה ובפרופיל התלמיד.
           </p>
-          <div className="space-y-2">
-            <Label htmlFor="intake-important-fields">שדות חשובים</Label>
-            <textarea
-              id="intake-important-fields"
-              className="min-h-[140px] w-full rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
-              placeholder="לדוגמה:\nשם פרטי\nמספר זהות\nטלפון איש קשר"
-              value={importantFieldsInput}
-              onChange={(event) => setImportantFieldsInput(event.target.value)}
-              disabled={isLoading || isSaving}
-            />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="intake-important-field">שדה חשוב</Label>
+              <Input
+                id="intake-important-field"
+                value={newImportantField}
+                onChange={(event) => setNewImportantField(event.target.value)}
+                placeholder='לדוגמה: "שם פרטי"'
+                disabled={isLoading || isSaving}
+              />
+            </div>
+            <Button
+              type="button"
+              onClick={handleAddImportantField}
+              disabled={isLoading || isSaving || !newImportantField.trim()}
+            >
+              הוסף
+            </Button>
           </div>
-        </div>
+          {importantFields.length ? (
+            <ul className="mt-2 space-y-2 text-sm text-slate-700">
+              {importantFields.map((field) => (
+                <li key={field} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                  <span>{field}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveImportantField(field)}
+                    disabled={isLoading || isSaving}
+                  >
+                    הסר
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">לא הוגדרו שדות חשובים עדיין.</p>
+          )}
+        </details>
 
         <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
           <div className="flex flex-col gap-2">
