@@ -181,6 +181,13 @@ export default async function handler(context, req) {
     return respond(context, 405, { message: 'method_not_allowed' }, { Allow: 'POST' });
   }
 
+  const orgIdHeader = normalizeString(resolveAuthorizationHeader(req, ['x-org-id']));
+  const providedSecret = normalizeString(resolveAuthorizationHeader(req, ['x-intake-secret']));
+
+  if (!orgIdHeader || !isValidOrgId(orgIdHeader) || !providedSecret) {
+    return respond(context, 401, { message: 'invalid_credentials' });
+  }
+
   const env = readEnv(context);
   const adminConfig = readSupabaseAdminConfig(env);
 
@@ -189,34 +196,10 @@ export default async function handler(context, req) {
     return respond(context, 500, { message: 'server_misconfigured' });
   }
 
-  const body = parseJsonBodyWithLimit(req, 64 * 1024, { mode: 'observe', context, endpoint: 'intake' });
-  if (!body || typeof body !== 'object') {
-    return respond(context, 400, { message: 'invalid_payload' });
-  }
-
-  const htmlContent = normalizeString(body?.html_content);
-  if (!htmlContent) {
-    return respond(context, 400, { message: 'missing_html_content' });
-  }
-
-  const orgIdHeader = normalizeString(resolveAuthorizationHeader(req, ['x-org-id']));
-  if (!orgIdHeader) {
-    return respond(context, 400, { message: 'missing_org_id' });
-  }
-
-  if (!isValidOrgId(orgIdHeader)) {
-    return respond(context, 400, { message: 'invalid_org_id' });
-  }
-
   const supabase = createSupabaseAdminClient(adminConfig);
   const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgIdHeader);
   if (tenantError) {
     return respond(context, tenantError.status, tenantError.body);
-  }
-
-  const providedSecret = normalizeString(resolveAuthorizationHeader(req, ['x-intake-secret']));
-  if (!providedSecret) {
-    return respond(context, 401, { message: 'invalid_secret' });
   }
 
   let storedSecret;
@@ -232,11 +215,21 @@ export default async function handler(context, req) {
   }
 
   if (normalizeString(storedSecret) !== providedSecret) {
-    return respond(context, 401, { message: 'invalid_secret' });
+    return respond(context, 401, { message: 'invalid_credentials' });
   }
 
   if (!intakeMapping || typeof intakeMapping !== 'object' || Array.isArray(intakeMapping)) {
     return respond(context, 400, { message: 'missing_intake_mapping' });
+  }
+
+  const body = parseJsonBodyWithLimit(req, 64 * 1024, { mode: 'observe', context, endpoint: 'intake' });
+  if (!body || typeof body !== 'object') {
+    return respond(context, 400, { message: 'invalid_payload' });
+  }
+
+  const htmlContent = normalizeString(body?.html_content);
+  if (!htmlContent) {
+    return respond(context, 400, { message: 'missing_html_content' });
   }
 
   const responses = extractQaPairs(htmlContent);
