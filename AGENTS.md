@@ -1075,3 +1075,17 @@
 - **Radix UI dependencies**: Uses `@radix-ui/react-dropdown-menu` for menu and `@radix-ui/react-checkbox` for filter selection and preview
 - **API client helper**: `authenticatedFetchBlob()` in `lib/api-client.js` preserves UTF-8 BOM and binary encoding for CSV downloads
 - **Comprehensive QA documentation**: See `docs/student-data-maintenance-qa.md` for full test plan covering all scenarios, edge cases, and validation rules
+
+### Intake Bridge (2025-12)
+- **Settings keys** (tenant DB `tuttiud."Settings"`):
+  - `intake_field_mapping` stores the Microsoft Forms → Tuttiud field mapping.
+  - `external_intake_secret` stores the shared secret expected in the `x-intake-secret` header.
+- **Database columns** (tenant DB `tuttiud."Students"`):
+  - `intake_responses` jsonb stores `{ current, history }` intake payloads.
+  - `needs_intake_approval` boolean flags pending intake reviews.
+- **API endpoints**:
+  - `POST /api/intake` is public (Power Automate) and validates `x-intake-secret` before inserting/updating student intake data.
+  - `POST /api/intake/approve` requires Supabase auth; admins can approve any student, members only their assigned students. Updates `needs_intake_approval=false` and appends `metadata.last_approval`.
+- **Frontend**:
+  - `IntakeSettingsCard.jsx` in Settings allows admins to manage mappings and rotate secrets.
+  - `IntakeReviewQueue.jsx` on the dashboard surfaces pending intake approvals and triggers `/api/intake/approve`.
