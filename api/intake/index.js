@@ -31,6 +31,43 @@ function normalizePhone(value) {
   return cleaned;
 }
 
+const QA_PAIR_REGEX = /<div class="qa-pair">.*?<p class="question">(.*?)<\/p>.*?<p class="answer">(.*?)<\/p>.*?<\/div>/gs;
+
+function decodeHtmlEntities(value) {
+  const raw = normalizeString(value);
+  if (!raw) {
+    return '';
+  }
+
+  return raw
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractQaPairs(htmlContent) {
+  const payload = {};
+  if (!htmlContent) {
+    return payload;
+  }
+
+  for (const match of htmlContent.matchAll(QA_PAIR_REGEX)) {
+    const question = decodeHtmlEntities(match?.[1]);
+    const answer = decodeHtmlEntities(match?.[2]);
+    if (!question || !answer) {
+      continue;
+    }
+    payload[question] = answer;
+  }
+
+  return payload;
+}
+
 
 function isSchemaError(error) {
   if (!error) {
@@ -157,6 +194,11 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'invalid_payload' });
   }
 
+  const htmlContent = normalizeString(body?.html_content);
+  if (!htmlContent) {
+    return respond(context, 400, { message: 'missing_html_content' });
+  }
+
   const orgIdHeader = normalizeString(resolveAuthorizationHeader(req, ['x-org-id']));
   if (!orgIdHeader) {
     return respond(context, 400, { message: 'missing_org_id' });
@@ -197,7 +239,7 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'missing_intake_mapping' });
   }
 
-  const responses = body;
+  const responses = extractQaPairs(htmlContent);
   const studentNameRaw = resolveMappedValue(intakeMapping, responses, 'student_name');
   const nationalIdRaw = resolveMappedValue(intakeMapping, responses, 'national_id');
   const phoneRaw = resolveMappedValue(intakeMapping, responses, 'phone');
@@ -231,7 +273,10 @@ export default async function handler(context, req) {
     return respond(context, 500, { message: 'failed_to_lookup_student' });
   }
 
-  const incomingPayload = responses;
+  const incomingPayload = {
+    ...responses,
+    intake_html_source: htmlContent,
+  };
 
   if (!existingStudent) {
     if (!studentName) {

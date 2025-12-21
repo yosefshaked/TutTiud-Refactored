@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { fetchSettings, upsertSettings } from '@/features/settings/api/settings.js';
 
@@ -55,12 +54,8 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
   const [showSecret, setShowSecret] = useState(false);
   const [mapping, setMapping] = useState({ ...DEFAULT_MAPPING });
   const [secret, setSecret] = useState('');
-  const [displayLabels, setDisplayLabels] = useState({});
   const [initialMapping, setInitialMapping] = useState({ ...DEFAULT_MAPPING });
   const [initialSecret, setInitialSecret] = useState('');
-  const [initialDisplayLabels, setInitialDisplayLabels] = useState({});
-  const [dictionaryInput, setDictionaryInput] = useState('');
-  const [dictionaryError, setDictionaryError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -71,10 +66,8 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
           setIsLoading(false);
           setMapping({ ...DEFAULT_MAPPING });
           setSecret('');
-          setDisplayLabels({});
           setInitialMapping({ ...DEFAULT_MAPPING });
           setInitialSecret('');
-          setInitialDisplayLabels({});
           setError('');
         }
         return;
@@ -92,27 +85,18 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         const nextSecret = typeof settings?.external_intake_secret === 'string'
           ? settings.external_intake_secret
           : '';
-        const nextDisplayLabels = settings?.intake_display_labels && typeof settings.intake_display_labels === 'object'
-          ? settings.intake_display_labels
-          : {};
         setMapping(nextMapping);
         setSecret(nextSecret);
-        setDisplayLabels(nextDisplayLabels);
-        setDictionaryInput(nextDisplayLabels ? JSON.stringify(nextDisplayLabels, null, 2) : '');
         setInitialMapping(nextMapping);
         setInitialSecret(nextSecret);
-        setInitialDisplayLabels(nextDisplayLabels);
       } catch (loadError) {
         console.error('Failed to load intake settings', loadError);
         if (!cancelled) {
           setError('טעינת הגדרות קליטת תלמידים נכשלה. נסו שוב.');
           setMapping({ ...DEFAULT_MAPPING });
           setSecret('');
-          setDisplayLabels({});
-          setDictionaryInput('');
           setInitialMapping({ ...DEFAULT_MAPPING });
           setInitialSecret('');
-          setInitialDisplayLabels({});
         }
       } finally {
         if (!cancelled) {
@@ -130,69 +114,12 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
 
   const hasChanges = useMemo(() => {
     return JSON.stringify(mapping) !== JSON.stringify(initialMapping)
-      || secret !== initialSecret
-      || JSON.stringify(displayLabels) !== JSON.stringify(initialDisplayLabels);
-  }, [mapping, initialMapping, secret, initialSecret, displayLabels, initialDisplayLabels]);
+      || secret !== initialSecret;
+  }, [mapping, initialMapping, secret, initialSecret]);
 
   const handleFieldChange = (field) => (event) => {
     const value = event.target.value;
     setMapping((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleImportDictionary = async () => {
-    if (!session || !orgId) {
-      toast.error('נדרשת התחברות פעילה כדי לשמור את ההגדרות.');
-      return;
-    }
-    if (!activeOrgHasConnection) {
-      toast.error('יש להשלים חיבור למסד הנתונים לפני שמירה.');
-      return;
-    }
-
-    setDictionaryError('');
-    let parsed;
-    try {
-      parsed = JSON.parse(dictionaryInput || '{}');
-    } catch {
-      setDictionaryError('פורמט JSON לא תקין. ודאו שהדבקתם אובייקט JSON תקין.');
-      return;
-    }
-
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      setDictionaryError('הקלט חייב להיות אובייקט JSON שטוח (מפתח: ערך).');
-      return;
-    }
-
-    const normalized = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      const normalizedKey = String(key || '').trim();
-      const normalizedValue = typeof value === 'string' ? value.trim() : '';
-      if (!normalizedKey || !normalizedValue) {
-        setDictionaryError('כל המפתחות והערכים חייבים להיות מחרוזות לא ריקות.');
-        return;
-      }
-      normalized[normalizedKey] = normalizedValue;
-    }
-
-    setIsSaving(true);
-    try {
-      await upsertSettings({
-        session,
-        orgId,
-        settings: {
-          intake_display_labels: normalized,
-        },
-      });
-      setDisplayLabels(normalized);
-      setInitialDisplayLabels(normalized);
-      toast.success(`${Object.keys(normalized).length} תוויות עודכנו בהצלחה.`);
-    } catch (saveError) {
-      console.error('Failed to save intake display labels', saveError);
-      setDictionaryError('שמירת מילון התוויות נכשלה. נסו שוב.');
-      toast.error('שמירת מילון התוויות נכשלה.');
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleRegenerateSecret = () => {
@@ -224,13 +151,11 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
         orgId,
         settings: {
           intake_field_mapping: mapping,
-          intake_display_labels: displayLabels,
           external_intake_secret: secret.trim(),
         },
       });
       setInitialMapping(mapping);
       setInitialSecret(secret.trim());
-      setInitialDisplayLabels(displayLabels);
       toast.success('הגדרות הקליטה נשמרו בהצלחה.');
     } catch (saveError) {
       console.error('Failed to save intake settings', saveError);
@@ -267,50 +192,12 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
                   id={`intake-${fieldKey}`}
                   value={mapping[fieldKey]}
                   onChange={handleFieldChange(fieldKey)}
-                  placeholder="לדוגמה: r459c"
+                  placeholder='הקלידו את נוסח השאלה בעברית (למשל: "תעודת זהות")'
                   disabled={isLoading || isSaving}
                 />
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">ניהול תוויות לשאלות</h3>
-          <p className="text-sm text-slate-600">
-            הדביקו אובייקט JSON שממפה מזהי שאלה לשמות קצרים כדי להציג תוויות ידידותיות.
-          </p>
-          <div className="space-y-2">
-            <Label htmlFor="intake-labels-dictionary">ייבוא מילון ידני</Label>
-            <Textarea
-              id="intake-labels-dictionary"
-              value={dictionaryInput}
-              onChange={(event) => setDictionaryInput(event.target.value)}
-              placeholder="Paste the JSON from your reference form submission here..."
-              className="min-h-[160px] font-mono text-sm"
-              disabled={isLoading || isSaving}
-            />
-          </div>
-          {dictionaryError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
-              {dictionaryError}
-            </div>
-          ) : null}
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleImportDictionary}
-              disabled={isLoading || isSaving}
-            >
-              Import &amp; Save
-            </Button>
-          </div>
-          {Object.keys(displayLabels).length ? (
-            <div className="text-xs text-slate-500">
-              שמורות כעת {Object.keys(displayLabels).length} תוויות.
-            </div>
-          ) : null}
         </div>
 
         <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
