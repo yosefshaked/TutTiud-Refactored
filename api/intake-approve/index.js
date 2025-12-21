@@ -53,6 +53,25 @@ function resolveStudentId(body) {
   return '';
 }
 
+function buildAgreementPayload(raw, userId) {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const acknowledged = Boolean(raw.acknowledged || raw.confirmed || raw.checked);
+  if (!acknowledged) {
+    return null;
+  }
+  const statement = normalizeString(raw.statement || raw.text || raw.label);
+  const clientTimestamp = normalizeString(raw.acknowledged_at || raw.confirmed_at || raw.timestamp);
+  return {
+    acknowledged: true,
+    statement: statement || null,
+    client_acknowledged_at: clientTimestamp || null,
+    by: userId,
+    at: new Date().toISOString(),
+  };
+}
+
 export default async function handler(context, req) {
   const method = String(req.method || 'POST').toUpperCase();
   if (method !== 'POST') {
@@ -96,6 +115,11 @@ export default async function handler(context, req) {
   const studentId = resolveStudentId(body);
   if (!studentId) {
     return respond(context, 400, { message: 'invalid_student_id' });
+  }
+
+  const agreement = buildAgreementPayload(body?.agreement, authResult.data.user.id);
+  if (!agreement) {
+    return respond(context, 400, { message: 'invalid_agreement' });
   }
 
   let role;
@@ -147,8 +171,12 @@ export default async function handler(context, req) {
   const updatedMetadata = {
     ...existingMetadata,
     last_approval: {
+      ...(existingMetadata.last_approval && typeof existingMetadata.last_approval === 'object'
+        ? existingMetadata.last_approval
+        : {}),
       at: new Date().toISOString(),
       by: authResult.data.user.id,
+      agreement,
     },
   };
 

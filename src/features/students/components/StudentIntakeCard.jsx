@@ -53,6 +53,7 @@ function buildIntakeEntries(payload, importantFields) {
 }
 
 export default function StudentIntakeCard({ intakeResponses, importantFields }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [expandedAnswers, setExpandedAnswers] = useState(() => new Set());
   const currentPayload = intakeResponses?.current && typeof intakeResponses.current === 'object'
@@ -97,44 +98,63 @@ export default function StudentIntakeCard({ intakeResponses, importantFields }) 
 
   return (
     <Card>
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-base font-semibold text-foreground sm:text-lg">נתוני קליטה</CardTitle>
-        <Button type="button" onClick={() => setIsDialogOpen(true)} disabled={!htmlSource}>
-          צפה בטופס המקורי
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {entries.length ? (
-          <div className="grid gap-3 text-sm text-slate-700 md:grid-cols-2" dir="rtl">
-            {entries.map((entry, index) => {
-              const answerKey = `${entry.label}-${index}`;
-              const isLongAnswer = entry.value.length > 120 || entry.value.includes('\n');
-              const isExpandedAnswer = expandedAnswers.has(answerKey);
-              return (
-                <div key={answerKey} className="rounded-md border border-slate-200 bg-white p-3">
-                  <p className="text-xs font-semibold text-slate-500">{entry.label}</p>
-                  <p
-                    className={`mt-1 text-sm text-slate-700 ${
-                      isLongAnswer ? 'cursor-pointer' : ''
-                    } ${isExpandedAnswer ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
-                    onClick={isLongAnswer ? () => toggleAnswer(answerKey) : undefined}
-                    onKeyDown={(event) => handleAnswerKeyDown(event, answerKey, isLongAnswer)}
-                    role={isLongAnswer ? 'button' : undefined}
-                    tabIndex={isLongAnswer ? 0 : undefined}
-                  >
-                    {entry.value}
-                  </p>
-                  {isLongAnswer && !isExpandedAnswer ? (
-                    <p className="mt-1 text-xs text-slate-400">לחצו להצגה מלאה</p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500" dir="rtl">לא נמצאו נתוני קליטה להצגה.</p>
-        )}
-      </CardContent>
+      <details
+        className="group"
+        open={isExpanded}
+        onToggle={(event) => setIsExpanded(event.currentTarget.open)}
+      >
+        <summary className="list-none cursor-pointer focus-visible:outline-none">
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold text-foreground sm:text-lg">נתוני קליטה</CardTitle>
+              <p className="text-xs text-muted-foreground">לחצו להצגת פרטי קליטה</p>
+            </div>
+            <Button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setIsDialogOpen(true);
+              }}
+              disabled={!htmlSource}
+            >
+              צפה בטופס המקורי
+            </Button>
+          </CardHeader>
+        </summary>
+        <CardContent>
+          {entries.length ? (
+            <div className="grid gap-3 text-sm text-slate-700 md:grid-cols-2" dir="rtl">
+              {entries.map((entry, index) => {
+                const answerKey = `${entry.label}-${index}`;
+                const isLongAnswer = entry.value.length > 120 || entry.value.includes('\n');
+                const isExpandedAnswer = expandedAnswers.has(answerKey);
+                return (
+                  <div key={answerKey} className="rounded-md border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold text-slate-500">{entry.label}</p>
+                    <p
+                      className={`mt-1 text-sm text-slate-700 ${
+                        isLongAnswer ? 'cursor-pointer' : ''
+                      } ${isExpandedAnswer ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
+                      onClick={isLongAnswer ? () => toggleAnswer(answerKey) : undefined}
+                      onKeyDown={(event) => handleAnswerKeyDown(event, answerKey, isLongAnswer)}
+                      role={isLongAnswer ? 'button' : undefined}
+                      tabIndex={isLongAnswer ? 0 : undefined}
+                    >
+                      {entry.value}
+                    </p>
+                    {isLongAnswer && !isExpandedAnswer ? (
+                      <p className="mt-1 text-xs text-slate-400">לחצו להצגה מלאה</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500" dir="rtl">לא נמצאו נתוני קליטה להצגה.</p>
+          )}
+        </CardContent>
+      </details>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-4xl overflow-y-auto max-h-[90vh]">

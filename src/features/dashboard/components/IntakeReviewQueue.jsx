@@ -2,11 +2,25 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import { fetchSettings } from '@/features/settings/api/settings.js';
+
+const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שהתלמיד/ה והאפוטרופוס נתנו הסכמה לקליטה.';
 
 function normalizeString(value) {
   if (value === null || value === undefined) {
@@ -76,8 +90,11 @@ export default function IntakeReviewQueue() {
   const [displayLabels, setDisplayLabels] = useState({});
   const [importantFields, setImportantFields] = useState([]);
   const [approvingIds, setApprovingIds] = useState(() => new Set());
-  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const [openIds, setOpenIds] = useState(() => new Set());
+  const [showAllIds, setShowAllIds] = useState(() => new Set());
   const [expandedAnswers, setExpandedAnswers] = useState(() => new Set());
+  const [confirmingStudentId, setConfirmingStudentId] = useState('');
+  const [agreementChecked, setAgreementChecked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,8 +152,12 @@ export default function IntakeReviewQueue() {
 
   const labelMap = useMemo(() => displayLabels, [displayLabels]);
 
-  const handleApprove = async (studentId) => {
+  const handleApprove = async (studentId, agreement) => {
     if (!session || !activeOrgId) {
+      return;
+    }
+    if (!agreement?.acknowledged) {
+      setError('יש לאשר את הצהרת ההסכמה לפני האישור.');
       return;
     }
 
@@ -150,6 +171,7 @@ export default function IntakeReviewQueue() {
         body: {
           org_id: activeOrgId,
           student_id: studentId,
+          agreement,
         },
       });
       setPendingStudents((prev) => prev.filter((student) => student.id !== studentId));
@@ -165,8 +187,20 @@ export default function IntakeReviewQueue() {
     }
   };
 
-  const toggleExpanded = (studentId) => {
-    setExpandedIds((prev) => {
+  const toggleSection = (studentId, isOpen) => {
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (isOpen) {
+        next.add(studentId);
+      } else {
+        next.delete(studentId);
+      }
+      return next;
+    });
+  };
+
+  const toggleShowAll = (studentId) => {
+    setShowAllIds((prev) => {
       const next = new Set(prev);
       if (next.has(studentId)) {
         next.delete(studentId);
@@ -199,6 +233,34 @@ export default function IntakeReviewQueue() {
     }
   };
 
+  const openConfirmDialog = (studentId) => {
+    setConfirmingStudentId(studentId);
+    setAgreementChecked(false);
+  };
+
+  const closeConfirmDialog = (open) => {
+    if (!open) {
+      setConfirmingStudentId('');
+      setAgreementChecked(false);
+    }
+  };
+
+  const confirmStudent = pendingStudents.find((student) => student.id === confirmingStudentId);
+  const isConfirmingApproval = confirmingStudentId ? approvingIds.has(confirmingStudentId) : false;
+
+  const handleConfirmApprove = async () => {
+    if (!confirmingStudentId || !agreementChecked) {
+      return;
+    }
+    await handleApprove(confirmingStudentId, {
+      acknowledged: true,
+      acknowledged_at: new Date().toISOString(),
+      statement: APPROVAL_AGREEMENT_TEXT,
+    });
+    setConfirmingStudentId('');
+    setAgreementChecked(false);
+  };
+
   if (!isLoading && !error && pendingStudents.length === 0) {
     return null;
   }
@@ -224,99 +286,151 @@ export default function IntakeReviewQueue() {
 
         <div className="space-y-4">
           {pendingStudents.map((student) => {
-            const isExpanded = expandedIds.has(student.id);
+            const isSectionOpen = openIds.has(student.id);
+            const showAll = showAllIds.has(student.id);
             const answers = formatAnswerEntries(
               student?.intake_responses?.current,
               labelMap,
               importantFields,
-              { showAll: isExpanded }
+              { showAll }
             );
             const isApproving = approvingIds.has(student.id);
 
             return (
               <div key={student.id} className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-2">
-                    <Link
-                      to={`/students/${student.id}`}
-                      className="text-base font-semibold text-slate-900 hover:text-primary"
-                    >
-                      {student.name}
-                    </Link>
-                    <dl className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                      <div>
-                        <dt className="font-medium">מספר זהות</dt>
-                        <dd>{student.national_id || 'לא צוין'}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium">שם איש קשר</dt>
-                        <dd>{student.contact_name || 'לא צוין'}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-medium">טלפון איש קשר</dt>
-                        <dd>{student.contact_phone || 'לא צוין'}</dd>
-                      </div>
-                    </dl>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => handleApprove(student.id)}
-                    disabled={isApproving}
-                  >
-                    {isApproving ? 'מאשר...' : 'אישור קליטה'}
-                  </Button>
-                </div>
-
-                <div className="mt-4 rounded-lg bg-slate-50 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-slate-800">תשובות מהטופס</p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => toggleExpanded(student.id)}
-                    >
-                      {isExpanded ? 'הצג תצוגה מצומצמת' : 'הצג את כל הקליטה'}
-                    </Button>
-                  </div>
-                  {answers.length ? (
-                    <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
-                      {answers.map((entry, index) => {
-                        const answerKey = `${student.id}-${entry.label}-${index}`;
-                        const isLongAnswer = entry.value.length > 120 || entry.value.includes('\n');
-                        const isExpandedAnswer = expandedAnswers.has(answerKey);
-                        return (
-                          <div key={answerKey} className="rounded-md border border-slate-200 bg-white p-3">
-                            <p className="text-xs font-semibold text-slate-500">{entry.label}</p>
-                            <p
-                              className={`mt-1 text-sm text-slate-700 ${
-                                isLongAnswer ? 'cursor-pointer' : ''
-                              } ${isExpandedAnswer ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
-                              onClick={isLongAnswer ? () => toggleAnswer(answerKey) : undefined}
-                              onKeyDown={(event) => handleAnswerKeyDown(event, answerKey, isLongAnswer)}
-                              role={isLongAnswer ? 'button' : undefined}
-                              tabIndex={isLongAnswer ? 0 : undefined}
-                            >
-                              {entry.value}
-                            </p>
-                            {isLongAnswer && !isExpandedAnswer ? (
-                              <p className="mt-1 text-xs text-slate-400">לחצו להצגה מלאה</p>
-                            ) : null}
+                <details
+                  className="group"
+                  open={isSectionOpen}
+                  onToggle={(event) => toggleSection(student.id, event.currentTarget.open)}
+                >
+                  <summary className="cursor-pointer list-none space-y-3 focus-visible:outline-none">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-2">
+                        <p className="text-base font-semibold text-slate-900">{student.name}</p>
+                        <dl className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                          <div>
+                            <dt className="font-medium">מספר זהות</dt>
+                            <dd>{student.national_id || 'לא צוין'}</dd>
                           </div>
-                        );
-                      })}
+                          <div>
+                            <dt className="font-medium">שם איש קשר</dt>
+                            <dd>{student.contact_name || 'לא צוין'}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-medium">טלפון איש קשר</dt>
+                            <dd>{student.contact_phone || 'לא צוין'}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                      <span className="text-xs font-medium text-slate-500">
+                        {isSectionOpen ? 'לחצו לסגירה' : 'לחצו לפתיחה'}
+                      </span>
                     </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-slate-500">
-                      {isExpanded ? 'אין תשובות זמינות להצגה.' : 'לא הוגדרו שדות חשובים להצגה.'}
-                    </p>
-                  )}
-                </div>
+                  </summary>
+
+                  <div className="mt-4 space-y-4 border-t border-slate-200 pt-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-2">
+                        <Link
+                          to={`/students/${student.id}`}
+                          className="text-sm font-semibold text-slate-900 hover:text-primary"
+                        >
+                          מעבר לכרטיס תלמיד
+                        </Link>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => openConfirmDialog(student.id)}
+                        disabled={isApproving}
+                      >
+                        {isApproving ? 'מאשר...' : 'אישור קליטה'}
+                      </Button>
+                    </div>
+
+                    <div className="rounded-lg bg-slate-50 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-slate-800">תשובות מהטופס</p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleShowAll(student.id)}
+                        >
+                          {showAll ? 'הצג תצוגה מצומצמת' : 'הצג את כל הקליטה'}
+                        </Button>
+                      </div>
+                      {answers.length ? (
+                        <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+                          {answers.map((entry, index) => {
+                            const answerKey = `${student.id}-${entry.label}-${index}`;
+                            const isLongAnswer = entry.value.length > 120 || entry.value.includes('\n');
+                            const isExpandedAnswer = expandedAnswers.has(answerKey);
+                            return (
+                              <div key={answerKey} className="rounded-md border border-slate-200 bg-white p-3">
+                                <p className="text-xs font-semibold text-slate-500">{entry.label}</p>
+                                <p
+                                  className={`mt-1 text-sm text-slate-700 ${
+                                    isLongAnswer ? 'cursor-pointer' : ''
+                                  } ${isExpandedAnswer ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
+                                  onClick={isLongAnswer ? () => toggleAnswer(answerKey) : undefined}
+                                  onKeyDown={(event) => handleAnswerKeyDown(event, answerKey, isLongAnswer)}
+                                  role={isLongAnswer ? 'button' : undefined}
+                                  tabIndex={isLongAnswer ? 0 : undefined}
+                                >
+                                  {entry.value}
+                                </p>
+                                {isLongAnswer && !isExpandedAnswer ? (
+                                  <p className="mt-1 text-xs text-slate-400">לחצו להצגה מלאה</p>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-500">
+                          {showAll ? 'אין תשובות זמינות להצגה.' : 'לא הוגדרו שדות חשובים להצגה.'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </details>
               </div>
             );
           })}
         </div>
       </div>
+
+      <AlertDialog open={Boolean(confirmingStudentId)} onOpenChange={closeConfirmDialog}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>אישור קליטה</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmStudent?.name
+                ? `לפני אישור קליטה עבור ${confirmStudent.name}, יש לאשר את הצהרת ההסכמה.`
+                : 'לפני אישור קליטה יש לאשר את הצהרת ההסכמה.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <Checkbox
+              id="intake-approval-agreement"
+              checked={agreementChecked}
+              onCheckedChange={(value) => setAgreementChecked(value === true)}
+            />
+            <Label htmlFor="intake-approval-agreement" className="text-sm text-slate-700">
+              {APPROVAL_AGREEMENT_TEXT}
+            </Label>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>בטל</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmApprove}
+              disabled={!agreementChecked || isConfirmingApproval}
+            >
+              {isConfirmingApproval ? 'מאשר...' : 'מאשר/ת קליטה'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Alert>
   );
 }
