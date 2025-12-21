@@ -18,7 +18,10 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchSettings } from '@/features/settings/api/settings.js';
+import { useInstructors } from '@/hooks/useOrgData.js';
+import { isAdminRole, normalizeMembershipRole } from '@/features/students/utils/endpoints.js';
 
 const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שהתלמיד/ה והאפוטרופוס נתנו הסכמה לקליטה.';
 
@@ -56,9 +59,8 @@ function formatAnswerEntries(currentAnswers, labelMap, importantFields, { showAl
   const excludedKeys = new Set(['intake_html_source', 'intake_date', 'response_id']);
   const importantSet = new Set(importantFields);
 
-  return Object.entries(currentAnswers)
+  const allEntries = Object.entries(currentAnswers)
     .filter(([key]) => !excludedKeys.has(key))
-    .filter(([key]) => (showAll ? true : importantSet.has(key)))
     .map(([key, value]) => {
       if (value === null || value === undefined) {
         return null;
@@ -74,16 +76,32 @@ function formatAnswerEntries(currentAnswers, labelMap, importantFields, { showAl
         return null;
       }
       return {
+        key,
         label: labelMap[key] || key,
         value: trimmedValue,
       };
     })
     .filter(Boolean);
+
+  if (!importantFields.length) {
+    return showAll ? allEntries : [];
+  }
+
+  const orderedImportant = importantFields
+    .map((fieldKey) => allEntries.find((entry) => entry.key === fieldKey))
+    .filter(Boolean);
+
+  if (!showAll) {
+    return orderedImportant;
+  }
+
+  const remaining = allEntries.filter((entry) => !importantSet.has(entry.key));
+  return [...orderedImportant, ...remaining];
 }
 
 export default function IntakeReviewQueue() {
   const { session } = useAuth();
-  const { activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
+  const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [pendingStudents, setPendingStudents] = useState([]);
@@ -95,6 +113,16 @@ export default function IntakeReviewQueue() {
   const [expandedAnswers, setExpandedAnswers] = useState(() => new Set());
   const [confirmingStudentId, setConfirmingStudentId] = useState('');
   const [agreementChecked, setAgreementChecked] = useState(false);
+  const [instructorFilterId, setInstructorFilterId] = useState('');
+
+  const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
+  const isAdmin = isAdminRole(membershipRole);
+  const { instructors, loadingInstructors } = useInstructors({
+    enabled: Boolean(session && activeOrgId && activeOrgHasConnection && tenantClientReady && isAdmin),
+    orgId: activeOrgId,
+    session,
+    includeInactive: true,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -261,6 +289,20 @@ export default function IntakeReviewQueue() {
     setAgreementChecked(false);
   };
 
+  const instructorMap = useMemo(() => {
+    return new Map((instructors || []).filter((entry) => entry?.id).map((entry) => [entry.id, entry]));
+  }, [instructors]);
+
+  const filteredStudents = useMemo(() => {
+    if (!isAdmin || !instructorFilterId) {
+      return pendingStudents;
+    }
+    if (instructorFilterId === 'unassigned') {
+      return pendingStudents.filter((student) => !student?.assigned_instructor_id);
+    }
+    return pendingStudents.filter((student) => student?.assigned_instructor_id === instructorFilterId);
+  }, [pendingStudents, instructorFilterId, isAdmin]);
+
   if (!isLoading && !error && pendingStudents.length === 0) {
     return null;
   }
@@ -274,7 +316,7 @@ export default function IntakeReviewQueue() {
           {isLoading ? (
             <p>טוען קליטות ממתינות...</p>
           ) : (
-            <p>נמצאו {pendingStudents.length} קליטות ממתינות לבדיקה.</p>
+            <p>נמצאו {filteredStudents.length} קליטות ממתינות לבדיקה.</p>
           )}
         </AlertDescription>
 
@@ -284,8 +326,45 @@ export default function IntakeReviewQueue() {
           </div>
         ) : null}
 
+        {isAdmin ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="font-semibold text-slate-900">סינון לפי מדריך</p>
+              <p className="text-xs text-slate-500">בחרו מדריך, לא משויך, או כל הקליטות.</p>
+            </div>
+            <div className="w-full sm:max-w-xs">
+              <label htmlFor="intake-instructor-filter" className="sr-only">סינון מדריך</label>
+              <Select
+                value={instructorFilterId || 'all'}
+                onValueChange={(value) => setInstructorFilterId(value === 'all' ? '' : value)}
+                disabled={loadingInstructors}
+              >
+                <SelectTrigger id="intake-instructor-filter">
+                  <SelectValue placeholder={loadingInstructors ? 'טוען מדריכים...' : 'כל המדריכים'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">כל המדריכים</SelectItem>
+                  <SelectItem value="unassigned">לא משויך</SelectItem>
+                  {(instructors || []).map((instructor) => (
+                    instructor?.id ? (
+                      <SelectItem key={instructor.id} value={instructor.id}>
+                        {instructor.name || instructor.email || 'מדריך ללא שם'}
+                      </SelectItem>
+                    ) : null
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ) : null}
+
         <div className="space-y-4">
-          {pendingStudents.map((student) => {
+          {filteredStudents.length === 0 && !isLoading ? (
+            <div className="rounded-md border border-red-100 bg-white p-3 text-sm text-slate-600">
+              אין קליטות תואמות למסנן שנבחר.
+            </div>
+          ) : null}
+          {filteredStudents.map((student) => {
             const isSectionOpen = openIds.has(student.id);
             const showAll = showAllIds.has(student.id);
             const answers = formatAnswerEntries(
@@ -295,6 +374,8 @@ export default function IntakeReviewQueue() {
               { showAll }
             );
             const isApproving = approvingIds.has(student.id);
+            const instructor = isAdmin ? instructorMap.get(student?.assigned_instructor_id) : null;
+            const instructorName = instructor?.name || instructor?.email || (student?.assigned_instructor_id ? 'מדריך לא זמין' : 'לא הוקצה מדריך');
 
             return (
               <div key={student.id} className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
@@ -304,22 +385,28 @@ export default function IntakeReviewQueue() {
                   onToggle={(event) => toggleSection(student.id, event.currentTarget.open)}
                 >
                   <summary className="cursor-pointer list-none space-y-3 focus-visible:outline-none">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                      <div className="space-y-2">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-3">
                         <p className="text-base font-semibold text-slate-900">{student.name}</p>
-                        <dl className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                          <div>
-                            <dt className="font-medium">מספר זהות</dt>
-                            <dd>{student.national_id || 'לא צוין'}</dd>
+                        <dl className="flex flex-col gap-3 text-sm text-slate-700 sm:flex-row sm:flex-wrap sm:items-center">
+                          <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                            <dt className="font-medium text-slate-500">מספר זהות</dt>
+                            <dd className="font-semibold text-slate-800">{student.national_id || 'לא צוין'}</dd>
                           </div>
-                          <div>
-                            <dt className="font-medium">שם איש קשר</dt>
-                            <dd>{student.contact_name || 'לא צוין'}</dd>
+                          <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                            <dt className="font-medium text-slate-500">שם איש קשר</dt>
+                            <dd className="font-semibold text-slate-800">{student.contact_name || 'לא צוין'}</dd>
                           </div>
-                          <div>
-                            <dt className="font-medium">טלפון איש קשר</dt>
-                            <dd>{student.contact_phone || 'לא צוין'}</dd>
+                          <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                            <dt className="font-medium text-slate-500">טלפון איש קשר</dt>
+                            <dd className="font-semibold text-slate-800">{student.contact_phone || 'לא צוין'}</dd>
                           </div>
+                          {isAdmin ? (
+                            <div className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-blue-800">
+                              <dt className="font-medium text-blue-600">מדריך</dt>
+                              <dd className="font-semibold">{instructorName}</dd>
+                            </div>
+                          ) : null}
                         </dl>
                       </div>
                       <span className="text-xs font-medium text-slate-500">

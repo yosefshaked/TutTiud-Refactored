@@ -1,0 +1,7 @@
+# Project Documentation (English)
+
+## Intake Review Queue Dashboard Enhancements
+- Pending intake student rows now show key identifiers (ID, contact name, phone) in a single horizontal row for desktop readability.
+- Admins see the assigned instructor label inline with the same row.
+- Admins can filter pending intake items by instructor, unassigned, or all.
+- Mobile layout wraps the row into stacked pill groups for comfortable scanning.
