@@ -62,7 +62,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - `GET /api/students-list` – unified endpoint for all users; admins see all students, non-admins filtered by `assigned_instructor_id`; supports status filtering (`active`/`inactive`/`all`).
 - `POST /api/students-list` – admin/owner creation of student records with optional instructor assignment.
 - `PUT /api/students-list/{studentId}` – admin/owner updates to student metadata (name, contact info, instructor, tags, notes).
-- `POST /api/intake` – public intake endpoint for Power Automate; validates `x-intake-secret` and writes intake history + approval flag.
+- `POST /api/intake` – public intake endpoint for Power Automate; requires `x-org-id` + `x-intake-secret` headers and writes intake history + approval flag.
 - `POST /api/intake/approve` – authenticated approval endpoint that clears `needs_intake_approval` and records `metadata.last_approval`.
 - `GET /api/weekly-compliance` – member/admin/owner weekly aggregation including instructor colors, scheduled chips, documentation status, and a dynamic hour range for the dashboard widget.
 - `POST /api/sessions` – member/admin/owner insertion of `SessionRecords` with assignment verification for members.

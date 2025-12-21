@@ -77,7 +77,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `/api/students-list/{studentId}` | PUT | מנהל/בעלים | מעדכן שדות תלמיד ניתנים לעריכה (שם, פרטי קשר, הגדרות ברירת מחדל, שיוך מדריך, `is_active`, תגיות, הערות) ומחזיר את הרשומה המעודכנת או 404. |
 | `/api/students-check-id` | GET | כל המשתמשים | בודק ייחודיות של מספר זהות, עם אפשרות להתעלם מתלמיד קיים בעת עריכה. מחזיר `{ exists, student }` כדי לחסום כפילויות ולספק קישור לפרופיל. |
 | `/api/students-search` | GET | מנהל/בעלים | חיפוש מטושטש לפי שם שמחזיר `{ id, name, national_id, is_active }` להצגת רמזי כפילות מתחת לשדה השם בטופס. |
-| `/api/intake` | POST | רובוט חיצוני | נקודת קצה ציבורית לקליטת טפסי Microsoft Forms דרך Power Automate. מאמתת `x-intake-secret` מול `external_intake_secret`, ממפה שדות לפי `intake_field_mapping` וכותבת `intake_responses` + `needs_intake_approval`. |
+| `/api/intake` | POST | רובוט חיצוני | נקודת קצה ציבורית לקליטת טפסי Microsoft Forms דרך Power Automate. דורשת את הכותרות `x-org-id` ו-`x-intake-secret` (מאומת מול `external_intake_secret`), ממפה שדות לפי `intake_field_mapping` וכותבת `intake_responses` + `needs_intake_approval`. |
 | `/api/intake/approve` | POST | מנהל/בעלים/מדריך | מאשר קליטה ממתינה ע\"י `needs_intake_approval=false` ורישום `metadata.last_approval` (זמן + מאשר). מדריכים יכולים לאשר רק תלמידים משויכים. |
 | `/api/students/maintenance-export` | GET | מנהל/בעלים | מחזיר CSV עם `system_uuid`, שם, מספר זהות, פרטי קשר, שיוך מדריך, הגדרות ברירת מחדל, תגיות וסטטוס פעילות לצורך ניקוי נתונים. |
 | `/api/loose-sessions` | GET/POST | מנהל/בעלים | מציג רשימת דיווחים לא משויכים (`student_id IS NULL`) ומאפשר לפתור אותם ע"י שיוך לתלמיד קיים או יצירת תלמיד חדש; מסיר רק את `metadata.unassigned_details` ומשמר מטאדטה אחרת. |

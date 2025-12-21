@@ -1084,7 +1084,7 @@
   - `intake_responses` jsonb stores `{ current, history }` intake payloads.
   - `needs_intake_approval` boolean flags pending intake reviews.
 - **API endpoints**:
-  - `POST /api/intake` is public (Power Automate) and validates `x-intake-secret` before inserting/updating student intake data.
+  - `POST /api/intake` is public (Power Automate) and requires `x-org-id` plus `x-intake-secret` before inserting/updating student intake data.
   - `POST /api/intake/approve` requires Supabase auth; admins can approve any student, members only their assigned students. Updates `needs_intake_approval=false` and appends `metadata.last_approval`.
 - **Frontend**:
   - `IntakeSettingsCard.jsx` in Settings allows admins to manage mappings and rotate secrets.

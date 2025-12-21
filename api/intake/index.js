@@ -2,7 +2,7 @@
 import { resolveAuthorizationHeader } from '../_shared/http.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import { parseJsonBodyWithLimit } from '../_shared/validation.js';
-import { readEnv, respond, resolveOrgId, resolveTenantClient } from '../_shared/org-bff.js';
+import { isValidOrgId, readEnv, respond, resolveTenantClient } from '../_shared/org-bff.js';
 
 const SETTINGS_MAPPING_KEY = 'intake_field_mapping';
 const SETTINGS_SECRET_KEY = 'external_intake_secret';
@@ -156,13 +156,17 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'invalid_payload' });
   }
 
-  const orgId = resolveOrgId(req, body);
-  if (!orgId) {
+  const orgIdHeader = normalizeString(resolveAuthorizationHeader(req, ['x-org-id']));
+  if (!orgIdHeader) {
+    return respond(context, 400, { message: 'missing_org_id' });
+  }
+
+  if (!isValidOrgId(orgIdHeader)) {
     return respond(context, 400, { message: 'invalid_org_id' });
   }
 
   const supabase = createSupabaseAdminClient(adminConfig);
-  const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgId);
+  const { client: tenantClient, error: tenantError } = await resolveTenantClient(context, supabase, env, orgIdHeader);
   if (tenantError) {
     return respond(context, tenantError.status, tenantError.body);
   }
