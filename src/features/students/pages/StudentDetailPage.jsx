@@ -23,6 +23,7 @@ import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } fro
 import { exportStudentPdf, downloadPdfBlob } from '@/api/students-export.js';
 import LegacyImportModal from '@/features/students/components/LegacyImportModal.jsx';
 import StudentDocumentsSection from '@/features/students/components/StudentDocumentsSection.jsx';
+import StudentIntakeCard from '@/features/students/components/StudentIntakeCard.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -955,6 +956,8 @@ export default function StudentDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <StudentIntakeCard intakeResponses={student?.intake_responses} />
 
       {/* Documents Section */}
       <StudentDocumentsSection

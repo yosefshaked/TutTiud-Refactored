@@ -1083,6 +1083,7 @@
   - `external_intake_secret` stores the shared secret expected in the `x-intake-secret` header.
 - **Database columns** (tenant DB `tuttiud."Students"`):
   - `intake_responses` jsonb stores `{ current, history }` intake payloads.
+  - `intake_responses.current.intake_html_source` preserves the original HTML summary for rendering on the student profile.
   - `needs_intake_approval` boolean flags pending intake reviews.
 - **API endpoints**:
   - `POST /api/intake` is public (Power Automate) and requires `x-org-id` plus `x-intake-secret` before inserting/updating student intake data. The request provides `html_content` which is parsed into Hebrew question/answer pairs.

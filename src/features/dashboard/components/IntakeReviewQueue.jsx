@@ -29,7 +29,10 @@ function formatAnswerEntries(currentAnswers, labelMap) {
     return [];
   }
 
+  const excludedKeys = new Set(['intake_html_source', 'intake_date', 'response_id']);
+
   return Object.entries(currentAnswers)
+    .filter(([key]) => !excludedKeys.has(key))
     .map(([key, value]) => {
       if (value === null || value === undefined) {
         return null;
