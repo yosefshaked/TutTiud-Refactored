@@ -117,8 +117,8 @@ export default function ChangelogModal({ open, onClose }) {
                     }}>
                       גרסה 1.9.0
                     </span>
-                    <time dateTime="2025-12-19" style={{ color: '#64748b', fontSize: '14px' }}>
-                      19 בדצמבר 2025
+                    <time dateTime="2025-12-22" style={{ color: '#64748b', fontSize: '14px' }}>
+                      22 בדצמבר 2025
                     </time>
                   </div>
                   <span style={{
@@ -138,7 +138,7 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#1e293b',
                   lineHeight: 1.4
                 }}>
-                  🧩 קליטת פניות חיצוניות (Intake)
+                  🧩 קליטת תלמידים (Intake)
                 </h3>
               </header>
 
@@ -151,9 +151,10 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#475569',
                   lineHeight: 1.8
                 }}>
-                  <li>נוספה קליטה של טפסים חיצוניים (למשל Microsoft Forms/Power Automate) ישירות למערכת עם שמירת התשובות.</li>
+                  <li>נוספה קליטה של טפסים חיצוניים ישירות למערכת עם שמירת התשובות.</li>
                   <li>תור אישורי קליטה חדש בדשבורד לניהול ואישור תלמידים שנכנסו דרך טפסים.</li>
-                  <li>כרטיס הגדרות חדש למיפוי שדות ותחזוקת סוד משותף לאינטגרציה.</li>
+                  <li>כרטיס הגדרות חדש למיפוי שדות ותחזוקת סוד משותף לאינטגרציה (למנהלים בלבד).</li>
+                  <li>בעת קבלת אינטייק חדש, הוא מקושר אוטומטית לתלמיד קיים/מייצר תלמיד חדש ע"ב מספר הזהות</li>
                 </ul>
               </section>
               )}
