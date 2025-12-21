@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ function normalizeImportantFields(raw) {
     .filter(Boolean);
 }
 
-function formatAnswerEntries(currentAnswers, labelMap, importantFields) {
+function formatAnswerEntries(currentAnswers, labelMap, importantFields, { showAll = false } = {}) {
   if (!currentAnswers || typeof currentAnswers !== 'object') {
     return [];
   }
@@ -43,7 +44,7 @@ function formatAnswerEntries(currentAnswers, labelMap, importantFields) {
 
   return Object.entries(currentAnswers)
     .filter(([key]) => !excludedKeys.has(key))
-    .filter(([key]) => (importantSet.size ? importantSet.has(key) : true))
+    .filter(([key]) => (showAll ? true : importantSet.has(key)))
     .map(([key, value]) => {
       if (value === null || value === undefined) {
         return null;
@@ -75,6 +76,7 @@ export default function IntakeReviewQueue() {
   const [displayLabels, setDisplayLabels] = useState({});
   const [importantFields, setImportantFields] = useState([]);
   const [approvingIds, setApprovingIds] = useState(() => new Set());
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -162,6 +164,18 @@ export default function IntakeReviewQueue() {
     }
   };
 
+  const toggleExpanded = (studentId) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentId)) {
+        next.delete(studentId);
+      } else {
+        next.add(studentId);
+      }
+      return next;
+    });
+  };
+
   if (!isLoading && !error && pendingStudents.length === 0) {
     return null;
   }
@@ -186,15 +200,26 @@ export default function IntakeReviewQueue() {
         ) : null}
 
         <div className="space-y-4">
-            {pendingStudents.map((student) => {
-            const answers = formatAnswerEntries(student?.intake_responses?.current, labelMap, importantFields);
+          {pendingStudents.map((student) => {
+            const isExpanded = expandedIds.has(student.id);
+            const answers = formatAnswerEntries(
+              student?.intake_responses?.current,
+              labelMap,
+              importantFields,
+              { showAll: isExpanded }
+            );
             const isApproving = approvingIds.has(student.id);
 
             return (
               <div key={student.id} className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="space-y-2">
-                    <h3 className="text-base font-semibold text-slate-900">{student.name}</h3>
+                    <Link
+                      to={`/students/${student.id}`}
+                      className="text-base font-semibold text-slate-900 hover:text-primary"
+                    >
+                      {student.name}
+                    </Link>
                     <dl className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
                       <div>
                         <dt className="font-medium">מספר זהות</dt>
@@ -220,7 +245,17 @@ export default function IntakeReviewQueue() {
                 </div>
 
                 <div className="mt-4 rounded-lg bg-slate-50 p-3">
-                  <p className="text-sm font-medium text-slate-800">תשובות מהטופס</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-800">תשובות מהטופס</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => toggleExpanded(student.id)}
+                    >
+                      {isExpanded ? 'הצג תצוגה מצומצמת' : 'הצג את כל הקליטה'}
+                    </Button>
+                  </div>
                   {answers.length ? (
                     <ul className="mt-2 space-y-1 text-sm text-slate-700">
                       {answers.map((entry) => (
@@ -231,7 +266,9 @@ export default function IntakeReviewQueue() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2 text-sm text-slate-500">אין תשובות זמינות להצגה.</p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {isExpanded ? 'אין תשובות זמינות להצגה.' : 'לא הוגדרו שדות חשובים להצגה.'}
+                    </p>
                   )}
                 </div>
               </div>

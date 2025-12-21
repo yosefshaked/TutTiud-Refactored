@@ -138,7 +138,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - `SETUP_SQL_SCRIPT` הוא מקור האמת היחיד לסקריפט; ייבאו אותו לכל מקום שבו מציגים את הסקריפט.
 - הסקריפט מוסיף עתה את העמודה `Students.is_active boolean default true` ומשלים ערך `true` ברשומות קיימות. ההרצה חוזרת בטוחה הודות לשימוש עקבי ב-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
-- גשר הקליטה (Intake Bridge) משתמש ב-`intake_field_mapping` וב-`external_intake_secret` מתוך `tuttiud.Settings`, ממפה לפי טקסט השאלה בעברית כפי שמופיע ב-HTML, שומר את ה-HTML המקורי ב-`intake_responses.intake_html_source`, והאישורים מתבצעים דרך `/api/intake/approve` כדי לשמור על בקרה ידנית.
+- גשר הקליטה (Intake Bridge) משתמש ב-`intake_field_mapping` וב-`external_intake_secret` מתוך `tuttiud.Settings`, ממפה לפי טקסט השאלה בעברית כפי שמופיע ב-HTML, שומר את ה-HTML המקורי ב-`intake_responses.intake_html_source`, והאישורים מתבצעים דרך `/api/intake/approve` כדי לשמור על בקרה ידנית. בלוח הבקרה מוצגים שדות חשובים עם אפשרות להרחיב לצפייה מלאה.
 - `SessionRecords.student_id` הוא כעת NULLABLE כדי לאפשר דיווחי סשן לא משויכים. בעת כתיבה יש להוסיף את `metadata.unassigned_details` באופן אדיטיבי (בלי למחוק מפתחות קיימים) ולוודא שכל השאילתות/נקודות הקצה יודעות להתמודד עם `student_id` שווה NULL.
 - `verifyOrgConnection` (`src/runtime/verification.js`) מקבל כעת לקוח Supabase ומחזיר את מערך התוצאות כדי לרנדר סטטוס.
 - בעת השלמת האשף חובה לקרוא ל-`recordVerification(orgId, timestamp)` כדי לעדכן את `setup_completed` / `verified_at` ב-Control DB.

@@ -241,13 +241,18 @@ export default async function handler(context, req) {
 
   const responses = extractQaPairs(htmlContent);
   const studentNameRaw = resolveMappedValue(intakeMapping, responses, 'student_name');
+  const firstNameRaw = resolveMappedValue(intakeMapping, responses, 'first_name') || responses['שם פרטי'];
+  const lastNameRaw = resolveMappedValue(intakeMapping, responses, 'last_name') || responses['שם משפחה'];
   const nationalIdRaw = resolveMappedValue(intakeMapping, responses, 'national_id');
   const phoneRaw = resolveMappedValue(intakeMapping, responses, 'phone');
   const parentNameRaw = resolveMappedValue(intakeMapping, responses, 'parent_name');
   const parentPhoneRaw = resolveMappedValue(intakeMapping, responses, 'parent_phone');
   const healthProviderRaw = resolveMappedValue(intakeMapping, responses, 'health_provider_tag');
 
-  const studentName = normalizeString(studentNameRaw);
+  const firstName = normalizeString(firstNameRaw);
+  const lastName = normalizeString(lastNameRaw);
+  const combinedName = [firstName, lastName].filter(Boolean).join(' ').trim();
+  const studentName = combinedName || normalizeString(studentNameRaw);
   const nationalId = normalizeString(nationalIdRaw);
   const studentPhone = normalizePhone(phoneRaw) || null;
   const contactName = normalizeString(parentNameRaw) || null;
