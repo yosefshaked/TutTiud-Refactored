@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchSettings, upsertSettings } from '@/features/settings/api/settings.js';
 
@@ -196,6 +197,19 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
     });
   };
 
+  const handleMoveImportantField = async (fieldIndex, direction) => {
+    const nextIndex = fieldIndex + direction;
+    if (nextIndex < 0 || nextIndex >= importantFields.length) {
+      return;
+    }
+    const nextFields = [...importantFields];
+    const [moved] = nextFields.splice(fieldIndex, 1);
+    nextFields.splice(nextIndex, 0, moved);
+    await saveImportantFields(nextFields, {
+      successMessage: 'סדר השדות עודכן בהצלחה.',
+    });
+  };
+
   const handleSave = async () => {
     if (!session || !orgId) {
       toast.error('נדרשת התחברות פעילה כדי לשמור את ההגדרות.');
@@ -299,18 +313,40 @@ export default function IntakeSettingsCard({ session, orgId, activeOrgHasConnect
           </div>
           {importantFields.length ? (
             <ul className="mt-2 space-y-2 text-sm text-slate-700">
-              {importantFields.map((field) => (
-                <li key={field} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+              {importantFields.map((field, index) => (
+                <li key={`${field}-${index}`} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
                   <span>{field}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveImportantField(field)}
-                    disabled={isLoading || isSaving}
-                  >
-                    הסר
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleMoveImportantField(index, -1)}
+                      disabled={isLoading || isSaving || index === 0}
+                      aria-label="העבר למעלה"
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleMoveImportantField(index, 1)}
+                      disabled={isLoading || isSaving || index === importantFields.length - 1}
+                      aria-label="העבר למטה"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveImportantField(field)}
+                      disabled={isLoading || isSaving}
+                    >
+                      הסר
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>

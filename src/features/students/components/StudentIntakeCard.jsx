@@ -30,9 +30,8 @@ function buildIntakeEntries(payload, importantFields) {
   }
 
   const importantSet = new Set(importantFields);
-  return Object.entries(payload)
+  const allEntries = Object.entries(payload)
     .filter(([key]) => !EXCLUDED_KEYS.has(key))
-    .filter(([key]) => (importantSet.size ? importantSet.has(key) : true))
     .map(([key, value]) => {
       if (value === null || value === undefined) {
         return null;
@@ -47,9 +46,19 @@ function buildIntakeEntries(payload, importantFields) {
       if (!trimmedValue) {
         return null;
       }
-      return { label: key, value: trimmedValue };
+      return { key, label: key, value: trimmedValue };
     })
     .filter(Boolean);
+
+  if (!importantFields.length) {
+    return allEntries;
+  }
+
+  const orderedImportant = importantFields
+    .map((fieldKey) => allEntries.find((entry) => entry.key === fieldKey))
+    .filter(Boolean);
+  const remaining = allEntries.filter((entry) => !importantSet.has(entry.key));
+  return [...orderedImportant, ...remaining];
 }
 
 export default function StudentIntakeCard({ intakeResponses, importantFields }) {

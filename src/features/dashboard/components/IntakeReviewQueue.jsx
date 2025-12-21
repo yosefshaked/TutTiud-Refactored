@@ -56,9 +56,8 @@ function formatAnswerEntries(currentAnswers, labelMap, importantFields, { showAl
   const excludedKeys = new Set(['intake_html_source', 'intake_date', 'response_id']);
   const importantSet = new Set(importantFields);
 
-  return Object.entries(currentAnswers)
+  const allEntries = Object.entries(currentAnswers)
     .filter(([key]) => !excludedKeys.has(key))
-    .filter(([key]) => (showAll ? true : importantSet.has(key)))
     .map(([key, value]) => {
       if (value === null || value === undefined) {
         return null;
@@ -74,11 +73,27 @@ function formatAnswerEntries(currentAnswers, labelMap, importantFields, { showAl
         return null;
       }
       return {
+        key,
         label: labelMap[key] || key,
         value: trimmedValue,
       };
     })
     .filter(Boolean);
+
+  if (!importantFields.length) {
+    return showAll ? allEntries : [];
+  }
+
+  const orderedImportant = importantFields
+    .map((fieldKey) => allEntries.find((entry) => entry.key === fieldKey))
+    .filter(Boolean);
+
+  if (!showAll) {
+    return orderedImportant;
+  }
+
+  const remaining = allEntries.filter((entry) => !importantSet.has(entry.key));
+  return [...orderedImportant, ...remaining];
 }
 
 export default function IntakeReviewQueue() {
