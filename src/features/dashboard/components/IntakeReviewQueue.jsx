@@ -20,7 +20,7 @@ import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import { fetchSettings } from '@/features/settings/api/settings.js';
 
-const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שהתלמיד/ה והאפוטרופוס נתנו הסכמה לקליטה.';
+const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שקראתי את האינטייק של התלמיד/ה וביצעתי שיחת קליטה עם האפוטרופוס.';
 
 function normalizeString(value) {
   if (value === null || value === undefined) {
