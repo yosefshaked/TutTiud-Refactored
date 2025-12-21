@@ -62,7 +62,9 @@ CREATE TABLE IF NOT EXISTS tuttiud."Students" (
   "default_service" text,
   "tags" uuid[],
   "notes" text,
-  "metadata" jsonb
+  "metadata" jsonb,
+  "intake_responses" jsonb,
+  "needs_intake_approval" boolean DEFAULT false
 );
 
 -- Ensure all new columns exist (idempotent)
@@ -72,7 +74,9 @@ ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
   ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
   ADD COLUMN IF NOT EXISTS "default_service" text,
-  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true;
+  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS "intake_responses" jsonb,
+  ADD COLUMN IF NOT EXISTS "needs_intake_approval" boolean DEFAULT false;
 
 UPDATE tuttiud."Students"
 SET "is_active" = true
@@ -129,7 +133,9 @@ ALTER TABLE tuttiud."Students"
   ADD COLUMN IF NOT EXISTS "default_day_of_week" integer,
   ADD COLUMN IF NOT EXISTS "default_session_time" time with time zone,
   ADD COLUMN IF NOT EXISTS "default_service" text,
-  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true;
+  ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS "intake_responses" jsonb,
+  ADD COLUMN IF NOT EXISTS "needs_intake_approval" boolean DEFAULT false;
 
 UPDATE tuttiud."Students"
 SET "is_active" = true
@@ -251,6 +257,13 @@ CREATE TABLE IF NOT EXISTS tuttiud."Settings" (
 );
 ALTER TABLE tuttiud."Settings"
   ADD COLUMN IF NOT EXISTS "metadata" jsonb;
+INSERT INTO tuttiud."Settings" ("key", "settings_value")
+VALUES
+  ('intake_field_mapping', '{}'::jsonb),
+  ('intake_important_fields', '[]'::jsonb),
+  ('intake_display_labels', '{}'::jsonb),
+  ('external_intake_secret', '""'::jsonb)
+ON CONFLICT ("key") DO NOTHING;
 
 -- =================================================================
 -- Documents Table (Polymorphic File Storage)
@@ -488,4 +501,3 @@ SELECT extensions.sign(
   'YOUR_SUPER_SECRET_AND_LONG_JWT_SECRET_HERE'
 ) AS "APP_DEDICATED_KEY (COPY THIS BACK TO THE APP)";
 `;
-

@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
+import { fetchSettings } from '@/features/settings/api/settings.js';
 import { useInstructors, useServices } from '@/hooks/useOrgData.js';
 import { describeSchedule, formatDefaultTime } from '@/features/students/utils/schedule.js';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
@@ -23,6 +24,7 @@ import { normalizeTagIdsForWrite, normalizeTagCatalog, buildTagDisplayList } fro
 import { exportStudentPdf, downloadPdfBlob } from '@/api/students-export.js';
 import LegacyImportModal from '@/features/students/components/LegacyImportModal.jsx';
 import StudentDocumentsSection from '@/features/students/components/StudentDocumentsSection.jsx';
+import StudentIntakeCard from '@/features/students/components/StudentIntakeCard.jsx';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -166,6 +168,7 @@ export default function StudentDetailPage() {
   const [studentState, setStudentState] = useState(REQUEST_STATE.idle);
   const [studentError, setStudentError] = useState('');
   const [student, setStudent] = useState(null);
+  const [importantFields, setImportantFields] = useState([]);
 
   const [sessionState, setSessionState] = useState(REQUEST_STATE.idle);
   const [sessionError, setSessionError] = useState('');
@@ -205,6 +208,37 @@ export default function StudentDetailPage() {
       !supabaseLoading
     );
   }, [studentId, activeOrgId, activeOrgHasConnection, tenantClientReady, supabaseLoading]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadImportantFields = async () => {
+      if (!canFetch || !session || !activeOrgId) {
+        return;
+      }
+      try {
+        const settings = await fetchSettings({ session, orgId: activeOrgId });
+        if (!isMounted) {
+          return;
+        }
+        const fields = Array.isArray(settings?.intake_important_fields)
+          ? settings.intake_important_fields
+          : [];
+        setImportantFields(fields);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+        setImportantFields([]);
+      }
+    };
+
+    loadImportantFields();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canFetch, session, activeOrgId]);
 
   const { instructors } = useInstructors({ enabled: canFetch });
   const { services, loadingServices, servicesError, refetchServices } = useServices({ enabled: canFetch });
@@ -955,6 +989,8 @@ export default function StudentDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <StudentIntakeCard intakeResponses={student?.intake_responses} importantFields={importantFields} />
 
       {/* Documents Section */}
       <StudentDocumentsSection

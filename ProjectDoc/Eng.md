@@ -1,7 +1,7 @@
 # Project Documentation: Tuttiud Student Support Platform
 
-**Version: 1.6.1**
-**Last Updated: 2025-12-09**
+**Version: 1.6.2**
+**Last Updated: 2025-12-15**
 
 > **Developer Conventions:** For folder structure, naming rules, API patterns, and feature organization, refer to [Conventions.md](./Conventions.md).
 
@@ -38,9 +38,9 @@ Key characteristics:
 | Table | Purpose | Key Columns |
 | :---- | :------ | :---------- |
 | `tuttiud."Instructors"` | Directory of teaching staff. | `id` (uuid PK storing `auth.users.id`, enforced by the application layer), `name`, contact fields, `is_active`, `metadata` (`instructor_color` stores the permanent palette assignment) |
-| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `national_id` (optional, uniqueness enforced in app), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata` |
+| `tuttiud."Students"` | Student roster for the organization. | `id`, `name`, `national_id` (optional, uniqueness enforced in app), `contact_info`, `contact_name`, `contact_phone`, `assigned_instructor_id` (FK → `Instructors.id`), `default_day_of_week` (1 = Sunday, 7 = Saturday), `default_session_time`, `default_service`, `is_active` (boolean, defaults to `true`), `tags`, `notes`, `metadata`, `intake_responses` (JSON payload history from external intake), `needs_intake_approval` (boolean flag for the intake inbox) |
 | `tuttiud."SessionRecords"` | Canonical record of every instruction session. | `id`, `date`, `student_id` (nullable FK → `Students.id` for loose reports), `instructor_id` (FK → `Instructors.id`), `service_context`, `content` (JSON answers map), `deleted`, `is_legacy` (marks imported historical rows), timestamps, `metadata` (includes `unassigned_details` for loose reports until resolution) |
-| `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` |
+| `tuttiud."Settings"` | JSON configuration bucket per tenant. | `id`, `key` (unique), `settings_value` (includes `intake_field_mapping`, `intake_important_fields`, `intake_display_labels`, `external_intake_secret`, and `student_tags`) |
 
 Supporting indexes:
 
@@ -77,6 +77,8 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/students-list/{studentId}` | PUT | Admin/Owner | Updates mutable student fields (name, contact data, scheduling defaults, instructor, `is_active`, tags, notes) and returns the refreshed row or 404. |
 | `/api/students-check-id` | GET | All Users | Validates a national ID for uniqueness, optionally excluding a student ID during edits. Returns `{ exists, student }` so the UI can block duplicates and deep-link to the profile. |
 | `/api/students-search` | GET | Admin/Owner | Fuzzy name search that surfaces `{ id, name, national_id, is_active }` for quick deduplication hints beneath the name input. |
+| `/api/intake` | POST | External Robot | Public endpoint for Microsoft Forms intake via Power Automate. Requires `x-org-id` plus `x-intake-secret` (validated against `external_intake_secret`), parses `html_content` into question/answer pairs, maps fields using `intake_field_mapping`, and writes `intake_responses` + `needs_intake_approval`. |
+| `/api/intake/approve` | POST | Admin/Owner/Instructor | Approves a pending intake by setting `needs_intake_approval=false` and appending `metadata.last_approval` (timestamp + approver + agreement). Members may only approve their assigned students. |
 | `/api/students/maintenance-export` | GET | Admin/Owner | Returns a CSV with `system_uuid`, name, national ID, contact info, assigned instructor, schedule defaults, tags, and `is_active` for bulk cleanup. |
 | `/api/loose-sessions` | GET/POST | Admin/Owner | Lists unassigned session records (`student_id IS NULL`) and resolves them by assigning to an existing student or creating a new student; strips only `metadata.unassigned_details` on resolution and preserves other metadata. |
 | `/api/students/maintenance-import` | POST | Admin/Owner | Accepts edited maintenance CSV text keyed by `system_uuid`, updates only changed fields, enforces national ID uniqueness per row and against the database, and reports per-row failures. |
@@ -135,6 +137,7 @@ All endpoints expect the tenant identifier (`org_id`) in the request body or que
 
 - Keep `SETUP_SQL_SCRIPT` as the single source of truth; import it anywhere the script must be displayed (wizard, docs, etc.).
 - The setup script now includes `Students.is_active boolean default true` (with backfill) to support inactive lifecycle flows; rerunning it on legacy tenants is safe because every `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` stays idempotent.
+- Intake Bridge uses `intake_field_mapping` + `external_intake_secret` in `tuttiud.Settings` to accept Microsoft Forms HTML summaries, maps by Hebrew question text as it appears in the HTML, stores the raw HTML in `intake_responses.intake_html_source`, and routes approvals through `/api/intake/approve`, keeping intake decisions explicit and agreement-backed. The dashboard shows the configured important fields in collapsible review cards with an option to expand to the full intake.
 - SessionRecords now allows `student_id` to be NULL to support unassigned ("loose") session reports. Loose writes must add `metadata.unassigned_details` without overwriting existing metadata keys, and downstream queries/endpoints must tolerate NULL student_ids.
 - `verifyOrgConnection` (`src/runtime/verification.js`) now expects a Supabase data client and returns the diagnostics array so callers can render pass/fail status.
 - All onboarding status updates should call `recordVerification(orgId, timestamp)` to persist `setup_completed` / `verified_at` on the control-plane organization row.

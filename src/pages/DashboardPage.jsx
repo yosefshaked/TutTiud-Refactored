@@ -8,6 +8,7 @@ import { useSupabase } from "@/context/SupabaseContext.jsx"
 import { useSessionModal } from "@/features/sessions/context/SessionModalContext.jsx"
 import { useInstructors } from "@/hooks/useOrgData.js"
 import { ComplianceHeatmap } from "@/features/dashboard/components/ComplianceHeatmap.jsx"
+import IntakeReviewQueue from "@/features/dashboard/components/IntakeReviewQueue.jsx"
 
 /**
  * Build greeting with proper fallback chain:
@@ -153,6 +154,10 @@ export default function DashboardPage() {
             </div>
           </header>
 
+          <div className="pb-md">
+            <IntakeReviewQueue />
+          </div>
+
           {/* Quick action cards */}
           <div className="grid grid-cols-1 gap-lg pb-xl md:grid-cols-2">
             <Link to={studentsLink} className="group focus-visible:outline-none">
@@ -211,6 +216,8 @@ export default function DashboardPage() {
               <p className="max-w-2xl text-sm text-neutral-600 sm:text-body-md">מה תרצו לעשות כעת?</p>
             </div>
           </header>
+
+          <IntakeReviewQueue />
 
           <div className="grid grid-cols-2 gap-lg">
             <Link to={studentsLink} className="group focus-visible:outline-none">
