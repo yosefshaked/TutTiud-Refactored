@@ -114,6 +114,8 @@ export default function IntakeReviewQueue() {
   const [confirmingStudentId, setConfirmingStudentId] = useState('');
   const [agreementChecked, setAgreementChecked] = useState(false);
   const [instructorFilterId, setInstructorFilterId] = useState('');
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [retryToken, setRetryToken] = useState(0);
 
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const isAdmin = isAdminRole(membershipRole);
@@ -176,9 +178,27 @@ export default function IntakeReviewQueue() {
     return () => {
       cancelled = true;
     };
-  }, [session, activeOrgId, activeOrgHasConnection, tenantClientReady]);
+  }, [session, activeOrgId, activeOrgHasConnection, tenantClientReady, retryToken]);
 
   const labelMap = useMemo(() => displayLabels, [displayLabels]);
+
+  const summaryCounts = useMemo(() => {
+    return pendingStudents.reduce(
+      (accumulator, student) => {
+        if (student?.assigned_instructor_id) {
+          accumulator.existing += 1;
+        } else {
+          accumulator.new += 1;
+        }
+        return accumulator;
+      },
+      { new: 0, existing: 0 }
+    );
+  }, [pendingStudents]);
+
+  const handleRetry = () => {
+    setRetryToken((value) => value + 1);
+  };
 
   const handleApprove = async (studentId, agreement) => {
     if (!session || !activeOrgId) {
@@ -303,188 +323,234 @@ export default function IntakeReviewQueue() {
     return pendingStudents.filter((student) => student?.assigned_instructor_id === instructorFilterId);
   }, [pendingStudents, instructorFilterId, isAdmin]);
 
-  if (!isLoading && !error && pendingStudents.length === 0) {
-    return null;
-  }
+  const alertVariant = pendingStudents.length > 0 || error ? 'destructive' : 'default';
+  const toggleLabel = isCollapsed ? 'פתח תור קליטה' : 'סגור תור קליטה';
+  const summaryStatus = (() => {
+    if (isLoading) {
+      return 'טוען קליטות ממתינות...';
+    }
+    if (error) {
+      return 'אירעה שגיאה בטעינת תור הקליטה.';
+    }
+    if (pendingStudents.length === 0) {
+      return 'אין קליטות שממתינות לאישור.';
+    }
+    return `נמצאו ${pendingStudents.length} קליטות ממתינות לבדיקה.`;
+  })();
 
   return (
-    <Alert variant="destructive" className="bg-red-50 border-red-200" dir="rtl">
+    <Alert
+      variant={alertVariant}
+      className={alertVariant === 'destructive' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}
+      dir="rtl"
+    >
       <AlertTriangle className="h-5 w-5" />
       <div className="space-y-4">
         <AlertTitle>תור קליטת תלמידים ממתין לאישור</AlertTitle>
-        <AlertDescription>
-          {isLoading ? (
-            <p>טוען קליטות ממתינות...</p>
-          ) : (
-            <p>נמצאו {filteredStudents.length} קליטות ממתינות לבדיקה.</p>
-          )}
+        <AlertDescription className="space-y-3">
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-2">
+                <p className="font-semibold text-slate-900">{summaryStatus}</p>
+                <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                    <span className="text-xs font-medium text-slate-500">חדשים</span>
+                    <span className="text-sm font-semibold text-slate-900" aria-live="polite">
+                      {isLoading ? '...' : summaryCounts.new}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                    <span className="text-xs font-medium text-slate-500">קיימים</span>
+                    <span className="text-sm font-semibold text-slate-900" aria-live="polite">
+                      {isLoading ? '...' : summaryCounts.existing}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCollapsed((value) => !value)}
+                aria-expanded={!isCollapsed}
+                aria-controls="intake-review-queue-details"
+              >
+                {toggleLabel}
+              </Button>
+            </div>
+            {error ? (
+              <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+                <span>{error}</span>
+                <Button type="button" size="sm" variant="outline" onClick={handleRetry}>
+                  נסו שוב
+                </Button>
+              </div>
+            ) : null}
+          </div>
         </AlertDescription>
 
-        {error ? (
-          <div className="rounded-md border border-red-200 bg-white p-3 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
-
-        {isAdmin ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="font-semibold text-slate-900">סינון לפי מדריך</p>
-              <p className="text-xs text-slate-500">בחרו מדריך, לא משויך, או כל הקליטות.</p>
-            </div>
-            <div className="w-full sm:max-w-xs">
-              <label htmlFor="intake-instructor-filter" className="sr-only">סינון מדריך</label>
-              <Select
-                value={instructorFilterId || 'all'}
-                onValueChange={(value) => setInstructorFilterId(value === 'all' ? '' : value)}
-                disabled={loadingInstructors}
-              >
-                <SelectTrigger id="intake-instructor-filter">
-                  <SelectValue placeholder={loadingInstructors ? 'טוען מדריכים...' : 'כל המדריכים'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">כל המדריכים</SelectItem>
-                  <SelectItem value="unassigned">לא משויך</SelectItem>
-                  {(instructors || []).map((instructor) => (
-                    instructor?.id ? (
-                      <SelectItem key={instructor.id} value={instructor.id}>
-                        {instructor.name || instructor.email || 'מדריך ללא שם'}
-                      </SelectItem>
-                    ) : null
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="space-y-4">
-          {filteredStudents.length === 0 && !isLoading ? (
-            <div className="rounded-md border border-red-100 bg-white p-3 text-sm text-slate-600">
-              אין קליטות תואמות למסנן שנבחר.
-            </div>
-          ) : null}
-          {filteredStudents.map((student) => {
-            const isSectionOpen = openIds.has(student.id);
-            const showAll = showAllIds.has(student.id);
-            const answers = formatAnswerEntries(
-              student?.intake_responses?.current,
-              labelMap,
-              importantFields,
-              { showAll }
-            );
-            const isApproving = approvingIds.has(student.id);
-            const instructor = isAdmin ? instructorMap.get(student?.assigned_instructor_id) : null;
-            const instructorName = instructor?.name || instructor?.email || (student?.assigned_instructor_id ? 'מדריך לא זמין' : 'לא הוקצה מדריך');
-
-            return (
-              <div key={student.id} className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
-                <details
-                  className="group"
-                  open={isSectionOpen}
-                  onToggle={(event) => toggleSection(student.id, event.currentTarget.open)}
-                >
-                  <summary className="cursor-pointer list-none space-y-3 focus-visible:outline-none">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="space-y-3">
-                        <p className="text-base font-semibold text-slate-900">{student.name}</p>
-                        <dl className="flex flex-col gap-3 text-sm text-slate-700 sm:flex-row sm:flex-wrap sm:items-center">
-                          <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
-                            <dt className="font-medium text-slate-500">מספר זהות</dt>
-                            <dd className="font-semibold text-slate-800">{student.national_id || 'לא צוין'}</dd>
-                          </div>
-                          <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
-                            <dt className="font-medium text-slate-500">שם איש קשר</dt>
-                            <dd className="font-semibold text-slate-800">{student.contact_name || 'לא צוין'}</dd>
-                          </div>
-                          <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
-                            <dt className="font-medium text-slate-500">טלפון איש קשר</dt>
-                            <dd className="font-semibold text-slate-800">{student.contact_phone || 'לא צוין'}</dd>
-                          </div>
-                          {isAdmin ? (
-                            <div className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-blue-800">
-                              <dt className="font-medium text-blue-600">מדריך</dt>
-                              <dd className="font-semibold">{instructorName}</dd>
-                            </div>
-                          ) : null}
-                        </dl>
-                      </div>
-                      <span className="text-xs font-medium text-slate-500">
-                        {isSectionOpen ? 'לחצו לסגירה' : 'לחצו לפתיחה'}
-                      </span>
-                    </div>
-                  </summary>
-
-                  <div className="mt-4 space-y-4 border-t border-slate-200 pt-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="space-y-2">
-                        <Link
-                          to={`/students/${student.id}`}
-                          className="text-sm font-semibold text-slate-900 hover:text-primary"
-                        >
-                          מעבר לכרטיס תלמיד
-                        </Link>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={() => openConfirmDialog(student.id)}
-                        disabled={isApproving}
-                      >
-                        {isApproving ? 'מאשר...' : 'אישור קליטה'}
-                      </Button>
-                    </div>
-
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-medium text-slate-800">תשובות מהטופס</p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleShowAll(student.id)}
-                        >
-                          {showAll ? 'הצג תצוגה מצומצמת' : 'הצג את כל הקליטה'}
-                        </Button>
-                      </div>
-                      {answers.length ? (
-                        <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
-                          {answers.map((entry, index) => {
-                            const answerKey = `${student.id}-${entry.label}-${index}`;
-                            const isLongAnswer = entry.value.length > 120 || entry.value.includes('\n');
-                            const isExpandedAnswer = expandedAnswers.has(answerKey);
-                            return (
-                              <div key={answerKey} className="rounded-md border border-slate-200 bg-white p-3">
-                                <p className="text-xs font-semibold text-slate-500">{entry.label}</p>
-                                <p
-                                  className={`mt-1 text-sm text-slate-700 ${
-                                    isLongAnswer ? 'cursor-pointer' : ''
-                                  } ${isExpandedAnswer ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
-                                  onClick={isLongAnswer ? () => toggleAnswer(answerKey) : undefined}
-                                  onKeyDown={(event) => handleAnswerKeyDown(event, answerKey, isLongAnswer)}
-                                  role={isLongAnswer ? 'button' : undefined}
-                                  tabIndex={isLongAnswer ? 0 : undefined}
-                                >
-                                  {entry.value}
-                                </p>
-                                {isLongAnswer && !isExpandedAnswer ? (
-                                  <p className="mt-1 text-xs text-slate-400">לחצו להצגה מלאה</p>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-sm text-slate-500">
-                          {showAll ? 'אין תשובות זמינות להצגה.' : 'לא הוגדרו שדות חשובים להצגה.'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </details>
+        {!isCollapsed ? (
+          <div id="intake-review-queue-details" className="space-y-4">
+            {isAdmin ? (
+              <div className="flex flex-col gap-2 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="font-semibold text-slate-900">סינון לפי מדריך</p>
+                  <p className="text-xs text-slate-500">בחרו מדריך, לא משויך, או כל הקליטות.</p>
+                </div>
+                <div className="w-full sm:max-w-xs">
+                  <label htmlFor="intake-instructor-filter" className="sr-only">סינון מדריך</label>
+                  <Select
+                    value={instructorFilterId || 'all'}
+                    onValueChange={(value) => setInstructorFilterId(value === 'all' ? '' : value)}
+                    disabled={loadingInstructors}
+                  >
+                    <SelectTrigger id="intake-instructor-filter">
+                      <SelectValue placeholder={loadingInstructors ? 'טוען מדריכים...' : 'כל המדריכים'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">כל המדריכים</SelectItem>
+                      <SelectItem value="unassigned">לא משויך</SelectItem>
+                      {(instructors || []).map((instructor) => (
+                        instructor?.id ? (
+                          <SelectItem key={instructor.id} value={instructor.id}>
+                            {instructor.name || instructor.email || 'מדריך ללא שם'}
+                          </SelectItem>
+                        ) : null
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            );
-          })}
-        </div>
+            ) : null}
+
+            <div className="space-y-4">
+              {filteredStudents.length === 0 && !isLoading ? (
+                <div className="rounded-md border border-red-100 bg-white p-3 text-sm text-slate-600">
+                  אין קליטות תואמות למסנן שנבחר.
+                </div>
+              ) : null}
+              {filteredStudents.map((student) => {
+                const isSectionOpen = openIds.has(student.id);
+                const showAll = showAllIds.has(student.id);
+                const answers = formatAnswerEntries(
+                  student?.intake_responses?.current,
+                  labelMap,
+                  importantFields,
+                  { showAll }
+                );
+                const isApproving = approvingIds.has(student.id);
+                const instructor = isAdmin ? instructorMap.get(student?.assigned_instructor_id) : null;
+                const instructorName = instructor?.name || instructor?.email || (student?.assigned_instructor_id ? 'מדריך לא זמין' : 'לא הוקצה מדריך');
+
+                return (
+                  <div key={student.id} className="rounded-xl border border-red-200 bg-white p-4 shadow-sm">
+                    <details
+                      className="group"
+                      open={isSectionOpen}
+                      onToggle={(event) => toggleSection(student.id, event.currentTarget.open)}
+                    >
+                      <summary className="cursor-pointer list-none space-y-3 focus-visible:outline-none">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-3">
+                            <p className="text-base font-semibold text-slate-900">{student.name}</p>
+                            <dl className="flex flex-col gap-3 text-sm text-slate-700 sm:flex-row sm:flex-wrap sm:items-center">
+                              <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                                <dt className="font-medium text-slate-500">מספר זהות</dt>
+                                <dd className="font-semibold text-slate-800">{student.national_id || 'לא צוין'}</dd>
+                              </div>
+                              <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                                <dt className="font-medium text-slate-500">שם איש קשר</dt>
+                                <dd className="font-semibold text-slate-800">{student.contact_name || 'לא צוין'}</dd>
+                              </div>
+                              <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
+                                <dt className="font-medium text-slate-500">טלפון איש קשר</dt>
+                                <dd className="font-semibold text-slate-800">{student.contact_phone || 'לא צוין'}</dd>
+                              </div>
+                              {isAdmin ? (
+                                <div className="flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-blue-800">
+                                  <dt className="font-medium text-blue-600">מדריך</dt>
+                                  <dd className="font-semibold">{instructorName}</dd>
+                                </div>
+                              ) : null}
+                            </dl>
+                          </div>
+                          <span className="text-xs font-medium text-slate-500">
+                            {isSectionOpen ? 'לחצו לסגירה' : 'לחצו לפתיחה'}
+                          </span>
+                        </div>
+                      </summary>
+
+                      <div className="mt-4 space-y-4 border-t border-slate-200 pt-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-2">
+                            <Link
+                              to={`/students/${student.id}`}
+                              className="text-sm font-semibold text-slate-900 hover:text-primary"
+                            >
+                              מעבר לכרטיס תלמיד
+                            </Link>
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={() => openConfirmDialog(student.id)}
+                            disabled={isApproving}
+                          >
+                            {isApproving ? 'מאשר...' : 'אישור קליטה'}
+                          </Button>
+                        </div>
+
+                        <div className="rounded-lg bg-slate-50 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-slate-800">תשובות מהטופס</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => toggleShowAll(student.id)}
+                            >
+                              {showAll ? 'הצג תצוגה מצומצמת' : 'הצג את כל הקליטה'}
+                            </Button>
+                          </div>
+                          {answers.length ? (
+                            <div className="mt-3 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+                              {answers.map((entry, index) => {
+                                const answerKey = `${student.id}-${entry.label}-${index}`;
+                                const isLongAnswer = entry.value.length > 120 || entry.value.includes('\n');
+                                const isExpandedAnswer = expandedAnswers.has(answerKey);
+                                return (
+                                  <div key={answerKey} className="rounded-md border border-slate-200 bg-white p-3">
+                                    <p className="text-xs font-semibold text-slate-500">{entry.label}</p>
+                                    <p
+                                      className={`mt-1 text-sm text-slate-700 ${
+                                        isLongAnswer ? 'cursor-pointer' : ''
+                                      } ${isExpandedAnswer ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}
+                                      onClick={isLongAnswer ? () => toggleAnswer(answerKey) : undefined}
+                                      onKeyDown={(event) => handleAnswerKeyDown(event, answerKey, isLongAnswer)}
+                                      role={isLongAnswer ? 'button' : undefined}
+                                      tabIndex={isLongAnswer ? 0 : undefined}
+                                    >
+                                      {entry.value}
+                                    </p>
+                                    {isLongAnswer && !isExpandedAnswer ? (
+                                      <p className="mt-1 text-xs text-slate-400">לחצו להצגה מלאה</p>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm text-slate-500">
+                              {showAll ? 'אין תשובות זמינות להצגה.' : 'לא הוגדרו שדות חשובים להצגה.'}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <AlertDialog open={Boolean(confirmingStudentId)} onOpenChange={closeConfirmDialog}>
