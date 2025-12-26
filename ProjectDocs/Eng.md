@@ -5,3 +5,5 @@
 - Admins see the assigned instructor label inline with the same row.
 - Admins can filter pending intake items by instructor, unassigned, or all.
 - Mobile layout wraps the row into stacked pill groups for comfortable scanning.
+- The intake queue now renders a collapsed summary header with total pending counts split into new (unassigned) and existing (assigned) students.
+- The summary stays visible with loading, error, and empty states, and exposes a retry action on load failures.
