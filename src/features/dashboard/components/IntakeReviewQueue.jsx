@@ -348,24 +348,11 @@ export default function IntakeReviewQueue() {
       <div className="space-y-4">
         <AlertTitle>תור קליטת תלמידים ממתין לאישור</AlertTitle>
         <AlertDescription className="space-y-3">
-          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-2">
-                <p className="font-semibold text-slate-900">{summaryStatus}</p>
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
-                    <span className="text-xs font-medium text-slate-500">חדשים</span>
-                    <span className="text-sm font-semibold text-slate-900" aria-live="polite">
-                      {isLoading ? '...' : summaryCounts.new}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
-                    <span className="text-xs font-medium text-slate-500">קיימים</span>
-                    <span className="text-sm font-semibold text-slate-900" aria-live="polite">
-                      {isLoading ? '...' : summaryCounts.existing}
-                    </span>
-                  </div>
-                </div>
+                <p className="text-base font-semibold text-slate-900">{summaryStatus}</p>
+                <p className="text-xs text-slate-500">חלוקה לפי תלמידים ללא שיוך מול תלמידים עם שיוך.</p>
               </div>
               <Button
                 type="button"
@@ -376,6 +363,32 @@ export default function IntakeReviewQueue() {
               >
                 {toggleLabel}
               </Button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold text-slate-500">חדשים</p>
+                <p
+                  className={`mt-2 text-3xl font-semibold text-slate-900 ${
+                    isLoading ? 'animate-pulse' : ''
+                  }`}
+                  aria-live="polite"
+                >
+                  {isLoading ? '—' : summaryCounts.new}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">ללא מדריך משויך</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold text-slate-500">קיימים</p>
+                <p
+                  className={`mt-2 text-3xl font-semibold text-slate-900 ${
+                    isLoading ? 'animate-pulse' : ''
+                  }`}
+                  aria-live="polite"
+                >
+                  {isLoading ? '—' : summaryCounts.existing}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">עם מדריך משויך</p>
+              </div>
             </div>
             {error ? (
               <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
