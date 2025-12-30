@@ -1092,4 +1092,4 @@
 - **Frontend**:
   - `IntakeSettingsCard.jsx` in Settings allows admins to manage mappings and rotate secrets.
   - `IntakeReviewQueue.jsx` on the dashboard surfaces pending intake approvals, keeps student cards collapsed by default, and requires an agreement confirmation before calling `/api/intake/approve`.
-  - The dashboard summary header is collapsed by default, stays visible with loading/error/empty states, splits counts into new (unassigned) vs existing (assigned) pending students, and uses large-number tiles for quick scanning.
+  - The dashboard intake widget uses a scorecard-style summary with large-number tiles for new (unassigned) vs existing (assigned) pending students, stays visible with loading/error/empty states, and exposes clicks on each tile (or "פתח תור") to open the detailed queue with matching filters.

@@ -6,5 +6,6 @@
 - Admins can filter pending intake items by instructor, unassigned, or all.
 - Mobile layout wraps the row into stacked pill groups for comfortable scanning.
 - The intake queue now renders a collapsed summary header with total pending counts split into new (unassigned) and existing (assigned) students.
-- The summary highlights large-number tiles for new vs existing pending intakes for quick scanning.
+- The summary highlights large-number tiles for new vs existing pending intakes for quick scanning in a scorecard layout.
+- Clicking the scorecard tiles (or the "Open Queue" action) opens the detailed queue with the matching filter applied.
 - The summary stays visible with loading, error, and empty states, and exposes a retry action on load failures.

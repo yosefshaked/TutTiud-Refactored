@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +22,61 @@ import { useInstructors } from '@/hooks/useOrgData.js';
 import { isAdminRole, normalizeMembershipRole } from '@/features/students/utils/endpoints.js';
 
 const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שקראתי את האינטייק של התלמיד/ה וביצעתי שיחת קליטה עם האפוטרופוס.';
+
+function IntakeQueueWidget({ newCount, existingCount, onOpen, isLoading = false, isExpanded = false }) {
+  const openLabel = isExpanded ? 'סגור תור' : 'פתח תור';
+  const openAriaLabel = isExpanded ? 'סגור את תור הקליטה' : 'פתח את תור הקליטה';
+  const buttonClasses =
+    'flex w-full flex-col items-center justify-center gap-1 p-4 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2';
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden flex flex-col h-full">
+      <div className="bg-neutral-50 px-4 py-3 border-b border-neutral-100 flex items-center justify-between">
+        <span className="font-bold text-neutral-700">תלמידים לקליטה</span>
+        <button
+          type="button"
+          className="text-primary text-xs hover:underline"
+          onClick={() => onOpen('all')}
+          aria-label={openAriaLabel}
+        >
+          {openLabel}
+        </button>
+      </div>
+
+      <div className="flex-1 grid grid-cols-2 divide-x divide-x-reverse divide-neutral-100">
+        <button
+          type="button"
+          className={`${buttonClasses} hover:bg-neutral-50`}
+          onClick={() => onOpen('new')}
+          aria-label="פתח תור עבור תלמידים חדשים"
+        >
+          <span
+            className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
+            aria-live="polite"
+          >
+            {isLoading ? '—' : newCount}
+          </span>
+          <span className="text-sm text-neutral-500 font-medium">חדשים</span>
+        </button>
+
+        <button
+          type="button"
+          className={`${buttonClasses} hover:bg-neutral-50`}
+          onClick={() => onOpen('existing')}
+          aria-label="פתח תור עבור תלמידים קיימים"
+        >
+          <span
+            className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
+            aria-live="polite"
+          >
+            {isLoading ? '—' : existingCount}
+          </span>
+          <span className="text-sm text-neutral-500 font-medium">קיימים</span>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function normalizeString(value) {
   if (value === null || value === undefined) {
@@ -116,6 +169,7 @@ export default function IntakeReviewQueue() {
   const [instructorFilterId, setInstructorFilterId] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [retryToken, setRetryToken] = useState(0);
+  const [assignmentFilter, setAssignmentFilter] = useState('all');
 
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const isAdmin = isAdminRole(membershipRole);
@@ -314,17 +368,22 @@ export default function IntakeReviewQueue() {
   }, [instructors]);
 
   const filteredStudents = useMemo(() => {
+    let filtered = pendingStudents;
+    if (assignmentFilter === 'new') {
+      filtered = filtered.filter((student) => !student?.assigned_instructor_id);
+    }
+    if (assignmentFilter === 'existing') {
+      filtered = filtered.filter((student) => student?.assigned_instructor_id);
+    }
     if (!isAdmin || !instructorFilterId) {
-      return pendingStudents;
+      return filtered;
     }
     if (instructorFilterId === 'unassigned') {
-      return pendingStudents.filter((student) => !student?.assigned_instructor_id);
+      return filtered.filter((student) => !student?.assigned_instructor_id);
     }
-    return pendingStudents.filter((student) => student?.assigned_instructor_id === instructorFilterId);
-  }, [pendingStudents, instructorFilterId, isAdmin]);
+    return filtered.filter((student) => student?.assigned_instructor_id === instructorFilterId);
+  }, [pendingStudents, assignmentFilter, instructorFilterId, isAdmin]);
 
-  const alertVariant = pendingStudents.length > 0 || error ? 'destructive' : 'default';
-  const toggleLabel = isCollapsed ? 'פתח תור קליטה' : 'סגור תור קליטה';
   const summaryStatus = (() => {
     if (isLoading) {
       return 'טוען קליטות ממתינות...';
@@ -338,102 +397,76 @@ export default function IntakeReviewQueue() {
     return `נמצאו ${pendingStudents.length} קליטות ממתינות לבדיקה.`;
   })();
 
-  return (
-    <Alert
-      variant={alertVariant}
-      className={alertVariant === 'destructive' ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}
-      dir="rtl"
-    >
-      <AlertTriangle className="h-5 w-5" />
-      <div className="space-y-4">
-        <AlertTitle>תור קליטת תלמידים ממתין לאישור</AlertTitle>
-        <AlertDescription className="space-y-3">
-          <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-2">
-                <p className="text-base font-semibold text-slate-900">{summaryStatus}</p>
-                <p className="text-xs text-slate-500">חלוקה לפי תלמידים ללא שיוך מול תלמידים עם שיוך.</p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsCollapsed((value) => !value)}
-                aria-expanded={!isCollapsed}
-                aria-controls="intake-review-queue-details"
-              >
-                {toggleLabel}
-              </Button>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold text-slate-500">חדשים</p>
-                <p
-                  className={`mt-2 text-3xl font-semibold text-slate-900 ${
-                    isLoading ? 'animate-pulse' : ''
-                  }`}
-                  aria-live="polite"
-                >
-                  {isLoading ? '—' : summaryCounts.new}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">ללא מדריך משויך</p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold text-slate-500">קיימים</p>
-                <p
-                  className={`mt-2 text-3xl font-semibold text-slate-900 ${
-                    isLoading ? 'animate-pulse' : ''
-                  }`}
-                  aria-live="polite"
-                >
-                  {isLoading ? '—' : summaryCounts.existing}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">עם מדריך משויך</p>
-              </div>
-            </div>
-            {error ? (
-              <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
-                <span>{error}</span>
-                <Button type="button" size="sm" variant="outline" onClick={handleRetry}>
-                  נסו שוב
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        </AlertDescription>
+  const handleOpenQueue = (filterType) => {
+    if (!isCollapsed && filterType === 'all') {
+      setIsCollapsed(true);
+      setAssignmentFilter('all');
+      return;
+    }
+    setIsCollapsed(false);
+    setAssignmentFilter(filterType);
+    if (filterType !== 'all') {
+      setInstructorFilterId('');
+    }
+  };
 
-        {!isCollapsed ? (
-          <div id="intake-review-queue-details" className="space-y-4">
-            {isAdmin ? (
-              <div className="flex flex-col gap-2 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <p className="font-semibold text-slate-900">סינון לפי מדריך</p>
-                  <p className="text-xs text-slate-500">בחרו מדריך, לא משויך, או כל הקליטות.</p>
-                </div>
-                <div className="w-full sm:max-w-xs">
-                  <label htmlFor="intake-instructor-filter" className="sr-only">סינון מדריך</label>
-                  <Select
-                    value={instructorFilterId || 'all'}
-                    onValueChange={(value) => setInstructorFilterId(value === 'all' ? '' : value)}
-                    disabled={loadingInstructors}
-                  >
-                    <SelectTrigger id="intake-instructor-filter">
-                      <SelectValue placeholder={loadingInstructors ? 'טוען מדריכים...' : 'כל המדריכים'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">כל המדריכים</SelectItem>
-                      <SelectItem value="unassigned">לא משויך</SelectItem>
-                      {(instructors || []).map((instructor) => (
-                        instructor?.id ? (
-                          <SelectItem key={instructor.id} value={instructor.id}>
-                            {instructor.name || instructor.email || 'מדריך ללא שם'}
-                          </SelectItem>
-                        ) : null
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+  return (
+    <div className="space-y-4" dir="rtl">
+      <IntakeQueueWidget
+        newCount={summaryCounts.new}
+        existingCount={summaryCounts.existing}
+        onOpen={handleOpenQueue}
+        isLoading={isLoading}
+        isExpanded={!isCollapsed}
+      />
+
+      <div className="space-y-2 text-xs text-neutral-500">
+        <p className="font-medium text-neutral-600">{summaryStatus}</p>
+        <p>חלוקה לפי תלמידים ללא שיוך מול תלמידים עם שיוך.</p>
+      </div>
+
+      {error ? (
+        <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+          <span>{error}</span>
+          <Button type="button" size="sm" variant="outline" onClick={handleRetry}>
+            נסו שוב
+          </Button>
+        </div>
+      ) : null}
+
+      {!isCollapsed ? (
+        <div id="intake-review-queue-details" className="space-y-4">
+          {isAdmin ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <p className="font-semibold text-slate-900">סינון לפי מדריך</p>
+                <p className="text-xs text-slate-500">בחרו מדריך, לא משויך, או כל הקליטות.</p>
               </div>
-            ) : null}
+              <div className="w-full sm:max-w-xs">
+                <label htmlFor="intake-instructor-filter" className="sr-only">סינון מדריך</label>
+                <Select
+                  value={instructorFilterId || 'all'}
+                  onValueChange={(value) => setInstructorFilterId(value === 'all' ? '' : value)}
+                  disabled={loadingInstructors}
+                >
+                  <SelectTrigger id="intake-instructor-filter">
+                    <SelectValue placeholder={loadingInstructors ? 'טוען מדריכים...' : 'כל המדריכים'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל המדריכים</SelectItem>
+                    <SelectItem value="unassigned">לא משויך</SelectItem>
+                    {(instructors || []).map((instructor) => (
+                      instructor?.id ? (
+                        <SelectItem key={instructor.id} value={instructor.id}>
+                          {instructor.name || instructor.email || 'מדריך ללא שם'}
+                        </SelectItem>
+                      ) : null
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : null}
 
             <div className="space-y-4">
               {filteredStudents.length === 0 && !isLoading ? (
@@ -563,8 +596,7 @@ export default function IntakeReviewQueue() {
               })}
             </div>
           </div>
-        ) : null}
-      </div>
+      ) : null}
 
       <AlertDialog open={Boolean(confirmingStudentId)} onOpenChange={closeConfirmDialog}>
         <AlertDialogContent dir="rtl">
@@ -597,6 +629,6 @@ export default function IntakeReviewQueue() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Alert>
+    </div>
   );
 }
