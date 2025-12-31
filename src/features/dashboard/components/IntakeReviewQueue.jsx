@@ -527,6 +527,7 @@ export default function IntakeReviewQueue() {
 
       setAssignSuccess('השמירה בוצעה והמדריך שויך לקליטה.');
       setAssignError('');
+      handleRetry();
     } catch (saveError) {
       console.error('Failed to assign intake instructor', saveError);
       setAssignError('שיוך המדריך נכשל. נסו שוב.');
@@ -572,6 +573,7 @@ export default function IntakeReviewQueue() {
         });
       }
       setDismissStudentId('');
+      handleRetry();
     } catch (dismissErrorResponse) {
       console.error('Failed to dismiss intake submission', dismissErrorResponse);
       setDismissError('הסרת הקליטה נכשלה. נסו שוב.');
@@ -619,6 +621,7 @@ export default function IntakeReviewQueue() {
       }
 
       setRestoreStudentId('');
+      handleRetry();
     } catch (restoreErrorResponse) {
       console.error('Failed to restore intake submission', restoreErrorResponse);
       setRestoreError('שחזור הקליטה נכשל. נסו שוב.');
@@ -780,6 +783,7 @@ export default function IntakeReviewQueue() {
 
       setMergeSuccess('המיזוג הושלם והרשומה עודכנה.');
       setMergeSourceId('');
+      handleRetry();
     } catch (mergeErrorResponse) {
       console.error('Failed to merge intake student', mergeErrorResponse);
       setMergeError('המיזוג נכשל. נסו שוב.');
