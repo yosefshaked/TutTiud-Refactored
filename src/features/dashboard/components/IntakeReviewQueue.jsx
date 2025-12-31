@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/auth/AuthContext.jsx';
@@ -826,6 +826,7 @@ export default function IntakeReviewQueue() {
         <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
             <DialogTitle>תור קליטת תלמידים</DialogTitle>
+            <DialogDescription>סקירת קליטות ממתינות, סינון וביצוע פעולות מנהל.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -1087,6 +1088,7 @@ export default function IntakeReviewQueue() {
         <DialogContent className="sm:max-w-lg" dir="rtl">
           <DialogHeader>
             <DialogTitle>שיוך מדריך ופרטים לקליטה</DialogTitle>
+            <DialogDescription>שיוך מדריך ועדכון פרטי קשר לפני אישור הקליטה.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
@@ -1254,6 +1256,7 @@ export default function IntakeReviewQueue() {
         <DialogContent className="sm:max-w-4xl" dir="rtl">
           <DialogHeader>
             <DialogTitle>מיזוג/העברת קליטה לתלמיד קיים</DialogTitle>
+            <DialogDescription>בחרו תלמיד יעד והגדירו אילו ערכים לשמור במיזוג.</DialogDescription>
           </DialogHeader>
           {mergeError ? (
             <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
