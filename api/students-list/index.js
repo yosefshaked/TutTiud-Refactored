@@ -418,7 +418,7 @@ export default async function handler(context, req) {
       builder = builder.eq('is_active', false);
     }
 
-    builder = builder.neq('metadata->intake_dismissal->>active', 'true');
+    builder = builder.or('metadata->intake_dismissal->>active.is.null,metadata->intake_dismissal->>active.neq.true');
 
     const { data, error } = await builder;
 

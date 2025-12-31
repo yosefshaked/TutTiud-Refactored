@@ -191,6 +191,7 @@ export default function IntakeReviewQueue() {
   const [restoreStudentId, setRestoreStudentId] = useState('');
   const [restoreError, setRestoreError] = useState('');
   const [isRestoring, setIsRestoring] = useState(false);
+  const [showDismissed, setShowDismissed] = useState(false);
   const [mergeSourceId, setMergeSourceId] = useState('');
   const [mergeTargetId, setMergeTargetId] = useState('');
   const [mergeSearch, setMergeSearch] = useState('');
@@ -996,43 +997,54 @@ export default function IntakeReviewQueue() {
 
             {isAdmin ? (
               <div className="space-y-3 border-t border-slate-200 pt-4">
-                <div className="flex flex-col gap-1">
-                  <h3 className="text-sm font-semibold text-slate-900">קליטות שהוסרו</h3>
-                  <p className="text-xs text-slate-500">קליטות שהוסרו מהתור מופיעות כאן וניתן לשחזר אותן.</p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold text-slate-900">קליטות שהוסרו</h3>
+                    <p className="text-xs text-slate-500">לחצו כדי להציג ולשחזר קליטות שהוסרו.</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowDismissed((prev) => !prev)}
+                  >
+                    {showDismissed ? 'הסתר קליטות שהוסרו' : 'הצג קליטות שהוסרו'}
+                  </Button>
                 </div>
-                {dismissedStudents.length === 0 ? (
-                  <div className="rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-600">
-                    אין קליטות שהוסרו להצגה.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {dismissedStudents.map((student) => {
-                      const dismissalMeta = student?.metadata?.intake_dismissal;
-                      const dismissedAt = dismissalMeta?.at
-                        ? new Date(dismissalMeta.at).toLocaleString('he-IL')
-                        : '';
-                      return (
-                        <div key={student.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                              <p className="text-sm font-semibold text-slate-900">{student.name}</p>
-                              <p className="text-xs text-slate-600">
-                                {dismissedAt ? `הוסר בתאריך ${dismissedAt}` : 'הוסר מהתור'}
-                              </p>
+                {showDismissed ? (
+                  dismissedStudents.length === 0 ? (
+                    <div className="rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                      אין קליטות שהוסרו להצגה.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {dismissedStudents.map((student) => {
+                        const dismissalMeta = student?.metadata?.intake_dismissal;
+                        const dismissedAt = dismissalMeta?.at
+                          ? new Date(dismissalMeta.at).toLocaleString('he-IL')
+                          : '';
+                        return (
+                          <div key={student.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="space-y-1">
+                                <p className="text-sm font-semibold text-slate-900">{student.name}</p>
+                                <p className="text-xs text-slate-600">
+                                  {dismissedAt ? `הוסר בתאריך ${dismissedAt}` : 'הוסר מהתור'}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => openRestoreDialog(student.id)}
+                              >
+                                שחזור קליטה
+                              </Button>
                             </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => openRestoreDialog(student.id)}
-                            >
-                              שחזור קליטה
-                            </Button>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  )
+                ) : null}
               </div>
             ) : null}
           </div>
