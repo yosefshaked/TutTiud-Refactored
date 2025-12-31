@@ -522,7 +522,7 @@ export default function IntakeReviewQueue() {
       ) : null}
 
       <Dialog open={isQueueOpen} onOpenChange={handleQueueOpenChange}>
-        <DialogContent className="sm:max-w-xl max-h-[80vh] overflow-y-auto" dir="rtl">
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
             <DialogTitle>תור קליטת תלמידים</DialogTitle>
           </DialogHeader>
