@@ -9,3 +9,4 @@
 - The summary highlights large-number tiles for new vs existing pending intakes for quick scanning in a scorecard layout sized to a half-page card.
 - Clicking the scorecard tiles (or the "Open Queue" action) opens the detailed queue in a modal with the matching filter applied.
 - The summary stays visible with loading, error, and empty states, and exposes a retry action on load failures.
+- Dashboard quick-action cards for students and new session were removed; use the right-side menu entries for navigation and session creation.
