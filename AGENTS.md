@@ -120,6 +120,7 @@
 - Weekly compliance status logic: `/api/weekly-compliance` marks undocumented sessions scheduled for the current day as `missing`; only future days are returned as `upcoming`.
 - Daily compliance status logic: `/api/daily-compliance` also marks undocumented sessions scheduled for today (UTC) as `missing`; `upcoming` applies strictly to future dates.
 - Intake approvals now require an assigned instructor: admins assign the intake (and optional contact details/notes) in the dashboard queue before the assigned instructor confirms reading the intake.
+- Admins can dismiss accidental intake submissions through `/api/intake/dismiss`, which clears `needs_intake_approval` and logs `metadata.last_intake_dismissal`.
 - Add any important information learned into this AGENTS.md file.
 	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
 	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.

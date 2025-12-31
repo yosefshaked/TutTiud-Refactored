@@ -182,6 +182,10 @@ export default function IntakeReviewQueue() {
   });
   const [assignError, setAssignError] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [assignSuccess, setAssignSuccess] = useState('');
+  const [dismissStudentId, setDismissStudentId] = useState('');
+  const [dismissError, setDismissError] = useState('');
+  const [isDismissing, setIsDismissing] = useState(false);
 
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const isAdmin = isAdminRole(membershipRole);
@@ -430,6 +434,7 @@ export default function IntakeReviewQueue() {
     }
     setAssigningStudentId(student.id);
     setAssignError('');
+    setAssignSuccess('');
     setAssignForm({
       instructorId: student.assigned_instructor_id || '',
       contactName: student.contact_name || '',
@@ -442,6 +447,7 @@ export default function IntakeReviewQueue() {
     if (!open) {
       setAssigningStudentId('');
       setAssignError('');
+      setAssignSuccess('');
       setAssignForm({
         instructorId: '',
         contactName: '',
@@ -469,6 +475,7 @@ export default function IntakeReviewQueue() {
 
     setIsAssigning(true);
     setAssignError('');
+    setAssignSuccess('');
 
     try {
       const updatedStudent = await authenticatedFetch('students-list', {
@@ -488,13 +495,52 @@ export default function IntakeReviewQueue() {
         prev.map((student) => (student.id === assigningStudentId ? { ...student, ...updatedStudent } : student))
       );
 
-      setAssigningStudentId('');
+      setAssignSuccess('השמירה בוצעה והמדריך שויך לקליטה.');
       setAssignError('');
     } catch (saveError) {
       console.error('Failed to assign intake instructor', saveError);
       setAssignError('שיוך המדריך נכשל. נסו שוב.');
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const openDismissDialog = (studentId) => {
+    setDismissStudentId(studentId);
+    setDismissError('');
+  };
+
+  const handleDismissDialogChange = (open) => {
+    if (!open) {
+      setDismissStudentId('');
+      setDismissError('');
+    }
+  };
+
+  const handleDismissIntake = async () => {
+    if (!session || !activeOrgId || !dismissStudentId) {
+      return;
+    }
+    setIsDismissing(true);
+    setDismissError('');
+
+    try {
+      await authenticatedFetch('intake/dismiss', {
+        method: 'POST',
+        session,
+        body: {
+          org_id: activeOrgId,
+          student_id: dismissStudentId,
+        },
+      });
+
+      setPendingStudents((prev) => prev.filter((student) => student.id !== dismissStudentId));
+      setDismissStudentId('');
+    } catch (dismissErrorResponse) {
+      console.error('Failed to dismiss intake submission', dismissErrorResponse);
+      setDismissError('הסרת הקליטה נכשלה. נסו שוב.');
+    } finally {
+      setIsDismissing(false);
     }
   };
 
@@ -640,6 +686,15 @@ export default function IntakeReviewQueue() {
                               {needsAssignment ? 'שיוך מדריך' : 'עדכון שיוך'}
                             </Button>
                           ) : null}
+                          {isAdmin ? (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              onClick={() => openDismissDialog(student.id)}
+                            >
+                              הסרת קליטה
+                            </Button>
+                          ) : null}
                           {canApprove ? (
                             <Button
                               type="button"
@@ -723,6 +778,11 @@ export default function IntakeReviewQueue() {
             {assignError ? (
               <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {assignError}
+              </div>
+            ) : null}
+            {assignSuccess ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                {assignSuccess}
               </div>
             ) : null}
             <div className="space-y-2">
@@ -824,6 +884,28 @@ export default function IntakeReviewQueue() {
               disabled={!agreementChecked || isConfirmingApproval}
             >
               {isConfirmingApproval ? 'מאשר...' : 'מאשר/ת קליטה'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(dismissStudentId)} onOpenChange={handleDismissDialogChange}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>הסרת קליטה</AlertDialogTitle>
+            <AlertDialogDescription>
+              הסרת הקליטה תוציא את הרשומה מתור הקליטה. ניתן להוסיף קליטה מחדש בעת הצורך.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {dismissError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {dismissError}
+            </div>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDismissIntake} disabled={isDismissing}>
+              {isDismissing ? 'מסיר...' : 'הסרת קליטה'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
