@@ -4,7 +4,6 @@ import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/s
 import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 import {
   ensureMembership,
-  isAdminRole,
   readEnv,
   respond,
   resolveOrgId,
@@ -162,8 +161,11 @@ export default async function handler(context, req) {
     return respond(context, 404, { message: 'student_not_found' });
   }
 
-  const isAdmin = isAdminRole(role);
-  if (!isAdmin && student.assigned_instructor_id !== authResult.data.user.id) {
+  if (!student.assigned_instructor_id) {
+    return respond(context, 409, { message: 'assigned_instructor_required' });
+  }
+
+  if (student.assigned_instructor_id !== authResult.data.user.id) {
     return respond(context, 403, { message: 'forbidden' });
   }
 

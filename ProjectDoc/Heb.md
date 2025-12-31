@@ -78,7 +78,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `/api/students-check-id` | GET | כל המשתמשים | בודק ייחודיות של מספר זהות, עם אפשרות להתעלם מתלמיד קיים בעת עריכה. מחזיר `{ exists, student }` כדי לחסום כפילויות ולספק קישור לפרופיל. |
 | `/api/students-search` | GET | מנהל/בעלים | חיפוש מטושטש לפי שם שמחזיר `{ id, name, national_id, is_active }` להצגת רמזי כפילות מתחת לשדה השם בטופס. |
 | `/api/intake` | POST | רובוט חיצוני | נקודת קצה ציבורית לקליטת טפסי Microsoft Forms דרך Power Automate. דורשת את הכותרות `x-org-id` ו-`x-intake-secret` (מאומת מול `external_intake_secret`), מפענחת `html_content` לזוגות שאלה/תשובה, ממפה שדות לפי `intake_field_mapping` וכותבת `intake_responses` + `needs_intake_approval`. |
-| `/api/intake/approve` | POST | מנהל/בעלים/מדריך | מאשר קליטה ממתינה ע\"י `needs_intake_approval=false` ורישום `metadata.last_approval` (זמן + מאשר + הסכמה). מדריכים יכולים לאשר רק תלמידים משויכים. |
+| `/api/intake/approve` | POST | מדריך | מאשר קליטה ממתינה ע\"י `needs_intake_approval=false` ורישום `metadata.last_approval` (זמן + מאשר + הסכמה). הקליטה חייבת להיות משויכת למדריך המאשר. |
 | `/api/students/maintenance-export` | GET | מנהל/בעלים | מחזיר CSV עם `system_uuid`, שם, מספר זהות, פרטי קשר, שיוך מדריך, הגדרות ברירת מחדל, תגיות וסטטוס פעילות לצורך ניקוי נתונים. |
 | `/api/loose-sessions` | GET/POST | מנהל/בעלים | מציג רשימת דיווחים לא משויכים (`student_id IS NULL`) ומאפשר לפתור אותם ע"י שיוך לתלמיד קיים או יצירת תלמיד חדש; מסיר רק את `metadata.unassigned_details` ומשמר מטאדטה אחרת. |
 | `/api/students/maintenance-import` | POST | מנהל/בעלים | מקבל טקסט CSV מעודכן לפי `system_uuid`, מעדכן רק שדות שהשתנו, בודק ייחודיות מספר זהות בכל שורה ומול המאגר, ומחזיר דו"ח כשלונות פר שורה. |
@@ -138,7 +138,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 
 - `SETUP_SQL_SCRIPT` הוא מקור האמת היחיד לסקריפט; ייבאו אותו לכל מקום שבו מציגים את הסקריפט.
 - הסקריפט מוסיף עתה את העמודה `Students.is_active boolean default true` ומשלים ערך `true` ברשומות קיימות. ההרצה חוזרת בטוחה הודות לשימוש עקבי ב-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
-- גשר הקליטה (Intake Bridge) משתמש ב-`intake_field_mapping` וב-`external_intake_secret` מתוך `tuttiud.Settings`, ממפה לפי טקסט השאלה בעברית כפי שמופיע ב-HTML, שומר את ה-HTML המקורי ב-`intake_responses.intake_html_source`, והאישורים מתבצעים דרך `/api/intake/approve` כדי לשמור על בקרה ידנית עם הצהרת הסכמה. בלוח הבקרה מוצג תקציר קליטה בסגנון Scorecard בחצי רוחב עמוד (חדשים/קיימים), ורשימת התור המלאה נפתחת במודאל עם כרטיסיות קליטה מתקפלות לצפייה מלאה.
+- גשר הקליטה (Intake Bridge) משתמש ב-`intake_field_mapping` וב-`external_intake_secret` מתוך `tuttiud.Settings`, ממפה לפי טקסט השאלה בעברית כפי שמופיע ב-HTML, שומר את ה-HTML המקורי ב-`intake_responses.intake_html_source`, והאישורים מתבצעים דרך `/api/intake/approve` כדי לשמור על בקרה ידנית עם הצהרת הסכמה. מנהלים משייכים מדריך ופרטים מתוך מודאל הדשבורד כדי שהמדריך המשויך יאשר את הקליטה. בלוח הבקרה מוצג תקציר קליטה בסגנון Scorecard בחצי רוחב עמוד (חדשים/קיימים), ורשימת התור המלאה נפתחת במודאל עם כרטיסיות קליטה מתקפלות לצפייה מלאה.
 - `SessionRecords.student_id` הוא כעת NULLABLE כדי לאפשר דיווחי סשן לא משויכים. בעת כתיבה יש להוסיף את `metadata.unassigned_details` באופן אדיטיבי (בלי למחוק מפתחות קיימים) ולוודא שכל השאילתות/נקודות הקצה יודעות להתמודד עם `student_id` שווה NULL.
 - `verifyOrgConnection` (`src/runtime/verification.js`) מקבל כעת לקוח Supabase ומחזיר את מערך התוצאות כדי לרנדר סטטוס.
 - בעת השלמת האשף חובה לקרוא ל-`recordVerification(orgId, timestamp)` כדי לעדכן את `setup_completed` / `verified_at` ב-Control DB.

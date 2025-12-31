@@ -13,11 +13,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { fetchSettings } from '@/features/settings/api/settings.js';
 import { useInstructors } from '@/hooks/useOrgData.js';
 import { isAdminRole, normalizeMembershipRole } from '@/features/students/utils/endpoints.js';
@@ -171,6 +173,15 @@ export default function IntakeReviewQueue() {
   const [retryToken, setRetryToken] = useState(0);
   const [assignmentFilter, setAssignmentFilter] = useState('all');
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [assigningStudentId, setAssigningStudentId] = useState('');
+  const [assignForm, setAssignForm] = useState({
+    instructorId: '',
+    contactName: '',
+    contactPhone: '',
+    notes: '',
+  });
+  const [assignError, setAssignError] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const isAdmin = isAdminRole(membershipRole);
@@ -413,6 +424,80 @@ export default function IntakeReviewQueue() {
     }
   };
 
+  const openAssignDialog = (student) => {
+    if (!student?.id) {
+      return;
+    }
+    setAssigningStudentId(student.id);
+    setAssignError('');
+    setAssignForm({
+      instructorId: student.assigned_instructor_id || '',
+      contactName: student.contact_name || '',
+      contactPhone: student.contact_phone || '',
+      notes: student.notes || '',
+    });
+  };
+
+  const handleAssignDialogChange = (open) => {
+    if (!open) {
+      setAssigningStudentId('');
+      setAssignError('');
+      setAssignForm({
+        instructorId: '',
+        contactName: '',
+        contactPhone: '',
+        notes: '',
+      });
+    }
+  };
+
+  const handleAssignChange = (field, value) => {
+    setAssignForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleAssignSave = async () => {
+    if (!session || !activeOrgId || !assigningStudentId) {
+      return;
+    }
+    if (!assignForm.instructorId) {
+      setAssignError('יש לבחור מדריך לפני השמירה.');
+      return;
+    }
+
+    setIsAssigning(true);
+    setAssignError('');
+
+    try {
+      const updatedStudent = await authenticatedFetch('students-list', {
+        method: 'PUT',
+        session,
+        body: {
+          org_id: activeOrgId,
+          student_id: assigningStudentId,
+          assigned_instructor_id: assignForm.instructorId,
+          contact_name: assignForm.contactName,
+          contact_phone: assignForm.contactPhone,
+          notes: assignForm.notes,
+        },
+      });
+
+      setPendingStudents((prev) =>
+        prev.map((student) => (student.id === assigningStudentId ? { ...student, ...updatedStudent } : student))
+      );
+
+      setAssigningStudentId('');
+      setAssignError('');
+    } catch (saveError) {
+      console.error('Failed to assign intake instructor', saveError);
+      setAssignError('שיוך המדריך נכשל. נסו שוב.');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   return (
     <div className="space-y-4" dir="rtl">
       <IntakeQueueWidget
@@ -490,6 +575,10 @@ export default function IntakeReviewQueue() {
                 { showAll }
               );
               const isApproving = approvingIds.has(student.id);
+              const isAssignedToUser = Boolean(session?.user?.id) && student?.assigned_instructor_id === session.user.id;
+              const canApprove = Boolean(student?.assigned_instructor_id) && isAssignedToUser;
+              const needsAssignment = !student?.assigned_instructor_id;
+              const showApprovalHint = isAdmin && !canApprove;
               const instructor = isAdmin ? instructorMap.get(student?.assigned_instructor_id) : null;
               const instructorName = instructor?.name || instructor?.email || (student?.assigned_instructor_id ? 'מדריך לא זמין' : 'לא הוקצה מדריך');
 
@@ -541,13 +630,31 @@ export default function IntakeReviewQueue() {
                             מעבר לכרטיס תלמיד
                           </Link>
                         </div>
-                        <Button
-                          type="button"
-                          onClick={() => openConfirmDialog(student.id)}
-                          disabled={isApproving}
-                        >
-                          {isApproving ? 'מאשר...' : 'אישור קליטה'}
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isAdmin ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => openAssignDialog(student)}
+                            >
+                              {needsAssignment ? 'שיוך מדריך' : 'עדכון שיוך'}
+                            </Button>
+                          ) : null}
+                          {canApprove ? (
+                            <Button
+                              type="button"
+                              onClick={() => openConfirmDialog(student.id)}
+                              disabled={isApproving}
+                            >
+                              {isApproving ? 'מאשר...' : 'אישור קליטה'}
+                            </Button>
+                          ) : null}
+                          {showApprovalHint ? (
+                            <span className="text-xs text-slate-500">
+                              {needsAssignment ? 'ממתין לשיוך מדריך לפני אישור.' : 'ממתין לאישור המדריך המשויך.'}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="rounded-lg bg-slate-50 p-3">
@@ -600,6 +707,92 @@ export default function IntakeReviewQueue() {
                 </div>
               );
             })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(assigningStudentId)} onOpenChange={handleAssignDialogChange}>
+        <DialogContent className="sm:max-w-lg" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>שיוך מדריך ופרטים לקליטה</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              השיוך מאפשר למדריך לראות את הקליטה ולאשר אותה.
+            </p>
+            {assignError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {assignError}
+              </div>
+            ) : null}
+            <div className="space-y-2">
+              <Label htmlFor="intake-assign-instructor">מדריך משויך</Label>
+              <Select
+                value={assignForm.instructorId}
+                onValueChange={(value) => handleAssignChange('instructorId', value)}
+                disabled={loadingInstructors}
+              >
+                <SelectTrigger id="intake-assign-instructor">
+                  <SelectValue placeholder={loadingInstructors ? 'טוען מדריכים...' : 'בחרו מדריך'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(instructors || []).map((instructor) => (
+                    instructor?.id ? (
+                      <SelectItem key={instructor.id} value={instructor.id}>
+                        {instructor.name || instructor.email || 'מדריך ללא שם'}
+                      </SelectItem>
+                    ) : null
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="intake-assign-contact-name">שם איש קשר</Label>
+                <Input
+                  id="intake-assign-contact-name"
+                  value={assignForm.contactName}
+                  onChange={(event) => handleAssignChange('contactName', event.target.value)}
+                  placeholder="שם איש קשר"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="intake-assign-contact-phone">טלפון איש קשר</Label>
+                <Input
+                  id="intake-assign-contact-phone"
+                  value={assignForm.contactPhone}
+                  onChange={(event) => handleAssignChange('contactPhone', event.target.value)}
+                  placeholder="05X-XXXXXXX"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="intake-assign-notes">הערות למדריך</Label>
+              <Textarea
+                id="intake-assign-notes"
+                value={assignForm.notes}
+                onChange={(event) => handleAssignChange('notes', event.target.value)}
+                rows={3}
+                placeholder="הוסיפו הנחיות או הקשר לקליטה"
+              />
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAssignDialogChange(false)}
+                disabled={isAssigning}
+              >
+                ביטול
+              </Button>
+              <Button
+                type="button"
+                onClick={handleAssignSave}
+                disabled={isAssigning || !assignForm.instructorId}
+              >
+                {isAssigning ? 'שומר...' : 'שמירה ושיוך'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
