@@ -162,6 +162,7 @@ export default function IntakeReviewQueue() {
   const [error, setError] = useState('');
   const [pendingStudents, setPendingStudents] = useState([]);
   const [dismissedStudents, setDismissedStudents] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
   const [displayLabels, setDisplayLabels] = useState({});
   const [importantFields, setImportantFields] = useState([]);
   const [approvingIds, setApprovingIds] = useState(() => new Set());
@@ -190,6 +191,13 @@ export default function IntakeReviewQueue() {
   const [restoreStudentId, setRestoreStudentId] = useState('');
   const [restoreError, setRestoreError] = useState('');
   const [isRestoring, setIsRestoring] = useState(false);
+  const [mergeSourceId, setMergeSourceId] = useState('');
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeSelections, setMergeSelections] = useState({});
+  const [mergeError, setMergeError] = useState('');
+  const [mergeSuccess, setMergeSuccess] = useState('');
+  const [isMerging, setIsMerging] = useState(false);
 
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const isAdmin = isAdminRole(membershipRole);
@@ -241,6 +249,7 @@ export default function IntakeReviewQueue() {
         const dismissed = Array.isArray(dismissedResponse) ? dismissedResponse : [];
         setPendingStudents(pending);
         setDismissedStudents(dismissed);
+        setAllStudents(roster);
         setDisplayLabels(normalizeDisplayLabels(settingsResponse?.intake_display_labels));
         setImportantFields(normalizeImportantFields(settingsResponse?.intake_important_fields));
       } catch (loadError) {
@@ -249,6 +258,7 @@ export default function IntakeReviewQueue() {
           setError('טעינת תור קליטה נכשלה. נסו שוב.');
           setPendingStudents([]);
           setDismissedStudents([]);
+          setAllStudents([]);
         }
       } finally {
         if (!cancelled) {
@@ -611,6 +621,151 @@ export default function IntakeReviewQueue() {
     }
   };
 
+  const openMergeDialog = (studentId) => {
+    setMergeSourceId(studentId);
+    setMergeTargetId('');
+    setMergeSearch('');
+    setMergeSelections({});
+    setMergeError('');
+    setMergeSuccess('');
+  };
+
+  const handleMergeDialogChange = (open) => {
+    if (!open) {
+      setMergeSourceId('');
+      setMergeTargetId('');
+      setMergeSearch('');
+      setMergeSelections({});
+      setMergeError('');
+      setMergeSuccess('');
+      setIsMerging(false);
+    }
+  };
+
+  const mergeSource = useMemo(
+    () => allStudents.find((student) => student.id === mergeSourceId),
+    [allStudents, mergeSourceId]
+  );
+
+  const mergeTarget = useMemo(
+    () => allStudents.find((student) => student.id === mergeTargetId),
+    [allStudents, mergeTargetId]
+  );
+
+  const mergeCandidates = useMemo(() => {
+    if (!mergeSource) {
+      return [];
+    }
+    const query = mergeSearch.trim().toLowerCase();
+    const candidates = allStudents.filter((student) => student.id !== mergeSource.id);
+    if (!query) {
+      return candidates.slice(0, 10);
+    }
+    return candidates.filter((student) => {
+      const name = (student.name || '').toLowerCase();
+      const nationalId = (student.national_id || '').toLowerCase();
+      const phone = (student.contact_phone || '').toLowerCase();
+      return name.includes(query) || nationalId.includes(query) || phone.includes(query);
+    }).slice(0, 10);
+  }, [allStudents, mergeSearch, mergeSource]);
+
+  const handleMergeSelectionChange = (field, value) => {
+    setMergeSelections((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const buildMergedTags = (selection, sourceTags, targetTags) => {
+    if (selection === 'combined') {
+      const combined = new Set([...(sourceTags || []), ...(targetTags || [])]);
+      return Array.from(combined);
+    }
+    return selection === 'source' ? (sourceTags || []) : (targetTags || []);
+  };
+
+  const handleMergeSubmit = async () => {
+    if (!session || !activeOrgId || !mergeSource || !mergeTarget) {
+      return;
+    }
+
+    setIsMerging(true);
+    setMergeError('');
+    setMergeSuccess('');
+
+    const selections = {
+      name: mergeSelections.name || 'source',
+      national_id: mergeSelections.national_id || 'source',
+      contact_name: mergeSelections.contact_name || 'source',
+      contact_phone: mergeSelections.contact_phone || 'source',
+      assigned_instructor_id: mergeSelections.assigned_instructor_id || 'source',
+      notes: mergeSelections.notes || 'source',
+      tags: mergeSelections.tags || 'source',
+    };
+
+    const mergedPayload = {
+      name: selections.name === 'source' ? mergeSource.name : mergeTarget.name,
+      national_id: selections.national_id === 'source' ? mergeSource.national_id : mergeTarget.national_id,
+      contact_name: selections.contact_name === 'source' ? mergeSource.contact_name : mergeTarget.contact_name,
+      contact_phone: selections.contact_phone === 'source' ? mergeSource.contact_phone : mergeTarget.contact_phone,
+      assigned_instructor_id: selections.assigned_instructor_id === 'source'
+        ? mergeSource.assigned_instructor_id
+        : mergeTarget.assigned_instructor_id,
+      notes: selections.notes === 'source' ? mergeSource.notes : mergeTarget.notes,
+      tags: buildMergedTags(selections.tags, mergeSource.tags, mergeTarget.tags),
+    };
+
+    try {
+      const result = await authenticatedFetch('students-merge', {
+        method: 'POST',
+        session,
+        body: {
+          org_id: activeOrgId,
+          source_student_id: mergeSource.id,
+          target_student_id: mergeTarget.id,
+          fields: mergedPayload,
+        },
+      });
+
+      const updatedTarget = result?.target;
+      const updatedSource = result?.source;
+
+      if (updatedTarget?.id) {
+        setPendingStudents((prev) => {
+          const without = prev.filter((student) => student.id !== updatedTarget.id);
+          return updatedTarget.needs_intake_approval ? [...without, updatedTarget] : without;
+        });
+      }
+
+      if (updatedSource?.id) {
+        setPendingStudents((prev) => prev.filter((student) => student.id !== updatedSource.id));
+        setDismissedStudents((prev) => {
+          const next = prev.filter((student) => student.id !== updatedSource.id);
+          return [...next, updatedSource];
+        });
+      }
+
+      setAllStudents((prev) => {
+        const next = prev.filter((student) => student.id !== mergeSource.id && student.id !== mergeTarget.id);
+        if (updatedTarget?.id) {
+          next.push(updatedTarget);
+        }
+        if (updatedSource?.id) {
+          next.push(updatedSource);
+        }
+        return next;
+      });
+
+      setMergeSuccess('המיזוג הושלם והרשומה עודכנה.');
+      setMergeSourceId('');
+    } catch (mergeErrorResponse) {
+      console.error('Failed to merge intake student', mergeErrorResponse);
+      setMergeError('המיזוג נכשל. נסו שוב.');
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
   return (
     <div className="space-y-4" dir="rtl">
       <IntakeQueueWidget
@@ -751,6 +906,15 @@ export default function IntakeReviewQueue() {
                               onClick={() => openAssignDialog(student)}
                             >
                               {needsAssignment ? 'שיוך מדריך' : 'עדכון שיוך'}
+                            </Button>
+                          ) : null}
+                          {isAdmin ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => openMergeDialog(student.id)}
+                            >
+                              מיזוג/העברה
                             </Button>
                           ) : null}
                           {isAdmin ? (
@@ -1041,6 +1205,159 @@ export default function IntakeReviewQueue() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={Boolean(mergeSourceId)} onOpenChange={handleMergeDialogChange}>
+        <DialogContent className="sm:max-w-4xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>מיזוג/העברת קליטה לתלמיד קיים</DialogTitle>
+          </DialogHeader>
+          {mergeError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {mergeError}
+            </div>
+          ) : null}
+          {mergeSuccess ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              {mergeSuccess}
+            </div>
+          ) : null}
+          {mergeSource ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="merge-student-search">חיפוש תלמיד יעד</Label>
+                <Input
+                  id="merge-student-search"
+                  value={mergeSearch}
+                  onChange={(event) => setMergeSearch(event.target.value)}
+                  placeholder="חיפוש לפי שם / תעודת זהות / טלפון"
+                />
+                <div className="max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white">
+                  {mergeCandidates.length === 0 ? (
+                    <p className="p-3 text-sm text-slate-500">לא נמצאו תלמידים תואמים.</p>
+                  ) : (
+                    mergeCandidates.map((candidate) => (
+                      <button
+                        key={candidate.id}
+                        type="button"
+                        className={`flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-slate-50 ${
+                          mergeTargetId === candidate.id ? 'bg-slate-100' : ''
+                        }`}
+                        onClick={() => setMergeTargetId(candidate.id)}
+                      >
+                        <span>{candidate.name || 'תלמיד ללא שם'}</span>
+                        <span className="text-xs text-slate-500">
+                          {candidate.national_id || 'ללא ת״ז'}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {mergeTarget ? (
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-xs font-semibold text-slate-500">קליטה חדשה</p>
+                      <p className="text-sm font-semibold text-slate-900">{mergeSource.name || 'לא צוין'}</p>
+                      <p className="text-xs text-slate-600">{mergeSource.national_id || 'ללא ת״ז'}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                      <p className="text-xs font-semibold text-slate-500">תלמיד יעד</p>
+                      <p className="text-sm font-semibold text-slate-900">{mergeTarget.name || 'לא צוין'}</p>
+                      <p className="text-xs text-slate-600">{mergeTarget.national_id || 'ללא ת״ז'}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-sm font-semibold text-slate-900">בחירת שדות לשמירה</p>
+                    {[
+                      { key: 'name', label: 'שם', source: mergeSource.name, target: mergeTarget.name },
+                      { key: 'national_id', label: 'תעודת זהות', source: mergeSource.national_id, target: mergeTarget.national_id },
+                      { key: 'contact_name', label: 'שם איש קשר', source: mergeSource.contact_name, target: mergeTarget.contact_name },
+                      { key: 'contact_phone', label: 'טלפון איש קשר', source: mergeSource.contact_phone, target: mergeTarget.contact_phone },
+                      { key: 'assigned_instructor_id', label: 'מדריך משויך', source: mergeSource.assigned_instructor_id, target: mergeTarget.assigned_instructor_id },
+                      { key: 'notes', label: 'הערות', source: mergeSource.notes, target: mergeTarget.notes },
+                    ].map((field) => (
+                      <div key={field.key} className="grid gap-2 border-b border-slate-100 pb-2 md:grid-cols-[160px_1fr_1fr]">
+                        <p className="text-sm font-medium text-slate-700">{field.label}</p>
+                        <button
+                          type="button"
+                          className={`rounded-md border px-2 py-1 text-sm text-slate-700 ${
+                            (mergeSelections[field.key] || 'source') === 'source'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-slate-200'
+                          }`}
+                          onClick={() => handleMergeSelectionChange(field.key, 'source')}
+                        >
+                          {field.source || '—'}
+                        </button>
+                        <button
+                          type="button"
+                          className={`rounded-md border px-2 py-1 text-sm text-slate-700 ${
+                            mergeSelections[field.key] === 'target'
+                              ? 'border-primary bg-primary/10'
+                              : 'border-slate-200'
+                          }`}
+                          onClick={() => handleMergeSelectionChange(field.key, 'target')}
+                        >
+                          {field.target || '—'}
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="grid gap-2 md:grid-cols-[160px_1fr_1fr]">
+                      <p className="text-sm font-medium text-slate-700">תגיות</p>
+                      <button
+                        type="button"
+                        className={`rounded-md border px-2 py-1 text-sm text-slate-700 ${
+                          (mergeSelections.tags || 'source') === 'source'
+                            ? 'border-primary bg-primary/10'
+                            : 'border-slate-200'
+                        }`}
+                        onClick={() => handleMergeSelectionChange('tags', 'source')}
+                      >
+                        {(mergeSource.tags || []).length ? (mergeSource.tags || []).join(', ') : '—'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`rounded-md border px-2 py-1 text-sm text-slate-700 ${
+                          mergeSelections.tags === 'target'
+                            ? 'border-primary bg-primary/10'
+                            : 'border-slate-200'
+                        }`}
+                        onClick={() => handleMergeSelectionChange('tags', 'target')}
+                      >
+                        {(mergeTarget.tags || []).length ? (mergeTarget.tags || []).join(', ') : '—'}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleMergeSelectionChange('tags', 'combined')}
+                      >
+                        שילוב תגיות
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => handleMergeDialogChange(false)}>
+                      ביטול
+                    </Button>
+                    <Button type="button" onClick={handleMergeSubmit} disabled={isMerging}>
+                      {isMerging ? 'ממזג...' : 'ביצוע מיזוג'}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">טוען נתוני קליטה...</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

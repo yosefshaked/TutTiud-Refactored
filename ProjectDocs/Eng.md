@@ -13,5 +13,6 @@
 - Admins can dismiss an intake submission from the queue modal to remove accidental or duplicate intakes.
 - Dismissed intakes are tracked separately from inactive students and can be restored into the queue when needed.
 - Dismissed intakes are filtered out of the main students list on the server and are only available through the dedicated dismissed intake endpoint in the intake queue.
+- Admins can merge intake submissions into an existing student from the intake queue, choosing field-by-field values to keep.
 - Intake approvals are now completed by the assigned instructor after the admin assignment step.
 - Dashboard quick-action cards for students and new session were removed; use the right-side menu entries for navigation and session creation.
