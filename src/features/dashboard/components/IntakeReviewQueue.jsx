@@ -161,6 +161,7 @@ export default function IntakeReviewQueue() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [pendingStudents, setPendingStudents] = useState([]);
+  const [dismissedStudents, setDismissedStudents] = useState([]);
   const [displayLabels, setDisplayLabels] = useState({});
   const [importantFields, setImportantFields] = useState([]);
   const [approvingIds, setApprovingIds] = useState(() => new Set());
@@ -186,6 +187,9 @@ export default function IntakeReviewQueue() {
   const [dismissStudentId, setDismissStudentId] = useState('');
   const [dismissError, setDismissError] = useState('');
   const [isDismissing, setIsDismissing] = useState(false);
+  const [restoreStudentId, setRestoreStudentId] = useState('');
+  const [restoreError, setRestoreError] = useState('');
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const isAdmin = isAdminRole(membershipRole);
@@ -203,6 +207,7 @@ export default function IntakeReviewQueue() {
       if (!session || !activeOrgId || !activeOrgHasConnection || !tenantClientReady) {
         if (!cancelled) {
           setPendingStudents([]);
+          setDismissedStudents([]);
           setError('');
           setIsLoading(false);
         }
@@ -227,7 +232,9 @@ export default function IntakeReviewQueue() {
 
         const roster = Array.isArray(studentsResponse) ? studentsResponse : [];
         const pending = roster.filter((student) => student?.needs_intake_approval === true);
+        const dismissed = roster.filter((student) => student?.metadata?.intake_dismissal?.active === true);
         setPendingStudents(pending);
+        setDismissedStudents(dismissed);
         setDisplayLabels(normalizeDisplayLabels(settingsResponse?.intake_display_labels));
         setImportantFields(normalizeImportantFields(settingsResponse?.intake_important_fields));
       } catch (loadError) {
@@ -235,6 +242,7 @@ export default function IntakeReviewQueue() {
         if (!cancelled) {
           setError('טעינת תור קליטה נכשלה. נסו שוב.');
           setPendingStudents([]);
+          setDismissedStudents([]);
         }
       } finally {
         if (!cancelled) {
@@ -525,7 +533,7 @@ export default function IntakeReviewQueue() {
     setDismissError('');
 
     try {
-      await authenticatedFetch('intake/dismiss', {
+      const updatedStudent = await authenticatedFetch('intake/dismiss', {
         method: 'POST',
         session,
         body: {
@@ -535,12 +543,65 @@ export default function IntakeReviewQueue() {
       });
 
       setPendingStudents((prev) => prev.filter((student) => student.id !== dismissStudentId));
+      if (updatedStudent?.id) {
+        setDismissedStudents((prev) => {
+          const next = prev.filter((student) => student.id !== updatedStudent.id);
+          return [...next, updatedStudent];
+        });
+      }
       setDismissStudentId('');
     } catch (dismissErrorResponse) {
       console.error('Failed to dismiss intake submission', dismissErrorResponse);
       setDismissError('הסרת הקליטה נכשלה. נסו שוב.');
     } finally {
       setIsDismissing(false);
+    }
+  };
+
+  const openRestoreDialog = (studentId) => {
+    setRestoreStudentId(studentId);
+    setRestoreError('');
+  };
+
+  const handleRestoreDialogChange = (open) => {
+    if (!open) {
+      setRestoreStudentId('');
+      setRestoreError('');
+    }
+  };
+
+  const handleRestoreIntake = async () => {
+    if (!session || !activeOrgId || !restoreStudentId) {
+      return;
+    }
+
+    setIsRestoring(true);
+    setRestoreError('');
+
+    try {
+      const updatedStudent = await authenticatedFetch('intake/restore', {
+        method: 'POST',
+        session,
+        body: {
+          org_id: activeOrgId,
+          student_id: restoreStudentId,
+        },
+      });
+
+      setDismissedStudents((prev) => prev.filter((student) => student.id !== restoreStudentId));
+      if (updatedStudent?.id) {
+        setPendingStudents((prev) => {
+          const next = prev.filter((student) => student.id !== updatedStudent.id);
+          return [...next, updatedStudent];
+        });
+      }
+
+      setRestoreStudentId('');
+    } catch (restoreErrorResponse) {
+      console.error('Failed to restore intake submission', restoreErrorResponse);
+      setRestoreError('שחזור הקליטה נכשל. נסו שוב.');
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -762,6 +823,48 @@ export default function IntakeReviewQueue() {
                 </div>
               );
             })}
+
+            {isAdmin ? (
+              <div className="space-y-3 border-t border-slate-200 pt-4">
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-sm font-semibold text-slate-900">קליטות שהוסרו</h3>
+                  <p className="text-xs text-slate-500">קליטות שהוסרו מהתור מופיעות כאן וניתן לשחזר אותן.</p>
+                </div>
+                {dismissedStudents.length === 0 ? (
+                  <div className="rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-600">
+                    אין קליטות שהוסרו להצגה.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {dismissedStudents.map((student) => {
+                      const dismissalMeta = student?.metadata?.intake_dismissal;
+                      const dismissedAt = dismissalMeta?.at
+                        ? new Date(dismissalMeta.at).toLocaleString('he-IL')
+                        : '';
+                      return (
+                        <div key={student.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-slate-900">{student.name}</p>
+                              <p className="text-xs text-slate-600">
+                                {dismissedAt ? `הוסר בתאריך ${dismissedAt}` : 'הוסר מהתור'}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => openRestoreDialog(student.id)}
+                            >
+                              שחזור קליטה
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
@@ -906,6 +1009,28 @@ export default function IntakeReviewQueue() {
             <AlertDialogCancel>ביטול</AlertDialogCancel>
             <AlertDialogAction onClick={handleDismissIntake} disabled={isDismissing}>
               {isDismissing ? 'מסיר...' : 'הסרת קליטה'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(restoreStudentId)} onOpenChange={handleRestoreDialogChange}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>שחזור קליטה</AlertDialogTitle>
+            <AlertDialogDescription>
+              שחזור יחזיר את הקליטה לתור לבדיקה ואישור.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {restoreError ? (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {restoreError}
+            </div>
+          ) : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel>ביטול</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestoreIntake} disabled={isRestoring}>
+              {isRestoring ? 'משחזר...' : 'שחזור קליטה'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

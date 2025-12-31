@@ -68,7 +68,7 @@ export default async function handler(context, req) {
   const adminConfig = readSupabaseAdminConfig(env);
 
   if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
-    context.log?.error?.('intake-dismiss missing Supabase admin credentials');
+    context.log?.error?.('intake-restore missing Supabase admin credentials');
     return respond(context, 500, { message: 'server_misconfigured' });
   }
 
@@ -78,7 +78,7 @@ export default async function handler(context, req) {
   try {
     authResult = await supabase.auth.getUser(authorization.token);
   } catch (error) {
-    context.log?.error?.('intake-dismiss failed to validate token', { message: error?.message });
+    context.log?.error?.('intake-restore failed to validate token', { message: error?.message });
     return respond(context, 401, { message: 'invalid or expired token' });
   }
 
@@ -86,7 +86,7 @@ export default async function handler(context, req) {
     return respond(context, 401, { message: 'invalid or expired token' });
   }
 
-  const body = parseJsonBodyWithLimit(req, 16 * 1024, { mode: 'observe', context, endpoint: 'intake-dismiss' });
+  const body = parseJsonBodyWithLimit(req, 16 * 1024, { mode: 'observe', context, endpoint: 'intake-restore' });
   const orgId = resolveOrgId(req, body);
 
   if (!orgId) {
@@ -102,7 +102,7 @@ export default async function handler(context, req) {
   try {
     role = await ensureMembership(supabase, orgId, authResult.data.user.id);
   } catch (membershipError) {
-    context.log?.error?.('intake-dismiss failed to verify membership', {
+    context.log?.error?.('intake-restore failed to verify membership', {
       message: membershipError?.message,
       orgId,
       userId: authResult.data.user.id,
@@ -121,7 +121,7 @@ export default async function handler(context, req) {
 
   const { data: student, error: studentError } = await tenantClient
     .from('Students')
-    .select('id, metadata, needs_intake_approval')
+    .select('id, metadata')
     .eq('id', studentId)
     .maybeSingle();
 
@@ -130,16 +130,12 @@ export default async function handler(context, req) {
       const schemaResponse = buildSchemaResponse(studentError);
       return respond(context, schemaResponse.status, schemaResponse.body);
     }
-    context.log?.error?.('intake-dismiss failed to load student', { message: studentError.message });
+    context.log?.error?.('intake-restore failed to load student', { message: studentError.message });
     return respond(context, 500, { message: 'failed_to_load_student' });
   }
 
   if (!student) {
     return respond(context, 404, { message: 'student_not_found' });
-  }
-
-  if (!student.needs_intake_approval) {
-    return respond(context, 200, { status: 'already_cleared' });
   }
 
   const existingMetadata = student.metadata && typeof student.metadata === 'object' ? student.metadata : {};
@@ -149,16 +145,16 @@ export default async function handler(context, req) {
       ...(existingMetadata.intake_dismissal && typeof existingMetadata.intake_dismissal === 'object'
         ? existingMetadata.intake_dismissal
         : {}),
-      active: true,
-      at: new Date().toISOString(),
-      by: authResult.data.user.id,
+      active: false,
+      restored_at: new Date().toISOString(),
+      restored_by: authResult.data.user.id,
     },
   };
 
   const { data, error } = await tenantClient
     .from('Students')
     .update({
-      needs_intake_approval: false,
+      needs_intake_approval: true,
       metadata: updatedMetadata,
     })
     .eq('id', studentId)
@@ -170,7 +166,7 @@ export default async function handler(context, req) {
       const schemaResponse = buildSchemaResponse(error);
       return respond(context, schemaResponse.status, schemaResponse.body);
     }
-    context.log?.error?.('intake-dismiss failed to update student', { message: error.message });
+    context.log?.error?.('intake-restore failed to update student', { message: error.message });
     return respond(context, 500, { message: 'failed_to_update_student' });
   }
 
@@ -178,5 +174,5 @@ export default async function handler(context, req) {
     return respond(context, 404, { message: 'student_not_found' });
   }
 
-  return respond(context, 200, { status: 'dismissed', student: data });
+  return respond(context, 200, { status: 'restored', student: data });
 }

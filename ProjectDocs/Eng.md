@@ -11,5 +11,6 @@
 - The summary stays visible with loading, error, and empty states, and exposes a retry action on load failures.
 - Admins can assign the intake to an instructor (plus contact details and notes) from the queue modal, which makes the intake visible to the assigned instructor for approval.
 - Admins can dismiss an intake submission from the queue modal to remove accidental or duplicate intakes.
+- Dismissed intakes are tracked separately from inactive students and can be restored into the queue when needed.
 - Intake approvals are now completed by the assigned instructor after the admin assignment step.
 - Dashboard quick-action cards for students and new session were removed; use the right-side menu entries for navigation and session creation.
