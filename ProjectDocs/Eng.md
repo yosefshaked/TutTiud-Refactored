@@ -15,5 +15,6 @@
 - Dismissed intakes are filtered out of the main students list on the server and are only available through the dedicated dismissed intake endpoint, shown behind a toggle in the intake queue.
 - Admins can merge intake submissions into an existing student from the intake queue, choosing field-by-field values to keep.
 - The merge flow reattaches intake responses to the target student and preserves any prior target intake payload in metadata.
+- The merge dialog resolves instructor names and tag labels using the same catalog used on the student profile, avoiding raw IDs in the comparison view.
 - Intake approvals are now completed by the assigned instructor after the admin assignment step.
 - Dashboard quick-action cards for students and new session were removed; use the right-side menu entries for navigation and session creation.

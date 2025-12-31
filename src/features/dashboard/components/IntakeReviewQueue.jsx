@@ -23,6 +23,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { fetchSettings } from '@/features/settings/api/settings.js';
 import { useInstructors } from '@/hooks/useOrgData.js';
 import { isAdminRole, normalizeMembershipRole } from '@/features/students/utils/endpoints.js';
+import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
+import { buildTagDisplayList } from '@/features/students/utils/tags.js';
 
 const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שקראתי את האינטייק של התלמיד/ה וביצעתי שיחת קליטה עם האפוטרופוס.';
 
@@ -208,6 +210,7 @@ export default function IntakeReviewQueue() {
     session,
     includeInactive: true,
   });
+  const { tagOptions, loadTags } = useStudentTags();
 
   useEffect(() => {
     let cancelled = false;
@@ -227,6 +230,7 @@ export default function IntakeReviewQueue() {
       setError('');
 
       try {
+        await loadTags();
         const [studentsResponse, dismissedResponse, settingsResponse] = await Promise.all([
           authenticatedFetch('students-list', {
             session,
@@ -273,7 +277,7 @@ export default function IntakeReviewQueue() {
     return () => {
       cancelled = true;
     };
-  }, [session, activeOrgId, activeOrgHasConnection, tenantClientReady, retryToken, isAdmin]);
+  }, [session, activeOrgId, activeOrgHasConnection, tenantClientReady, retryToken, isAdmin, loadTags]);
 
   const labelMap = useMemo(() => displayLabels, [displayLabels]);
 
@@ -407,6 +411,7 @@ export default function IntakeReviewQueue() {
   const instructorMap = useMemo(() => {
     return new Map((instructors || []).filter((entry) => entry?.id).map((entry) => [entry.id, entry]));
   }, [instructors]);
+
 
   const filteredStudents = useMemo(() => {
     let filtered = pendingStudents;
@@ -683,6 +688,22 @@ export default function IntakeReviewQueue() {
       return Array.from(combined);
     }
     return selection === 'source' ? (sourceTags || []) : (targetTags || []);
+  };
+
+  const resolveInstructorName = (id) => {
+    if (!id) {
+      return 'לא הוקצה מדריך';
+    }
+    const instructor = instructorMap.get(id);
+    return instructor?.name || instructor?.email || 'מדריך לא זמין';
+  };
+
+  const resolveTagLabel = (tags) => {
+    const displayList = buildTagDisplayList(tags, tagOptions);
+    if (!displayList.length) {
+      return '—';
+    }
+    return displayList.map((tag) => tag.name).join(', ');
   };
 
   const handleMergeSubmit = async () => {
@@ -1288,7 +1309,12 @@ export default function IntakeReviewQueue() {
                       { key: 'national_id', label: 'תעודת זהות', source: mergeSource.national_id, target: mergeTarget.national_id },
                       { key: 'contact_name', label: 'שם איש קשר', source: mergeSource.contact_name, target: mergeTarget.contact_name },
                       { key: 'contact_phone', label: 'טלפון איש קשר', source: mergeSource.contact_phone, target: mergeTarget.contact_phone },
-                      { key: 'assigned_instructor_id', label: 'מדריך משויך', source: mergeSource.assigned_instructor_id, target: mergeTarget.assigned_instructor_id },
+                      {
+                        key: 'assigned_instructor_id',
+                        label: 'מדריך משויך',
+                        source: resolveInstructorName(mergeSource.assigned_instructor_id),
+                        target: resolveInstructorName(mergeTarget.assigned_instructor_id),
+                      },
                       { key: 'notes', label: 'הערות', source: mergeSource.notes, target: mergeTarget.notes },
                     ].map((field) => (
                       <div key={field.key} className="grid gap-2 border-b border-slate-100 pb-2 md:grid-cols-[160px_1fr_1fr]">
@@ -1329,7 +1355,7 @@ export default function IntakeReviewQueue() {
                         }`}
                         onClick={() => handleMergeSelectionChange('tags', 'source')}
                       >
-                        {(mergeSource.tags || []).length ? (mergeSource.tags || []).join(', ') : '—'}
+                        {resolveTagLabel(mergeSource.tags)}
                       </button>
                       <button
                         type="button"
@@ -1340,7 +1366,7 @@ export default function IntakeReviewQueue() {
                         }`}
                         onClick={() => handleMergeSelectionChange('tags', 'target')}
                       >
-                        {(mergeTarget.tags || []).length ? (mergeTarget.tags || []).join(', ') : '—'}
+                        {resolveTagLabel(mergeTarget.tags)}
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
