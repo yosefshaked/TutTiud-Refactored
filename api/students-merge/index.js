@@ -241,6 +241,10 @@ export default async function handler(context, req) {
       merged_at: new Date().toISOString(),
       merged_by: authResult.data.user.id,
     },
+    merge_backup: {
+      source_student: sourceStudent,
+      target_before_merge: targetStudent,
+    },
   };
 
   const updates = {
@@ -281,37 +285,20 @@ export default async function handler(context, req) {
     return respond(context, 500, { message: 'failed_to_update_target' });
   }
 
-  const sourceMetadata = sourceStudent.metadata && typeof sourceStudent.metadata === 'object' ? sourceStudent.metadata : {};
-  const updatedSourceMetadata = {
-    ...sourceMetadata,
-    intake_dismissal: {
-      ...(sourceMetadata.intake_dismissal && typeof sourceMetadata.intake_dismissal === 'object'
-        ? sourceMetadata.intake_dismissal
-        : {}),
-      active: true,
-      at: new Date().toISOString(),
-      by: authResult.data.user.id,
-      merged_into: targetStudentId,
-    },
-  };
-
-  const { data: updatedSource, error: sourceUpdateError } = await tenantClient
+  const { data: deletedSource, error: sourceDeleteError } = await tenantClient
     .from('Students')
-    .update({
-      needs_intake_approval: false,
-      metadata: updatedSourceMetadata,
-    })
+    .delete()
     .eq('id', sourceStudentId)
     .select()
     .maybeSingle();
 
-  if (sourceUpdateError) {
-    if (isSchemaError(sourceUpdateError)) {
-      const schemaResponse = buildSchemaResponse(sourceUpdateError);
+  if (sourceDeleteError) {
+    if (isSchemaError(sourceDeleteError)) {
+      const schemaResponse = buildSchemaResponse(sourceDeleteError);
       return respond(context, schemaResponse.status, schemaResponse.body);
     }
-    context.log?.error?.('students-merge failed to update source', { message: sourceUpdateError.message });
-    return respond(context, 500, { message: 'failed_to_update_source' });
+    context.log?.error?.('students-merge failed to delete source', { message: sourceDeleteError.message });
+    return respond(context, 500, { message: 'failed_to_delete_source' });
   }
 
   await logAuditEvent(supabase, {
@@ -326,12 +313,13 @@ export default async function handler(context, req) {
     details: {
       merged_from: sourceStudentId,
       fields: Object.keys(fields || {}),
+      deleted_source: true,
     },
   });
 
   return respond(context, 200, {
     status: 'merged',
     target: updatedTarget,
-    source: updatedSource,
+    source: deletedSource,
   });
 }

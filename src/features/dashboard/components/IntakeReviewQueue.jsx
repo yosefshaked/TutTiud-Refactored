@@ -201,6 +201,7 @@ export default function IntakeReviewQueue() {
   const [mergeError, setMergeError] = useState('');
   const [mergeSuccess, setMergeSuccess] = useState('');
   const [isMerging, setIsMerging] = useState(false);
+  const [mergeConfirmed, setMergeConfirmed] = useState(false);
 
   const membershipRole = normalizeMembershipRole(activeOrg?.membership?.role);
   const isAdmin = isAdminRole(membershipRole);
@@ -648,6 +649,7 @@ export default function IntakeReviewQueue() {
       setMergeError('');
       setMergeSuccess('');
       setIsMerging(false);
+      setMergeConfirmed(false);
     }
   };
 
@@ -711,6 +713,10 @@ export default function IntakeReviewQueue() {
 
   const handleMergeSubmit = async () => {
     if (!session || !activeOrgId || !mergeSource || !mergeTarget) {
+      return;
+    }
+    if (!mergeConfirmed) {
+      setMergeError('יש לאשר את הודעת האזהרה לפני המיזוג.');
       return;
     }
 
@@ -783,6 +789,7 @@ export default function IntakeReviewQueue() {
 
       setMergeSuccess('המיזוג הושלם והרשומה עודכנה.');
       setMergeSourceId('');
+      setMergeConfirmed(false);
       handleRetry();
     } catch (mergeErrorResponse) {
       console.error('Failed to merge intake student', mergeErrorResponse);
@@ -1388,7 +1395,7 @@ export default function IntakeReviewQueue() {
                     <Button type="button" variant="outline" onClick={() => handleMergeDialogChange(false)}>
                       ביטול
                     </Button>
-                    <Button type="button" onClick={handleMergeSubmit} disabled={isMerging}>
+                    <Button type="button" onClick={handleMergeSubmit} disabled={isMerging || !mergeConfirmed}>
                       {isMerging ? 'ממזג...' : 'ביצוע מיזוג'}
                     </Button>
                   </div>
@@ -1398,6 +1405,25 @@ export default function IntakeReviewQueue() {
           ) : (
             <p className="text-sm text-slate-500">טוען נתוני קליטה...</p>
           )}
+          {mergeTarget ? (
+            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="font-semibold">שימו לב:</p>
+              <p>
+                המיזוג מוחק את רשומת המקור ומעביר את הקליטה לתלמיד היעד. הפעולה אינה הפיכה,
+                ולכן יש לוודא שהמיזוג מתבצע מהתלמיד הנכון אל התלמיד הנכון.
+              </p>
+              <div className="mt-3 flex items-start gap-2">
+                <Checkbox
+                  id="merge-confirmation"
+                  checked={mergeConfirmed}
+                  onCheckedChange={(value) => setMergeConfirmed(value === true)}
+                />
+                <Label htmlFor="merge-confirmation" className="text-sm">
+                  אני מאשר/ת שהבנתי שהמיזוג מוחק את רשומת המקור ואינו ניתן לשחזור.
+                </Label>
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
