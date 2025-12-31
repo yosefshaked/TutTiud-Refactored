@@ -60,7 +60,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 ## 🔐 Secure API endpoints (MVP)
 
 - `GET /api/instructors` – admin/owner list of instructor IDs + names derived from `org_memberships` and `profiles`.
-- `GET /api/students-list` – unified endpoint for all users; admins see all students, non-admins filtered by `assigned_instructor_id`; supports status filtering (`active`/`inactive`/`all`).
+- `GET /api/students-list` – unified endpoint for all users; admins see all students, non-admins filtered by `assigned_instructor_id`; supports status filtering (`active`/`inactive`/`all`). Dismissed intakes are excluded unless `include_dismissed=true`.
 - `POST /api/students-list` – admin/owner creation of student records with optional instructor assignment.
 - `PUT /api/students-list/{studentId}` – admin/owner updates to student metadata (name, contact info, instructor, tags, notes).
 - `POST /api/intake` – public intake endpoint for Power Automate; requires `x-org-id` + `x-intake-secret` headers, parses `html_content`, and writes intake history + approval flag.

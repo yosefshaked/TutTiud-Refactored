@@ -221,7 +221,7 @@ export default function IntakeReviewQueue() {
         const [studentsResponse, settingsResponse] = await Promise.all([
           authenticatedFetch('students-list', {
             session,
-            params: { org_id: activeOrgId, status: 'all' },
+            params: { org_id: activeOrgId, status: 'all', include_dismissed: 'true' },
           }),
           fetchSettings({ session, orgId: activeOrgId }),
         ]);

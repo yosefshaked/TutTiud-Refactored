@@ -122,6 +122,7 @@
 - Intake approvals now require an assigned instructor: admins assign the intake (and optional contact details/notes) in the dashboard queue before the assigned instructor confirms reading the intake.
 - Admins can dismiss accidental intake submissions through `/api/intake/dismiss`, which clears `needs_intake_approval` and logs `metadata.intake_dismissal.active=true`.
 - Admins can restore dismissed intakes through `/api/intake/restore`, which reopens the queue entry and marks `metadata.intake_dismissal.active=false`.
+- `/api/students-list` filters out dismissed intakes by default; pass `include_dismissed=true` only when a workflow explicitly needs them (e.g., the intake queue).
 - Add any important information learned into this AGENTS.md file.
 	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
 	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.

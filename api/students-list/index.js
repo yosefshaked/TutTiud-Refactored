@@ -298,6 +298,15 @@ function determineStatusFilter(query, canViewInactive = true) {
   return 'active';
 }
 
+function shouldIncludeDismissed(query) {
+  const raw = normalizeString(query?.include_dismissed ?? query?.includeDismissed);
+  if (!raw) {
+    return false;
+  }
+  const normalized = raw.toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on';
+}
+
 export default async function handler(context, req) {
   const method = String(req.method || 'GET').toUpperCase();
   if (!['GET', 'POST', 'PUT'].includes(method)) {
@@ -416,6 +425,11 @@ export default async function handler(context, req) {
       builder = builder.eq('is_active', true);
     } else if (statusFilter === 'inactive') {
       builder = builder.eq('is_active', false);
+    }
+
+    const includeDismissed = shouldIncludeDismissed(req?.query);
+    if (!includeDismissed) {
+      builder = builder.neq('metadata->intake_dismissal->>active', 'true');
     }
 
     const { data, error } = await builder;
