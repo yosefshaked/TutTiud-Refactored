@@ -60,13 +60,14 @@ All states (loading, error, success) are surfaced inline with accessible message
 ## 🔐 Secure API endpoints (MVP)
 
 - `GET /api/instructors` – admin/owner list of instructor IDs + names derived from `org_memberships` and `profiles`.
-- `GET /api/students-list` – unified endpoint for all users; admins see all students, non-admins filtered by `assigned_instructor_id`; supports status filtering (`active`/`inactive`/`all`). Dismissed intakes are excluded unless `include_dismissed=true`.
+- `GET /api/students-list` – unified endpoint for all users; admins see all students, non-admins filtered by `assigned_instructor_id`; supports status filtering (`active`/`inactive`/`all`). Dismissed intakes are always excluded.
 - `POST /api/students-list` – admin/owner creation of student records with optional instructor assignment.
 - `PUT /api/students-list/{studentId}` – admin/owner updates to student metadata (name, contact info, instructor, tags, notes).
 - `POST /api/intake` – public intake endpoint for Power Automate; requires `x-org-id` + `x-intake-secret` headers, parses `html_content`, and writes intake history + approval flag.
 - `POST /api/intake/approve` – instructor-only approval endpoint that clears `needs_intake_approval` and records `metadata.last_approval` with agreement metadata once the intake is assigned.
 - `POST /api/intake/dismiss` – admin-only endpoint that removes an intake submission from the queue.
 - `POST /api/intake/restore` – admin-only endpoint that restores a dismissed intake back into the queue.
+- `GET /api/intake/dismissed` – admin-only endpoint that returns dismissed intakes for the intake queue.
 - `GET /api/weekly-compliance` – member/admin/owner weekly aggregation including instructor colors, scheduled chips, documentation status, and a dynamic hour range for the dashboard widget.
 - `POST /api/sessions` – member/admin/owner insertion of `SessionRecords` with assignment verification for members.
 - `GET /api/user-context` – authenticated fetch that returns the caller's organization memberships and pending invitations (with organization names) via the Supabase admin client so invitees bypass RLS limitations.

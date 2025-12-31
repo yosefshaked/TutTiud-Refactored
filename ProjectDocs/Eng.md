@@ -12,6 +12,6 @@
 - Admins can assign the intake to an instructor (plus contact details and notes) from the queue modal, which makes the intake visible to the assigned instructor for approval.
 - Admins can dismiss an intake submission from the queue modal to remove accidental or duplicate intakes.
 - Dismissed intakes are tracked separately from inactive students and can be restored into the queue when needed.
-- Dismissed intakes are filtered out of the main students list on the server unless `include_dismissed=true` is requested.
+- Dismissed intakes are filtered out of the main students list on the server and are only available through the dedicated dismissed intake endpoint in the intake queue.
 - Intake approvals are now completed by the assigned instructor after the admin assignment step.
 - Dashboard quick-action cards for students and new session were removed; use the right-side menu entries for navigation and session creation.

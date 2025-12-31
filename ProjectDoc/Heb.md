@@ -72,7 +72,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | נתיב | מתודה | קהל יעד | מטרה |
 | :--- | :---- | :------- | :---- |
 | `/api/instructors` | GET | מנהל/בעלים | קורא את `tuttiud."Instructors"` (ברירת מחדל: מדריכים פעילים) ומחזיר רשומות שמזוהות לפי מזהה המשתמש של Supabase (`id`). |
-| `/api/students-list` | GET | כל המשתמשים | נקודת קצה מאוחדת; מנהלים רואים את כל התלמידים, משתמשים רגילים מסוננים לפי `assigned_instructor_id`. מחזיר תלמידים פעילים כברירת מחדל (`status=active`), עם אפשרויות `status=inactive` ו-`status=all` ופרמטר תאימות `include_inactive=true`. קליטות שהוסרו מסוננות אלא אם נשלח `include_dismissed=true`. התגובה מחזירה גם את הדגל `is_active` להצגת סטטוס. מחליף את `/api/students` ו-`/api/my-students` הישנים. |
+| `/api/students-list` | GET | כל המשתמשים | נקודת קצה מאוחדת; מנהלים רואים את כל התלמידים, משתמשים רגילים מסוננים לפי `assigned_instructor_id`. מחזיר תלמידים פעילים כברירת מחדל (`status=active`), עם אפשרויות `status=inactive` ו-`status=all` ופרמטר תאימות `include_inactive=true`. קליטות שהוסרו מסוננות תמיד. התגובה מחזירה גם את הדגל `is_active` להצגת סטטוס. מחליף את `/api/students` ו-`/api/my-students` הישנים. |
 | `/api/students-list` | POST | מנהל/בעלים | מוסיף תלמיד (שם + פרטי קשר, הגדרות ברירת מחדל ושיוך למדריך) ומחזיר את הרשומה שנוצרה. |
 | `/api/students-list/{studentId}` | PUT | מנהל/בעלים | מעדכן שדות תלמיד ניתנים לעריכה (שם, פרטי קשר, הגדרות ברירת מחדל, שיוך מדריך, `is_active`, תגיות, הערות) ומחזיר את הרשומה המעודכנת או 404. |
 | `/api/students-check-id` | GET | כל המשתמשים | בודק ייחודיות של מספר זהות, עם אפשרות להתעלם מתלמיד קיים בעת עריכה. מחזיר `{ exists, student }` כדי לחסום כפילויות ולספק קישור לפרופיל. |
@@ -81,6 +81,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `/api/intake/approve` | POST | מדריך | מאשר קליטה ממתינה ע\"י `needs_intake_approval=false` ורישום `metadata.last_approval` (זמן + מאשר + הסכמה). הקליטה חייבת להיות משויכת למדריך המאשר. |
 | `/api/intake/dismiss` | POST | מנהל/בעלים | מסיר קליטה מתור הקליטה ע\"י ניקוי `needs_intake_approval` ורישום `metadata.last_intake_dismissal`. |
 | `/api/intake/restore` | POST | מנהל/בעלים | משחזר קליטה שהוסרה ע\"י `needs_intake_approval=true` וסימון `metadata.intake_dismissal.active=false`. |
+| `/api/intake/dismissed` | GET | מנהל/בעלים | מחזיר קליטות שהוסרו כדי להציגן באזור השחזור של תור הקליטה. |
 | `/api/students/maintenance-export` | GET | מנהל/בעלים | מחזיר CSV עם `system_uuid`, שם, מספר זהות, פרטי קשר, שיוך מדריך, הגדרות ברירת מחדל, תגיות וסטטוס פעילות לצורך ניקוי נתונים. |
 | `/api/loose-sessions` | GET/POST | מנהל/בעלים | מציג רשימת דיווחים לא משויכים (`student_id IS NULL`) ומאפשר לפתור אותם ע"י שיוך לתלמיד קיים או יצירת תלמיד חדש; מסיר רק את `metadata.unassigned_details` ומשמר מטאדטה אחרת. |
 | `/api/students/maintenance-import` | POST | מנהל/בעלים | מקבל טקסט CSV מעודכן לפי `system_uuid`, מעדכן רק שדות שהשתנו, בודק ייחודיות מספר זהות בכל שורה ומול המאגר, ומחזיר דו"ח כשלונות פר שורה. |

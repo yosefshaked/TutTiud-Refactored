@@ -218,11 +218,17 @@ export default function IntakeReviewQueue() {
       setError('');
 
       try {
-        const [studentsResponse, settingsResponse] = await Promise.all([
+        const [studentsResponse, dismissedResponse, settingsResponse] = await Promise.all([
           authenticatedFetch('students-list', {
             session,
-            params: { org_id: activeOrgId, status: 'all', include_dismissed: 'true' },
+            params: { org_id: activeOrgId, status: 'all' },
           }),
+          isAdmin
+            ? authenticatedFetch('intake/dismissed', {
+              session,
+              params: { org_id: activeOrgId },
+            })
+            : Promise.resolve([]),
           fetchSettings({ session, orgId: activeOrgId }),
         ]);
 
@@ -232,7 +238,7 @@ export default function IntakeReviewQueue() {
 
         const roster = Array.isArray(studentsResponse) ? studentsResponse : [];
         const pending = roster.filter((student) => student?.needs_intake_approval === true);
-        const dismissed = roster.filter((student) => student?.metadata?.intake_dismissal?.active === true);
+        const dismissed = Array.isArray(dismissedResponse) ? dismissedResponse : [];
         setPendingStudents(pending);
         setDismissedStudents(dismissed);
         setDisplayLabels(normalizeDisplayLabels(settingsResponse?.intake_display_labels));
@@ -256,7 +262,7 @@ export default function IntakeReviewQueue() {
     return () => {
       cancelled = true;
     };
-  }, [session, activeOrgId, activeOrgHasConnection, tenantClientReady, retryToken]);
+  }, [session, activeOrgId, activeOrgHasConnection, tenantClientReady, retryToken, isAdmin]);
 
   const labelMap = useMemo(() => displayLabels, [displayLabels]);
 
