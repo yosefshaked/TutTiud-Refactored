@@ -124,6 +124,7 @@
 - Admins can restore dismissed intakes through `/api/intake/restore`, which reopens the queue entry and marks `metadata.intake_dismissal.active=false`.
 - `/api/students-list` always filters out dismissed intakes; use `/api/intake/dismissed` to load them for the intake queue.
 - Admins can merge intake submissions into existing students via `/api/students-merge`, selecting per-field values to keep.
+- `/api/students-merge` reattaches intake responses to the target student and stores any previous target intake payload in `metadata.intake_merge_backup`.
 - Add any important information learned into this AGENTS.md file.
 	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
 	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.

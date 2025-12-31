@@ -68,7 +68,7 @@ All states (loading, error, success) are surfaced inline with accessible message
 - `POST /api/intake/dismiss` – admin-only endpoint that removes an intake submission from the queue.
 - `POST /api/intake/restore` – admin-only endpoint that restores a dismissed intake back into the queue.
 - `GET /api/intake/dismissed` – admin-only endpoint that returns dismissed intakes for the intake queue.
-- `POST /api/students-merge` – admin-only endpoint that merges a pending intake into an existing student with field-by-field selection.
+- `POST /api/students-merge` – admin-only endpoint that merges a pending intake into an existing student with field-by-field selection and reattaches intake responses.
 - `GET /api/weekly-compliance` – member/admin/owner weekly aggregation including instructor colors, scheduled chips, documentation status, and a dynamic hour range for the dashboard widget.
 - `POST /api/sessions` – member/admin/owner insertion of `SessionRecords` with assignment verification for members.
 - `GET /api/user-context` – authenticated fetch that returns the caller's organization memberships and pending invitations (with organization names) via the Supabase admin client so invitees bypass RLS limitations.

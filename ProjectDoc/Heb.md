@@ -82,7 +82,7 @@ Tuttiud מאפשרת לצוותי הוראה לתאם שיעורים, לעקוב
 | `/api/intake/dismiss` | POST | מנהל/בעלים | מסיר קליטה מתור הקליטה ע\"י ניקוי `needs_intake_approval` ורישום `metadata.last_intake_dismissal`. |
 | `/api/intake/restore` | POST | מנהל/בעלים | משחזר קליטה שהוסרה ע\"י `needs_intake_approval=true` וסימון `metadata.intake_dismissal.active=false`. |
 | `/api/intake/dismissed` | GET | מנהל/בעלים | מחזיר קליטות שהוסרו כדי להציגן באזור השחזור של תור הקליטה. |
-| `/api/students-merge` | POST | מנהל/בעלים | ממזג קליטה לתלמיד קיים לפי בחירת שדות ומסמן את קליטת המקור כמוסרת. |
+| `/api/students-merge` | POST | מנהל/בעלים | ממזג קליטה לתלמיד קיים לפי בחירת שדות, מחבר את נתוני הקליטה לתלמיד היעד ומסמן את קליטת המקור כמוסרת. |
 | `/api/students/maintenance-export` | GET | מנהל/בעלים | מחזיר CSV עם `system_uuid`, שם, מספר זהות, פרטי קשר, שיוך מדריך, הגדרות ברירת מחדל, תגיות וסטטוס פעילות לצורך ניקוי נתונים. |
 | `/api/loose-sessions` | GET/POST | מנהל/בעלים | מציג רשימת דיווחים לא משויכים (`student_id IS NULL`) ומאפשר לפתור אותם ע"י שיוך לתלמיד קיים או יצירת תלמיד חדש; מסיר רק את `metadata.unassigned_details` ומשמר מטאדטה אחרת. |
 | `/api/students/maintenance-import` | POST | מנהל/בעלים | מקבל טקסט CSV מעודכן לפי `system_uuid`, מעדכן רק שדות שהשתנו, בודק ייחודיות מספר זהות בכל שורה ומול המאגר, ומחזיר דו"ח כשלונות פר שורה. |

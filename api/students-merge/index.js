@@ -18,6 +18,7 @@ import {
   validateAssignedInstructor,
   validateIsraeliPhone,
 } from '../_shared/student-validation.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
 function isSchemaError(error) {
   if (!error) {
@@ -254,7 +255,13 @@ export default async function handler(context, req) {
     metadata: updatedMetadata,
   };
 
-  if (!targetStudent.intake_responses && sourceStudent.intake_responses) {
+  if (sourceStudent.intake_responses) {
+    if (targetStudent.intake_responses && targetStudent.intake_responses !== sourceStudent.intake_responses) {
+      updates.metadata = {
+        ...updates.metadata,
+        intake_merge_backup: targetStudent.intake_responses,
+      };
+    }
     updates.intake_responses = sourceStudent.intake_responses;
   }
 
@@ -306,6 +313,21 @@ export default async function handler(context, req) {
     context.log?.error?.('students-merge failed to update source', { message: sourceUpdateError.message });
     return respond(context, 500, { message: 'failed_to_update_source' });
   }
+
+  await logAuditEvent(supabase, {
+    orgId,
+    userId: authResult.data.user.id,
+    userEmail: authResult.data.user.email || '',
+    userRole: role,
+    actionType: AUDIT_ACTIONS.STUDENT_UPDATED,
+    actionCategory: AUDIT_CATEGORIES.STUDENTS,
+    resourceType: 'student',
+    resourceId: targetStudentId,
+    details: {
+      merged_from: sourceStudentId,
+      fields: Object.keys(fields || {}),
+    },
+  });
 
   return respond(context, 200, {
     status: 'merged',

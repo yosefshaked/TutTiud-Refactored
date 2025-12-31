@@ -82,7 +82,7 @@ The wizard always tracks loading, error, and success states, ensuring accessibil
 | `/api/intake/dismiss` | POST | Admin/Owner | Removes an intake submission from the queue by clearing `needs_intake_approval` and recording `metadata.last_intake_dismissal`. |
 | `/api/intake/restore` | POST | Admin/Owner | Restores a dismissed intake by setting `needs_intake_approval=true` and marking `metadata.intake_dismissal.active=false`. |
 | `/api/intake/dismissed` | GET | Admin/Owner | Returns dismissed intake rows so the intake queue can display and restore them. |
-| `/api/students-merge` | POST | Admin/Owner | Merges a pending intake student into an existing student with field-by-field selections, then dismisses the source intake row. |
+| `/api/students-merge` | POST | Admin/Owner | Merges a pending intake student into an existing student with field-by-field selections, reattaches intake responses to the target, and dismisses the source intake row. |
 | `/api/students/maintenance-export` | GET | Admin/Owner | Returns a CSV with `system_uuid`, name, national ID, contact info, assigned instructor, schedule defaults, tags, and `is_active` for bulk cleanup. |
 | `/api/loose-sessions` | GET/POST | Admin/Owner | Lists unassigned session records (`student_id IS NULL`) and resolves them by assigning to an existing student or creating a new student; strips only `metadata.unassigned_details` on resolution and preserves other metadata. |
 | `/api/students/maintenance-import` | POST | Admin/Owner | Accepts edited maintenance CSV text keyed by `system_uuid`, updates only changed fields, enforces national ID uniqueness per row and against the database, and reports per-row failures. |
