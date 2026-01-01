@@ -4,6 +4,7 @@ import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/s
 import { parseJsonBodyWithLimit } from '../_shared/validation.js';
 import {
   ensureMembership,
+  isAdminRole,
   readEnv,
   respond,
   resolveOrgId,
@@ -52,25 +53,6 @@ function resolveStudentId(body) {
   return '';
 }
 
-function buildAgreementPayload(raw, userId) {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-  const acknowledged = Boolean(raw.acknowledged || raw.confirmed || raw.checked);
-  if (!acknowledged) {
-    return null;
-  }
-  const statement = normalizeString(raw.statement || raw.text || raw.label);
-  const clientTimestamp = normalizeString(raw.acknowledged_at || raw.confirmed_at || raw.timestamp);
-  return {
-    acknowledged: true,
-    statement: statement || null,
-    client_acknowledged_at: clientTimestamp || null,
-    by: userId,
-    at: new Date().toISOString(),
-  };
-}
-
 export default async function handler(context, req) {
   const method = String(req.method || 'POST').toUpperCase();
   if (method !== 'POST') {
@@ -86,7 +68,7 @@ export default async function handler(context, req) {
   const adminConfig = readSupabaseAdminConfig(env);
 
   if (!adminConfig.supabaseUrl || !adminConfig.serviceRoleKey) {
-    context.log?.error?.('intake-approve missing Supabase admin credentials');
+    context.log?.error?.('intake-dismiss missing Supabase admin credentials');
     return respond(context, 500, { message: 'server_misconfigured' });
   }
 
@@ -96,7 +78,7 @@ export default async function handler(context, req) {
   try {
     authResult = await supabase.auth.getUser(authorization.token);
   } catch (error) {
-    context.log?.error?.('intake-approve failed to validate token', { message: error?.message });
+    context.log?.error?.('intake-dismiss failed to validate token', { message: error?.message });
     return respond(context, 401, { message: 'invalid or expired token' });
   }
 
@@ -104,7 +86,7 @@ export default async function handler(context, req) {
     return respond(context, 401, { message: 'invalid or expired token' });
   }
 
-  const body = parseJsonBodyWithLimit(req, 16 * 1024, { mode: 'observe', context, endpoint: 'intake-approve' });
+  const body = parseJsonBodyWithLimit(req, 16 * 1024, { mode: 'observe', context, endpoint: 'intake-dismiss' });
   const orgId = resolveOrgId(req, body);
 
   if (!orgId) {
@@ -116,16 +98,11 @@ export default async function handler(context, req) {
     return respond(context, 400, { message: 'invalid_student_id' });
   }
 
-  const agreement = buildAgreementPayload(body?.agreement, authResult.data.user.id);
-  if (!agreement) {
-    return respond(context, 400, { message: 'invalid_agreement' });
-  }
-
   let role;
   try {
     role = await ensureMembership(supabase, orgId, authResult.data.user.id);
   } catch (membershipError) {
-    context.log?.error?.('intake-approve failed to verify membership', {
+    context.log?.error?.('intake-dismiss failed to verify membership', {
       message: membershipError?.message,
       orgId,
       userId: authResult.data.user.id,
@@ -133,7 +110,7 @@ export default async function handler(context, req) {
     return respond(context, 500, { message: 'failed_to_verify_membership' });
   }
 
-  if (!role) {
+  if (!role || !isAdminRole(role)) {
     return respond(context, 403, { message: 'forbidden' });
   }
 
@@ -144,7 +121,7 @@ export default async function handler(context, req) {
 
   const { data: student, error: studentError } = await tenantClient
     .from('Students')
-    .select('id, assigned_instructor_id, metadata')
+    .select('id, metadata, needs_intake_approval')
     .eq('id', studentId)
     .maybeSingle();
 
@@ -153,7 +130,7 @@ export default async function handler(context, req) {
       const schemaResponse = buildSchemaResponse(studentError);
       return respond(context, schemaResponse.status, schemaResponse.body);
     }
-    context.log?.error?.('intake-approve failed to load student', { message: studentError.message });
+    context.log?.error?.('intake-dismiss failed to load student', { message: studentError.message });
     return respond(context, 500, { message: 'failed_to_load_student' });
   }
 
@@ -161,24 +138,20 @@ export default async function handler(context, req) {
     return respond(context, 404, { message: 'student_not_found' });
   }
 
-  if (!student.assigned_instructor_id) {
-    return respond(context, 409, { message: 'assigned_instructor_required' });
-  }
-
-  if (student.assigned_instructor_id !== authResult.data.user.id) {
-    return respond(context, 403, { message: 'forbidden' });
+  if (!student.needs_intake_approval) {
+    return respond(context, 200, { status: 'already_cleared' });
   }
 
   const existingMetadata = student.metadata && typeof student.metadata === 'object' ? student.metadata : {};
   const updatedMetadata = {
     ...existingMetadata,
-    last_approval: {
-      ...(existingMetadata.last_approval && typeof existingMetadata.last_approval === 'object'
-        ? existingMetadata.last_approval
+    intake_dismissal: {
+      ...(existingMetadata.intake_dismissal && typeof existingMetadata.intake_dismissal === 'object'
+        ? existingMetadata.intake_dismissal
         : {}),
+      active: true,
       at: new Date().toISOString(),
       by: authResult.data.user.id,
-      agreement,
     },
   };
 
@@ -197,7 +170,7 @@ export default async function handler(context, req) {
       const schemaResponse = buildSchemaResponse(error);
       return respond(context, schemaResponse.status, schemaResponse.body);
     }
-    context.log?.error?.('intake-approve failed to update student', { message: error.message });
+    context.log?.error?.('intake-dismiss failed to update student', { message: error.message });
     return respond(context, 500, { message: 'failed_to_update_student' });
   }
 
@@ -205,5 +178,5 @@ export default async function handler(context, req) {
     return respond(context, 404, { message: 'student_not_found' });
   }
 
-  return respond(context, 200, { status: 'approved', student: data });
+  return respond(context, 200, { status: 'dismissed', student: data });
 }
