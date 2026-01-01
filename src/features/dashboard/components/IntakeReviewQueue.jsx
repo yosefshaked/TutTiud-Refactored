@@ -182,7 +182,7 @@ export default function IntakeReviewQueue() {
     instructorId: '',
     contactName: '',
     contactPhone: '',
-    notes: '',
+    intakeNotes: '',
   });
   const [assignError, setAssignError] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
@@ -470,7 +470,7 @@ export default function IntakeReviewQueue() {
       instructorId: student.assigned_instructor_id || '',
       contactName: student.contact_name || '',
       contactPhone: student.contact_phone || '',
-      notes: student.notes || '',
+      intakeNotes: student?.metadata?.intake_notes || '',
     });
   };
 
@@ -483,7 +483,7 @@ export default function IntakeReviewQueue() {
         instructorId: '',
         contactName: '',
         contactPhone: '',
-        notes: '',
+        intakeNotes: '',
       });
     }
   };
@@ -518,7 +518,7 @@ export default function IntakeReviewQueue() {
           assigned_instructor_id: assignForm.instructorId,
           contact_name: assignForm.contactName,
           contact_phone: assignForm.contactPhone,
-          notes: assignForm.notes,
+          intake_notes: assignForm.intakeNotes,
         },
       });
 
@@ -1149,8 +1149,8 @@ export default function IntakeReviewQueue() {
               <Label htmlFor="intake-assign-notes">הערות למדריך</Label>
               <Textarea
                 id="intake-assign-notes"
-                value={assignForm.notes}
-                onChange={(event) => handleAssignChange('notes', event.target.value)}
+                value={assignForm.intakeNotes}
+                onChange={(event) => handleAssignChange('intakeNotes', event.target.value)}
                 rows={3}
                 placeholder="הוסיפו הנחיות או הקשר לקליטה"
               />

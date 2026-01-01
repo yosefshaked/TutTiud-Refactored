@@ -10,6 +10,7 @@
 - Clicking the scorecard tiles (or the "Open Queue" action) opens the detailed queue in a modal with the matching filter applied.
 - The summary stays visible with loading, error, and empty states, and exposes a retry action on load failures.
 - Admins can assign the intake to an instructor (plus contact details and notes) from the queue modal, which makes the intake visible to the assigned instructor for approval.
+- Intake notes for instructors are stored in `Students.metadata.intake_notes` (not the main `notes` field).
 - Admins can dismiss an intake submission from the queue modal to remove accidental or duplicate intakes.
 - Dismissed intakes are tracked separately from inactive students and can be restored into the queue when needed.
 - Dismissed intakes are filtered out of the main students list on the server and are only available through the dedicated dismissed intake endpoint, shown behind a toggle in the intake queue.

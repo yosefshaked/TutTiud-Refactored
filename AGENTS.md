@@ -126,6 +126,7 @@
 - Admins can merge intake submissions into existing students via `/api/students-merge`, selecting per-field values to keep.
 - `/api/students-merge` reattaches intake responses to the target student and stores any previous target intake payload in `metadata.intake_merge_backup`.
 - `/api/students-merge` deletes the source student row and stores full source/target snapshots in `metadata.merge_backup` for recovery.
+- Intake instructor notes are stored in `Students.metadata.intake_notes` so the main `notes` field remains for student-level notes.
 - Add any important information learned into this AGENTS.md file.
 	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
 	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.
