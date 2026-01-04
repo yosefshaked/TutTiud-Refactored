@@ -1101,3 +1101,4 @@
   - `IntakeSettingsCard.jsx` in Settings allows admins to manage mappings and rotate secrets.
   - `IntakeReviewQueue.jsx` on the dashboard surfaces pending intake approvals, keeps student cards collapsed by default, and requires an agreement confirmation before calling `/api/intake/approve`.
   - The dashboard intake widget uses a half-page scorecard summary with large-number tiles for new (unassigned) vs existing (assigned) pending students, stays visible with loading/error/empty states, and opens the detailed queue in a modal when clicking a tile or "פתח תור" (matching filters applied).
+  - The "assigned to me" shortcut appears only for admins who are also instructors (non-admin instructors see a single combined queue, and non-instructor admins cannot be assigned).

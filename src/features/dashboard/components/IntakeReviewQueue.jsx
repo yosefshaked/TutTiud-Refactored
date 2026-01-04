@@ -268,6 +268,15 @@ export default function IntakeReviewQueue() {
     session,
     includeInactive: true,
   });
+  const isAdminInstructor = useMemo(() => {
+    if (!isAdmin || !userId) {
+      return false;
+    }
+    if (!Array.isArray(instructors) || instructors.length === 0) {
+      return false;
+    }
+    return instructors.some((instructor) => instructor?.id === userId);
+  }, [isAdmin, instructors, userId]);
   const { tagOptions, loadTags } = useStudentTags();
 
   useEffect(() => {
@@ -874,7 +883,7 @@ export default function IntakeReviewQueue() {
         onOpen={handleOpenQueue}
         isLoading={isLoading}
         showAdminSplit={isAdmin}
-        showAssignedToMe={!isAdmin && Boolean(userId)}
+        showAssignedToMe={isAdminInstructor}
       />
 
       <div className="space-y-2 text-xs text-neutral-500">

@@ -9,6 +9,7 @@
 - The summary highlights large-number tiles for unassigned vs assigned pending intakes for quick scanning in a scorecard layout sized to a half-page card.
 - Clicking the scorecard tiles (or the "Open Queue" action) opens the detailed queue in a modal with the matching filter applied, and the modal provides quick filter buttons for assigned/unassigned/all.
 - The summary stays visible with loading, error, and empty states, and exposes a retry action on load failures.
+- The "assigned to me" shortcut is shown only for admins who are also instructors (non-admin instructors already see a single combined queue, and non-instructor admins cannot be assigned).
 - Admins can assign the intake to an instructor (plus contact details and notes) from the queue modal, which makes the intake visible to the assigned instructor for approval.
 - Intake notes for instructors are stored in `Students.metadata.intake_notes` (not the main `notes` field).
 - Intake rows show a status badge next to the student name (needs instructor assignment vs ready for approval), and the dismiss action is represented by a trash icon to save space.
