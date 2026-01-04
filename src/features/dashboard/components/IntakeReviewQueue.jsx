@@ -29,7 +29,7 @@ import { Trash2 } from 'lucide-react';
 
 const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שקראתי את האינטייק של התלמיד/ה וביצעתי שיחת קליטה עם האפוטרופוס.';
 
-function IntakeQueueWidget({ newCount, existingCount, onOpen, isLoading = false }) {
+function IntakeQueueWidget({ unassignedCount, assignedCount, onOpen, isLoading = false }) {
   const openLabel = 'פתח תור';
   const openAriaLabel = 'פתח את תור הקליטה';
   const buttonClasses =
@@ -53,31 +53,31 @@ function IntakeQueueWidget({ newCount, existingCount, onOpen, isLoading = false 
         <button
           type="button"
           className={`${buttonClasses} hover:bg-neutral-50`}
-          onClick={() => onOpen('new')}
-          aria-label="פתח תור עבור תלמידים חדשים"
+          onClick={() => onOpen('unassigned')}
+          aria-label="פתח תור עבור תלמידים ללא שיוך מדריך"
         >
           <span
             className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
             aria-live="polite"
           >
-            {isLoading ? '—' : newCount}
+            {isLoading ? '—' : unassignedCount}
           </span>
-          <span className="text-sm text-neutral-500 font-medium">חדשים</span>
+          <span className="text-sm text-neutral-500 font-medium">ללא שיוך</span>
         </button>
 
         <button
           type="button"
           className={`${buttonClasses} hover:bg-neutral-50`}
-          onClick={() => onOpen('existing')}
-          aria-label="פתח תור עבור תלמידים קיימים"
+          onClick={() => onOpen('assigned')}
+          aria-label="פתח תור עבור תלמידים משויכים"
         >
           <span
             className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
             aria-live="polite"
           >
-            {isLoading ? '—' : existingCount}
+            {isLoading ? '—' : assignedCount}
           </span>
-          <span className="text-sm text-neutral-500 font-medium">קיימים</span>
+          <span className="text-sm text-neutral-500 font-medium">משויכים</span>
         </button>
       </div>
     </div>
@@ -287,13 +287,13 @@ export default function IntakeReviewQueue() {
     return pendingStudents.reduce(
       (accumulator, student) => {
         if (student?.assigned_instructor_id) {
-          accumulator.existing += 1;
+          accumulator.assigned += 1;
         } else {
-          accumulator.new += 1;
+          accumulator.unassigned += 1;
         }
         return accumulator;
       },
-      { new: 0, existing: 0 }
+      { unassigned: 0, assigned: 0 }
     );
   }, [pendingStudents]);
 
@@ -417,10 +417,10 @@ export default function IntakeReviewQueue() {
 
   const filteredStudents = useMemo(() => {
     let filtered = pendingStudents;
-    if (assignmentFilter === 'new') {
+    if (assignmentFilter === 'unassigned') {
       filtered = filtered.filter((student) => !student?.assigned_instructor_id);
     }
-    if (assignmentFilter === 'existing') {
+    if (assignmentFilter === 'assigned') {
       filtered = filtered.filter((student) => student?.assigned_instructor_id);
     }
     if (!isAdmin || !instructorFilterId) {
@@ -446,9 +446,10 @@ export default function IntakeReviewQueue() {
   })();
 
   const handleOpenQueue = (filterType) => {
+    const normalizedFilter = filterType === 'new' ? 'unassigned' : filterType === 'existing' ? 'assigned' : filterType;
     setIsQueueOpen(true);
-    setAssignmentFilter(filterType);
-    if (filterType !== 'all') {
+    setAssignmentFilter(normalizedFilter);
+    if (normalizedFilter !== 'all') {
       setInstructorFilterId('');
     }
   };
@@ -803,15 +804,15 @@ export default function IntakeReviewQueue() {
   return (
     <div className="space-y-4" dir="rtl">
       <IntakeQueueWidget
-        newCount={summaryCounts.new}
-        existingCount={summaryCounts.existing}
+        unassignedCount={summaryCounts.unassigned}
+        assignedCount={summaryCounts.assigned}
         onOpen={handleOpenQueue}
         isLoading={isLoading}
       />
 
       <div className="space-y-2 text-xs text-neutral-500">
         <p className="font-medium text-neutral-600">{summaryStatus}</p>
-        <p>חלוקה לפי תלמידים ללא שיוך מול תלמידים עם שיוך.</p>
+        <p>חלוקה לפי תלמידים ללא שיוך מדריך מול תלמידים משויכים.</p>
       </div>
 
       {error ? (
@@ -831,6 +832,37 @@ export default function IntakeReviewQueue() {
           </DialogHeader>
 
           <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold text-slate-900">תצוגת תור</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={assignmentFilter === 'unassigned' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleOpenQueue('unassigned')}
+                  >
+                    ללא שיוך
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={assignmentFilter === 'assigned' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleOpenQueue('assigned')}
+                  >
+                    משויכים
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={assignmentFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleOpenQueue('all')}
+                  >
+                    כל הקליטות
+                  </Button>
+                </div>
+              </div>
+            </div>
             {isAdmin ? (
               <div className="flex flex-col gap-2 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
