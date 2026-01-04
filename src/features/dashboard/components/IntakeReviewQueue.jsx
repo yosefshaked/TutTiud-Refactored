@@ -25,6 +25,7 @@ import { useInstructors } from '@/hooks/useOrgData.js';
 import { isAdminRole, normalizeMembershipRole } from '@/features/students/utils/endpoints.js';
 import { useStudentTags } from '@/features/students/hooks/useStudentTags.js';
 import { buildTagDisplayList } from '@/features/students/utils/tags.js';
+import { Trash2 } from 'lucide-react';
 
 const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שקראתי את האינטייק של התלמיד/ה וביצעתי שיחת קליטה עם האפוטרופוס.';
 
@@ -894,7 +895,12 @@ export default function IntakeReviewQueue() {
                     <summary className="cursor-pointer list-none space-y-3 focus-visible:outline-none">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="space-y-3">
-                          <p className="text-base font-semibold text-slate-900">{student.name}</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-base font-semibold text-slate-900">{student.name}</p>
+                            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                              {needsAssignment ? 'דורש שיוך מדריך' : 'מוכן לאישור מדריך'}
+                            </span>
+                          </div>
                           <dl className="flex flex-col gap-3 text-sm text-slate-700 sm:flex-row sm:flex-wrap sm:items-center">
                             <div className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1">
                               <dt className="font-medium text-slate-500">מספר זהות</dt>
@@ -936,7 +942,6 @@ export default function IntakeReviewQueue() {
                           {isAdmin ? (
                             <Button
                               type="button"
-                              variant="outline"
                               onClick={() => openAssignDialog(student)}
                             >
                               {needsAssignment ? 'שיוך מדריך' : 'עדכון שיוך'}
@@ -954,10 +959,12 @@ export default function IntakeReviewQueue() {
                           {isAdmin ? (
                             <Button
                               type="button"
-                              variant="destructive"
+                              variant="ghost"
+                              size="icon"
                               onClick={() => openDismissDialog(student.id)}
+                              aria-label="הסרת קליטה"
                             >
-                              הסרת קליטה
+                              <Trash2 className="h-4 w-4 text-red-600" aria-hidden="true" />
                             </Button>
                           ) : null}
                           {canApprove ? (
