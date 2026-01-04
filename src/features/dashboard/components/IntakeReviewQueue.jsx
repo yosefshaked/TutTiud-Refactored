@@ -29,7 +29,17 @@ import { Trash2 } from 'lucide-react';
 
 const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שקראתי את האינטייק של התלמיד/ה וביצעתי שיחת קליטה עם האפוטרופוס.';
 
-function IntakeQueueWidget({ unassignedCount, assignedCount, onOpen, isLoading = false }) {
+function IntakeQueueWidget({
+  unassignedCount,
+  assignedCount,
+  assignedToMeCount,
+  adminAssignedToMeCount,
+  totalCount,
+  onOpen,
+  isLoading = false,
+  showAdminSplit = false,
+  showAssignedToMe = false,
+}) {
   const openLabel = 'פתח תור';
   const openAriaLabel = 'פתח את תור הקליטה';
   const buttonClasses =
@@ -49,37 +59,82 @@ function IntakeQueueWidget({ unassignedCount, assignedCount, onOpen, isLoading =
         </button>
       </div>
 
-      <div className="flex-1 grid grid-cols-2 divide-x divide-x-reverse divide-neutral-100">
-        <button
-          type="button"
-          className={`${buttonClasses} hover:bg-neutral-50`}
-          onClick={() => onOpen('unassigned')}
-          aria-label="פתח תור עבור תלמידים ללא שיוך מדריך"
-        >
-          <span
-            className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
-            aria-live="polite"
-          >
-            {isLoading ? '—' : unassignedCount}
-          </span>
-          <span className="text-sm text-neutral-500 font-medium">ללא שיוך</span>
-        </button>
+      <div className="flex-1">
+        {showAdminSplit ? (
+          <div className="grid grid-cols-2 divide-x divide-x-reverse divide-neutral-100">
+            <button
+              type="button"
+              className={`${buttonClasses} hover:bg-neutral-50`}
+              onClick={() => onOpen('unassigned')}
+              aria-label="פתח תור עבור תלמידים ללא שיוך מדריך"
+            >
+              <span
+                className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
+                aria-live="polite"
+              >
+                {isLoading ? '—' : unassignedCount}
+              </span>
+              <span className="text-sm text-neutral-500 font-medium">ללא שיוך</span>
+            </button>
 
-        <button
-          type="button"
-          className={`${buttonClasses} hover:bg-neutral-50`}
-          onClick={() => onOpen('assigned')}
-          aria-label="פתח תור עבור תלמידים משויכים"
-        >
-          <span
-            className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
-            aria-live="polite"
+            <button
+              type="button"
+              className={`${buttonClasses} hover:bg-neutral-50`}
+              onClick={() => onOpen('assigned')}
+              aria-label="פתח תור עבור תלמידים משויכים"
+            >
+              <span
+                className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
+                aria-live="polite"
+              >
+                {isLoading ? '—' : assignedCount}
+              </span>
+              <span className="text-sm text-neutral-500 font-medium">משויכים</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`${buttonClasses} hover:bg-neutral-50`}
+            onClick={() => onOpen('all')}
+            aria-label="פתח תור עבור כל הקליטות"
           >
-            {isLoading ? '—' : assignedCount}
-          </span>
-          <span className="text-sm text-neutral-500 font-medium">משויכים</span>
-        </button>
+            <span
+              className={`text-3xl font-extrabold text-neutral-800 ${isLoading ? 'animate-pulse' : ''}`}
+              aria-live="polite"
+            >
+              {isLoading ? '—' : totalCount}
+            </span>
+            <span className="text-sm text-neutral-500 font-medium">קליטות ממתינות</span>
+          </button>
+        )}
       </div>
+      {showAssignedToMe ? (
+        <div className="border-t border-neutral-100 bg-white px-4 py-3">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            onClick={() => onOpen('mine')}
+            aria-label="הצגת קליטות משויכות אלי"
+          >
+            <span>משויכים אלי</span>
+            <span className="text-base font-semibold text-neutral-900">{isLoading ? '—' : assignedToMeCount}</span>
+          </button>
+        </div>
+      ) : null}
+      {showAdminSplit ? (
+        <div className="border-t border-neutral-100 bg-white px-4 py-3">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+            onClick={() => onOpen('mine')}
+            aria-label="הצגת קליטות משויכות אלי"
+          >
+            <span>משויכים אלי</span>
+            <span className="text-base font-semibold">{isLoading ? '—' : adminAssignedToMeCount}</span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -161,6 +216,7 @@ function formatAnswerEntries(currentAnswers, labelMap, importantFields, { showAl
 export default function IntakeReviewQueue() {
   const { session } = useAuth();
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
+  const userId = session?.user?.id || '';
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [pendingStudents, setPendingStudents] = useState([]);
@@ -291,11 +347,14 @@ export default function IntakeReviewQueue() {
         } else {
           accumulator.unassigned += 1;
         }
+        if (userId && student?.assigned_instructor_id === userId) {
+          accumulator.assignedToMe += 1;
+        }
         return accumulator;
       },
-      { unassigned: 0, assigned: 0 }
+      { unassigned: 0, assigned: 0, assignedToMe: 0 }
     );
-  }, [pendingStudents]);
+  }, [pendingStudents, userId]);
 
   const handleRetry = () => {
     setRetryToken((value) => value + 1);
@@ -423,6 +482,9 @@ export default function IntakeReviewQueue() {
     if (assignmentFilter === 'assigned') {
       filtered = filtered.filter((student) => student?.assigned_instructor_id);
     }
+    if (assignmentFilter === 'mine') {
+      filtered = filtered.filter((student) => student?.assigned_instructor_id === userId);
+    }
     if (!isAdmin || !instructorFilterId) {
       return filtered;
     }
@@ -430,7 +492,7 @@ export default function IntakeReviewQueue() {
       return filtered.filter((student) => !student?.assigned_instructor_id);
     }
     return filtered.filter((student) => student?.assigned_instructor_id === instructorFilterId);
-  }, [pendingStudents, assignmentFilter, instructorFilterId, isAdmin]);
+  }, [pendingStudents, assignmentFilter, instructorFilterId, isAdmin, userId]);
 
   const summaryStatus = (() => {
     if (isLoading) {
@@ -806,13 +868,18 @@ export default function IntakeReviewQueue() {
       <IntakeQueueWidget
         unassignedCount={summaryCounts.unassigned}
         assignedCount={summaryCounts.assigned}
+        assignedToMeCount={summaryCounts.assignedToMe}
+        adminAssignedToMeCount={summaryCounts.assignedToMe}
+        totalCount={pendingStudents.length}
         onOpen={handleOpenQueue}
         isLoading={isLoading}
+        showAdminSplit={isAdmin}
+        showAssignedToMe={!isAdmin && Boolean(userId)}
       />
 
       <div className="space-y-2 text-xs text-neutral-500">
         <p className="font-medium text-neutral-600">{summaryStatus}</p>
-        <p>חלוקה לפי תלמידים ללא שיוך מדריך מול תלמידים משויכים.</p>
+        {isAdmin ? <p>חלוקה לפי תלמידים ללא שיוך מדריך מול תלמידים משויכים.</p> : null}
       </div>
 
       {error ? (
@@ -832,37 +899,39 @@ export default function IntakeReviewQueue() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-semibold text-slate-900">תצוגת תור</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant={assignmentFilter === 'unassigned' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleOpenQueue('unassigned')}
-                  >
-                    ללא שיוך
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={assignmentFilter === 'assigned' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleOpenQueue('assigned')}
-                  >
-                    משויכים
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={assignmentFilter === 'all' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleOpenQueue('all')}
-                  >
-                    כל הקליטות
-                  </Button>
+            {isAdmin ? (
+              <div className="rounded-lg border border-slate-200 bg-white p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-semibold text-slate-900">תצוגת תור</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant={assignmentFilter === 'unassigned' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleOpenQueue('unassigned')}
+                    >
+                      ללא שיוך
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={assignmentFilter === 'assigned' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleOpenQueue('assigned')}
+                    >
+                      משויכים
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={assignmentFilter === 'all' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleOpenQueue('all')}
+                    >
+                      כל הקליטות
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
             {isAdmin ? (
               <div className="flex flex-col gap-2 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
