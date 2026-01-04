@@ -881,7 +881,6 @@ export default function IntakeReviewQueue() {
               const isAssignedToUser = Boolean(session?.user?.id) && student?.assigned_instructor_id === session.user.id;
               const canApprove = Boolean(student?.assigned_instructor_id) && isAssignedToUser;
               const needsAssignment = !student?.assigned_instructor_id;
-              const showApprovalHint = isAdmin && !canApprove;
               const instructor = isAdmin ? instructorMap.get(student?.assigned_instructor_id) : null;
               const instructorName = instructor?.name || instructor?.email || (student?.assigned_instructor_id ? 'מדריך לא זמין' : 'לא הוקצה מדריך');
 
@@ -975,11 +974,6 @@ export default function IntakeReviewQueue() {
                             >
                               {isApproving ? 'מאשר...' : 'אישור קליטה'}
                             </Button>
-                          ) : null}
-                          {showApprovalHint ? (
-                            <span className="text-xs text-slate-500">
-                              {needsAssignment ? 'ממתין לשיוך מדריך לפני אישור.' : 'ממתין לאישור המדריך המשויך.'}
-                            </span>
                           ) : null}
                         </div>
                       </div>
