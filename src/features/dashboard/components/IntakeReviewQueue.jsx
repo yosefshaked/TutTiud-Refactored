@@ -32,7 +32,6 @@ const APPROVAL_AGREEMENT_TEXT = 'אני מאשר/ת שקראתי את האינט
 function IntakeQueueWidget({
   unassignedCount,
   assignedCount,
-  assignedToMeCount,
   adminAssignedToMeCount,
   totalCount,
   onOpen,
@@ -109,19 +108,6 @@ function IntakeQueueWidget({
           </button>
         )}
       </div>
-      {showAssignedToMe ? (
-        <div className="border-t border-neutral-100 bg-white px-4 py-3">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-md border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-            onClick={() => onOpen('mine')}
-            aria-label="הצגת קליטות משויכות אלי"
-          >
-            <span>משויכים אלי</span>
-            <span className="text-base font-semibold text-neutral-900">{isLoading ? '—' : assignedToMeCount}</span>
-          </button>
-        </div>
-      ) : null}
       {showAdminSplit && showAssignedToMe ? (
         <div className="border-t border-neutral-100 bg-white px-4 py-3">
           <button
@@ -877,7 +863,6 @@ export default function IntakeReviewQueue() {
       <IntakeQueueWidget
         unassignedCount={summaryCounts.unassigned}
         assignedCount={summaryCounts.assigned}
-        assignedToMeCount={summaryCounts.assignedToMe}
         adminAssignedToMeCount={summaryCounts.assignedToMe}
         totalCount={pendingStudents.length}
         onOpen={handleOpenQueue}
