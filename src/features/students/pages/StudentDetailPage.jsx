@@ -753,6 +753,9 @@ export default function StudentDetailPage() {
   const contactInfo = student?.contact_info || '';
   const nationalId = student?.national_id || '';
   const notes = typeof student?.notes === 'string' ? student.notes.trim() : '';
+  const intakeNotes = typeof student?.metadata?.intake_notes === 'string'
+    ? student.metadata.intake_notes.trim()
+    : '';
   const defaultService = student?.default_service || 'לא הוגדר';
   const scheduleDescription = describeSchedule(student?.default_day_of_week, student?.default_session_time);
   const tagDisplayList = buildTagDisplayList(student?.tags, tagCatalog);
@@ -953,6 +956,12 @@ export default function StudentDetailPage() {
                 <div className="space-y-1 col-span-2 lg:col-span-3">
                   <dt className="text-xs font-medium text-neutral-500 sm:text-sm">הערות</dt>
                   <dd className="whitespace-pre-wrap break-words text-foreground">{notes}</dd>
+                </div>
+              ) : null}
+              {intakeNotes ? (
+                <div className="space-y-1 col-span-2 lg:col-span-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+                  <dt className="text-xs font-medium text-amber-700 sm:text-sm">הערות קליטה למדריך</dt>
+                  <dd className="whitespace-pre-wrap break-words text-amber-900">{intakeNotes}</dd>
                 </div>
               ) : null}
               {hasStudentTags ? (

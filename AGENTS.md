@@ -119,6 +119,14 @@
 - `/api/weekly-compliance` powers the dashboard widget with aggregated schedules, legend entries, and dynamic hour ranges. Frontend work should consume its payload instead of duplicating aggregation logic.
 - Weekly compliance status logic: `/api/weekly-compliance` marks undocumented sessions scheduled for the current day as `missing`; only future days are returned as `upcoming`.
 - Daily compliance status logic: `/api/daily-compliance` also marks undocumented sessions scheduled for today (UTC) as `missing`; `upcoming` applies strictly to future dates.
+- Intake approvals now require an assigned instructor: admins assign the intake (and optional contact details/notes) in the dashboard queue before the assigned instructor confirms reading the intake.
+- Admins can dismiss accidental intake submissions through `/api/intake/dismiss`, which clears `needs_intake_approval` and logs `metadata.intake_dismissal.active=true`.
+- Admins can restore dismissed intakes through `/api/intake/restore`, which reopens the queue entry and marks `metadata.intake_dismissal.active=false`.
+- `/api/students-list` always filters out dismissed intakes; use `/api/intake/dismissed` to load them for the intake queue.
+- Admins can merge intake submissions into existing students via `/api/students-merge`, selecting per-field values to keep.
+- `/api/students-merge` reattaches intake responses to the target student and stores any previous target intake payload in `metadata.intake_merge_backup`.
+- `/api/students-merge` deletes the source student row and stores full source/target snapshots in `metadata.merge_backup` for recovery.
+- Intake instructor notes are stored in `Students.metadata.intake_notes` so the main `notes` field remains for student-level notes.
 - Add any important information learned into this AGENTS.md file.
 	- If global lint is run across the entire repo, there are legacy violations unrelated to recent changes; follow the workflow and lint only the files you touched in a PR. Address broader lint cleanup in a dedicated maintenance pass.
 	- When preserving a function signature for temporarily disabled exports, mark intentionally unused parameters as used with `void param;` (and/or prefix with `_`) to satisfy `no-unused-vars` without altering the public API.
@@ -1092,3 +1100,5 @@
 - **Frontend**:
   - `IntakeSettingsCard.jsx` in Settings allows admins to manage mappings and rotate secrets.
   - `IntakeReviewQueue.jsx` on the dashboard surfaces pending intake approvals, keeps student cards collapsed by default, and requires an agreement confirmation before calling `/api/intake/approve`.
+  - The dashboard intake widget uses a half-page scorecard summary with large-number tiles for new (unassigned) vs existing (assigned) pending students, stays visible with loading/error/empty states, and opens the detailed queue in a modal when clicking a tile or "פתח תור" (matching filters applied).
+  - The "assigned to me" shortcut appears only for admins who are also instructors (non-admin instructors see a single combined queue, and non-instructor admins cannot be assigned).
