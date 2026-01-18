@@ -122,7 +122,7 @@ function IntakeQueueWidget({
           </button>
         </div>
       ) : null}
-      {showAdminSplit ? (
+      {showAdminSplit && showAssignedToMe ? (
         <div className="border-t border-neutral-100 bg-white px-4 py-3">
           <button
             type="button"
