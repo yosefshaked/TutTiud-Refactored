@@ -117,8 +117,8 @@ export default function ChangelogModal({ open, onClose }) {
                     }}>
                       גרסה 1.9.1
                     </span>
-                    <time dateTime="2025-12-30" style={{ color: '#64748b', fontSize: '14px' }}>
-                      30 בדצמבר 2025
+                    <time dateTime="2026-01-18" style={{ color: '#64748b', fontSize: '14px' }}>
+                      18 בינואר 2026
                     </time>
                   </div>
                   <span style={{
@@ -151,8 +151,8 @@ export default function ChangelogModal({ open, onClose }) {
                   color: '#475569',
                   lineHeight: 1.8
                 }}>
-                  <li>מדור הקליטה שופר כדי להפוך את העבודה לנוחה וברורה יותר.</li>
-                  <li>הוסרו מהעמוד הראשי כפתורים ליצירת דוח חדש ולמעבר לרשימת תלמידים.</li>
+                  <li>מדור הקליטה במסך הראשי שופר כדי להפוך את העבודה לנוחה וברורה יותר.</li>
+                  <li>הוסרו מהעמוד הראשי כפתורים ליצירת דיווח חדש ומעבר לרשימת התלמידים.</li>
                   <li>כעת ניתן להסיר או למזג קליטות שנוצרו בטעות פעמיים.</li>
                 </ul>
               </section>
