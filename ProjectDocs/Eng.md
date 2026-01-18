@@ -22,3 +22,9 @@
 - Merging permanently deletes the source student row and stores a full source/target snapshot in `metadata.merge_backup` for recovery audits.
 - Intake approvals are now completed by the assigned instructor after the admin assignment step.
 - Dashboard quick-action cards for students and new session were removed; use the right-side menu entries for navigation and session creation.
+
+## Instructor Placeholder Accounts
+- Admins can create instructor accounts without sending an email by enabling "Create as Placeholder (Invite later)" in the Instructor Directory.
+- Placeholder instructors are created as real Supabase users with verified email and an org membership, so they can be assigned students immediately.
+- Placeholder instructors are labeled as "Not Activated" in the roster and include a "Send Activation" action to trigger the password reset onboarding email later.
+- Activation emails use the standard password reset flow and land on `/#/update-password` so instructors can claim the account when ready.

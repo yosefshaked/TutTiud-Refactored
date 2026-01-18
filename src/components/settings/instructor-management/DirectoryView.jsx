@@ -3,7 +3,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar.jsx';
-import { Loader2, UserPlus, UserX, RotateCcw, Check, ChevronDown } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Loader2,
+  MailPlus,
+  RotateCcw,
+  UserPlus,
+  UserX,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useInstructorTypes } from '@/features/instructors/hooks/useInstructorTypes.js';
@@ -15,6 +23,15 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { useInstructors } from '@/hooks/useOrgData.js';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.jsx';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const REQUEST = { idle: 'idle', loading: 'loading', error: 'error' };
 const SAVE = { idle: 'idle', saving: 'saving', error: 'error' };
@@ -24,6 +41,13 @@ export default function DirectoryView({ session, orgId, canLoad }) {
   const [loadState, setLoadState] = useState(REQUEST.idle);
   const [loadError, setLoadError] = useState('');
   const [saveState, setSaveState] = useState(SAVE.idle);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createEmail, setCreateEmail] = useState('');
+  const [createPlaceholder, setCreatePlaceholder] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [activatingId, setActivatingId] = useState(null);
 
   const { typeOptions, loadTypes } = useInstructorTypes();
   const { instructors, loadingInstructors, instructorsError, refetchInstructors } = useInstructors({
@@ -84,6 +108,75 @@ export default function DirectoryView({ session, orgId, canLoad }) {
       toast.error('הוספת המדריך נכשלה.');
     } finally {
       setSaveState(SAVE.idle);
+    }
+  };
+
+  const handleCreateInstructor = async (event) => {
+    event.preventDefault();
+    if (!canLoad) return;
+    setIsCreating(true);
+    setCreateError('');
+    try {
+      const payload = {
+        org_id: orgId,
+        name: createName.trim() || undefined,
+        email: createEmail.trim(),
+        create_placeholder: createPlaceholder,
+      };
+      await authenticatedFetch('instructors', {
+        session,
+        method: 'POST',
+        body: payload,
+      });
+
+      toast.success(createPlaceholder
+        ? 'המדריך נוצר כמחזיק מקום. ניתן לשלוח הפעלה בהמשך.'
+        : 'המדריך נוצר ונשלח אליו קישור הפעלה.');
+
+      setCreateName('');
+      setCreateEmail('');
+      setCreatePlaceholder(false);
+      setIsCreateOpen(false);
+      await Promise.all([refetchInstructors(), loadDirectory()]);
+    } catch (error) {
+      console.error('Failed to create instructor', error);
+      const message = error?.data?.message;
+      if (message === 'missing_email') {
+        setCreateError('חובה להזין כתובת אימייל תקינה.');
+      } else if (message === 'invalid_email') {
+        setCreateError('כתובת האימייל אינה תקינה.');
+      } else if (message === 'failed_to_send_activation') {
+        setCreateError('המדריך נוצר אך שליחת ההפעלה נכשלה. נסה שוב.');
+      } else {
+        setCreateError('יצירת המדריך נכשלה. נסה שוב.');
+      }
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleSendActivation = async (instructor) => {
+    if (!canLoad || !instructor?.email) {
+      toast.error('חסרה כתובת אימייל להפעלה.');
+      return;
+    }
+    setActivatingId(instructor.id);
+    try {
+      await authenticatedFetch('instructors', {
+        session,
+        method: 'POST',
+        body: {
+          org_id: orgId,
+          action: 'send_activation',
+          email: instructor.email,
+        },
+      });
+      toast.success('קישור הפעלה נשלח למדריך.');
+    } catch (error) {
+      console.error('Failed to send activation email', error);
+      toast.error('שליחת ההפעלה נכשלה. נסה שוב.');
+    } finally {
+      setActivatingId(null);
     }
   };
 
@@ -190,6 +283,97 @@ export default function DirectoryView({ session, orgId, canLoad }) {
 
   return (
     <Tabs defaultValue="active" className="w-full" dir="rtl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700">ניהול מדריכים</h3>
+          <p className="text-xs text-muted-foreground">
+            צור מדריך חדש או הגדר מדריך כמחזיק מקום להפעלה מאוחרת.
+          </p>
+        </div>
+        <Dialog
+          open={isCreateOpen}
+          onOpenChange={(open) => {
+            setIsCreateOpen(open);
+            if (!open) {
+              setCreateError('');
+            }
+          }}
+        >
+          <Button type="button" className="gap-2" onClick={() => setIsCreateOpen(true)}>
+            <UserPlus className="h-4 w-4" />
+            הוסף מדריך
+          </Button>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>הוספת מדריך חדש</DialogTitle>
+            </DialogHeader>
+            <form className="space-y-4" onSubmit={handleCreateInstructor}>
+              <div className="space-y-2">
+                <label htmlFor="instructor-name" className="block text-sm font-medium text-slate-700">
+                  שם מלא
+                </label>
+                <Input
+                  id="instructor-name"
+                  value={createName}
+                  onChange={(event) => setCreateName(event.target.value)}
+                  placeholder="שם המדריך"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="instructor-email" className="block text-sm font-medium text-slate-700">
+                  כתובת אימייל
+                </label>
+                <Input
+                  id="instructor-email"
+                  type="email"
+                  dir="ltr"
+                  required
+                  value={createEmail}
+                  onChange={(event) => setCreateEmail(event.target.value)}
+                  placeholder="instructor@example.com"
+                />
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="instructor-placeholder"
+                    checked={createPlaceholder}
+                    onCheckedChange={(value) => setCreatePlaceholder(Boolean(value))}
+                  />
+                  <div className="space-y-1">
+                    <label htmlFor="instructor-placeholder" className="text-sm font-medium text-slate-700">
+                      צור כמחזיק מקום (שלח הפעלה מאוחר יותר)
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      כאשר האפשרות פעילה לא נשלח מייל. ניתן לשלוח קישור הפעלה ידנית מהרשימה.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {createError ? (
+                <p className="text-sm text-red-600" role="alert">{createError}</p>
+              ) : null}
+              <DialogFooter>
+                <Button
+                  type="submit"
+                  className="gap-2"
+                  disabled={isCreating}
+                >
+                  {isCreating ? 'יוצר...' : 'צור מדריך'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateOpen(false)}
+                  disabled={isCreating}
+                >
+                  ביטול
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
       <TabsList className="grid w-full grid-cols-3 mb-4 h-auto">
         <TabsTrigger value="active" className="flex-col gap-1 py-2 whitespace-normal break-words">
           <div className="flex flex-col items-center gap-1">
@@ -229,8 +413,13 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">
+                    <div className="flex flex-wrap items-center gap-2 font-medium text-sm truncate">
                       {instructor.name || instructor.email || instructor.id}
+                      {instructor?.metadata?.placeholder ? (
+                        <Badge variant="outline" className="text-amber-700 border-amber-200 bg-amber-50">
+                          לא הופעל
+                        </Badge>
+                      ) : null}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
                       {instructor.email || '—'}
@@ -324,6 +513,18 @@ export default function DirectoryView({ session, orgId, canLoad }) {
                     <UserX className="h-4 w-4" />
                     <span>השבת</span>
                   </Button>
+                  {instructor?.metadata?.placeholder ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleSendActivation(instructor)}
+                      disabled={isSaving || activatingId === instructor.id}
+                      className="gap-2 h-10 w-full sm:w-auto"
+                    >
+                      <MailPlus className="h-4 w-4" />
+                      <span>{activatingId === instructor.id ? 'שולח...' : 'שלח הפעלה'}</span>
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ))}

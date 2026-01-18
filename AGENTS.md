@@ -198,6 +198,11 @@
   - **Day view integration**: The DayScheduleView (both mobile and desktop day mode) also includes the InstructorLegend in a sticky header that stays visible while scrolling through time slots.
   - **Solid backgrounds**: Both week and day view sticky headers use solid `bg-surface` (no transparency or backdrop blur) to ensure clean visual separation when scrolling. Day header backgrounds changed from `bg-muted/30` to `bg-muted` for consistency.
 
+### Instructor placeholder accounts (2025-12)
+- `/api/instructors` now supports creating placeholder instructors by sending `create_placeholder: true` with `name` + `email`. This creates a real Supabase user (email confirmed), inserts an org membership, and writes the instructor row with `metadata.placeholder = true`.
+- Use `POST /api/instructors` with `action: 'send_activation'` and `email` to send the activation (password reset) email later; the reset link must redirect to `/#/update-password`.
+- The Instructor Directory UI shows a "לא הופעל" badge when `metadata.placeholder` is true and surfaces a "שלח הפעלה" action to trigger the email.
+
 ### Invitation and Password Reset Flow Improvements (2025-11)
 - **CompleteRegistrationPage** now distinguishes between different OTP error types:
   - Expired tokens: "ההזמנה פגה. נא לבקש מהמנהל לשלוח הזמנה חדשה."

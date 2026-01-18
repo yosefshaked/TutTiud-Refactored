@@ -1,5 +1,7 @@
 /* eslint-env node */
+import { randomBytes } from 'node:crypto';
 import { resolveBearerAuthorization } from '../_shared/http.js';
+import { resolvePasswordResetRedirect } from '../_shared/auth-redirect.js';
 import { createSupabaseAdminClient, readSupabaseAdminConfig } from '../_shared/supabase-admin.js';
 import {
   ensureMembership,
@@ -10,11 +12,30 @@ import {
   resolveOrgId,
   resolveTenantClient,
 } from '../_shared/org-bff.js';
-import { parseJsonBodyWithLimit, validateInstructorCreate, validateInstructorUpdate } from '../_shared/validation.js';
+import {
+  isEmail,
+  parseJsonBodyWithLimit,
+  validateInstructorCreate,
+  validateInstructorUpdate,
+} from '../_shared/validation.js';
 import { ensureInstructorColors } from '../_shared/instructor-colors.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
 
-      // Intentionally ignore profile fetch errors; fallback to provided values.
+const ACTION_SEND_ACTIVATION = 'send_activation';
+
+function generateTemporaryPassword() {
+  return `temp_${randomBytes(24).toString('base64url')}`;
+}
+
+function resolveNormalizedEmail(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) {
+    return '';
+  }
+  return isEmail(normalized) ? normalized : '';
+}
+
+// Intentionally ignore profile fetch errors; fallback to provided values.
 export default async function (context, req) {
   const method = String(req.method || 'GET').toUpperCase();
 
@@ -117,57 +138,187 @@ export default async function (context, req) {
       return respond(context, 403, { message: 'forbidden' });
     }
 
+    const action = normalizeString(body?.action).toLowerCase();
+    if (action === ACTION_SEND_ACTIVATION) {
+      const targetEmail = resolveNormalizedEmail(body?.email);
+      if (!targetEmail) {
+        return respond(context, 400, { message: 'missing_email' });
+      }
+
+      const redirectTo = resolvePasswordResetRedirect(context, req);
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        targetEmail,
+        redirectTo ? { redirectTo } : undefined,
+      );
+
+      if (resetError) {
+        context.log?.error?.('instructors failed to send activation email', { message: resetError.message });
+        return respond(context, 500, { message: 'failed_to_send_activation' });
+      }
+
+      try {
+        const { data: existingInstructor } = await tenantClient
+          .from('Instructors')
+          .select('id, metadata')
+          .eq('email', targetEmail)
+          .maybeSingle();
+
+        if (existingInstructor?.id) {
+          const baseMetadata = existingInstructor.metadata && typeof existingInstructor.metadata === 'object'
+            ? existingInstructor.metadata
+            : {};
+          const nextMetadata = {
+            ...baseMetadata,
+            activation_last_sent_at: new Date().toISOString(),
+          };
+          await tenantClient
+            .from('Instructors')
+            .update({ metadata: nextMetadata })
+            .eq('id', existingInstructor.id);
+        }
+      } catch (error) {
+        context.log?.warn?.('instructors failed to store activation metadata', { message: error?.message });
+      }
+
+      return respond(context, 200, { message: 'activation_sent' });
+    }
+
     const validation = validateInstructorCreate(body);
     if (validation.error) {
       return respond(context, 400, { message: validation.error });
     }
 
+    const createPlaceholder = validation.createPlaceholder;
     const targetUserId = validation.userId;
 
-    // Verify target user is a member of the org in control DB
-    const { data: membership, error: membershipError } = await supabase
-      .from('org_memberships')
-      .select('user_id')
-      .eq('org_id', orgId)
-      .eq('user_id', targetUserId)
-      .maybeSingle();
-
-    if (membershipError) {
-      context.log?.error?.('instructors failed to verify target membership', { message: membershipError.message });
-      return respond(context, 500, { message: 'failed_to_verify_target_membership' });
-    }
-
-    if (!membership) {
-      return respond(context, 400, { message: 'user_not_in_organization' });
-    }
-
-    // Fetch profile defaults if name/email not provided
     const providedName = validation.name;
     const providedEmail = validation.email;
     const providedPhone = validation.phone;
     const notes = validation.notes;
-
+    let createdUserId = targetUserId;
     let profileName = '';
     let profileEmail = '';
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, email, full_name')
-        .eq('id', targetUserId)
+    let placeholderMetadata = createPlaceholder ? {
+      placeholder: true,
+      placeholder_created_at: new Date().toISOString(),
+      placeholder_created_by: userId,
+    } : {};
+
+    if (!createdUserId) {
+      if (!providedEmail) {
+        return respond(context, 400, { message: 'missing_email' });
+      }
+
+      let resolvedUser = null;
+      try {
+        const { data, error } = await supabase.auth.admin.getUserByEmail(providedEmail);
+        if (error) {
+          context.log?.warn?.('instructors failed to lookup user by email', { message: error.message });
+        }
+        resolvedUser = data?.user ?? null;
+      } catch (error) {
+        context.log?.warn?.('instructors failed to lookup user by email', { message: error?.message });
+      }
+
+      if (!resolvedUser) {
+        const { data: createResult, error: createError } = await supabase.auth.admin.createUser({
+          email: providedEmail,
+          password: generateTemporaryPassword(),
+          email_confirm: true,
+          user_metadata: {
+            full_name: providedName || undefined,
+          },
+        });
+
+        if (createError || !createResult?.user?.id) {
+          context.log?.error?.('instructors failed to create auth user', { message: createError?.message });
+          return respond(context, 500, { message: 'failed_to_create_user' });
+        }
+
+        resolvedUser = createResult.user;
+      }
+
+      createdUserId = resolvedUser?.id || '';
+      profileEmail = normalizeString(resolvedUser?.email).toLowerCase();
+      profileName = normalizeString(resolvedUser?.user_metadata?.full_name || '');
+
+      if (!createdUserId) {
+        return respond(context, 500, { message: 'failed_to_create_user' });
+      }
+
+      const membershipInsert = await supabase
+        .from('org_memberships')
+        .upsert({ org_id: orgId, user_id: createdUserId, role: 'member' }, { onConflict: 'org_id,user_id' })
+        .select('id')
         .maybeSingle();
-      profileName = normalizeString(profile?.full_name);
-      profileEmail = normalizeString(profile?.email).toLowerCase();
-    } catch {
-      // Intentionally ignore profile fetch errors; fallback to provided values.
+
+      if (membershipInsert.error) {
+        context.log?.error?.('instructors failed to insert membership', { message: membershipInsert.error.message });
+        return respond(context, 500, { message: 'failed_to_add_membership' });
+      }
+
+    } else {
+      // Verify target user is a member of the org in control DB
+      const { data: membership, error: membershipError } = await supabase
+        .from('org_memberships')
+        .select('user_id')
+        .eq('org_id', orgId)
+        .eq('user_id', createdUserId)
+        .maybeSingle();
+
+      if (membershipError) {
+        context.log?.error?.('instructors failed to verify target membership', { message: membershipError.message });
+        return respond(context, 500, { message: 'failed_to_verify_target_membership' });
+      }
+
+      if (!membership) {
+        return respond(context, 400, { message: 'user_not_in_organization' });
+      }
+    }
+
+    if (!profileEmail || !profileName) {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .eq('id', createdUserId)
+          .maybeSingle();
+        profileName = profileName || normalizeString(profile?.full_name);
+        profileEmail = profileEmail || normalizeString(profile?.email).toLowerCase();
+      } catch {
+        // Intentionally ignore profile fetch errors; fallback to provided values.
+      }
+    }
+
+    let metadataPayload = null;
+    if (createPlaceholder) {
+      try {
+        const { data: existingInstructor } = await tenantClient
+          .from('Instructors')
+          .select('id, metadata')
+          .eq('id', createdUserId)
+          .maybeSingle();
+        const baseMetadata = existingInstructor?.metadata && typeof existingInstructor.metadata === 'object'
+          ? existingInstructor.metadata
+          : {};
+        metadataPayload = {
+          ...baseMetadata,
+          ...placeholderMetadata,
+        };
+      } catch (error) {
+        context.log?.warn?.('instructors failed to read existing metadata', { message: error?.message });
+        metadataPayload = { ...placeholderMetadata };
+      }
     }
 
     const insertPayload = {
-      id: targetUserId,
-      name: providedName || profileName || providedEmail || profileEmail || targetUserId,
+      id: createdUserId,
+      name: providedName || profileName || providedEmail || profileEmail || createdUserId,
       email: providedEmail || profileEmail || null,
       phone: providedPhone || null,
       notes: notes || null,
       is_active: true,
+      ...(metadataPayload && Object.keys(metadataPayload).length > 0 ? { metadata: metadataPayload } : {}),
     };
 
     const { data, error } = await tenantClient
@@ -179,6 +330,33 @@ export default async function (context, req) {
     if (error) {
       context.log?.error?.('instructors failed to upsert instructor', { message: error.message });
       return respond(context, 500, { message: 'failed_to_save_instructor' });
+    }
+
+    if (!createPlaceholder && data?.email) {
+      const redirectTo = resolvePasswordResetRedirect(context, req);
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        data.email,
+        redirectTo ? { redirectTo } : undefined,
+      );
+
+      if (resetError) {
+        context.log?.error?.('instructors failed to send activation email', { message: resetError.message });
+        return respond(context, 500, { message: 'failed_to_send_activation' });
+      }
+
+      try {
+        const baseMetadata = data.metadata && typeof data.metadata === 'object' ? data.metadata : {};
+        const nextMetadata = {
+          ...baseMetadata,
+          activation_last_sent_at: new Date().toISOString(),
+        };
+        await tenantClient
+          .from('Instructors')
+          .update({ metadata: nextMetadata })
+          .eq('id', data.id);
+      } catch (error) {
+        context.log?.warn?.('instructors failed to store activation metadata', { message: error?.message });
+      }
     }
 
     // Audit log: instructor created
@@ -194,6 +372,7 @@ export default async function (context, req) {
       details: {
         instructor_name: data.name,
         instructor_email: data.email,
+        placeholder: createPlaceholder,
       },
     });
 

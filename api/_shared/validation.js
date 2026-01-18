@@ -224,10 +224,9 @@ export function validateSessionWrite(body) {
 const PHONE_PATTERN = /^[0-9+\-()\s]{6,20}$/;
 
 export function validateInstructorCreate(body) {
+  const createPlaceholder = Boolean(body?.create_placeholder || body?.createPlaceholder);
   const userId = normalizeString(body?.user_id || body?.userId);
-  if (!isUUID(userId)) {
-    return { error: 'missing_user_id' };
-  }
+  const hasUserId = isUUID(userId);
 
   const name = normalizeString(body?.name) || '';
   const emailRaw = normalizeString(body?.email).toLowerCase();
@@ -239,8 +238,21 @@ export function validateInstructorCreate(body) {
     return { error: 'invalid_notes' };
   }
 
+  if (!hasUserId && emailRaw && !email) {
+    return { error: 'invalid_email' };
+  }
+
+  if (!hasUserId && !email) {
+    return { error: 'missing_user_id' };
+  }
+
+  if (createPlaceholder && !email) {
+    return { error: 'missing_email' };
+  }
+
   return {
-    userId,
+    createPlaceholder,
+    userId: hasUserId ? userId : '',
     // empty strings mean "not provided"; nulls mean "provided but invalid"
     name,
     email,
