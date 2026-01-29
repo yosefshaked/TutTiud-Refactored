@@ -71,6 +71,16 @@ function buildAgreementPayload(raw, userId) {
   };
 }
 
+const INTAKE_NOTES_SEPARATOR = '------------------------------------';
+
+function buildIntakeNotesBlock(raw) {
+  const note = normalizeString(raw);
+  if (!note) {
+    return null;
+  }
+  return `${INTAKE_NOTES_SEPARATOR}\nהערות קליטה:\n${note}\n${INTAKE_NOTES_SEPARATOR}`;
+}
+
 export default async function handler(context, req) {
   const method = String(req.method || 'POST').toUpperCase();
   if (method !== 'POST') {
@@ -144,7 +154,7 @@ export default async function handler(context, req) {
 
   const { data: student, error: studentError } = await tenantClient
     .from('Students')
-    .select('id, assigned_instructor_id, metadata')
+    .select('id, assigned_instructor_id, metadata, notes')
     .eq('id', studentId)
     .maybeSingle();
 
@@ -169,6 +179,14 @@ export default async function handler(context, req) {
     return respond(context, 403, { message: 'forbidden' });
   }
 
+  const intakeNotesBlock = buildIntakeNotesBlock(
+    body?.approval_notes || body?.intake_notes || body?.notes
+  );
+  const existingNotes = normalizeString(student?.notes);
+  const updatedNotes = intakeNotesBlock
+    ? (existingNotes ? `${intakeNotesBlock}\n${existingNotes}` : intakeNotesBlock)
+    : null;
+
   const existingMetadata = student.metadata && typeof student.metadata === 'object' ? student.metadata : {};
   const updatedMetadata = {
     ...existingMetadata,
@@ -182,12 +200,18 @@ export default async function handler(context, req) {
     },
   };
 
+  const updatePayload = {
+    needs_intake_approval: false,
+    metadata: updatedMetadata,
+  };
+
+  if (updatedNotes) {
+    updatePayload.notes = updatedNotes;
+  }
+
   const { data, error } = await tenantClient
     .from('Students')
-    .update({
-      needs_intake_approval: false,
-      metadata: updatedMetadata,
-    })
+    .update(updatePayload)
     .eq('id', studentId)
     .select()
     .maybeSingle();
