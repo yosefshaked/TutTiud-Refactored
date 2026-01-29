@@ -480,7 +480,7 @@ export default function StudentsPage() {
     setUpdateError('');
   };
 
-  const handleEditSubmit = async (studentId, updates) => {
+  const handleEditSubmit = async (formData) => {
     if (!session || !activeOrgId || !tenantClientReady || !activeOrgHasConnection) {
       setUpdateError('חיבור לא זמין. ודא את החיבור וניסיון מחדש.');
       return;
@@ -489,10 +489,20 @@ export default function StudentsPage() {
     setIsUpdatingStudent(true);
     setUpdateError('');
 
+    const studentId = formData.id;
     const body = {
       org_id: activeOrgId,
-      ...updates,
-      tags: normalizeTagIdsForWrite(updates.tags),
+      name: formData.name,
+      assigned_instructor_id: formData.assignedInstructorId,
+      tags: normalizeTagIdsForWrite(formData.tags),
+      default_service: formData.defaultService ?? '',
+      default_day_of_week: formData.defaultDayOfWeek,
+      default_session_time: formData.defaultSessionTime ?? '',
+      national_id: (formData.nationalId ?? '').trim(),
+      contact_name: (formData.contactName ?? '').trim(),
+      contact_phone: (formData.contactPhone ?? '').trim(),
+      notes: (formData.notes ?? '').trim(),
+      is_active: formData.isActive,
     };
 
     try {
