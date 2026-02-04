@@ -1097,6 +1097,7 @@
 - **API endpoints**:
   - `POST /api/intake` is public (Power Automate) and requires `x-org-id` plus `x-intake-secret` before inserting/updating student intake data. The request provides `html_content` which is parsed into Hebrew question/answer pairs.
   - `POST /api/intake/approve` requires Supabase auth; admins can approve any student, members only their assigned students. Updates `needs_intake_approval=false`, appends `metadata.last_approval`, and stores agreement metadata under `metadata.last_approval.agreement`.
+    - Optional approval notes can be sent; if present they are prepended to `Students.notes` wrapped between separator lines and the label "הערות קליטה" (existing notes are preserved below).
 - **Frontend**:
   - `IntakeSettingsCard.jsx` in Settings allows admins to manage mappings and rotate secrets.
   - `IntakeReviewQueue.jsx` on the dashboard surfaces pending intake approvals, keeps student cards collapsed by default, and requires an agreement confirmation before calling `/api/intake/approve`.

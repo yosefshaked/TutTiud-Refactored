@@ -216,6 +216,7 @@ export default function IntakeReviewQueue() {
   const [expandedAnswers, setExpandedAnswers] = useState(() => new Set());
   const [confirmingStudentId, setConfirmingStudentId] = useState('');
   const [agreementChecked, setAgreementChecked] = useState(false);
+  const [approvalNotes, setApprovalNotes] = useState('');
   const [instructorFilterId, setInstructorFilterId] = useState('');
   const [retryToken, setRetryToken] = useState(0);
   const [assignmentFilter, setAssignmentFilter] = useState('all');
@@ -355,7 +356,7 @@ export default function IntakeReviewQueue() {
     setRetryToken((value) => value + 1);
   };
 
-  const handleApprove = async (studentId, agreement) => {
+  const handleApprove = async (studentId, agreement, notes, approvalDate) => {
     if (!session || !activeOrgId) {
       return;
     }
@@ -375,6 +376,8 @@ export default function IntakeReviewQueue() {
           org_id: activeOrgId,
           student_id: studentId,
           agreement,
+          approval_notes: notes,
+          approval_date: approvalDate,
         },
       });
       setPendingStudents((prev) => prev.filter((student) => student.id !== studentId));
@@ -439,12 +442,14 @@ export default function IntakeReviewQueue() {
   const openConfirmDialog = (studentId) => {
     setConfirmingStudentId(studentId);
     setAgreementChecked(false);
+    setApprovalNotes('');
   };
 
   const closeConfirmDialog = (open) => {
     if (!open) {
       setConfirmingStudentId('');
       setAgreementChecked(false);
+      setApprovalNotes('');
     }
   };
 
@@ -455,13 +460,16 @@ export default function IntakeReviewQueue() {
     if (!confirmingStudentId || !agreementChecked) {
       return;
     }
+    const now = new Date();
+    const localDateStr = now.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
     await handleApprove(confirmingStudentId, {
       acknowledged: true,
-      acknowledged_at: new Date().toISOString(),
+      acknowledged_at: now.toISOString(),
       statement: APPROVAL_AGREEMENT_TEXT,
-    });
+    }, approvalNotes, localDateStr);
     setConfirmingStudentId('');
     setAgreementChecked(false);
+    setApprovalNotes('');
   };
 
   const instructorMap = useMemo(() => {
@@ -1291,6 +1299,19 @@ export default function IntakeReviewQueue() {
             <Label htmlFor="intake-approval-agreement" className="text-sm text-slate-700">
               {APPROVAL_AGREEMENT_TEXT}
             </Label>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="intake-approval-notes">הערות קליטה (אופציונלי)</Label>
+            <Textarea
+              id="intake-approval-notes"
+              value={approvalNotes}
+              onChange={(event) => setApprovalNotes(event.target.value)}
+              rows={4}
+              placeholder="הוסיפו הערות מהשיחה עם ההורים/אפוטרופוס/תלמיד"
+            />
+            <p className="text-xs text-slate-500">
+              אם תוסיפו הערות, הן יישמרו בתחילת ההערות הקיימות של התלמיד.
+            </p>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>בטל</AlertDialogCancel>
