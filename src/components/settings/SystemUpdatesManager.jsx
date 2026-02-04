@@ -20,27 +20,16 @@ export default function SystemUpdatesManager({ session, orgId }) {
       
       setChecking(true);
       try {
-        const response = await authenticatedFetch(`/api/admin/run-migration`, {
+        const data = await authenticatedFetch('admin-run-migration', {
+          session,
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'X-Supabase-Authorization': `Bearer ${session.access_token}`,
-            'x-supabase-authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
+          body: {
             org_id: orgId,
             check_only: true,
-          }),
+          },
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to check migration status');
-        }
-
-        const data = await response.json();
-        setCheckResult(data.check);
+        setCheckResult(data?.check ?? null);
       } catch (error) {
         console.error('Failed to check migration status:', error);
         toast.error('שגיאה בבדיקת סטטוס מעבר', {
@@ -60,27 +49,16 @@ export default function SystemUpdatesManager({ session, orgId }) {
     
     setChecking(true);
     try {
-      const response = await authenticatedFetch(`/api/admin-run-migration`, {
+      const data = await authenticatedFetch('admin-run-migration', {
+        session,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'X-Supabase-Authorization': `Bearer ${session.access_token}`,
-          'x-supabase-authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
+        body: {
           org_id: orgId,
           check_only: true,
-        }),
+        },
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to check migration status');
-      }
-
-      const data = await response.json();
-      setCheckResult(data.check);
+      setCheckResult(data?.check ?? null);
     } catch (error) {
       console.error('Failed to check migration status:', error);
       toast.error('שגיאה בבדיקת סטטוס מעבר', {
@@ -98,26 +76,14 @@ export default function SystemUpdatesManager({ session, orgId }) {
     setMigrationReport(null);
     
     try {
-      const response = await authenticatedFetch(`/api/admin-run-migration`, {
+      const data = await authenticatedFetch('admin-run-migration', {
+        session,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'X-Supabase-Authorization': `Bearer ${session.access_token}`,
-          'x-supabase-authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
+        body: {
           org_id: orgId,
           check_only: false,
-        }),
+        },
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Migration failed');
-      }
-
-      const data = await response.json();
       setMigrationReport(data);
       
       if (data.success) {
