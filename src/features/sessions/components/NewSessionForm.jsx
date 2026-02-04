@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Loader2, ListChecks, RotateCcw, ChevronDown, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { describeSchedule, dayMatches, includesDayQuery } from '@/features/students/utils/schedule.js';
 import { sortStudentsBySchedule } from '@/features/students/utils/sorting.js';
 import { cn } from '@/lib/utils.js';
+import { authenticatedFetch } from '@/lib/api-client.js';
 import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
 import { useLooseReportNameSuggestions } from '@/features/sessions/hooks/useLooseReportNameSuggestions.js';
@@ -18,6 +20,9 @@ export default function NewSessionForm({
   questions = [],
   suggestions = {},
   services = [],
+  serviceCatalog = [],
+  session,
+  orgId,
   instructors = [],
   personalPreanswers = {},
   onSavePersonalPreanswers,
@@ -53,6 +58,16 @@ export default function NewSessionForm({
   const [sessionDate, setSessionDate] = useState(initialDate || '');
   const [serviceContext, setServiceContext] = useState('');
   const [serviceTouched, setServiceTouched] = useState(false);
+  const [serviceId, setServiceId] = useState('');
+  const [serviceSelectionTouched, setServiceSelectionTouched] = useState(false);
+  const [templateId, setTemplateId] = useState('');
+  const [templateSelectionTouched, setTemplateSelectionTouched] = useState(false);
+  const [serviceRecommendations, setServiceRecommendations] = useState(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [inheritance, setInheritance] = useState(null);
+  const [inheritanceApplied, setInheritanceApplied] = useState(false);
   const [sessionTime, setSessionTime] = useState('');
   const [looseMode, setLooseMode] = useState(false);
   const [unassignedName, setUnassignedName] = useState('');
@@ -63,6 +78,7 @@ export default function NewSessionForm({
   const [activeQuestionKey, setActiveQuestionKey] = useState(null);
   const [isFormValid, setIsFormValid] = useState(false);
   const formRef = useRef(null);
+  const inheritanceSnapshotRef = useRef(null);
   
   // Loose report name duplicate checker
   const { suggestions: nameSuggestions, loading: loadingNameSuggestions } = useLooseReportNameSuggestions(
@@ -87,11 +103,30 @@ export default function NewSessionForm({
     return initial;
   });
 
+    const normalizeQuestionLabelKey = useCallback((label) => {
+      if (typeof label !== 'string') return '';
+      return label
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9א-ת]+/gi, '_')
+        .replace(/_{2,}/g, '_')
+        .replace(/^_|_$/g, '');
+    }, []);
+
+    const buildQuestionLookupKeys = useCallback((question) => {
+      const keys = [];
+      if (question?.key) keys.push(question.key);
+      if (question?.id && question.id !== question?.key) keys.push(question.id);
+      const labelKey = normalizeQuestionLabelKey(question?.label);
+      if (labelKey && !keys.includes(labelKey)) keys.push(labelKey);
+      return keys;
+    }, [normalizeQuestionLabelKey]);
+
   useEffect(() => {
     setAnswers((previous) => {
       const next = { ...previous };
       const keys = new Set();
-      for (const question of questions) {
+      for (const question of normalizedQuestions) {
         if (!question?.key) {
           continue;
         }
@@ -111,7 +146,7 @@ export default function NewSessionForm({
       }
       return next;
     });
-  }, [questions]);
+  }, [normalizedQuestions]);
 
   useEffect(() => {
     if (!initialStudentId) {
@@ -124,6 +159,43 @@ export default function NewSessionForm({
   const selectedStudent = useMemo(() => {
     return students.find((student) => student?.id === selectedStudentId) || null;
   }, [students, selectedStudentId]);
+
+  const normalizedServiceCatalog = useMemo(() => {
+    if (!Array.isArray(serviceCatalog)) return [];
+    return serviceCatalog
+      .filter((service) => service?.id && service?.name)
+      .map((service) => ({
+        id: String(service.id),
+        name: String(service.name),
+        linkedStudentTag: service?.linked_student_tag || null,
+      }));
+  }, [serviceCatalog]);
+
+  const usingServiceCatalog = normalizedServiceCatalog.length > 0;
+
+  const selectedService = useMemo(() => {
+    if (!serviceId) return null;
+    return normalizedServiceCatalog.find((service) => service.id === serviceId) || null;
+  }, [normalizedServiceCatalog, serviceId]);
+
+  const selectedTemplate = useMemo(() => {
+    if (!templateId) return null;
+    return templates.find((template) => template?.id === templateId) || null;
+  }, [templates, templateId]);
+
+  const activeQuestions = useMemo(() => {
+    if (usingServiceCatalog && selectedTemplate?.structure_json?.questions) {
+      return selectedTemplate.structure_json.questions;
+    }
+    return questions;
+  }, [questions, selectedTemplate, usingServiceCatalog]);
+
+  const normalizedQuestions = useMemo(() => {
+    return activeQuestions.map((question, index) => {
+      const key = question?.key || question?.id || `question_${index + 1}`;
+      return { ...question, key };
+    });
+  }, [activeQuestions]);
 
   // Build instructor map for sorting
   const instructorMap = useMemo(() => {
@@ -197,20 +269,41 @@ export default function NewSessionForm({
   }, [filteredStudents, selectedStudentId, initialStudentId, isLoadingStudents]);
 
   useEffect(() => {
-    if (!selectedStudent || serviceTouched) {
+    if (!selectedStudent || serviceTouched || serviceSelectionTouched) {
       return;
+    }
+    if (selectedStudent.default_service_id) {
+      setServiceId(String(selectedStudent.default_service_id));
     }
     if (selectedStudent.default_service) {
       setServiceContext(selectedStudent.default_service);
     }
-  }, [selectedStudent, serviceTouched]);
+  }, [selectedStudent, serviceTouched, serviceSelectionTouched]);
+
+  useEffect(() => {
+    if (!selectedService || serviceTouched) {
+      return;
+    }
+    setServiceContext(selectedService.name || '');
+  }, [selectedService, serviceTouched]);
 
   const handleStudentChange = (value) => {
     setSelectedStudentId(value);
     setLooseMode(false);
     onSelectedStudentChange?.(value); // Notify parent
     setServiceTouched(false);
+    setServiceSelectionTouched(false);
+    setTemplateSelectionTouched(false);
+    setTemplateId('');
+    setInheritance(null);
+    setInheritanceApplied(false);
+    inheritanceSnapshotRef.current = null;
     const nextStudent = students.find((student) => student?.id === value);
+    if (nextStudent?.default_service_id) {
+      setServiceId(String(nextStudent.default_service_id));
+    } else {
+      setServiceId('');
+    }
     if (nextStudent?.default_service) {
       setServiceContext(nextStudent.default_service);
     } else {
@@ -243,6 +336,15 @@ export default function NewSessionForm({
     updateAnswer(questionKey, value);
   }, [updateAnswer]);
 
+  const handleServiceContextChange = useCallback((value) => {
+    setServiceContext(value);
+    setServiceTouched(true);
+    setServiceSelectionTouched(true);
+    if (!value) {
+      setServiceId('');
+    }
+  }, []);
+
   // Handler to switch from loose mode to regular mode when selecting an existing student
   const handleSelectExistingStudent = useCallback((student) => {
     // Switch to regular mode
@@ -254,6 +356,180 @@ export default function NewSessionForm({
     setUnassignedReason('');
     setUnassignedReasonOther('');
     // Keep service, time, answers, and date - they're preserved automatically
+  }, []);
+
+  const loadTemplatesForService = useCallback(async (nextServiceId) => {
+    if (!session || !orgId || !nextServiceId) {
+      setTemplates([]);
+      return;
+    }
+
+    setTemplatesLoading(true);
+    try {
+      const response = await authenticatedFetch('report-templates', {
+        session,
+        params: {
+          org_id: orgId,
+          service_id: nextServiceId,
+        },
+      });
+      setTemplates(Array.isArray(response?.templates) ? response.templates : []);
+    } catch (loadError) {
+      console.error('Failed to load report templates', loadError);
+      setTemplates([]);
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, [orgId, session]);
+
+  const loadRecommendations = useCallback(async () => {
+    if (!session || !orgId || !usingServiceCatalog) {
+      return;
+    }
+
+    setRecommendationsLoading(true);
+    try {
+      const response = await authenticatedFetch('session-recommendations', {
+        session,
+        method: 'POST',
+        body: {
+          org_id: orgId,
+          student_id: selectedStudentId || null,
+          service_id: serviceId || null,
+          template_id: templateId || null,
+          service_context: serviceContext || null,
+        },
+      });
+
+      setServiceRecommendations(response || null);
+      setInheritance(response?.inheritance || null);
+      setInheritanceApplied(false);
+      inheritanceSnapshotRef.current = null;
+
+      if (!serviceSelectionTouched && response?.service?.id) {
+        setServiceId(String(response.service.id));
+      }
+
+      if (!serviceTouched && response?.service_context) {
+        setServiceContext(String(response.service_context));
+      }
+
+      if (!templateSelectionTouched && response?.template?.id) {
+        setTemplateId(String(response.template.id));
+      }
+    } catch (recError) {
+      console.error('Failed to load session recommendations', recError);
+      setServiceRecommendations(null);
+      setInheritance(null);
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  }, [orgId, selectedStudentId, serviceContext, serviceId, session, serviceSelectionTouched, serviceTouched, templateId, templateSelectionTouched, usingServiceCatalog]);
+
+  useEffect(() => {
+    if (!usingServiceCatalog) {
+      return;
+    }
+    void loadRecommendations();
+  }, [loadRecommendations, usingServiceCatalog]);
+
+  useEffect(() => {
+    if (!usingServiceCatalog) {
+      return;
+    }
+    if (!serviceId) {
+      setTemplates([]);
+      setTemplateId('');
+      return;
+    }
+    void loadTemplatesForService(serviceId);
+  }, [loadTemplatesForService, serviceId, usingServiceCatalog]);
+
+  useEffect(() => {
+    if (!templateId || templates.length === 0) {
+      return;
+    }
+    const stillExists = templates.some((template) => template?.id === templateId);
+    if (!stillExists && !templateSelectionTouched) {
+      setTemplateId('');
+    }
+  }, [templateId, templates, templateSelectionTouched]);
+
+  const recommendedTemplate = useMemo(() => {
+    const recommendedId = serviceRecommendations?.template?.id;
+    if (recommendedId) {
+      return templates.find((template) => template?.id === recommendedId) || serviceRecommendations?.template || null;
+    }
+    return null;
+  }, [serviceRecommendations, templates]);
+
+  const otherTemplates = useMemo(() => {
+    const recommendedId = recommendedTemplate?.id;
+    return templates.filter((template) => template?.id && template.id !== recommendedId);
+  }, [templates, recommendedTemplate]);
+
+  const handleServiceSelection = useCallback((nextServiceId) => {
+    setServiceId(nextServiceId);
+    setServiceSelectionTouched(true);
+    setTemplateSelectionTouched(false);
+    setTemplateId('');
+    setInheritance(null);
+    setInheritanceApplied(false);
+    inheritanceSnapshotRef.current = null;
+
+    const matched = normalizedServiceCatalog.find((service) => service.id === nextServiceId) || null;
+    if (!serviceTouched) {
+      setServiceContext(matched?.name || '');
+    }
+  }, [normalizedServiceCatalog, serviceTouched]);
+
+  const handleTemplateSelection = useCallback((nextTemplateId) => {
+    setTemplateId(nextTemplateId);
+    setTemplateSelectionTouched(true);
+    setInheritance(null);
+    setInheritanceApplied(false);
+    inheritanceSnapshotRef.current = null;
+  }, []);
+
+  const applyInheritance = useCallback(() => {
+    if (!inheritance?.content || typeof inheritance.content !== 'object') {
+      return;
+    }
+    const snapshot = {};
+    setAnswers((previous) => {
+      const next = { ...previous };
+      Object.entries(inheritance.content).forEach(([key, value]) => {
+        if (!Object.prototype.hasOwnProperty.call(previous, key)) {
+          return;
+        }
+        const currentValue = previous[key];
+        const isEmpty = currentValue === '' || currentValue === null || typeof currentValue === 'undefined';
+        if (!isEmpty) {
+          return;
+        }
+        snapshot[key] = currentValue;
+        next[key] = value;
+      });
+      return next;
+    });
+    inheritanceSnapshotRef.current = snapshot;
+    setInheritanceApplied(true);
+  }, [inheritance]);
+
+  const clearInheritance = useCallback(() => {
+    const snapshot = inheritanceSnapshotRef.current;
+    if (!snapshot) {
+      return;
+    }
+    setAnswers((previous) => {
+      const next = { ...previous };
+      Object.entries(snapshot).forEach(([key, value]) => {
+        next[key] = value;
+      });
+      return next;
+    });
+    inheritanceSnapshotRef.current = null;
+    setInheritanceApplied(false);
   }, []);
 
   const handleSubmit = (event) => {
@@ -278,6 +554,7 @@ export default function NewSessionForm({
     }
 
     const trimmedService = serviceContext.trim();
+    const resolvedServiceContext = trimmedService || (selectedService?.name ? selectedService.name : null);
     const answerEntries = Object.entries(answers)
       .map(([key, value]) => {
         if (typeof value === 'string') {
@@ -296,7 +573,9 @@ export default function NewSessionForm({
       studentId: looseMode ? null : selectedStudentId,
       date: sessionDate,
       time: looseMode ? sessionTime : sessionTime || null,
-      serviceContext: trimmedService || null,
+      serviceContext: resolvedServiceContext,
+      serviceId: serviceId || null,
+      templateId: templateId || null,
       answers: Object.fromEntries(answerEntries),
       instructorId: looseMode && looseInstructorId ? looseInstructorId : undefined,
       unassignedDetails: looseMode
@@ -326,7 +605,7 @@ export default function NewSessionForm({
     
     // Reset all form fields
     const initialAnswers = {};
-    for (const question of questions) {
+    for (const question of normalizedQuestions) {
       if (question?.key) {
         if (question.type === 'scale' && typeof question?.range?.min === 'number') {
           initialAnswers[question.key] = String(question.range.min);
@@ -355,6 +634,7 @@ export default function NewSessionForm({
       if (looseService) {
         setServiceContext(looseService);
         setServiceTouched(true);
+        setServiceSelectionTouched(true);
       }
     } else {
       setLooseMode(false);
@@ -366,6 +646,13 @@ export default function NewSessionForm({
       if (!keepStudent) {
         setServiceContext('');
         setServiceTouched(false);
+        setServiceId('');
+        setServiceSelectionTouched(false);
+        setTemplateId('');
+        setTemplateSelectionTouched(false);
+        setInheritance(null);
+        setInheritanceApplied(false);
+        inheritanceSnapshotRef.current = null;
       }
     }
     
@@ -382,7 +669,7 @@ export default function NewSessionForm({
       setSelectedStudentId('');
       onSelectedStudentChange?.('');
     }
-  }, [questions, onSelectedStudentChange]);
+  }, [normalizedQuestions, onSelectedStudentChange]);
 
   useEffect(() => {
     const form = formRef.current;
@@ -394,7 +681,7 @@ export default function NewSessionForm({
       setIsFormValid(nextIsValid);
     }
     onFormValidityChange?.(nextIsValid);
-  }, [selectedStudentId, sessionDate, sessionTime, serviceContext, looseMode, unassignedName, unassignedReason, unassignedReasonOther, looseInstructorId, answers, questions, onFormValidityChange, isFormValid]);
+  }, [selectedStudentId, sessionDate, sessionTime, serviceContext, serviceId, looseMode, unassignedName, unassignedReason, unassignedReasonOther, looseInstructorId, answers, normalizedQuestions, onFormValidityChange, isFormValid]);
 
   return (
     <form
@@ -434,6 +721,13 @@ export default function NewSessionForm({
                   onSelectedStudentChange?.('');
                   setServiceContext('');
                   setServiceTouched(true);
+                  setServiceId('');
+                  setServiceSelectionTouched(false);
+                  setTemplateId('');
+                  setTemplateSelectionTouched(false);
+                  setInheritance(null);
+                  setInheritanceApplied(false);
+                  inheritanceSnapshotRef.current = null;
                 } else {
                   setServiceTouched(false);
                 }
@@ -748,12 +1042,200 @@ export default function NewSessionForm({
             />
           </div>
         )}
+      </div>
+
+      {usingServiceCatalog ? (
+        <div className="space-y-md">
+          <div className="space-y-sm">
+            <div className="flex items-center justify-between">
+              <Label className="block text-right">שירות{looseMode ? ' *' : ''}</Label>
+              {!looseMode && serviceId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    setServiceId('');
+                    setServiceSelectionTouched(true);
+                    setTemplateId('');
+                    setTemplateSelectionTouched(false);
+                    setInheritance(null);
+                    setInheritanceApplied(false);
+                    inheritanceSnapshotRef.current = null;
+                  }}
+                >
+                  נקה בחירה
+                </Button>
+              )}
+            </div>
+            {recommendationsLoading ? (
+              <p className="text-xs text-slate-500 text-right">טוען המלצות...</p>
+            ) : serviceRecommendations?.service?.name ? (
+              <p className="text-xs text-slate-500 text-right">מומלץ: {serviceRecommendations.service.name}</p>
+            ) : null}
+            <div className="space-y-2">
+              {normalizedServiceCatalog.map((service, index) => {
+                const isRecommended = serviceRecommendations?.service?.id === service.id;
+                const isChecked = serviceId === service.id;
+                return (
+                  <label
+                    key={service.id}
+                    className={cn(
+                      'flex items-center justify-between gap-2 rounded-md border p-2 transition-colors',
+                      isChecked ? 'border-primary bg-primary/5' : 'border-slate-200'
+                    )}
+                  >
+                    <span className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="service-id"
+                        value={service.id}
+                        checked={isChecked}
+                        onChange={(event) => handleServiceSelection(event.target.value)}
+                        required={looseMode && index === 0}
+                        disabled={isSubmitting}
+                        className="h-4 w-4"
+                      />
+                      {service.name}
+                    </span>
+                    {isRecommended && (
+                      <Badge variant="secondary" className="text-xs">מומלץ</Badge>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            {looseMode && !serviceId && (
+              <p className="text-xs text-red-600 text-right">חובה לבחור שירות לדיווח לא משויך.</p>
+            )}
+          </div>
+
+          {serviceId && (
+            <div className="space-y-sm">
+              <div className="flex items-center justify-between">
+                <Label className="block text-right">תבנית דיווח</Label>
+                {templateId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      setTemplateId('');
+                      setTemplateSelectionTouched(false);
+                      setInheritance(null);
+                      setInheritanceApplied(false);
+                      inheritanceSnapshotRef.current = null;
+                    }}
+                  >
+                    נקה בחירה
+                  </Button>
+                )}
+              </div>
+              {templatesLoading ? (
+                <p className="text-xs text-slate-500 text-right">טוען תבניות...</p>
+              ) : templates.length === 0 ? (
+                <p className="text-xs text-slate-500 text-right">לא נמצאו תבניות עבור שירות זה.</p>
+              ) : (
+                <div className="space-y-3">
+                  {recommendedTemplate && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-600 text-right">מומלץ</p>
+                      <label
+                        className={cn(
+                          'flex items-center justify-between gap-2 rounded-md border p-2 transition-colors',
+                          templateId === recommendedTemplate.id ? 'border-primary bg-primary/5' : 'border-slate-200'
+                        )}
+                      >
+                        <span className="flex items-center gap-2 text-sm">
+                          <input
+                            type="radio"
+                            name="template-id"
+                            value={recommendedTemplate.id}
+                            checked={templateId === recommendedTemplate.id}
+                            onChange={(event) => handleTemplateSelection(event.target.value)}
+                            disabled={isSubmitting}
+                            className="h-4 w-4"
+                          />
+                          {recommendedTemplate.name}
+                        </span>
+                        <Badge variant="secondary" className="text-xs">{recommendedTemplate.system_type}</Badge>
+                      </label>
+                    </div>
+                  )}
+
+                  {otherTemplates.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-600 text-right">כל התבניות</p>
+                      {otherTemplates.map((template) => (
+                        <label
+                          key={template.id}
+                          className={cn(
+                            'flex items-center justify-between gap-2 rounded-md border p-2 transition-colors',
+                            templateId === template.id ? 'border-primary bg-primary/5' : 'border-slate-200'
+                          )}
+                        >
+                          <span className="flex items-center gap-2 text-sm">
+                            <input
+                              type="radio"
+                              name="template-id"
+                              value={template.id}
+                              checked={templateId === template.id}
+                              onChange={(event) => handleTemplateSelection(event.target.value)}
+                              disabled={isSubmitting}
+                              className="h-4 w-4"
+                            />
+                            {template.name}
+                          </span>
+                          <Badge variant="outline" className="text-xs">{template.system_type}</Badge>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {inheritance?.content && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-sm">
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-slate-600 text-right">
+                  נמצאו נתונים מדיווח קודם{inheritance.date ? ` (${inheritance.date})` : ''}.
+                </p>
+                {inheritanceApplied ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="self-start text-xs"
+                    onClick={clearInheritance}
+                  >
+                    הסרת נתונים מיובאים
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="self-start text-xs"
+                    onClick={applyInheritance}
+                  >
+                    החל נתונים מהדיווח האחרון
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
         <ComboBoxField
           id="session-service"
           name="service"
           label="שירות"
           value={serviceContext}
-          onChange={setServiceContext}
+          onChange={handleServiceContextChange}
           options={services}
           placeholder="בחרו מהרשימה או הקלידו שירות"
           disabled={isSubmitting}
@@ -762,13 +1244,13 @@ export default function NewSessionForm({
           description={looseMode ? 'חובה לבחור שירות לדיווח לא משויך.' : 'הערך מוצע לפי ברירת המחדל של התלמיד אך ניתן לעריכה.'}
           required={looseMode}
         />
-      </div>
+      )}
 
-      {questions.length ? (
+      {normalizedQuestions.length ? (
         <div className="space-y-md">
           <h3 className="text-base font-semibold text-foreground text-right">שאלות המפגש</h3>
           <div className="space-y-md">
-            {questions.map((question) => {
+            {normalizedQuestions.map((question) => {
               const questionId = `question-${question.key}`;
               const questionOptions = Array.isArray(question.options)
                 ? question.options
@@ -787,9 +1269,12 @@ export default function NewSessionForm({
               const answerValue = answers[question.key];
 
               const orgPreanswers = (() => {
-                const byKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
-                const byId = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
-                return byKey.length > 0 ? byKey : byId;
+                const keys = buildQuestionLookupKeys(question);
+                for (const key of keys) {
+                  const list = Array.isArray(suggestions?.[key]) ? suggestions[key] : [];
+                  if (list.length > 0) return list;
+                }
+                return [];
               })();
               // Show button if user is an instructor (can add personal answers) OR there are org answers to pick from
               const showButton = canEditPersonalPreanswers || orgPreanswers.length > 0;
@@ -1102,19 +1587,25 @@ export default function NewSessionForm({
         }}
         answers={(() => {
           if (!activeQuestionKey) return [];
-          const question = questions.find((q) => q.key === activeQuestionKey);
+          const question = normalizedQuestions.find((q) => q.key === activeQuestionKey);
           if (!question) return [];
-          const byKey = Array.isArray(suggestions?.[question.key]) ? suggestions[question.key] : [];
-          const byId = Array.isArray(suggestions?.[question.id]) ? suggestions[question.id] : [];
-          return byKey.length > 0 ? byKey : byId;
+          const keys = buildQuestionLookupKeys(question);
+          for (const key of keys) {
+            const list = Array.isArray(suggestions?.[key]) ? suggestions[key] : [];
+            if (list.length > 0) return list;
+          }
+          return [];
         })()}
         personalAnswers={(() => {
           if (!activeQuestionKey) return [];
-          const question = questions.find((q) => q.key === activeQuestionKey);
+          const question = normalizedQuestions.find((q) => q.key === activeQuestionKey);
           if (!question) return [];
-          const byKey = Array.isArray(personalPreanswers?.[question.key]) ? personalPreanswers[question.key] : [];
-          const byId = Array.isArray(personalPreanswers?.[question.id]) ? personalPreanswers[question.id] : [];
-          return byKey.length > 0 ? byKey : byId;
+          const keys = buildQuestionLookupKeys(question);
+          for (const key of keys) {
+            const list = Array.isArray(personalPreanswers?.[key]) ? personalPreanswers[key] : [];
+            if (list.length > 0) return list;
+          }
+          return [];
         })()}
         onSavePersonal={(list) => {
           if (!activeQuestionKey) return;
@@ -1129,7 +1620,7 @@ export default function NewSessionForm({
         }}
         questionLabel={
           activeQuestionKey
-            ? questions.find((q) => q.key === activeQuestionKey)?.label || 'שאלה'
+            ? normalizedQuestions.find((q) => q.key === activeQuestionKey)?.label || 'שאלה'
             : 'שאלה'
         }
       />

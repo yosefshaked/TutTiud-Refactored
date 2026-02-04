@@ -100,8 +100,7 @@ CREATE INDEX idx_students_default_service_id ON tuttiud."Students"(default_servi
 - [x] 3. Create backend endpoint `/api/admin/run-migration`
 - [x] 4. Create Admin Settings UI component
 - [x] 5. Integrate migration trigger into Settings page
-- [ ] 4. Create Admin Settings UI trigger
-- [ ] 5. Test migration flow end-to-end
+- [ ] 6. Test migration flow end-to-end
 
 ### Migration Service Logic
 **Function:** `migrate_legacy_data(tenantClient, orgId)`
@@ -128,20 +127,20 @@ CREATE INDEX idx_students_default_service_id ON tuttiud."Students"(default_servi
 ## Phase C: Logic & Rules
 
 ### Tasks Checklist
-- [ ] 1. Implement Service Selection Algorithm
-- [ ] 2. Implement Template Selection Algorithm
-- [ ] 3. Implement Data Inheritance Logic
-- [ ] 4. Backend API endpoints updated
+- [x] 1. Implement Service Selection Algorithm
+- [x] 2. Implement Template Selection Algorithm
+- [x] 3. Implement Data Inheritance Logic
+- [x] 4. Backend API endpoints updated
 
 ### Service Selection Logic
-**Status:** Not Started  
+**Status:** ✅ Complete  
 **Algorithm:**
 1. Check `Student.default_service_id` + Instructor authorization → Auto-select
 2. Check Student Tags ∩ Instructor Types → If 1 match, auto-select
 3. Fallback: Show radio button list
 
 ### Template Selection Logic
-**Status:** Not Started  
+**Status:** ✅ Complete  
 **Rules:**
 - New Student (0 reports) → Default to `INTAKE` template
 - Ongoing Student (>0 reports) → Default to `ONGOING` template + Data Inheritance
@@ -152,9 +151,9 @@ CREATE INDEX idx_students_default_service_id ON tuttiud."Students"(default_servi
 ## Phase D: Frontend UX
 
 ### Tasks Checklist
-- [ ] 1. Service selection UI (conditional visibility)
-- [ ] 2. Template selection UI (grouped by recommended/all)
-- [ ] 3. Data inheritance UI (pre-fill persistent fields)
+- [x] 1. Service selection UI (conditional visibility)
+- [x] 2. Template selection UI (grouped by recommended/all)
+- [x] 3. Data inheritance UI (pre-fill persistent fields)
 - [ ] 4. Testing with real user flows
 
 ---

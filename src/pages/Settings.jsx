@@ -10,6 +10,7 @@ import SetupAssistant from '@/components/settings/SetupAssistant.jsx';
 import OrgMembersCard from '@/components/settings/OrgMembersCard.jsx';
 import SessionFormManager from '@/components/settings/SessionFormManager.jsx';
 import ServiceManager from '@/components/settings/ServiceManager.jsx';
+import ReportTemplateManager from '@/components/settings/ReportTemplateManager.jsx';
 import InstructorManagementHub from '@/components/settings/instructor-management/InstructorManagementHub.jsx';
 import BackupManager from '@/components/settings/BackupManager.jsx';
 import LogoManager from '@/components/settings/LogoManager.jsx';
@@ -35,7 +36,7 @@ export default function Settings() {
   const normalizedRole = typeof membershipRole === 'string' ? membershipRole.trim().toLowerCase() : '';
   const canManageSessionForm = normalizedRole === 'admin' || normalizedRole === 'owner';
   const setupDialogAutoOpenRef = useRef(!activeOrgHasConnection);
-  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage' | 'documents' | 'orgDocuments' | 'myDocuments' | 'intake' | 'systemUpdates'
+  const [selectedModule, setSelectedModule] = useState(null); // 'setup' | 'orgMembers' | 'sessionForm' | 'services' | 'reportTemplates' | 'instructors' | 'backup' | 'logo' | 'tags' | 'studentVisibility' | 'storage' | 'documents' | 'orgDocuments' | 'myDocuments' | 'intake' | 'systemUpdates'
   const [backupEnabled, setBackupEnabled] = useState(false);
   const [logoEnabled, setLogoEnabled] = useState(false);
   const [storageEnabled, setStorageEnabled] = useState(false);
@@ -526,6 +527,34 @@ export default function Settings() {
             </CardContent>
           </Card>
 
+            {/* Report Templates Card */}
+            <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
+              <CardHeader className="space-y-2 pb-3 flex-1">
+                <div className="flex items-start gap-2">
+                  <div className="rounded-lg bg-blue-100 p-2 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                    <ListChecks className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                  <CardTitle className="text-lg font-bold text-slate-900">
+                    תבניות דיווח
+                  </CardTitle>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed min-h-[2.5rem]">
+                  ניהול תבניות קליטה/שוטף/סיכום ותבניות מותאמות לשירותים
+                </p>
+              </CardHeader>
+              <CardContent className="pt-0 mt-auto">
+                <Button 
+                  size="sm" 
+                  className="w-full gap-2" 
+                  onClick={() => setSelectedModule('reportTemplates')} 
+                  disabled={!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady}
+                  variant={(!canManageSessionForm || !activeOrgHasConnection || !tenantClientReady) ? 'secondary' : 'default'}
+                >
+                  <ListChecks className="h-4 w-4" /> ניהול תבניות
+                </Button>
+              </CardContent>
+            </Card>
+
           {/* Instructors Card */}
           <Card className="group relative w-full overflow-hidden border-0 bg-white/80 shadow-md transition-all duration-200 hover:shadow-xl hover:scale-[1.02] flex flex-col">
             <CardHeader className="space-y-2 pb-3 flex-1">
@@ -886,6 +915,7 @@ export default function Settings() {
                 selectedModule === 'orgMembers' ? <Users /> :
                 selectedModule === 'sessionForm' ? <ClipboardList /> :
                 selectedModule === 'services' ? <ListChecks /> :
+                selectedModule === 'reportTemplates' ? <ListChecks /> :
                 selectedModule === 'instructors' ? <Users /> :
                 selectedModule === 'backup' ? <ShieldCheck /> :
                 selectedModule === 'systemUpdates' ? <Database /> :
@@ -904,6 +934,7 @@ export default function Settings() {
                 selectedModule === 'orgMembers' ? 'ניהול חברי צוות' :
                 selectedModule === 'sessionForm' ? 'טופס שאלות מפגש' :
                 selectedModule === 'services' ? 'ניהול שירותים' :
+                selectedModule === 'reportTemplates' ? 'תבניות דיווח' :
                 selectedModule === 'instructors' ? 'ניהול מדריכים' :
                 selectedModule === 'backup' ? 'גיבוי ושחזור' :
                 selectedModule === 'systemUpdates' ? 'עדכוני מערכת' :
@@ -948,6 +979,12 @@ export default function Settings() {
                     orgId={activeOrgId}
                     activeOrgHasConnection={activeOrgHasConnection}
                     tenantClientReady={tenantClientReady}
+                  />
+                )}
+                {selectedModule === 'reportTemplates' && (
+                  <ReportTemplateManager
+                    session={session}
+                    orgId={activeOrgId}
                   />
                 )}
                 {selectedModule === 'instructors' && (
