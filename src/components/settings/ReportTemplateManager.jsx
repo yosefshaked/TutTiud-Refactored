@@ -93,10 +93,11 @@ function normalizeQuestionsForSave(questions) {
 }
 
 export default function ReportTemplateManager({ session, orgId }) {
-  const { serviceCatalog, loadingServiceCatalog } = useServiceCatalog({
+  const { serviceCatalog, loadingServiceCatalog, serviceCatalogError } = useServiceCatalog({
     enabled: Boolean(session && orgId),
     orgId,
   });
+  const [serviceError, setServiceError] = useState('');
 
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [templates, setTemplates] = useState([]);
@@ -143,6 +144,18 @@ export default function ReportTemplateManager({ session, orgId }) {
       setTemplatesLoading(false);
     }
   }, [orgId, session]);
+
+  useEffect(() => {
+    if (serviceCatalogError) {
+      if (serviceCatalogError.includes('services_table_missing')) {
+        setServiceError('נדרש להריץ את עדכון המערכת כדי ליצור טבלת שירותים.');
+        return;
+      }
+      setServiceError(serviceCatalogError);
+      return;
+    }
+    setServiceError('');
+  }, [serviceCatalogError, selectedServiceId]);
 
   useEffect(() => {
     if (!selectedServiceId) {
@@ -337,6 +350,9 @@ export default function ReportTemplateManager({ session, orgId }) {
                 ))}
               </SelectContent>
             </Select>
+          )}
+          {serviceError && (
+            <p className="text-xs text-red-600">{serviceError}</p>
           )}
         </div>
 

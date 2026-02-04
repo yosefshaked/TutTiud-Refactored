@@ -86,11 +86,55 @@ export default async function handler(context, req) {
     query = query.eq('is_active', true);
   }
 
-  const { data, error } = await query;
+  let data = null;
+  const { data: serviceRows, error } = await query;
 
   if (error) {
+    const message = error.message || '';
+    if (message.includes('relation "Services" does not exist') || message.includes('Services')) {
+      return respond(context, 424, { message: 'services_table_missing' });
+    }
     context.log?.error?.('services failed to load', { message: error.message });
     return respond(context, 500, { message: 'failed_to_load_services' });
+  }
+
+  data = Array.isArray(serviceRows) ? serviceRows : [];
+
+  if (data.length === 0) {
+    const settingsResult = await tenantClient
+      .from('Settings')
+      .select('settings_value')
+      .eq('key', 'available_services')
+      .maybeSingle();
+
+    if (!settingsResult.error) {
+      const list = Array.isArray(settingsResult.data?.settings_value)
+        ? settingsResult.data.settings_value
+        : [];
+
+      if (list.length > 0) {
+        const payload = list
+          .map((name) => normalizeString(name))
+          .filter((name) => name)
+          .map((name) => ({ organization_id: orgId, name }));
+
+        if (payload.length > 0) {
+          await tenantClient
+            .from('Services')
+            .upsert(payload, { onConflict: 'organization_id,name' });
+
+          const refreshed = await tenantClient
+            .from('Services')
+            .select('id, name, linked_student_tag, is_active')
+            .eq('organization_id', orgId)
+            .order('name', { ascending: true });
+
+          if (!refreshed.error && Array.isArray(refreshed.data)) {
+            data = refreshed.data;
+          }
+        }
+      }
+    }
   }
 
   return respond(context, 200, { services: Array.isArray(data) ? data : [] });

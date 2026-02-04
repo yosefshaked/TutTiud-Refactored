@@ -60,7 +60,7 @@ export default function SystemUpdatesManager({ session, orgId }) {
     
     setChecking(true);
     try {
-      const response = await authenticatedFetch(`/api/admin/run-migration`, {
+      const response = await authenticatedFetch(`/api/admin-run-migration`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,7 +98,7 @@ export default function SystemUpdatesManager({ session, orgId }) {
     setMigrationReport(null);
     
     try {
-      const response = await authenticatedFetch(`/api/admin/run-migration`, {
+      const response = await authenticatedFetch(`/api/admin-run-migration`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

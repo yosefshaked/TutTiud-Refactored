@@ -410,6 +410,8 @@ ALTER TABLE tuttiud."Instructors" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tuttiud."Students" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tuttiud."SessionRecords" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tuttiud."Settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tuttiud."Services" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tuttiud."ReportTemplates" ENABLE ROW LEVEL SECURITY;
 
 -- Policies for "Instructors"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors";
@@ -426,6 +428,14 @@ CREATE POLICY "Allow full access to authenticated users on SessionRecords" ON tu
 -- Policies for "Settings"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Settings" ON tuttiud."Settings";
 CREATE POLICY "Allow full access to authenticated users on Settings" ON tuttiud."Settings" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
+
+-- Policies for "Services"
+DROP POLICY IF EXISTS "Allow full access to authenticated users on Services" ON tuttiud."Services";
+CREATE POLICY "Allow full access to authenticated users on Services" ON tuttiud."Services" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
+
+-- Policies for "ReportTemplates"
+DROP POLICY IF EXISTS "Allow full access to authenticated users on ReportTemplates" ON tuttiud."ReportTemplates";
+CREATE POLICY "Allow full access to authenticated users on ReportTemplates" ON tuttiud."ReportTemplates" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 
 -- Part 4: Application Role and Permissions (No Changes)
@@ -450,7 +460,7 @@ RETURNS TABLE (check_name text, success boolean, details text)
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
-  required_tables constant text[] := array['Instructors', 'Students', 'SessionRecords', 'Settings'];
+  required_tables constant text[] := array['Instructors', 'Students', 'SessionRecords', 'Settings', 'Services', 'ReportTemplates'];
   required_indexes constant text[] := array[
     'SessionRecords|SessionRecords_student_date_idx',
     'SessionRecords|SessionRecords_instructor_idx'
@@ -459,7 +469,9 @@ DECLARE
     'Instructors|Allow full access to authenticated users on Instructors',
     'Students|Allow full access to authenticated users on Students',
     'SessionRecords|Allow full access to authenticated users on SessionRecords',
-    'Settings|Allow full access to authenticated users on Settings'
+    'Settings|Allow full access to authenticated users on Settings',
+    'Services|Allow full access to authenticated users on Services',
+    'ReportTemplates|Allow full access to authenticated users on ReportTemplates'
   ];
   table_name text;
   policy_spec text;
