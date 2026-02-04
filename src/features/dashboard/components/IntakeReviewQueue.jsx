@@ -356,7 +356,7 @@ export default function IntakeReviewQueue() {
     setRetryToken((value) => value + 1);
   };
 
-  const handleApprove = async (studentId, agreement, notes) => {
+  const handleApprove = async (studentId, agreement, notes, approvalDate) => {
     if (!session || !activeOrgId) {
       return;
     }
@@ -377,6 +377,7 @@ export default function IntakeReviewQueue() {
           student_id: studentId,
           agreement,
           approval_notes: notes,
+          approval_date: approvalDate,
         },
       });
       setPendingStudents((prev) => prev.filter((student) => student.id !== studentId));
@@ -459,11 +460,13 @@ export default function IntakeReviewQueue() {
     if (!confirmingStudentId || !agreementChecked) {
       return;
     }
+    const now = new Date();
+    const localDateStr = now.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' });
     await handleApprove(confirmingStudentId, {
       acknowledged: true,
-      acknowledged_at: new Date().toISOString(),
+      acknowledged_at: now.toISOString(),
       statement: APPROVAL_AGREEMENT_TEXT,
-    }, approvalNotes);
+    }, approvalNotes, localDateStr);
     setConfirmingStudentId('');
     setAgreementChecked(false);
     setApprovalNotes('');

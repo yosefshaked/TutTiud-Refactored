@@ -73,12 +73,13 @@ function buildAgreementPayload(raw, userId) {
 
 const INTAKE_NOTES_SEPARATOR = '------------------------------------';
 
-function buildIntakeNotesBlock(raw) {
+function buildIntakeNotesBlock(raw, dateStr) {
   const note = normalizeString(raw);
   if (!note) {
     return null;
   }
-  return `${INTAKE_NOTES_SEPARATOR}\nהערות קליטה:\n${note}\n${INTAKE_NOTES_SEPARATOR}`;
+  const dateLabel = dateStr ? ` (${dateStr})` : '';
+  return `${INTAKE_NOTES_SEPARATOR}\nהערות קליטה${dateLabel}:\n${note}\n${INTAKE_NOTES_SEPARATOR}`;
 }
 
 export default async function handler(context, req) {
@@ -180,7 +181,8 @@ export default async function handler(context, req) {
   }
 
   const intakeNotesBlock = buildIntakeNotesBlock(
-    body?.approval_notes || body?.intake_notes || body?.notes
+    body?.approval_notes || body?.intake_notes || body?.notes,
+    body?.approval_date
   );
   const existingNotes = normalizeString(student?.notes);
   const updatedNotes = intakeNotesBlock
