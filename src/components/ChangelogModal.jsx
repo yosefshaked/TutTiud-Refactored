@@ -121,13 +121,19 @@ export default function ChangelogModal({ open, onClose }) {
                       4 בפברואר 2026
                     </time>
                   </div>
-                  <div style={{ fontSize: '20px' }}>
-                    {expandedVersions['1.9.3'] ? '▴' : '▾'}
-                  </div>
+                  <span style={{
+                    fontSize: '20px',
+                    color: '#64748b',
+                    transition: 'transform 0.2s ease',
+                    transform: expandedVersions['1.9.3'] ? 'rotate(180deg)' : 'rotate(0deg)',
+                    display: 'inline-block'
+                  }}>
+                    ▼
+                  </span>
                 </div>
                 <h3 style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
+                  fontWeight: 700,
+                  fontSize: 18,
                   margin: '8px 0 0 0',
                   color: '#1e293b',
                   lineHeight: 1.4
@@ -137,16 +143,17 @@ export default function ChangelogModal({ open, onClose }) {
               </header>
 
               {expandedVersions['1.9.3'] && (
-                <div style={{
-                  padding: '0 16px',
-                  borderRight: '3px solid #5B5BD6',
-                  marginRight: '16px'
+              <section style={{ paddingRight: '16px' }}>
+                <ul style={{
+                  listStyleType: 'disc',
+                  paddingRight: '20px',
+                  marginBottom: '16px',
+                  color: '#475569',
+                  lineHeight: 1.8
                 }}>
-                  <p style={{ margin: '0 0 12px', display: 'flex', alignItems: 'start', gap: '8px' }}>
-                    <span style={{ color: '#5B5BD6', fontSize: '18px', marginTop: '2px' }}>✨</span>
-                    <span>ניתן כעת להוסיף הערות אישיות בעת אישור קליטת תלמיד חדש - ההערות נשמרות בפרופיל התלמיד יחד עם התאריך</span>
-                  </p>
-                </div>
+                  <li>ניתן כעת להוסיף הערות אישיות בעת אישור קליטת תלמיד חדש - ההערות נשמרות בפרופיל התלמיד יחד עם התאריך.</li>
+                </ul>
+              </section>
               )}
             </article>
           </li>
