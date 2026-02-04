@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 export default function ChangelogModal({ open, onClose }) {
   // הגרסה האחרונה נפתחת כברירת מחדל
-  const [expandedVersions, setExpandedVersions] = useState({ '1.9.2': true });
+  const [expandedVersions, setExpandedVersions] = useState({ '1.9.3': true });
 
   const toggleVersion = (version) => {
     setExpandedVersions(prev => ({
@@ -89,6 +89,67 @@ export default function ChangelogModal({ open, onClose }) {
 
         <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#334155', fontSize: 15, lineHeight: 1.7 }}>
+
+          {/* 1.9.3 - Intake Notes */}
+          <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
+            <article style={{ display: 'flex', flexDirection: 'column' }}>
+              <header
+                onClick={() => toggleVersion('1.9.3')}
+                style={{
+                  cursor: 'pointer',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: expandedVersions['1.9.3'] ? '#f8fafc' : 'transparent',
+                  border: '1px solid #e2e8f0',
+                  transition: 'all 0.2s ease',
+                  marginBottom: expandedVersions['1.9.3'] ? '16px' : 0
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{
+                      background: '#5B5BD6',
+                      color: 'white',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: 600
+                    }}>
+                      גרסה 1.9.3
+                    </span>
+                    <time dateTime="2026-02-04" style={{ color: '#64748b', fontSize: '14px' }}>
+                      4 בפברואר 2026
+                    </time>
+                  </div>
+                  <div style={{ fontSize: '20px' }}>
+                    {expandedVersions['1.9.3'] ? '▴' : '▾'}
+                  </div>
+                </div>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  margin: '8px 0 0 0',
+                  color: '#1e293b',
+                  lineHeight: 1.4
+                }}>
+                  ✨ שיפורים בתהליך הקליטה
+                </h3>
+              </header>
+
+              {expandedVersions['1.9.3'] && (
+                <div style={{
+                  padding: '0 16px',
+                  borderRight: '3px solid #5B5BD6',
+                  marginRight: '16px'
+                }}>
+                  <p style={{ margin: '0 0 12px', display: 'flex', alignItems: 'start', gap: '8px' }}>
+                    <span style={{ color: '#5B5BD6', fontSize: '18px', marginTop: '2px' }}>✨</span>
+                    <span>ניתן כעת להוסיף הערות אישיות בעת אישור קליטת תלמיד חדש - ההערות נשמרות בפרופיל התלמיד יחד עם התאריך</span>
+                  </p>
+                </div>
+              )}
+            </article>
+          </li>
 
           {/* 1.9.2 - Bug Fix */}
           <li dir="rtl" style={{ marginBottom: 16, textAlign: 'right' }}>
