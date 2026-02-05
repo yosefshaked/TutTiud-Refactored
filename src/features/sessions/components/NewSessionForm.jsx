@@ -395,9 +395,6 @@ export default function NewSessionForm({
         body: {
           org_id: orgId,
           student_id: selectedStudentId || null,
-          service_id: serviceId || null,
-          template_id: templateId || null,
-          service_context: serviceContext || null,
         },
       });
 
@@ -424,7 +421,7 @@ export default function NewSessionForm({
     } finally {
       setRecommendationsLoading(false);
     }
-  }, [orgId, selectedStudentId, serviceContext, serviceId, session, serviceSelectionTouched, serviceTouched, templateId, templateSelectionTouched, usingServiceCatalog]);
+  }, [orgId, selectedStudentId, session, serviceSelectionTouched, serviceTouched, templateSelectionTouched, usingServiceCatalog]);
 
   useEffect(() => {
     if (!usingServiceCatalog) {
@@ -462,11 +459,6 @@ export default function NewSessionForm({
     }
     return null;
   }, [serviceRecommendations, templates]);
-
-  const otherTemplates = useMemo(() => {
-    const recommendedId = recommendedTemplate?.id;
-    return templates.filter((template) => template?.id && template.id !== recommendedId);
-  }, [templates, recommendedTemplate]);
 
   const handleServiceSelection = useCallback((nextServiceId) => {
     setServiceId(nextServiceId);
@@ -1046,82 +1038,19 @@ export default function NewSessionForm({
 
       {usingServiceCatalog ? (
         <div className="space-y-md">
-          <div className="space-y-sm">
-            <div className="flex items-center justify-between">
-              <Label className="block text-right">שירות{looseMode ? ' *' : ''}</Label>
-              {!looseMode && serviceId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => {
-                    setServiceId('');
-                    setServiceSelectionTouched(true);
-                    setTemplateId('');
-                    setTemplateSelectionTouched(false);
-                    setInheritance(null);
-                    setInheritanceApplied(false);
-                    inheritanceSnapshotRef.current = null;
-                  }}
-                >
-                  נקה בחירה
-                </Button>
-              )}
-            </div>
-            {recommendationsLoading ? (
-              <p className="text-xs text-slate-500 text-right">טוען המלצות...</p>
-            ) : serviceRecommendations?.service?.name ? (
-              <p className="text-xs text-slate-500 text-right">מומלץ: {serviceRecommendations.service.name}</p>
-            ) : null}
-            <div className="space-y-2">
-              {normalizedServiceCatalog.map((service, index) => {
-                const isRecommended = serviceRecommendations?.service?.id === service.id;
-                const isChecked = serviceId === service.id;
-                return (
-                  <label
-                    key={service.id}
-                    className={cn(
-                      'flex items-center justify-between gap-2 rounded-md border p-2 transition-colors',
-                      isChecked ? 'border-primary bg-primary/5' : 'border-slate-200'
-                    )}
-                  >
-                    <span className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        name="service-id"
-                        value={service.id}
-                        checked={isChecked}
-                        onChange={(event) => handleServiceSelection(event.target.value)}
-                        required={looseMode && index === 0}
-                        disabled={isSubmitting}
-                        className="h-4 w-4"
-                      />
-                      {service.name}
-                    </span>
-                    {isRecommended && (
-                      <Badge variant="secondary" className="text-xs">מומלץ</Badge>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-            {looseMode && !serviceId && (
-              <p className="text-xs text-red-600 text-right">חובה לבחור שירות לדיווח לא משויך.</p>
-            )}
-          </div>
-
-          {serviceId && (
+          <div className={cn('grid gap-md', serviceId ? 'sm:grid-cols-2' : '')}>
             <div className="space-y-sm">
               <div className="flex items-center justify-between">
-                <Label className="block text-right">תבנית דיווח</Label>
-                {templateId && (
+                <Label className="block text-right">שירות{looseMode ? ' *' : ''}</Label>
+                {!looseMode && serviceId && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     className="text-xs"
                     onClick={() => {
+                      setServiceId('');
+                      setServiceSelectionTouched(true);
                       setTemplateId('');
                       setTemplateSelectionTouched(false);
                       setInheritance(null);
@@ -1133,70 +1062,99 @@ export default function NewSessionForm({
                   </Button>
                 )}
               </div>
-              {templatesLoading ? (
-                <p className="text-xs text-slate-500 text-right">טוען תבניות...</p>
-              ) : templates.length === 0 ? (
-                <p className="text-xs text-slate-500 text-right">לא נמצאו תבניות עבור שירות זה.</p>
-              ) : (
-                <div className="space-y-3">
-                  {recommendedTemplate && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-slate-600 text-right">מומלץ</p>
-                      <label
-                        className={cn(
-                          'flex items-center justify-between gap-2 rounded-md border p-2 transition-colors',
-                          templateId === recommendedTemplate.id ? 'border-primary bg-primary/5' : 'border-slate-200'
-                        )}
-                      >
-                        <span className="flex items-center gap-2 text-sm">
-                          <input
-                            type="radio"
-                            name="template-id"
-                            value={recommendedTemplate.id}
-                            checked={templateId === recommendedTemplate.id}
-                            onChange={(event) => handleTemplateSelection(event.target.value)}
-                            disabled={isSubmitting}
-                            className="h-4 w-4"
-                          />
-                          {recommendedTemplate.name}
-                        </span>
-                        <Badge variant="secondary" className="text-xs">{recommendedTemplate.system_type}</Badge>
-                      </label>
-                    </div>
-                  )}
-
-                  {otherTemplates.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs font-semibold text-slate-600 text-right">כל התבניות</p>
-                      {otherTemplates.map((template) => (
-                        <label
-                          key={template.id}
-                          className={cn(
-                            'flex items-center justify-between gap-2 rounded-md border p-2 transition-colors',
-                            templateId === template.id ? 'border-primary bg-primary/5' : 'border-slate-200'
+              {recommendationsLoading ? (
+                <p className="text-xs text-slate-500 text-right">טוען המלצות...</p>
+              ) : serviceRecommendations?.service?.name ? (
+                <p className="text-xs text-slate-500 text-right">מומלץ: {serviceRecommendations.service.name}</p>
+              ) : null}
+              <Select
+                value={serviceId}
+                onValueChange={handleServiceSelection}
+                disabled={isSubmitting}
+                required={looseMode}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="בחרו שירות" />
+                </SelectTrigger>
+                <SelectContent>
+                  {normalizedServiceCatalog.map((service) => {
+                    const isRecommended = serviceRecommendations?.service?.id === service.id;
+                    return (
+                      <SelectItem key={service.id} value={service.id}>
+                        <span className="flex w-full items-center justify-between gap-2">
+                          <span>{service.name}</span>
+                          {isRecommended && (
+                            <Badge variant="secondary" className="text-xs">מומלץ</Badge>
                           )}
-                        >
-                          <span className="flex items-center gap-2 text-sm">
-                            <input
-                              type="radio"
-                              name="template-id"
-                              value={template.id}
-                              checked={templateId === template.id}
-                              onChange={(event) => handleTemplateSelection(event.target.value)}
-                              disabled={isSubmitting}
-                              className="h-4 w-4"
-                            />
-                            {template.name}
-                          </span>
-                          <Badge variant="outline" className="text-xs">{template.system_type}</Badge>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              {looseMode && !serviceId && (
+                <p className="text-xs text-red-600 text-right">חובה לבחור שירות לדיווח לא משויך.</p>
               )}
             </div>
-          )}
+
+            {serviceId && (
+              <div className="space-y-sm">
+                <div className="flex items-center justify-between">
+                  <Label className="block text-right">תבנית דיווח</Label>
+                  {templateId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        setTemplateId('');
+                        setTemplateSelectionTouched(false);
+                        setInheritance(null);
+                        setInheritanceApplied(false);
+                        inheritanceSnapshotRef.current = null;
+                      }}
+                    >
+                      נקה בחירה
+                    </Button>
+                  )}
+                </div>
+                {recommendedTemplate?.name && (
+                  <p className="text-xs text-slate-500 text-right">מומלץ: {recommendedTemplate.name}</p>
+                )}
+                {templatesLoading ? (
+                  <p className="text-xs text-slate-500 text-right">טוען תבניות...</p>
+                ) : templates.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-right">לא נמצאו תבניות עבור שירות זה.</p>
+                ) : (
+                  <Select
+                    value={templateId}
+                    onValueChange={handleTemplateSelection}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="בחרו תבנית" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.map((template) => {
+                        const isRecommended = recommendedTemplate?.id === template.id;
+                        return (
+                          <SelectItem key={template.id} value={template.id}>
+                            <span className="flex w-full items-center justify-between gap-2">
+                              <span>{template.name}</span>
+                              <Badge variant={isRecommended ? 'secondary' : 'outline'} className="text-xs">
+                                {isRecommended ? 'מומלץ' : template.system_type}
+                              </Badge>
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+          </div>
 
           {inheritance?.content && (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-sm">
