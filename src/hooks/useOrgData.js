@@ -225,6 +225,67 @@ export function useServices(options = {}) {
   };
 }
 
+export function useServiceCatalog(options = {}) {
+  const { enabled = true, orgId, session, resetOnDisable = true, includeInactive = false } = options;
+
+  const params = useMemo(() => ({ include_inactive: includeInactive ? 'true' : undefined }), [includeInactive]);
+  const mapResponse = useCallback((payload) => payload?.services, []);
+
+  const { data, loading, error, refetch } = useOrgDataResource({
+    resource: 'service-catalog',
+    path: 'services',
+    enabled,
+    orgId,
+    session,
+    resetOnDisable,
+    params,
+    mapResponse,
+  });
+
+  return {
+    serviceCatalog: data,
+    loadingServiceCatalog: loading,
+    serviceCatalogError: error,
+    refetchServiceCatalog: refetch,
+  };
+}
+
+export function useReportTemplates(options = {}) {
+  const {
+    enabled = true,
+    orgId,
+    session,
+    resetOnDisable = true,
+    serviceId,
+    includeInactive = false,
+  } = options;
+
+  const params = useMemo(() => ({
+    service_id: serviceId || undefined,
+    include_inactive: includeInactive ? 'true' : undefined,
+  }), [serviceId, includeInactive]);
+
+  const mapResponse = useCallback((payload) => payload?.templates, []);
+
+  const { data, loading, error, refetch } = useOrgDataResource({
+    resource: 'report-templates',
+    path: 'report-templates',
+    enabled: enabled && Boolean(serviceId),
+    orgId,
+    session,
+    resetOnDisable,
+    params,
+    mapResponse,
+  });
+
+  return {
+    reportTemplates: data,
+    loadingReportTemplates: loading,
+    reportTemplatesError: error,
+    refetchReportTemplates: refetch,
+  };
+}
+
 export function useStudents(options = {}) {
   const {
     status = 'active',

@@ -14,6 +14,11 @@ import { isUUID, parseJsonBodyWithLimit, validateSessionWrite } from '../_shared
 import { buildSessionMetadata } from '../_shared/session-metadata.js';
 import { mergeMetadata } from '../_shared/metadata-utils.js';
 import { logAuditEvent, AUDIT_ACTIONS, AUDIT_CATEGORIES } from '../_shared/audit-log.js';
+import {
+  fetchServiceById,
+  resolveServiceSelection,
+  resolveTemplateSelection,
+} from '../_shared/service-recommendations.js';
 
 const MAX_BODY_BYTES = 128 * 1024; // observe-only for now
 
@@ -101,6 +106,10 @@ export default async function (context, req) {
                         ? 'missing unassigned reason'
                         : validation.error === 'missing_unassigned_reason_detail'
                           ? 'missing unassigned reason detail'
+                          : validation.error === 'invalid_service_id'
+                            ? 'invalid service id'
+                            : validation.error === 'invalid_template_id'
+                              ? 'invalid template id'
                           : 'invalid content';
     return respond(context, 400, { message });
   }
@@ -119,7 +128,7 @@ export default async function (context, req) {
   if (!isLoose) {
     const studentResult = await tenantClient
       .from('Students')
-      .select('id, assigned_instructor_id, default_service')
+      .select('id, assigned_instructor_id, default_service, default_service_id, tags')
       .eq('id', validation.studentId)
       .maybeSingle();
 
@@ -228,6 +237,69 @@ export default async function (context, req) {
     return respond(context, 400, { message: 'student_missing_instructor' });
   }
 
+  let selectedService = null;
+  let serviceContext = validation.serviceContext || null;
+
+  try {
+    const serviceSelection = await resolveServiceSelection({
+      tenantClient,
+      orgId,
+      studentRecord,
+      explicitServiceId: validation.serviceId,
+      explicitServiceContext: validation.serviceContext,
+    });
+
+    if (serviceSelection?.error) {
+      return respond(context, 400, { message: serviceSelection.error });
+    }
+
+    selectedService = serviceSelection.service || null;
+    serviceContext = serviceSelection.serviceContext || null;
+  } catch (selectionError) {
+    context.log?.error?.('sessions failed to resolve service selection', { message: selectionError?.message });
+    return respond(context, 500, { message: 'failed_to_resolve_service' });
+  }
+
+  let selectedTemplate = null;
+  try {
+    const templateSelection = await resolveTemplateSelection({
+      tenantClient,
+      studentId: validation.studentId,
+      serviceId: selectedService?.id || null,
+      explicitTemplateId: validation.templateId,
+      isLoose,
+    });
+
+    if (templateSelection?.error) {
+      return respond(context, 400, { message: templateSelection.error });
+    }
+
+    selectedTemplate = templateSelection.template || null;
+  } catch (templateError) {
+    context.log?.error?.('sessions failed to resolve template selection', { message: templateError?.message });
+    return respond(context, 500, { message: 'failed_to_resolve_template' });
+  }
+
+  if (!selectedService && selectedTemplate?.service_id) {
+    try {
+      const serviceFromTemplate = await fetchServiceById(tenantClient, selectedTemplate.service_id);
+      if (!serviceFromTemplate) {
+        return respond(context, 400, { message: 'service_not_found' });
+      }
+      selectedService = serviceFromTemplate;
+      if (!serviceContext) {
+        serviceContext = serviceFromTemplate.name || null;
+      }
+    } catch (serviceError) {
+      context.log?.error?.('sessions failed to resolve service from template', { message: serviceError?.message });
+      return respond(context, 500, { message: 'failed_to_resolve_service' });
+    }
+  }
+
+  if (isLoose && !selectedService?.id && !serviceContext) {
+    return respond(context, 400, { message: 'missing_service_context' });
+  }
+
   const { metadata } = await buildSessionMetadata({
     tenantClient,
     userId: normalizedUserId,
@@ -273,9 +345,11 @@ export default async function (context, req) {
         date: validation.date,
         content: validation.content,
         instructor_id: sessionInstructorId || null,
+        service_id: selectedService?.id || null,
+        template_id: selectedTemplate?.id || null,
         service_context: validation.hasExplicitService
           ? validation.serviceContext
-          : validation.serviceContext ?? studentRecord?.default_service ?? null,
+          : serviceContext ?? null,
         metadata: finalMetadata,
       },
     ])

@@ -249,6 +249,63 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- =================================================================
+-- Multi-Service Dynamic Reports - Services and Templates
+-- =================================================================
+
+-- Services table: Defines service types offered by the organization
+CREATE TABLE IF NOT EXISTS tuttiud."Services" (
+  "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  "organization_id" uuid NOT NULL,
+  "name" text NOT NULL,
+  "linked_student_tag" uuid,
+  "is_active" boolean DEFAULT true,
+  "created_at" timestamptz DEFAULT NOW(),
+  "updated_at" timestamptz DEFAULT NOW(),
+  "metadata" jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT "services_org_name_unique" UNIQUE ("organization_id", "name")
+);
+
+CREATE INDEX IF NOT EXISTS idx_services_org_id ON tuttiud."Services"("organization_id");
+CREATE INDEX IF NOT EXISTS idx_services_linked_tag ON tuttiud."Services"("linked_student_tag");
+
+-- ReportTemplates table: Form templates for different report types within each service
+CREATE TABLE IF NOT EXISTS tuttiud."ReportTemplates" (
+  "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  "service_id" uuid NOT NULL REFERENCES tuttiud."Services"("id") ON DELETE CASCADE,
+  "name" text NOT NULL,
+  "system_type" text NOT NULL CHECK ("system_type" IN ('INTAKE', 'ONGOING', 'SUMMARY', 'CUSTOM')),
+  "structure_json" jsonb NOT NULL,
+  "display_order" integer DEFAULT 0,
+  "is_active" boolean DEFAULT true,
+  "created_at" timestamptz DEFAULT NOW(),
+  "updated_at" timestamptz DEFAULT NOW(),
+  "metadata" jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT "report_templates_service_name_unique" UNIQUE ("service_id", "name")
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_templates_service_id ON tuttiud."ReportTemplates"("service_id");
+CREATE INDEX IF NOT EXISTS idx_report_templates_system_type ON tuttiud."ReportTemplates"("system_type");
+
+-- Add foreign key columns to SessionRecords (nullable for backward compatibility)
+ALTER TABLE tuttiud."SessionRecords"
+  ADD COLUMN IF NOT EXISTS "service_id" uuid REFERENCES tuttiud."Services"("id"),
+  ADD COLUMN IF NOT EXISTS "template_id" uuid REFERENCES tuttiud."ReportTemplates"("id");
+
+CREATE INDEX IF NOT EXISTS idx_session_records_service_id ON tuttiud."SessionRecords"("service_id");
+CREATE INDEX IF NOT EXISTS idx_session_records_template_id ON tuttiud."SessionRecords"("template_id");
+
+-- Add foreign key column to Students (nullable for backward compatibility)
+ALTER TABLE tuttiud."Students"
+  ADD COLUMN IF NOT EXISTS "default_service_id" uuid REFERENCES tuttiud."Services"("id");
+
+CREATE INDEX IF NOT EXISTS idx_students_default_service_id ON tuttiud."Students"("default_service_id");
+
+-- =================================================================
+-- End Multi-Service Dynamic Reports
+-- =================================================================
+
 CREATE TABLE IF NOT EXISTS tuttiud."Settings" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   "key" text NOT NULL UNIQUE,
@@ -353,6 +410,8 @@ ALTER TABLE tuttiud."Instructors" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tuttiud."Students" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tuttiud."SessionRecords" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tuttiud."Settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tuttiud."Services" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tuttiud."ReportTemplates" ENABLE ROW LEVEL SECURITY;
 
 -- Policies for "Instructors"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Instructors" ON tuttiud."Instructors";
@@ -369,6 +428,14 @@ CREATE POLICY "Allow full access to authenticated users on SessionRecords" ON tu
 -- Policies for "Settings"
 DROP POLICY IF EXISTS "Allow full access to authenticated users on Settings" ON tuttiud."Settings";
 CREATE POLICY "Allow full access to authenticated users on Settings" ON tuttiud."Settings" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
+
+-- Policies for "Services"
+DROP POLICY IF EXISTS "Allow full access to authenticated users on Services" ON tuttiud."Services";
+CREATE POLICY "Allow full access to authenticated users on Services" ON tuttiud."Services" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
+
+-- Policies for "ReportTemplates"
+DROP POLICY IF EXISTS "Allow full access to authenticated users on ReportTemplates" ON tuttiud."ReportTemplates";
+CREATE POLICY "Allow full access to authenticated users on ReportTemplates" ON tuttiud."ReportTemplates" FOR ALL TO authenticated, app_user USING (true) WITH CHECK (true);
 
 
 -- Part 4: Application Role and Permissions (No Changes)
@@ -393,7 +460,7 @@ RETURNS TABLE (check_name text, success boolean, details text)
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
 DECLARE
-  required_tables constant text[] := array['Instructors', 'Students', 'SessionRecords', 'Settings'];
+  required_tables constant text[] := array['Instructors', 'Students', 'SessionRecords', 'Settings', 'Services', 'ReportTemplates'];
   required_indexes constant text[] := array[
     'SessionRecords|SessionRecords_student_date_idx',
     'SessionRecords|SessionRecords_instructor_idx'
@@ -402,7 +469,9 @@ DECLARE
     'Instructors|Allow full access to authenticated users on Instructors',
     'Students|Allow full access to authenticated users on Students',
     'SessionRecords|Allow full access to authenticated users on SessionRecords',
-    'Settings|Allow full access to authenticated users on Settings'
+    'Settings|Allow full access to authenticated users on Settings',
+    'Services|Allow full access to authenticated users on Services',
+    'ReportTemplates|Allow full access to authenticated users on ReportTemplates'
   ];
   table_name text;
   policy_spec text;
