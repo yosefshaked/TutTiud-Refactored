@@ -103,50 +103,24 @@ export default function NewSessionForm({
     return initial;
   });
 
-    const normalizeQuestionLabelKey = useCallback((label) => {
-      if (typeof label !== 'string') return '';
-      return label
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9א-ת]+/gi, '_')
-        .replace(/_{2,}/g, '_')
-        .replace(/^_|_$/g, '');
-    }, []);
+  const normalizeQuestionLabelKey = useCallback((label) => {
+    if (typeof label !== 'string') return '';
+    return label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9א-ת]+/gi, '_')
+      .replace(/_{2,}/g, '_')
+      .replace(/^_|_$/g, '');
+  }, []);
 
-    const buildQuestionLookupKeys = useCallback((question) => {
-      const keys = [];
-      if (question?.key) keys.push(question.key);
-      if (question?.id && question.id !== question?.key) keys.push(question.id);
-      const labelKey = normalizeQuestionLabelKey(question?.label);
-      if (labelKey && !keys.includes(labelKey)) keys.push(labelKey);
-      return keys;
-    }, [normalizeQuestionLabelKey]);
-
-  useEffect(() => {
-    setAnswers((previous) => {
-      const next = { ...previous };
-      const keys = new Set();
-      for (const question of normalizedQuestions) {
-        if (!question?.key) {
-          continue;
-        }
-        keys.add(question.key);
-        if (!Object.prototype.hasOwnProperty.call(next, question.key)) {
-          if (question.type === 'scale' && typeof question?.range?.min === 'number') {
-            next[question.key] = String(question.range.min);
-          } else {
-            next[question.key] = '';
-          }
-        }
-      }
-      for (const existingKey of Object.keys(next)) {
-        if (!keys.has(existingKey)) {
-          delete next[existingKey];
-        }
-      }
-      return next;
-    });
-  }, [normalizedQuestions]);
+  const buildQuestionLookupKeys = useCallback((question) => {
+    const keys = [];
+    if (question?.key) keys.push(question.key);
+    if (question?.id && question.id !== question?.key) keys.push(question.id);
+    const labelKey = normalizeQuestionLabelKey(question?.label);
+    if (labelKey && !keys.includes(labelKey)) keys.push(labelKey);
+    return keys;
+  }, [normalizeQuestionLabelKey]);
 
   useEffect(() => {
     if (!initialStudentId) {
@@ -196,6 +170,32 @@ export default function NewSessionForm({
       return { ...question, key };
     });
   }, [activeQuestions]);
+
+  useEffect(() => {
+    setAnswers((previous) => {
+      const next = { ...previous };
+      const keys = new Set();
+      for (const question of normalizedQuestions) {
+        if (!question?.key) {
+          continue;
+        }
+        keys.add(question.key);
+        if (!Object.prototype.hasOwnProperty.call(next, question.key)) {
+          if (question.type === 'scale' && typeof question?.range?.min === 'number') {
+            next[question.key] = String(question.range.min);
+          } else {
+            next[question.key] = '';
+          }
+        }
+      }
+      for (const existingKey of Object.keys(next)) {
+        if (!keys.has(existingKey)) {
+          delete next[existingKey];
+        }
+      }
+      return next;
+    });
+  }, [normalizedQuestions]);
 
   // Build instructor map for sorting
   const instructorMap = useMemo(() => {

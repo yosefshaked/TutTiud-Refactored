@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, Calendar, CalendarCheck, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -791,6 +791,9 @@ export default function NewSessionModal({
       >
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription className="sr-only">
+            טופס לדיווח מפגש חדש כולל בחירת תלמיד ופרטי דיווח.
+          </DialogDescription>
         </DialogHeader>
 
         {!canFetchStudents ? (
