@@ -216,21 +216,36 @@ export default function ReportTemplateManager({ session, orgId }) {
     }));
   };
 
+  const callTemplateWrite = async (payload, method) => {
+    try {
+      return await authenticatedFetch('report-templates', {
+        session,
+        method,
+        body: payload,
+      });
+    } catch (error) {
+      if (error?.status !== 404) {
+        throw error;
+      }
+      return authenticatedFetch('report-templates-action', {
+        session,
+        method,
+        body: payload,
+      });
+    }
+  };
+
   const handleSaveTemplate = async () => {
     if (!selectedTemplate || !session) return;
 
     setSaving(true);
     try {
-      await authenticatedFetch('report-templates', {
-        session,
-        method: 'PUT',
-        body: {
-          org_id: orgId,
-          id: selectedTemplate.id,
-          name: templateName,
-          structure_json: { questions: normalizeQuestionsForSave(questions) },
-        },
-      });
+      await callTemplateWrite({
+        org_id: orgId,
+        id: selectedTemplate.id,
+        name: templateName,
+        structure_json: { questions: normalizeQuestionsForSave(questions) },
+      }, 'PUT');
       toast.success('התבנית נשמרה בהצלחה');
       await loadTemplates(selectedServiceId);
     } catch (error) {
@@ -245,15 +260,11 @@ export default function ReportTemplateManager({ session, orgId }) {
     if (!session || !selectedServiceId) return;
     setCreatingSystem(true);
     try {
-      await authenticatedFetch('report-templates', {
-        session,
-        method: 'POST',
-        body: {
-          org_id: orgId,
-          service_id: selectedServiceId,
-          action: 'ensure_system',
-        },
-      });
+      await callTemplateWrite({
+        org_id: orgId,
+        service_id: selectedServiceId,
+        action: 'ensure_system',
+      }, 'POST');
       toast.success('תבניות מערכת נוצרו');
       await loadTemplates(selectedServiceId);
     } catch (error) {
@@ -268,18 +279,14 @@ export default function ReportTemplateManager({ session, orgId }) {
     if (!session || !selectedServiceId || !baseTemplate) return;
     setCreatingCustom(true);
     try {
-      const response = await authenticatedFetch('report-templates', {
-        session,
-        method: 'POST',
-        body: {
-          org_id: orgId,
-          service_id: selectedServiceId,
-          action: 'create_custom',
-          base_template_id: baseTemplate.id,
-          system_type: baseTemplate.system_type,
-          name: `תבנית מותאמת - ${baseTemplate.name}`,
-        },
-      });
+      const response = await callTemplateWrite({
+        org_id: orgId,
+        service_id: selectedServiceId,
+        action: 'create_custom',
+        base_template_id: baseTemplate.id,
+        system_type: baseTemplate.system_type,
+        name: `תבנית מותאמת - ${baseTemplate.name}`,
+      }, 'POST');
       toast.success('תבנית מותאמת נוצרה');
       await loadTemplates(selectedServiceId);
       if (response?.template?.id) {
@@ -302,14 +309,10 @@ export default function ReportTemplateManager({ session, orgId }) {
 
     setSaving(true);
     try {
-      await authenticatedFetch('report-templates', {
-        session,
-        method: 'DELETE',
-        body: {
-          org_id: orgId,
-          id: selectedTemplate.id,
-        },
-      });
+      await callTemplateWrite({
+        org_id: orgId,
+        id: selectedTemplate.id,
+      }, 'DELETE');
       toast.success('התבנית נמחקה');
       setSelectedTemplateId('');
       await loadTemplates(selectedServiceId);

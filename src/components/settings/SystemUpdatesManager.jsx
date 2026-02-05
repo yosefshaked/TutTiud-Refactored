@@ -13,6 +13,25 @@ export default function SystemUpdatesManager({ session, orgId }) {
   const [checkResult, setCheckResult] = useState(null);
   const [migrationReport, setMigrationReport] = useState(null);
 
+  const callMigrationEndpoint = async (payload) => {
+    try {
+      return await authenticatedFetch('admin-run-migration', {
+        session,
+        method: 'POST',
+        body: payload,
+      });
+    } catch (error) {
+      if (error?.status !== 404) {
+        throw error;
+      }
+      return authenticatedFetch('admin/run-migration', {
+        session,
+        method: 'POST',
+        body: payload,
+      });
+    }
+  };
+
   // Check migration status on mount
   useEffect(() => {
     async function loadMigrationStatus() {
@@ -20,13 +39,9 @@ export default function SystemUpdatesManager({ session, orgId }) {
       
       setChecking(true);
       try {
-        const data = await authenticatedFetch('admin-run-migration', {
-          session,
-          method: 'POST',
-          body: {
-            org_id: orgId,
-            check_only: true,
-          },
+        const data = await callMigrationEndpoint({
+          org_id: orgId,
+          check_only: true,
         });
 
         setCheckResult(data?.check ?? null);
@@ -49,13 +64,9 @@ export default function SystemUpdatesManager({ session, orgId }) {
     
     setChecking(true);
     try {
-      const data = await authenticatedFetch('admin-run-migration', {
-        session,
-        method: 'POST',
-        body: {
-          org_id: orgId,
-          check_only: true,
-        },
+      const data = await callMigrationEndpoint({
+        org_id: orgId,
+        check_only: true,
       });
 
       setCheckResult(data?.check ?? null);
@@ -76,13 +87,9 @@ export default function SystemUpdatesManager({ session, orgId }) {
     setMigrationReport(null);
     
     try {
-      const data = await authenticatedFetch('admin-run-migration', {
-        session,
-        method: 'POST',
-        body: {
-          org_id: orgId,
-          check_only: false,
-        },
+      const data = await callMigrationEndpoint({
+        org_id: orgId,
+        check_only: false,
       });
       setMigrationReport(data);
       

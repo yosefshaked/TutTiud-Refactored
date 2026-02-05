@@ -5,8 +5,8 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get", "post", "put", "delete"],
-      "route": "report-templates"
+      "methods": ["post", "put", "delete"],
+      "route": "report-templates-action"
     },
     {
       "type": "http",
