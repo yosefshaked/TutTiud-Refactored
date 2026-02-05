@@ -272,13 +272,16 @@ export default function NewSessionForm({
     if (!selectedStudent || serviceTouched || serviceSelectionTouched) {
       return;
     }
+    if (usingServiceCatalog && serviceRecommendations?.service?.id) {
+      return;
+    }
     if (selectedStudent.default_service_id) {
       setServiceId(String(selectedStudent.default_service_id));
     }
     if (selectedStudent.default_service) {
       setServiceContext(selectedStudent.default_service);
     }
-  }, [selectedStudent, serviceTouched, serviceSelectionTouched]);
+  }, [selectedStudent, serviceTouched, serviceSelectionTouched, serviceRecommendations, usingServiceCatalog]);
 
   useEffect(() => {
     if (!selectedService || serviceTouched) {
@@ -298,17 +301,8 @@ export default function NewSessionForm({
     setInheritance(null);
     setInheritanceApplied(false);
     inheritanceSnapshotRef.current = null;
-    const nextStudent = students.find((student) => student?.id === value);
-    if (nextStudent?.default_service_id) {
-      setServiceId(String(nextStudent.default_service_id));
-    } else {
-      setServiceId('');
-    }
-    if (nextStudent?.default_service) {
-      setServiceContext(nextStudent.default_service);
-    } else {
-      setServiceContext('');
-    }
+    setServiceId('');
+    setServiceContext('');
   };
 
   const handleResetFilters = () => {
@@ -1038,7 +1032,7 @@ export default function NewSessionForm({
 
       {usingServiceCatalog ? (
         <div className="space-y-md">
-          <div className={cn('grid gap-md', serviceId ? 'sm:grid-cols-2' : '')}>
+          <div className="grid gap-md sm:grid-cols-2">
             <div className="space-y-sm">
               <div className="flex items-center justify-between">
                 <Label className="block text-right">שירות{looseMode ? ' *' : ''}</Label>
@@ -1097,63 +1091,63 @@ export default function NewSessionForm({
               )}
             </div>
 
-            {serviceId && (
-              <div className="space-y-sm">
-                <div className="flex items-center justify-between">
-                  <Label className="block text-right">תבנית דיווח</Label>
-                  {templateId && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => {
-                        setTemplateId('');
-                        setTemplateSelectionTouched(false);
-                        setInheritance(null);
-                        setInheritanceApplied(false);
-                        inheritanceSnapshotRef.current = null;
-                      }}
-                    >
-                      נקה בחירה
-                    </Button>
-                  )}
-                </div>
-                {recommendedTemplate?.name && (
-                  <p className="text-xs text-slate-500 text-right">מומלץ: {recommendedTemplate.name}</p>
-                )}
-                {templatesLoading ? (
-                  <p className="text-xs text-slate-500 text-right">טוען תבניות...</p>
-                ) : templates.length === 0 ? (
-                  <p className="text-xs text-slate-500 text-right">לא נמצאו תבניות עבור שירות זה.</p>
-                ) : (
-                  <Select
-                    value={templateId}
-                    onValueChange={handleTemplateSelection}
-                    disabled={isSubmitting}
+            <div className="space-y-sm">
+              <div className="flex items-center justify-between">
+                <Label className="block text-right">תבנית דיווח</Label>
+                {templateId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      setTemplateId('');
+                      setTemplateSelectionTouched(false);
+                      setInheritance(null);
+                      setInheritanceApplied(false);
+                      inheritanceSnapshotRef.current = null;
+                    }}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="בחרו תבנית" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templates.map((template) => {
-                        const isRecommended = recommendedTemplate?.id === template.id;
-                        return (
-                          <SelectItem key={template.id} value={template.id}>
-                            <span className="flex w-full items-center justify-between gap-2">
-                              <span>{template.name}</span>
-                              <Badge variant={isRecommended ? 'secondary' : 'outline'} className="text-xs">
-                                {isRecommended ? 'מומלץ' : template.system_type}
-                              </Badge>
-                            </span>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
+                    נקה בחירה
+                  </Button>
                 )}
               </div>
-            )}
+              {recommendedTemplate?.name && (
+                <p className="text-xs text-slate-500 text-right">מומלץ: {recommendedTemplate.name}</p>
+              )}
+              {!serviceId ? (
+                <p className="text-xs text-slate-500 text-right">בחרו שירות כדי להציג תבניות.</p>
+              ) : templatesLoading ? (
+                <p className="text-xs text-slate-500 text-right">טוען תבניות...</p>
+              ) : templates.length === 0 ? (
+                <p className="text-xs text-slate-500 text-right">לא נמצאו תבניות עבור שירות זה.</p>
+              ) : (
+                <Select
+                  value={templateId}
+                  onValueChange={handleTemplateSelection}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="בחרו תבנית" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => {
+                      const isRecommended = recommendedTemplate?.id === template.id;
+                      return (
+                        <SelectItem key={template.id} value={template.id}>
+                          <span className="flex w-full items-center justify-between gap-2">
+                            <span>{template.name}</span>
+                            <Badge variant={isRecommended ? 'secondary' : 'outline'} className="text-xs">
+                              {isRecommended ? 'מומלץ' : template.system_type}
+                            </Badge>
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
           {inheritance?.content && (
