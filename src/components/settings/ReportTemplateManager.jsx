@@ -358,8 +358,7 @@ export default function ReportTemplateManager({ session, orgId }) {
   return (
     <Card className="w-full border-0 shadow-lg bg-white/80">
       <CardHeader>
-        <CardTitle className="text-base sm:text-lg">תבניות דיווח</CardTitle>
-        <div className="space-y-2 mt-2">
+        <div className="space-y-2">
           <p className="text-xs text-slate-600 sm:text-sm">
             בחרו שירות כדי לנהל את תבניות הדיווח של המטופלים.
           </p>
@@ -446,24 +445,29 @@ export default function ReportTemplateManager({ session, orgId }) {
                       <div className="space-y-xs">
                         {systemTemplates.map((template) => {
                           const typeInfo = SYSTEM_TEMPLATE_TYPES[template.system_type] || {};
+                          const isSelected = selectedTemplateId === template.id;
                           return (
-                            <div key={template.id} className="rounded-md border border-blue-100 bg-blue-50 p-3 space-y-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="text-sm font-medium text-blue-900 text-right block w-full hover:underline"
-                                    onClick={() => setSelectedTemplateId(template.id)}
-                                  >
+                            <Tooltip key={template.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={`w-full text-right rounded-md border p-3 space-y-1 transition-colors ${
+                                    isSelected 
+                                      ? 'border-blue-400 bg-blue-100 ring-1 ring-blue-400' 
+                                      : 'border-blue-100 bg-blue-50 hover:bg-blue-100/70'
+                                  }`}
+                                  onClick={() => setSelectedTemplateId(template.id)}
+                                >
+                                  <div className="text-sm font-medium text-blue-900">
                                     {typeInfo.name || template.name}
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="max-w-xs">
-                                  <p className="text-xs">{typeInfo.details}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                              <p className="text-xs text-blue-700">{typeInfo.description}</p>
-                            </div>
+                                  </div>
+                                  <p className="text-xs text-blue-700">{typeInfo.description}</p>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-xs">
+                                <p className="text-xs">{typeInfo.details}</p>
+                              </TooltipContent>
+                            </Tooltip>
                           );
                         })}
                       </div>
@@ -476,20 +480,28 @@ export default function ReportTemplateManager({ session, orgId }) {
                           ➕ טפסים מותאמים (אופציונלי)
                         </h4>
                         <div className="space-y-xs">
-                          {customTemplates.map((template) => (
-                            <div key={template.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 p-3 bg-slate-50">
+                          {customTemplates.map((template) => {
+                            const isSelected = selectedTemplateId === template.id;
+                            return (
                               <button
+                                key={template.id}
                                 type="button"
-                                className="text-sm font-medium text-slate-700 text-right flex-1"
+                                className={`w-full flex items-center justify-between gap-2 rounded-md border p-3 transition-colors ${
+                                  isSelected
+                                    ? 'border-slate-400 bg-slate-100 ring-1 ring-slate-400'
+                                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                                }`}
                                 onClick={() => setSelectedTemplateId(template.id)}
                               >
-                                {template.name}
+                                <span className="text-sm font-medium text-slate-700 text-right flex-1">
+                                  {template.name}
+                                </span>
+                                <Badge variant="outline" className="text-xs text-slate-600">
+                                  מותאם
+                                </Badge>
                               </button>
-                              <Badge variant="outline" className="text-xs text-slate-600">
-                                מותאם
-                              </Badge>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}

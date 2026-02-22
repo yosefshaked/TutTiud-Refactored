@@ -342,6 +342,22 @@ export default function Settings() {
     );
   }
 
+  if (selectedModule === 'reportTemplates') {
+    return (
+      <PageLayout
+        title="תבניות דיווח"
+        description="ניהול תבניות קליטה/שוטף/סיכום ותבניות מותאמות לשירותים"
+        actions={
+          <Button variant="outline" onClick={() => setSelectedModule(null)}>
+            חזור להגדרות
+          </Button>
+        }
+      >
+        <ReportTemplateManager session={session} orgId={activeOrgId} />
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout
       title="הגדרות הארגון"
@@ -915,7 +931,6 @@ export default function Settings() {
                 selectedModule === 'orgMembers' ? <Users /> :
                 selectedModule === 'sessionForm' ? <ClipboardList /> :
                 selectedModule === 'services' ? <ListChecks /> :
-                selectedModule === 'reportTemplates' ? <ListChecks /> :
                 selectedModule === 'instructors' ? <Users /> :
                 selectedModule === 'backup' ? <ShieldCheck /> :
                 selectedModule === 'systemUpdates' ? <Database /> :
@@ -934,7 +949,6 @@ export default function Settings() {
                 selectedModule === 'orgMembers' ? 'ניהול חברי צוות' :
                 selectedModule === 'sessionForm' ? 'טופס שאלות מפגש' :
                 selectedModule === 'services' ? 'ניהול שירותים' :
-                selectedModule === 'reportTemplates' ? 'תבניות דיווח' :
                 selectedModule === 'instructors' ? 'ניהול מדריכים' :
                 selectedModule === 'backup' ? 'גיבוי ושחזור' :
                 selectedModule === 'systemUpdates' ? 'עדכוני מערכת' :
@@ -979,12 +993,6 @@ export default function Settings() {
                     orgId={activeOrgId}
                     activeOrgHasConnection={activeOrgHasConnection}
                     tenantClientReady={tenantClientReady}
-                  />
-                )}
-                {selectedModule === 'reportTemplates' && (
-                  <ReportTemplateManager
-                    session={session}
-                    orgId={activeOrgId}
                   />
                 )}
                 {selectedModule === 'instructors' && (
