@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +34,6 @@ export default function StudentsPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
   const navigate = useNavigate();
-  const location = useLocation();
   const scrollContainerRef = useRef(null);
   const scrollPositionRef = useRef(0);
 
@@ -76,14 +75,20 @@ export default function StudentsPage() {
   }, [navigate]);
 
   // Restore scroll position when returning from student detail
+  // Must happen after students are loaded and filtered
   useEffect(() => {
     const savedScrollPosition = sessionStorage.getItem('studentListScrollPosition');
-    if (savedScrollPosition && scrollContainerRef.current) {
-      const position = parseInt(savedScrollPosition, 10);
-      scrollContainerRef.current.scrollTop = position;
-      sessionStorage.removeItem('studentListScrollPosition');
+    if (savedScrollPosition && scrollContainerRef.current && filteredStudents.length > 0) {
+      // Use setTimeout to ensure DOM has been updated
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          const position = parseInt(savedScrollPosition, 10);
+          scrollContainerRef.current.scrollTop = position;
+          sessionStorage.removeItem('studentListScrollPosition');
+        }
+      }, 0);
     }
-  }, [location]);
+  }, [filteredStudents]);
 
   // Determine user role
   const membershipRole = activeOrg?.membership?.role;
@@ -712,7 +717,7 @@ export default function StudentsPage() {
                             <div className="flex flex-col gap-1">
                               <button
                                 onClick={() => handleStudentNavigate(student.id)}
-                                className="font-medium text-primary hover:underline text-left"
+                                className="font-medium text-primary hover:underline text-right"
                               >
                                 {student.name}
                               </button>
