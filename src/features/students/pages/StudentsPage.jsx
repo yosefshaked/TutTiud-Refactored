@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,9 @@ export default function StudentsPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
   const navigate = useNavigate();
+  const location = useLocation();
+  const scrollContainerRef = useRef(null);
+  const scrollPositionRef = useRef(0);
 
   // All hooks must be called before any conditional returns
   const { tagOptions, loadTags } = useStudentTags();
@@ -62,6 +65,25 @@ export default function StudentsPage() {
   // Mobile fix: prevent Dialog close when Select is open/closing
   const openSelectCountRef = useRef(0);
   const isClosingSelectRef = useRef(false);
+
+  // Save scroll position before navigating to student detail
+  const handleStudentNavigate = useCallback((studentId) => {
+    if (scrollContainerRef.current) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+      sessionStorage.setItem('studentListScrollPosition', String(scrollPositionRef.current));
+    }
+    navigate(`/students/${studentId}`);
+  }, [navigate]);
+
+  // Restore scroll position when returning from student detail
+  useEffect(() => {
+    const savedScrollPosition = sessionStorage.getItem('studentListScrollPosition');
+    if (savedScrollPosition && scrollContainerRef.current) {
+      const position = parseInt(savedScrollPosition, 10);
+      scrollContainerRef.current.scrollTop = position;
+      sessionStorage.removeItem('studentListScrollPosition');
+    }
+  }, [location]);
 
   // Determine user role
   const membershipRole = activeOrg?.membership?.role;
@@ -555,6 +577,7 @@ export default function StudentsPage() {
       title={pageTitle}
       description={pageDescription}
       fullHeight={false}
+      ref={scrollContainerRef}
     >
       {supabaseLoading ? (
         <div className="flex items-center justify-center gap-sm rounded-xl bg-neutral-50 p-lg text-neutral-600" role="status">
@@ -687,12 +710,12 @@ export default function StudentsPage() {
                         <TableRow key={student.id}>
                           <TableCell className="text-right">
                             <div className="flex flex-col gap-1">
-                              <Link
-                                to={`/students/${student.id}`}
-                                className="font-medium text-primary hover:underline"
+                              <button
+                                onClick={() => handleStudentNavigate(student.id)}
+                                className="font-medium text-primary hover:underline text-left"
                               >
                                 {student.name}
-                              </Link>
+                              </button>
                               {isInactive && (
                                 <Badge variant="secondary" className="w-fit bg-neutral-200 text-neutral-700">
                                   לא פעיל
@@ -740,11 +763,13 @@ export default function StudentsPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center gap-2">
-                              <Link to={`/students/${student.id}`}>
-                                <Button variant="ghost" size="icon">
-                                  <User className="h-4 w-4" />
-                                </Button>
-                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleStudentNavigate(student.id)}
+                              >
+                                <User className="h-4 w-4" />
+                              </Button>
                               {isAdmin && (
                                 <Button
                                   variant="ghost"
