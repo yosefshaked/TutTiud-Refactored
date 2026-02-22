@@ -13,7 +13,7 @@ export async function fetchServiceById(tenantClient, serviceId) {
   if (!serviceId || !isUUID(serviceId)) return null;
   const { data, error } = await tenantClient
     .from('Services')
-    .select('id, name, linked_student_tag, is_active, organization_id')
+    .select('id, name, linked_student_tag, is_active')
     .eq('id', serviceId)
     .maybeSingle();
 
@@ -23,11 +23,10 @@ export async function fetchServiceById(tenantClient, serviceId) {
 
 async function fetchServiceByName(tenantClient, orgId, serviceName) {
   const normalized = normalizeString(serviceName);
-  if (!normalized || !orgId) return null;
+  if (!normalized) return null;
   const { data, error } = await tenantClient
     .from('Services')
-    .select('id, name, linked_student_tag, is_active, organization_id')
-    .eq('organization_id', orgId)
+    .select('id, name, linked_student_tag, is_active')
     .eq('name', normalized)
     .maybeSingle();
 
@@ -36,11 +35,10 @@ async function fetchServiceByName(tenantClient, orgId, serviceName) {
 }
 
 async function fetchServicesByTags(tenantClient, orgId, tags) {
-  if (!orgId || !tags.length) return [];
+  if (!tags.length) return [];
   const { data, error } = await tenantClient
     .from('Services')
-    .select('id, name, linked_student_tag, is_active, organization_id')
-    .eq('organization_id', orgId)
+    .select('id, name, linked_student_tag, is_active')
     .in('linked_student_tag', tags)
     .eq('is_active', true);
 

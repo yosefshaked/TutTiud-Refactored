@@ -12,23 +12,24 @@
 ```sql
 CREATE TABLE IF NOT EXISTS tuttiud."Services" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "organization_id" uuid NOT NULL,
-  "name" text NOT NULL,
+  "name" text NOT NULL UNIQUE,
   "linked_student_tag" uuid,
   "is_active" boolean DEFAULT true,
   "created_at" timestamptz DEFAULT NOW(),
   "updated_at" timestamptz DEFAULT NOW(),
-  "metadata" jsonb DEFAULT '{}'::jsonb,
-  CONSTRAINT "services_org_name_unique" UNIQUE ("organization_id", "name")
+  "metadata" jsonb DEFAULT '{}'::jsonb
 );
 ```
 
 **Purpose:** Stores service types offered by the organization (e.g., "Therapeutic Horseback Riding", "Occupational Therapy")
 
 **Key Features:**
-- Org-scoped with unique constraint
+- Organization scoping implicit via isolated tenant database connection (no explicit organization_id column needed)
+- Unique service names per organization
 - Optional `linked_student_tag` for auto-matching
 - Metadata for extensibility
+
+**Schema Note (Feb 22, 2026):** Removed redundant `organization_id` column. Since each organization has an isolated tenant database with its own Supabase client connection, explicit org scoping via a column was unnecessary overhead. Service names are now simply UNIQUE across the organization's database.
 
 ---
 

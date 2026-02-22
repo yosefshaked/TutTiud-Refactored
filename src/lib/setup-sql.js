@@ -257,17 +257,14 @@ $$;
 -- Services table: Defines service types offered by the organization
 CREATE TABLE IF NOT EXISTS tuttiud."Services" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  "organization_id" uuid NOT NULL,
-  "name" text NOT NULL,
+  "name" text NOT NULL UNIQUE,
   "linked_student_tag" uuid,
   "is_active" boolean DEFAULT true,
   "created_at" timestamptz DEFAULT NOW(),
   "updated_at" timestamptz DEFAULT NOW(),
-  "metadata" jsonb DEFAULT '{}'::jsonb,
-  CONSTRAINT "services_org_name_unique" UNIQUE ("organization_id", "name")
+  "metadata" jsonb DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX IF NOT EXISTS idx_services_org_id ON tuttiud."Services"("organization_id");
 CREATE INDEX IF NOT EXISTS idx_services_linked_tag ON tuttiud."Services"("linked_student_tag");
 
 -- ReportTemplates table: Form templates for different report types within each service

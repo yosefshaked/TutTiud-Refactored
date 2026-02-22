@@ -38,19 +38,18 @@
 ```sql
 CREATE TABLE tuttiud."Services" (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     linked_student_tag UUID,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     is_active BOOLEAN DEFAULT TRUE,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    CONSTRAINT services_org_name_unique UNIQUE (organization_id, name)
+    metadata JSONB DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX idx_services_org_id ON tuttiud."Services"(organization_id);
 CREATE INDEX idx_services_linked_tag ON tuttiud."Services"(linked_student_tag);
 ```
+
+**Note:** Removed `organization_id` column (February 22, 2026) as it was redundant in isolated tenant databases. Each database is already organization-scoped at the connection level, making the explicit org_id column unnecessary and adding query overhead.
 
 #### New Table: `ReportTemplates`
 ```sql

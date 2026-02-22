@@ -112,7 +112,6 @@ async function createServiceRecords(tenantClient, orgId, services) {
     const { data: existing, error: checkError } = await tenantClient
       .from('Services')
       .select('id')
-      .eq('organization_id', orgId)
       .eq('name', service.name)
       .maybeSingle();
     
@@ -129,7 +128,6 @@ async function createServiceRecords(tenantClient, orgId, services) {
     const { data: newService, error: createError } = await tenantClient
       .from('Services')
       .insert({
-        organization_id: orgId,
         name: service.name,
         is_active: true,
         metadata: {

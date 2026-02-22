@@ -79,7 +79,6 @@ export default async function handler(context, req) {
   let query = tenantClient
     .from('Services')
     .select('id, name, linked_student_tag, is_active')
-    .eq('organization_id', orgId)
     .order('name', { ascending: true });
 
   if (!includeInactive) {
@@ -116,17 +115,16 @@ export default async function handler(context, req) {
         const payload = list
           .map((name) => normalizeString(name))
           .filter((name) => name)
-          .map((name) => ({ organization_id: orgId, name }));
+          .map((name) => ({ name }));
 
         if (payload.length > 0) {
           await tenantClient
             .from('Services')
-            .upsert(payload, { onConflict: 'organization_id,name' });
+            .upsert(payload, { onConflict: 'name' });
 
           const refreshed = await tenantClient
             .from('Services')
             .select('id, name, linked_student_tag, is_active')
-            .eq('organization_id', orgId)
             .order('name', { ascending: true });
 
           if (!refreshed.error && Array.isArray(refreshed.data)) {
