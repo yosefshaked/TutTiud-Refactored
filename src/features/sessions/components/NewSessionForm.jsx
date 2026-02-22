@@ -15,6 +15,17 @@ import DayOfWeekSelect from '@/components/ui/DayOfWeekSelect.jsx';
 import PreanswersPickerDialog from './PreanswersPickerDialog.jsx';
 import { useLooseReportNameSuggestions } from '@/features/sessions/hooks/useLooseReportNameSuggestions.js';
 
+// Helper to get human-friendly template type label
+function getTemplateTypeLabel(systemType) {
+  const typeMap = {
+    INTAKE: 'טופס קליטה',
+    ONGOING: 'טופס שוטף',
+    SUMMARY: 'טופס סיכום',
+    CUSTOM: 'טופס מותאם אישית',
+  };
+  return typeMap[systemType] || systemType;
+}
+
 export default function NewSessionForm({
   students = [],
   questions = [],
@@ -1138,7 +1149,7 @@ export default function NewSessionForm({
                           <span className="flex w-full items-center justify-between gap-2">
                             <span>{template.name}</span>
                             <Badge variant={isRecommended ? 'secondary' : 'outline'} className="text-xs">
-                              {isRecommended ? 'מומלץ' : template.system_type}
+                              {isRecommended ? 'מומלץ' : getTemplateTypeLabel(template.system_type)}
                             </Badge>
                           </span>
                         </SelectItem>

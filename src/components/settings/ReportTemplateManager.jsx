@@ -6,10 +6,41 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Save, Trash2, RefreshCw, ListChecks } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, RefreshCw, ListChecks, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import { useServiceCatalog } from '@/hooks/useOrgData.js';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+
+// System template types with human-friendly names and descriptions
+const SYSTEM_TEMPLATE_TYPES = {
+  INTAKE: {
+    id: 'INTAKE',
+    name: 'טופס קליטה',
+    description: 'למילוי בפגישה הראשונה עם המטופל',
+    details: 'משמש לאיסוף מידע רקע, מטרות ואבחון ראשוני. המערכת ממליצה טופס זה באופן אוטומטי לפגישה הראשונה.',
+    functionalNote: '🔄 משפיע על המלצות המערכת: כל פגישה חדשה תשתמש בטופס קליטה אוטומטית.',
+  },
+  ONGOING: {
+    id: 'ONGOING',
+    name: 'טופס שוטף',
+    description: 'למילוי בפגישות הטיפול המתמשכות',
+    details: 'מתעדת התקדמות וכיווני עבודה במהלך הטיפול. המערכת ממליצה טופס זה לפגישות לאחר שבוצעה הקליטה.',
+    functionalNote: '🔄 משפיע על המלצות המערכת: פגישות עוקבות יוצגו אוטומטית עם טופס זה.',
+  },
+  SUMMARY: {
+    id: 'SUMMARY',
+    name: 'טופס סיכום',
+    description: 'למילוי בסיום תהליך הטיפול',
+    details: 'מתעד את תוצאות הטיפול וההמלצות להמשך. מיועד למילוי כאשר מסיימים טיפול עם המטופל.',
+    functionalNote: '📝 טופס סיכום משמש כטופס סיום וניתן למילוי בכל עת.',
+  },
+};
 
 const QUESTION_TYPE_OPTIONS = [
   { value: 'textarea', label: 'טקסט חופשי (פסקה)' },
@@ -328,9 +359,19 @@ export default function ReportTemplateManager({ session, orgId }) {
     <Card className="w-full border-0 shadow-lg bg-white/80">
       <CardHeader>
         <CardTitle className="text-base sm:text-lg">תבניות דיווח</CardTitle>
-        <p className="text-xs text-slate-600 mt-xs sm:mt-sm sm:text-sm">
-          בחרו שירות כדי לנהל את תבניות הדיווח (קליטה, שוטף, סיכום ותבניות מותאמות).
-        </p>
+        <div className="space-y-2 mt-2">
+          <p className="text-xs text-slate-600 sm:text-sm">
+            בחרו שירות כדי לנהל את תבניות הדיווח של המטופלים.
+          </p>
+          <div className="flex items-start gap-2 p-2 rounded-md bg-blue-50 border border-blue-100">
+            <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-blue-700">
+              <strong>טפסי מערכת:</strong> משמשים כבסיס להמלצות המערכת האוטומטיות. ניתן לערוך את השאלות והתוכן של טפסים אלה.
+              <br />
+              <strong>טפסים מותאמים:</strong> אפשרויות נוספות לשימוש לפי הצורך. הם לא משפיעים על המלצות המערכת.
+            </p>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-md">
         <div className="space-y-xs">
@@ -394,64 +435,125 @@ export default function ReportTemplateManager({ session, orgId }) {
             ) : templates.length === 0 ? (
               <p className="text-sm text-slate-500">אין תבניות לשירות זה.</p>
             ) : (
-              <div className="grid gap-md md:grid-cols-[1fr,2fr]">
-                <div className="space-y-sm">
-                  <h4 className="text-sm font-semibold text-slate-700">תבניות קיימות</h4>
-                  <div className="space-y-xs">
-                    {systemTemplates.map((template) => (
-                      <div key={template.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                        <button
-                          type="button"
-                          className="text-sm text-right flex-1"
-                          onClick={() => setSelectedTemplateId(template.id)}
-                        >
-                          {template.name}
-                        </button>
-                        <Badge variant="secondary" className="text-xs">מערכת</Badge>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={creatingCustom}
-                          onClick={() => handleCreateCustomFromBase(template)}
-                        >
-                          צור מותאם
-                        </Button>
+              <TooltipProvider>
+                <div className="grid gap-md md:grid-cols-[1fr,2fr]">
+                  <div className="space-y-md">
+                    {/* System Templates Section */}
+                    <div className="space-y-sm">
+                      <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        📌 טפסי מערכת (חובה לתפקוד חכם)
+                      </h4>
+                      <div className="space-y-xs">
+                        {systemTemplates.map((template) => {
+                          const typeInfo = SYSTEM_TEMPLATE_TYPES[template.system_type] || {};
+                          return (
+                            <div key={template.id} className="rounded-md border border-blue-100 bg-blue-50 p-3 space-y-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="text-sm font-medium text-blue-900 text-right block w-full hover:underline"
+                                    onClick={() => setSelectedTemplateId(template.id)}
+                                  >
+                                    {typeInfo.name || template.name}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <p className="text-xs">{typeInfo.details}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <p className="text-xs text-blue-700">{typeInfo.description}</p>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                    {customTemplates.map((template) => (
-                      <div key={template.id} className="flex items-center justify-between gap-2 rounded-md border p-2">
-                        <button
-                          type="button"
-                          className="text-sm text-right flex-1"
-                          onClick={() => setSelectedTemplateId(template.id)}
-                        >
-                          {template.name}
-                        </button>
-                        <Badge variant="outline" className="text-xs">
-                          {template.system_type === 'CUSTOM' ? 'מותאם' : `מותאם • ${template.system_type}`}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div className="space-y-sm">
-                  {selectedTemplate ? (
-                    <>
-                      <div className="flex items-center justify-between gap-2">
+                    {/* Custom Templates Section */}
+                    {customTemplates.length > 0 && (
+                      <div className="space-y-sm">
+                        <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                          ➕ טפסים מותאמים (אופציונלי)
+                        </h4>
                         <div className="space-y-xs">
-                          <Label className="text-xs">שם תבנית</Label>
+                          {customTemplates.map((template) => (
+                            <div key={template.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 p-3 bg-slate-50">
+                              <button
+                                type="button"
+                                className="text-sm font-medium text-slate-700 text-right flex-1"
+                                onClick={() => setSelectedTemplateId(template.id)}
+                              >
+                                {template.name}
+                              </button>
+                              <Badge variant="outline" className="text-xs text-slate-600">
+                                מותאם
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Create Custom Template Button */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (systemTemplates.length > 0) {
+                          handleCreateCustomFromBase(systemTemplates[0]);
+                        }
+                      }}
+                      disabled={creatingCustom || systemTemplates.length === 0}
+                      className="gap-2 w-full"
+                    >
+                      <Plus className="h-4 w-4" />
+                      צור טופס מותאם חדש
+                    </Button>
+                  </div>
+
+                  <div className="space-y-sm">
+                    {selectedTemplate ? (
+                      <>
+                        {/* Template Header */}
+                        <div className="space-y-md border-b pb-md">
+                          {selectedTemplate?.metadata?.is_system && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-blue-100 text-blue-700 border border-blue-200">📌 טופס מעורכת</Badge>
+                              </div>
+                              {SYSTEM_TEMPLATE_TYPES[selectedTemplate.system_type] && (
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium text-slate-700">
+                                    {SYSTEM_TEMPLATE_TYPES[selectedTemplate.system_type].details}
+                                  </p>
+                                  <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50 border border-amber-100">
+                                    <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                    <p className="text-xs text-amber-700">
+                                      {SYSTEM_TEMPLATE_TYPES[selectedTemplate.system_type].functionalNote}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {!selectedTemplate?.metadata?.is_system && (
+                            <div>
+                              <Badge className="bg-slate-100 text-slate-700 border border-slate-200">➕ טופס מותאם</Badge>
+                              <p className="text-xs text-slate-600 mt-2">טופס זה משמש לשימוש נוסף ולא משפיע על הטפסים של המערכת.</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Template Name */}
+                        <div className="space-y-xs">
+                          <Label className="text-xs">שם הטופס</Label>
                           <Input
                             value={templateName}
                             onChange={(event) => setTemplateName(event.target.value)}
                             disabled={saving}
+                            placeholder="הכניסו שם טופס"
                           />
                         </div>
-                        {selectedTemplate?.metadata?.is_system && (
-                          <Badge variant="secondary" className="text-xs">מערכת</Badge>
-                        )}
-                      </div>
 
                       <div className="space-y-sm">
                         {questions.map((question, index) => (
@@ -595,21 +697,24 @@ export default function ReportTemplateManager({ session, orgId }) {
                         </Button>
                         <Button type="button" onClick={handleSaveTemplate} disabled={saving} className="gap-2">
                           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                          שמור תבנית
+                          שמור טופס
                         </Button>
                         {!selectedTemplate?.metadata?.is_system && (
                           <Button type="button" variant="destructive" onClick={handleDeleteTemplate} disabled={saving} className="gap-2">
                             <Trash2 className="h-4 w-4" />
-                            מחק תבנית
+                            מחק טופס
                           </Button>
                         )}
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm text-slate-500">בחרו תבנית כדי לערוך את השאלות.</p>
+                    <div className="text-center py-8">
+                      <p className="text-sm text-slate-500">בחרו טופס מהרשימה שמשמאל כדי לערוך את השאלות והתוכן.</p>
+                    </div>
                   )}
+                  </div>
                 </div>
-              </div>
+              </TooltipProvider>
             )}
           </div>
         )}
