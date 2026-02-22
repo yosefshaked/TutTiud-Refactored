@@ -34,8 +34,6 @@ export default function StudentsPage() {
   const { activeOrg, activeOrgId, activeOrgHasConnection, tenantClientReady } = useOrg();
   const { session, user, loading: supabaseLoading } = useSupabase();
   const navigate = useNavigate();
-  const scrollContainerRef = useRef(null);
-  const scrollPositionRef = useRef(0);
 
   // All hooks must be called before any conditional returns
   const { tagOptions, loadTags } = useStudentTags();
@@ -67,9 +65,9 @@ export default function StudentsPage() {
 
   // Save scroll position before navigating to student detail
   const handleStudentNavigate = useCallback((studentId) => {
-    if (scrollContainerRef.current) {
-      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
-      sessionStorage.setItem('studentListScrollPosition', String(scrollPositionRef.current));
+    const mainElement = document.getElementById('main-content');
+    if (mainElement) {
+      sessionStorage.setItem('studentListScrollPosition', String(mainElement.scrollTop));
     }
     navigate(`/students/${studentId}`);
   }, [navigate]);
@@ -78,12 +76,13 @@ export default function StudentsPage() {
   // Must happen after students are loaded and filtered
   useEffect(() => {
     const savedScrollPosition = sessionStorage.getItem('studentListScrollPosition');
-    if (savedScrollPosition && scrollContainerRef.current && filteredStudents.length > 0) {
+    if (savedScrollPosition && filteredStudents.length > 0) {
       // Use setTimeout to ensure DOM has been updated
       setTimeout(() => {
-        if (scrollContainerRef.current) {
+        const mainElement = document.getElementById('main-content');
+        if (mainElement) {
           const position = parseInt(savedScrollPosition, 10);
-          scrollContainerRef.current.scrollTop = position;
+          mainElement.scrollTop = position;
           sessionStorage.removeItem('studentListScrollPosition');
         }
       }, 0);
@@ -582,7 +581,6 @@ export default function StudentsPage() {
       title={pageTitle}
       description={pageDescription}
       fullHeight={false}
-      ref={scrollContainerRef}
     >
       {supabaseLoading ? (
         <div className="flex items-center justify-center gap-sm rounded-xl bg-neutral-50 p-lg text-neutral-600" role="status">
