@@ -647,7 +647,7 @@ export default function ReportTemplateManager({ session, orgId }) {
                                     <span>תשובות מוכנות</span>
                                     {(preanswersMap[question.id]?.length > 0) && (
                                       <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-1">
-                                        {preanswersMap[question.id].length}
+                                        {preanswersMap[question.id].length}/{cap}
                                       </Badge>
                                     )}
                                   </Button>

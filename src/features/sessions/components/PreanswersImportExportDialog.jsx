@@ -221,16 +221,16 @@ export default function PreanswersImportExportDialog({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="left" className="w-full sm:max-w-xl flex flex-col">
-        <SheetHeader>
+      <SheetContent side="left" className="w-full sm:max-w-xl flex flex-col" dir="rtl">
+        <SheetHeader className="text-right">
           <SheetTitle>ייצוא/ייבוא תשובות מוכנות מראש</SheetTitle>
-          <SheetDescription>
+          <SheetDescription className="text-right">
             ייצא תשובות משאלה ספציפית וייבא אותן לשאלה אחרת. כל קובץ מכיל רק תשובות לשאלה אחת.
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto mt-4">
-          <Tabs defaultValue="export" className="w-full">
+          <Tabs defaultValue="export" className="w-full" dir="rtl">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="export">ייצוא</TabsTrigger>
               <TabsTrigger value="import">ייבוא</TabsTrigger>
@@ -239,8 +239,8 @@ export default function PreanswersImportExportDialog({
             {/* Export Tab */}
             <TabsContent value="export" className="space-y-4">
             <div className="space-y-3">
-              <h3 className="font-semibold">בחר שאלה לייצא</h3>
-              <p className="text-sm text-slate-600">
+              <h3 className="font-semibold text-right">בחר שאלה לייצא</h3>
+              <p className="text-sm text-slate-600 text-right">
                 בחר שאלה וייצא את התשובות המוכנות שלה. שם הקובץ יכלול את שם השאלה להקל על הזיהוי.
               </p>
 
@@ -257,28 +257,18 @@ export default function PreanswersImportExportDialog({
                         key={question.id}
                         className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 hover:border-slate-300 transition-colors"
                       >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-900 truncate">{question.label}</p>
-                          <p className="text-xs text-slate-500">
-                            {currentAnswers[question.id]?.length || 0} תשובות
-                          </p>
-                        </div>
                         <div className="flex gap-2 flex-shrink-0">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleCopyQuestion(question.id)}
                             title="העתק"
-                            className="text-xs"
+                            className="text-xs gap-1"
                           >
                             {isCopied ? (
-                              <>
-                                <Check className="h-3 w-3 ml-1" />
-                              </>
+                              <Check className="h-3 w-3" />
                             ) : (
-                              <>
-                                <Copy className="h-3 w-3 ml-1" />
-                              </>
+                              <Copy className="h-3 w-3" />
                             )}
                           </Button>
                           <Button
@@ -290,6 +280,12 @@ export default function PreanswersImportExportDialog({
                             הורד
                           </Button>
                         </div>
+                        <div className="flex-1 min-w-0 text-right">
+                          <p className="font-medium text-slate-900 truncate">{question.label}</p>
+                          <p className="text-xs text-slate-500">
+                            {currentAnswers[question.id]?.length || 0} תשובות
+                          </p>
+                        </div>
                       </div>
                     ))
                 )}
@@ -300,7 +296,7 @@ export default function PreanswersImportExportDialog({
             {/* Import Tab */}
             <TabsContent value="import" className="space-y-4">
             <div className="space-y-3">
-              <h3 className="font-semibold">ייבא תשובות</h3>
+              <h3 className="font-semibold text-right">ייבא תשובות</h3>
 
               {/* File Upload */}
               <div className="p-3 bg-amber-50 rounded-lg border-2 border-dashed border-amber-300">
@@ -322,29 +318,30 @@ export default function PreanswersImportExportDialog({
                 variant="outline"
                 onClick={handlePasteImport}
                 disabled={isLoading}
-                className="w-full"
+                className="w-full gap-2"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
                     טוען...
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   </>
                 ) : (
                   <>
-                    <Copy className="w-4 h-4 ml-2" />
                     הדבק מלוח העריכה
+                    <Copy className="w-4 h-4" />
                   </>
                 )}
               </Button>
 
               {/* Manual Paste */}
               <div className="space-y-2">
-                <p className="text-sm font-medium">או הדבק ידנית:</p>
+                <p className="text-sm font-medium text-right">או הדבק ידנית:</p>
                 <Textarea
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
                   placeholder="הדבק JSON כאן..."
                   className="font-mono text-xs h-40"
+                  dir="ltr"
                 />
                 <Button
                   variant="secondary"
@@ -358,18 +355,18 @@ export default function PreanswersImportExportDialog({
 
               {/* Error Display */}
               {importError && (
-                <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-200 flex-row-reverse">
                   <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-red-700">{importError}</div>
+                  <div className="text-sm text-red-700 text-right">{importError}</div>
                 </div>
               )}
 
               {/* Success and Target Selection */}
               {importedData && (
                 <div className="space-y-3 rounded-lg border border-green-200 bg-green-50 p-3">
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-green-600" />
-                    <div className="text-sm">
+                  <div className="flex items-center gap-2 flex-row-reverse">
+                    <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <div className="text-sm text-right">
                       <p className="font-medium text-green-900">
                         נטענו בהצלחה {importedData.length} תשובות
                       </p>
@@ -382,11 +379,11 @@ export default function PreanswersImportExportDialog({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-green-900">
+                    <label className="block text-sm font-medium text-green-900 text-right">
                       בחר שאלה יעד לייבוא:
                     </label>
                     <Select value={targetQuestionId} onValueChange={setTargetQuestionId}>
-                      <SelectTrigger className="text-sm text-right">
+                      <SelectTrigger className="text-sm text-right" dir="rtl">
                         <SelectValue placeholder="בחר שאלה..." />
                       </SelectTrigger>
                       <SelectContent dir="rtl">

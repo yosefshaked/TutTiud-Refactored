@@ -28,6 +28,7 @@ export default function PreanswersManagerSheet({
   const [newAnswer, setNewAnswer] = useState('');
   const [editingIndex, setEditingIndex] = useState(null);
   const [editingValue, setEditingValue] = useState('');
+  const [expandedIndex, setExpandedIndex] = useState(null);
 
   // Reset local state whenever the target question changes
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function PreanswersManagerSheet({
     setNewAnswer('');
     setEditingIndex(null);
     setEditingValue('');
+    setExpandedIndex(null);
   }, [question?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Persist a new list immediately. */
@@ -141,7 +143,9 @@ export default function PreanswersManagerSheet({
               localAnswers.map((answer, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-2 rounded-md border border-slate-200 bg-white p-2"
+                  className={`flex gap-2 rounded-md border border-slate-200 bg-white p-2 ${
+                    expandedIndex === index ? 'items-start' : 'items-center'
+                  }`}
                   dir="rtl"
                 >
                   {editingIndex === index ? (
@@ -177,9 +181,12 @@ export default function PreanswersManagerSheet({
                   ) : (
                     <>
                       <span
-                        className="flex-1 text-sm text-right truncate"
+                        className={`flex-1 text-sm text-right cursor-pointer select-none ${
+                          expandedIndex === index ? 'break-words whitespace-pre-wrap' : 'truncate'
+                        }`}
                         dir="rtl"
-                        title={answer}
+                        title={expandedIndex === index ? undefined : answer}
+                        onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
                       >
                         {answer}
                       </span>
