@@ -237,7 +237,8 @@ export default function ReportTemplateManager({ session, orgId }) {
     }
     setTemplateName(selectedTemplate.name || '');
     setQuestions(extractQuestions(selectedTemplate.structure_json));
-    const preanswers = selectedTemplate.preconfigured_answers || {};
+    const metadata = selectedTemplate.metadata || {};
+    const preanswers = metadata.preconfigured_answers || {};
     setPreanswersMap(typeof preanswers === 'object' ? preanswers : {});
   }, [selectedTemplate]);
 
@@ -310,12 +311,13 @@ export default function ReportTemplateManager({ session, orgId }) {
 
     setSaving(true);
     try {
+      const metadata = selectedTemplate.metadata || {};
       await callTemplateWrite({
         org_id: orgId,
         id: selectedTemplate.id,
         name: templateName,
         structure_json: { questions: normalizeQuestionsForSave(questions) },
-        preconfigured_answers: preanswersMap,
+        metadata: { ...metadata, preconfigured_answers: preanswersMap },
       }, 'PUT');
       toast.success('התבנית נשמרה בהצלחה');
       await loadTemplates(selectedServiceId);

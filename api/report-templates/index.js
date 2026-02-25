@@ -87,7 +87,7 @@ export default async function handler(context, req) {
 
     let query = tenantClient
       .from('ReportTemplates')
-      .select('id, service_id, name, system_type, display_order, is_active, metadata, structure_json, preconfigured_answers')
+      .select('id, service_id, name, system_type, display_order, is_active, metadata, structure_json')
       .eq('service_id', serviceId)
       .order('display_order', { ascending: true });
 
@@ -192,7 +192,7 @@ export default async function handler(context, req) {
       const { data, error } = await tenantClient
         .from('ReportTemplates')
         .insert([payload])
-        .select('id, service_id, name, system_type, display_order, is_active, metadata, structure_json, preconfigured_answers');
+        .select('id, service_id, name, system_type, display_order, is_active, metadata, structure_json');
 
       if (error) {
         context.log?.error?.('report-templates failed to create custom template', { message: error.message });
@@ -218,8 +218,8 @@ export default async function handler(context, req) {
     if (Object.prototype.hasOwnProperty.call(body, 'structure_json')) {
       updates.structure_json = body.structure_json;
     }
-    if (Object.prototype.hasOwnProperty.call(body, 'preconfigured_answers')) {
-      updates.preconfigured_answers = body.preconfigured_answers;
+    if (Object.prototype.hasOwnProperty.call(body, 'metadata')) {
+      updates.metadata = body.metadata;
     }
     if (Object.prototype.hasOwnProperty.call(body, 'display_order')) {
       updates.display_order = body.display_order;
@@ -232,7 +232,7 @@ export default async function handler(context, req) {
       .from('ReportTemplates')
       .update(updates)
       .eq('id', templateId)
-      .select('id, service_id, name, system_type, display_order, is_active, metadata, structure_json, preconfigured_answers');
+      .select('id, service_id, name, system_type, display_order, is_active, metadata, structure_json');
 
     if (error) {
       context.log?.error?.('report-templates failed to update template', { message: error.message });
