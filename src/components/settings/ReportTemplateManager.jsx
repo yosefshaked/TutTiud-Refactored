@@ -6,10 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Save, Trash2, RefreshCw, ListChecks, AlertCircle, Info } from 'lucide-react';
+import { Loader2, Plus, Save, Trash2, RefreshCw, ListChecks, AlertCircle, Info, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import { useServiceCatalog } from '@/hooks/useOrgData.js';
+import { useAuth } from '@/auth/AuthContext.jsx';
+import { useOrg } from '@/org/OrgContext.jsx';
+import PreanswersImportExportDialog from '@/features/sessions/components/PreanswersImportExportDialog.jsx';
 import {
   Tooltip,
   TooltipContent,
@@ -124,6 +127,8 @@ function normalizeQuestionsForSave(questions) {
 }
 
 export default function ReportTemplateManager({ session, orgId }) {
+  const { authClient } = useAuth() || {};
+  const { activeOrgId } = useOrg() || {};
   const { serviceCatalog, loadingServiceCatalog, serviceCatalogError } = useServiceCatalog({
     enabled: Boolean(session && orgId),
     orgId,
@@ -135,6 +140,9 @@ export default function ReportTemplateManager({ session, orgId }) {
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [templateName, setTemplateName] = useState('');
+  const [preanswersMap, setPreanswersMap] = useState({}); // { [questionId]: string[] }
+  const [cap, setCap] = useState(50);
+  const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [creatingSystem, setCreatingSystem] = useState(false);
@@ -188,6 +196,28 @@ export default function ReportTemplateManager({ session, orgId }) {
     setServiceError('');
   }, [serviceCatalogError, selectedServiceId]);
 
+  // Load cap from control DB org permissions (fallback 50)
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!authClient || !activeOrgId) return;
+        const { data: orgSettings, error } = await authClient
+          .from('org_settings')
+          .select('permissions')
+          .eq('org_id', activeOrgId)
+          .single();
+        if (error) return;
+        const perms = orgSettings?.permissions || {};
+        const capRaw = perms.session_form_preanswers_cap;
+        const parsed = Number.parseInt(String(capRaw ?? '50'), 10);
+        setCap(Number.isFinite(parsed) && parsed > 0 ? parsed : 50);
+      } catch {
+        setCap(50);
+      }
+    };
+    run();
+  }, [authClient, activeOrgId]);
+
   useEffect(() => {
     if (!selectedServiceId) {
       setTemplates([]);
@@ -202,10 +232,13 @@ export default function ReportTemplateManager({ session, orgId }) {
     if (!selectedTemplate) {
       setTemplateName('');
       setQuestions([]);
+      setPreanswersMap({});
       return;
     }
     setTemplateName(selectedTemplate.name || '');
     setQuestions(extractQuestions(selectedTemplate.structure_json));
+    const preanswers = selectedTemplate.preconfigured_answers || {};
+    setPreanswersMap(typeof preanswers === 'object' ? preanswers : {});
   }, [selectedTemplate]);
 
   const handleAddQuestion = () => {
@@ -266,6 +299,12 @@ export default function ReportTemplateManager({ session, orgId }) {
     }
   };
 
+  const handlePreanswersImport = async (imported) => {
+    // imported is { [questionId]: string[] }
+    setPreanswersMap((prev) => ({ ...prev, ...imported }));
+    toast.success('ערכים מוצעים התווספו בהצלחה');
+  };
+
   const handleSaveTemplate = async () => {
     if (!selectedTemplate || !session) return;
 
@@ -276,6 +315,7 @@ export default function ReportTemplateManager({ session, orgId }) {
         id: selectedTemplate.id,
         name: templateName,
         structure_json: { questions: normalizeQuestionsForSave(questions) },
+        preconfigured_answers: preanswersMap,
       }, 'PUT');
       toast.success('התבנית נשמרה בהצלחה');
       await loadTemplates(selectedServiceId);
@@ -567,6 +607,23 @@ export default function ReportTemplateManager({ session, orgId }) {
                           />
                         </div>
 
+                        {/* Export/Import Button */}
+                        <div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreanswersDialogOpen(true)}
+                            disabled={saving || questions.length === 0}
+                            className="gap-2"
+                          >
+                            <Download className="h-4 w-4" />
+                            <Upload className="h-4 w-4" />
+                            <span className="hidden sm:inline">ייצוא/ייבוא ערכים מוצעים</span>
+                            <span className="sm:hidden">ייצוא/ייבוא</span>
+                          </Button>
+                        </div>
+
                       <div className="space-y-sm">
                         {questions.map((question, index) => (
                           <div key={question.id} className="rounded-md border p-sm space-y-sm">
@@ -730,6 +787,16 @@ export default function ReportTemplateManager({ session, orgId }) {
             )}
           </div>
         )}
+
+        {/* Preconfigured Answers Export/Import Dialog */}
+        <PreanswersImportExportDialog
+          open={preanswersDialogOpen}
+          onClose={() => setPreanswersDialogOpen(false)}
+          currentAnswers={preanswersMap}
+          questions={questions}
+          onImport={handlePreanswersImport}
+          capLimit={cap}
+        />
       </CardContent>
     </Card>
   );
