@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   Tabs,
   TabsContent,
@@ -214,30 +220,31 @@ export default function PreanswersImportExportDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>ייצוא/ייבוא תשובות מוכנות מראש</DialogTitle>
-          <DialogDescription>
-            ייצא תשובות מ שאלה ספציפית וייבא אותן לשאלה אחרת. כל קובץ מכיל רק תשובות לשאלה אחת.
-          </DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent side="left" className="w-full sm:max-w-xl flex flex-col">
+        <SheetHeader>
+          <SheetTitle>ייצוא/ייבוא תשובות מוכנות מראש</SheetTitle>
+          <SheetDescription>
+            ייצא תשובות משאלה ספציפית וייבא אותן לשאלה אחרת. כל קובץ מכיל רק תשובות לשאלה אחת.
+          </SheetDescription>
+        </SheetHeader>
 
-        <Tabs defaultValue="export" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="export">ייצוא</TabsTrigger>
-            <TabsTrigger value="import">ייבוא</TabsTrigger>
-          </TabsList>
+        <div className="flex-1 overflow-y-auto mt-4">
+          <Tabs defaultValue="export" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="export">ייצוא</TabsTrigger>
+              <TabsTrigger value="import">ייבוא</TabsTrigger>
+            </TabsList>
 
-          {/* Export Tab */}
-          <TabsContent value="export" className="space-y-4">
+            {/* Export Tab */}
+            <TabsContent value="export" className="space-y-4">
             <div className="space-y-3">
               <h3 className="font-semibold">בחר שאלה לייצא</h3>
               <p className="text-sm text-slate-600">
                 בחר שאלה וייצא את התשובות המוכנות שלה. שם הקובץ יכלול את שם השאלה להקל על הזיהוי.
               </p>
 
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-2">
                 {textQuestions.length === 0 ? (
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
                     אין שאלות טקסט זמינות
@@ -288,10 +295,10 @@ export default function PreanswersImportExportDialog({
                 )}
               </div>
             </div>
-          </TabsContent>
+            </TabsContent>
 
-          {/* Import Tab */}
-          <TabsContent value="import" className="space-y-4">
+            {/* Import Tab */}
+            <TabsContent value="import" className="space-y-4">
             <div className="space-y-3">
               <h3 className="font-semibold">ייבא תשובות</h3>
 
@@ -402,9 +409,10 @@ export default function PreanswersImportExportDialog({
                 </div>
               )}
             </div>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
