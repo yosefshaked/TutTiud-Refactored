@@ -10,7 +10,7 @@ import { Loader2, Plus, Save, Trash2, RefreshCw, ListChecks, AlertCircle, Info, 
 import { toast } from 'sonner';
 import { authenticatedFetch } from '@/lib/api-client.js';
 import { useServiceCatalog } from '@/hooks/useOrgData.js';
-import { useAuth } from '@/auth/AuthContext.jsx';
+import { useSupabase } from '@/context/SupabaseContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import PreanswersImportExportDialog from '@/features/sessions/components/PreanswersImportExportDialog.jsx';
 import PreanswersManagerSheet from '@/features/sessions/components/PreanswersManagerSheet.jsx';
@@ -128,7 +128,7 @@ function normalizeQuestionsForSave(questions) {
 }
 
 export default function ReportTemplateManager({ session, orgId }) {
-  const { authClient } = useAuth() || {};
+  const { authClient } = useSupabase();
   const { activeOrgId } = useOrg() || {};
   const { serviceCatalog, loadingServiceCatalog, serviceCatalogError } = useServiceCatalog({
     enabled: Boolean(session && orgId),

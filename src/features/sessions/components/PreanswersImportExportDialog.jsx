@@ -223,7 +223,7 @@ export default function PreanswersImportExportDialog({
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent side="left" className="w-full sm:max-w-xl flex flex-col" dir="rtl">
         <SheetHeader className="text-right">
-          <SheetTitle>ייצוא/ייבוא תשובות מוכנות מראש</SheetTitle>
+          <SheetTitle className="text-right">ייצוא/ייבוא תשובות מוכנות מראש</SheetTitle>
           <SheetDescription className="text-right">
             ייצא תשובות משאלה ספציפית וייבא אותן לשאלה אחרת. כל קובץ מכיל רק תשובות לשאלה אחת.
           </SheetDescription>
