@@ -143,6 +143,7 @@ export default async function handler(context, req) {
       serviceId: selectedService?.id || null,
       explicitTemplateId: body?.template_id || body?.templateId,
       isLoose: !studentId,
+      serviceContext: serviceContext,
     });
 
     if (templateSelection?.error) {

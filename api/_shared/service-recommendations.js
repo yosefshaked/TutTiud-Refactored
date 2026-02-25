@@ -105,26 +105,54 @@ async function fetchLatestSessionForTemplate(tenantClient, studentId, templateId
   return data || null;
 }
 
-async function fetchLatestSessionSystemType(tenantClient, studentId, serviceId) {
-  if (!studentId || !serviceId) return null;
-  const { data, error } = await tenantClient
-    .from('SessionRecords')
-    .select(`
-      id,
-      date,
-      template_id,
-      ReportTemplates (
-        system_type
-      )
-    `)
-    .eq('student_id', studentId)
-    .eq('service_id', serviceId)
-    .order('date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+async function fetchLatestSessionSystemType(tenantClient, studentId, serviceId, serviceContext) {
+  if (!studentId) return null;
+  
+  // First try to find by service_id (new schema)
+  if (serviceId) {
+    const { data, error } = await tenantClient
+      .from('SessionRecords')
+      .select(`
+        id,
+        date,
+        template_id,
+        ReportTemplates (
+          system_type
+        )
+      `)
+      .eq('student_id', studentId)
+      .eq('service_id', serviceId)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data ? (data.ReportTemplates?.system_type || 'LEGACY') : null;
+    if (error) throw error;
+    if (data) return data.ReportTemplates?.system_type || 'LEGACY';
+  }
+
+  // Fallback to service_context (old schema, backwards compatibility)
+  if (serviceContext) {
+    const { data, error } = await tenantClient
+      .from('SessionRecords')
+      .select(`
+        id,
+        date,
+        template_id,
+        ReportTemplates (
+          system_type
+        )
+      `)
+      .eq('student_id', studentId)
+      .eq('service_context', serviceContext)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data) return data.ReportTemplates?.system_type || 'LEGACY';
+  }
+
+  return null;
 }
 
 export async function resolveServiceSelection({
@@ -199,6 +227,7 @@ export async function resolveTemplateSelection({
   serviceId,
   explicitTemplateId,
   isLoose,
+  serviceContext,
 }) {
   const normalizedTemplateId = normalizeString(explicitTemplateId);
 
@@ -224,7 +253,7 @@ export async function resolveTemplateSelection({
   let desiredType = 'INTAKE';
 
   if (hasStudent) {
-    const latestSystemType = await fetchLatestSessionSystemType(tenantClient, studentId, serviceId);
+    const latestSystemType = await fetchLatestSessionSystemType(tenantClient, studentId, serviceId, serviceContext);
     if (latestSystemType) {
       // If the last report was a SUMMARY, the next one should be an INTAKE
       if (latestSystemType === 'SUMMARY') {
