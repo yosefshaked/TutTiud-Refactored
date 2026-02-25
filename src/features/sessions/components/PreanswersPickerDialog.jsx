@@ -2,11 +2,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { Search, CheckCircle2, Plus, Trash2, Download } from 'lucide-react';
 import { cn } from '@/lib/utils.js';
+import {
+  exportAnswersAsJSON,
+  downloadJSON,
+  generateExportFilename,
+} from '@/features/sessions/utils/preanswers-export-import';
+import { toast } from 'sonner';
 
 const TAB_ORG = 'org';
 const TAB_PERSONAL = 'personal';
+const STORAGE_KEY = 'preanswers_last_source';
 
 /**
  * PreanswersPickerDialog - Dialog for searching and selecting preconfigured answers
@@ -29,6 +36,27 @@ export default function PreanswersPickerDialog({
   const [newEntry, setNewEntry] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Load last used source from localStorage
+  const getLastUsedSource = () => {
+    if (typeof window === 'undefined') return TAB_ORG;
+    try {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      return stored === TAB_PERSONAL ? TAB_PERSONAL : TAB_ORG;
+    } catch {
+      return TAB_ORG;
+    }
+  };
+
+  // Save source to localStorage
+  const saveSourcePreference = (source) => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, source);
+    } catch {
+      // Silently fail if localStorage is unavailable
+    }
+  };
+
   useEffect(() => {
     if (open) {
       setSelectedAnswer(null);
@@ -36,7 +64,14 @@ export default function PreanswersPickerDialog({
       setNewEntry('');
       setDraftPersonal(Array.isArray(personalAnswers) ? personalAnswers : []);
       const shouldShowPersonal = (personalAnswers && personalAnswers.length > 0) || canEditPersonal;
-      setActiveTab(shouldShowPersonal ? TAB_PERSONAL : TAB_ORG);
+      
+      // Try to restore last used source, but validate it's available
+      if (shouldShowPersonal) {
+        const lastSource = getLastUsedSource();
+        setActiveTab(lastSource);
+      } else {
+        setActiveTab(TAB_ORG);
+      }
     }
   }, [open, personalAnswers, canEditPersonal]);
 
@@ -49,6 +84,7 @@ export default function PreanswersPickerDialog({
 
   const handleInsert = () => {
     if (selectedAnswer) {
+      saveSourcePreference(activeTab);
       onSelect?.(selectedAnswer);
       onClose?.();
     }
@@ -102,6 +138,17 @@ export default function PreanswersPickerDialog({
 
   const showPersonalTab = (personalAnswers && personalAnswers.length > 0) || canEditPersonal;
 
+  const handleExportLegacy = () => {
+    try {
+      const json = exportAnswersAsJSON(answers, { label: questionLabel });
+      const filename = generateExportFilename(questionLabel);
+      downloadJSON(json, filename);
+      toast.success(`ניצור קובץ: ${filename}`);
+    } catch (error) {
+      toast.error(`שגיאה בהורדה: ${error.message}`);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg">
@@ -121,7 +168,10 @@ export default function PreanswersPickerDialog({
                   variant={activeTab === TAB_ORG ? 'default' : 'outline'}
                   size="sm"
                   className="flex-1"
-                  onClick={() => setActiveTab(TAB_ORG)}
+                  onClick={() => {
+                    setActiveTab(TAB_ORG);
+                    saveSourcePreference(TAB_ORG);
+                  }}
                 >
                   תשובות ארגוניות
                 </Button>
@@ -130,7 +180,10 @@ export default function PreanswersPickerDialog({
                   variant={activeTab === TAB_PERSONAL ? 'default' : 'outline'}
                   size="sm"
                   className="flex-1"
-                  onClick={() => setActiveTab(TAB_PERSONAL)}
+                  onClick={() => {
+                    setActiveTab(TAB_PERSONAL);
+                    saveSourcePreference(TAB_PERSONAL);
+                  }}
                 >
                   תשובות אישיות
                 </Button>
@@ -225,6 +278,7 @@ export default function PreanswersPickerDialog({
                     )}
                     onClick={() => setSelectedAnswer(answer)}
                     onDoubleClick={() => {
+                      saveSourcePreference(activeTab);
                       onSelect?.(answer);
                       onClose?.();
                     }}
@@ -255,17 +309,31 @@ export default function PreanswersPickerDialog({
             )}
           </div>
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row-reverse sm:justify-start">
-            <Button
-              onClick={handleInsert}
-              disabled={!selectedAnswer}
-              className="gap-2"
-            >
-              הכנס תשובה
-            </Button>
-            <Button variant="outline" onClick={onClose}>
-              ביטול
-            </Button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row-reverse sm:justify-between">
+            <div className="flex gap-2 flex-col-reverse sm:flex-row-reverse sm:flex-1">
+              <Button
+                onClick={handleInsert}
+                disabled={!selectedAnswer}
+                className="gap-2"
+              >
+                הכנס תשובה
+              </Button>
+              <Button variant="outline" onClick={onClose}>
+                ביטול
+              </Button>
+            </div>
+            {answers.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleExportLegacy}
+                title="ייצא את התשובות המוכנות של השאלה הזו"
+                className="text-amber-600 hover:bg-amber-50"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline ml-2">ייצא</span>
+              </Button>
+            )}
           </div>
 
           {filteredAnswers.length > 0 && (

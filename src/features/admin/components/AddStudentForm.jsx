@@ -296,32 +296,6 @@ export default function AddStudentForm({
             </div>
           )}
 
-          {loadingInstructors ? (
-            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700" role="status">
-              טוען רשימת מדריכים...
-            </div>
-          ) : noInstructorsAvailable ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
-              <p className="font-semibold">לא נמצאו מדריכים פעילים.</p>
-              <p>יש ליצור מדריך חדש בלשונית צוות/מדריכים ואז לחזור להוספת תלמיד.</p>
-            </div>
-          ) : (
-            <SelectField
-              id="assigned-instructor"
-              name="assignedInstructorId"
-              label="מדריך משויך"
-              value={values.assignedInstructorId}
-              onChange={(value) => handleSelectChange('assignedInstructorId', value)}
-              onOpenChange={onSelectOpenChange}
-              options={instructorOptions}
-              placeholder="בחר מדריך"
-              required
-              disabled={isSubmitting}
-              description="מוצגים רק מדריכים פעילים."
-              error={showInstructorError ? 'יש לבחור מדריך.' : ''}
-            />
-          )}
-
           <TextField
             id="contact-name"
             name="contactName"
@@ -363,6 +337,32 @@ export default function AddStudentForm({
             emptyMessage="לא נמצאו שירותים תואמים"
             description="ניתן להגדיר שירותים זמינים בעמוד ההגדרות."
           />
+
+          {loadingInstructors ? (
+            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700" role="status">
+              טוען רשימת מדריכים...
+            </div>
+          ) : noInstructorsAvailable ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+              <p className="font-semibold">לא נמצאו מדריכים פעילים.</p>
+              <p>יש ליצור מדריך חדש בלשונית צוות/מדריכים ואז לחזור להוספת תלמיד.</p>
+            </div>
+          ) : (
+            <SelectField
+              id="assigned-instructor"
+              name="assignedInstructorId"
+              label="מדריך משויך"
+              value={values.assignedInstructorId}
+              onChange={(value) => handleSelectChange('assignedInstructorId', value)}
+              onOpenChange={onSelectOpenChange}
+              options={instructorOptions}
+              placeholder="בחר מדריך"
+              required
+              disabled={isSubmitting}
+              description="מוצגים רק מדריכים פעילים."
+              error={showInstructorError ? 'יש לבחור מדריך.' : ''}
+            />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <DayOfWeekField

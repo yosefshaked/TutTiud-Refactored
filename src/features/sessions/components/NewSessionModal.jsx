@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, Calendar, CalendarCheck, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -10,7 +10,7 @@ import { authenticatedFetch } from '@/lib/api-client.js';
 import NewSessionForm, { NewSessionFormFooter } from './NewSessionForm.jsx';
 import { ensureSessionFormFallback, parseSessionFormConfig } from '@/features/sessions/utils/form-config.js';
 import { normalizeMembershipRole, isAdminRole } from '@/features/students/utils/endpoints.js';
-import { useInstructors, useServices } from '@/hooks/useOrgData.js';
+import { useInstructors, useServices, useServiceCatalog } from '@/hooks/useOrgData.js';
 
 const REQUEST_STATE = Object.freeze({
   idle: 'idle',
@@ -220,7 +220,7 @@ export default function NewSessionModal({
   onCreated,
 }) {
   const { loading: supabaseLoading } = useSupabase();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { activeOrg, activeOrgHasConnection, tenantClientReady, activeOrgConnection } = useOrg();
   const [studentsState, setStudentsState] = useState(REQUEST_STATE.idle);
   const [studentsError, setStudentsError] = useState('');
@@ -269,6 +269,11 @@ export default function NewSessionModal({
   });
 
   const { services } = useServices({
+    enabled: open && canFetchStudents,
+    orgId: activeOrgId,
+  });
+
+  const { serviceCatalog } = useServiceCatalog({
     enabled: open && canFetchStudents,
     orgId: activeOrgId,
   });
@@ -786,6 +791,9 @@ export default function NewSessionModal({
       >
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription className="sr-only">
+            טופס לדיווח מפגש חדש כולל בחירת תלמיד ופרטי דיווח.
+          </DialogDescription>
         </DialogHeader>
 
         {!canFetchStudents ? (
@@ -811,6 +819,9 @@ export default function NewSessionModal({
             canEditPersonalPreanswers={canEditPersonalPreanswers}
             preanswersCapLimit={preanswersCapLimit}
             services={services}
+            serviceCatalog={serviceCatalog}
+            session={session}
+            orgId={activeOrgId}
             instructors={instructors}
             canFilterByInstructor={isAdminRole(membershipRole)}
             userIsInstructor={userIsInstructor}

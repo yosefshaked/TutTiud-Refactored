@@ -1,0 +1,839 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Plus, Save, Trash2, RefreshCw, ListChecks, AlertCircle, Info, Download, Upload } from 'lucide-react';
+import { toast } from 'sonner';
+import { authenticatedFetch } from '@/lib/api-client.js';
+import { useServiceCatalog } from '@/hooks/useOrgData.js';
+import { useSupabase } from '@/context/SupabaseContext.jsx';
+import { useOrg } from '@/org/OrgContext.jsx';
+import PreanswersImportExportDialog from '@/features/sessions/components/PreanswersImportExportDialog.jsx';
+import PreanswersManagerSheet from '@/features/sessions/components/PreanswersManagerSheet.jsx';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+
+// System template types with human-friendly names and descriptions
+const SYSTEM_TEMPLATE_TYPES = {
+  INTAKE: {
+    id: 'INTAKE',
+    name: 'טופס קליטה',
+    description: 'למילוי בפגישה הראשונה עם המטופל',
+    details: 'משמש לאיסוף מידע רקע, מטרות ואבחון ראשוני. המערכת ממליצה טופס זה באופן אוטומטי לפגישה הראשונה.',
+    functionalNote: '🔄 משפיע על המלצות המערכת: כל פגישה חדשה תשתמש בטופס קליטה אוטומטית.',
+  },
+  ONGOING: {
+    id: 'ONGOING',
+    name: 'טופס שוטף',
+    description: 'למילוי בפגישות הטיפול המתמשכות',
+    details: 'מתעדת התקדמות וכיווני עבודה במהלך הטיפול. המערכת ממליצה טופס זה לפגישות לאחר שבוצעה הקליטה.',
+    functionalNote: '🔄 משפיע על המלצות המערכת: פגישות עוקבות יוצגו אוטומטית עם טופס זה.',
+  },
+  SUMMARY: {
+    id: 'SUMMARY',
+    name: 'טופס סיכום',
+    description: 'למילוי בסיום תהליך הטיפול',
+    details: 'מתעד את תוצאות הטיפול וההמלצות להמשך. מיועד למילוי כאשר מסיימים טיפול עם המטופל.',
+    functionalNote: '📝 טופס סיכום משמש כטופס סיום וניתן למילוי בכל עת.',
+  },
+};
+
+const QUESTION_TYPE_OPTIONS = [
+  { value: 'textarea', label: 'טקסט חופשי (פסקה)' },
+  { value: 'text', label: 'טקסט קצר' },
+  { value: 'number', label: 'מספר' },
+  { value: 'date', label: 'תאריך' },
+  { value: 'select', label: 'בחירה מרשימה' },
+  { value: 'radio', label: 'כפתורי בחירה' },
+  { value: 'buttons', label: 'בחירה באמצעות כפתורים' },
+  { value: 'scale', label: 'סולם הערכה (טווח מספרי)' },
+];
+
+const OPTION_TYPES = new Set(['select', 'radio', 'buttons']);
+const RANGE_TYPES = new Set(['scale']);
+const DEFAULT_RANGE = Object.freeze({ min: 1, max: 5, step: 1 });
+
+function generateId(prefix) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createEmptyQuestion(index = 0) {
+  return {
+    id: generateId('question'),
+    label: `שאלה ${index + 1}`,
+    type: 'textarea',
+    placeholder: '',
+    required: false,
+    options: [],
+    range: { ...DEFAULT_RANGE },
+  };
+}
+
+function createEmptyOption() {
+  return {
+    id: generateId('option'),
+    label: '',
+    value: '',
+  };
+}
+
+function extractQuestions(structureJson) {
+  if (!structureJson || typeof structureJson !== 'object') return [];
+  const raw = structureJson.questions;
+  return Array.isArray(raw) ? raw : [];
+}
+
+function normalizeQuestionsForSave(questions) {
+  return questions.map((question, index) => {
+    const base = {
+      id: question.id || generateId('question'),
+      label: typeof question.label === 'string' && question.label.trim()
+        ? question.label.trim()
+        : `שאלה ${index + 1}`,
+      type: question.type || 'textarea',
+      placeholder: question.placeholder || '',
+      required: Boolean(question.required),
+    };
+
+    if (OPTION_TYPES.has(base.type)) {
+      const options = Array.isArray(question.options) ? question.options : [];
+      base.options = options
+        .map((option) => ({
+          id: option.id || generateId('option'),
+          label: (option.label || '').trim(),
+          value: (option.value || '').trim(),
+        }))
+        .filter((option) => option.label && option.value);
+    } else if (RANGE_TYPES.has(base.type)) {
+      base.range = {
+        min: Number(question.range?.min ?? DEFAULT_RANGE.min),
+        max: Number(question.range?.max ?? DEFAULT_RANGE.max),
+        step: Number(question.range?.step ?? DEFAULT_RANGE.step),
+      };
+    }
+
+    return base;
+  });
+}
+
+export default function ReportTemplateManager({ session, orgId }) {
+  const { authClient } = useSupabase();
+  const { activeOrgId } = useOrg() || {};
+  const { serviceCatalog, loadingServiceCatalog, serviceCatalogError } = useServiceCatalog({
+    enabled: Boolean(session && orgId),
+    orgId,
+  });
+  const [serviceError, setServiceError] = useState('');
+
+  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateName, setTemplateName] = useState('');
+  const [preanswersMap, setPreanswersMap] = useState({}); // { [questionId]: string[] }
+  const [cap, setCap] = useState(50);
+  const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
+  const [preanswersQuestion, setPreanswersQuestion] = useState(null); // question being managed
+  const [questions, setQuestions] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [creatingSystem, setCreatingSystem] = useState(false);
+  const [creatingCustom, setCreatingCustom] = useState(false);
+
+  const selectedTemplate = useMemo(() => {
+    return templates.find((template) => template.id === selectedTemplateId) || null;
+  }, [templates, selectedTemplateId]);
+
+  const systemTemplates = useMemo(() => {
+    return templates.filter((template) => template?.metadata?.is_system);
+  }, [templates]);
+
+  const customTemplates = useMemo(() => {
+    return templates.filter((template) => !template?.metadata?.is_system);
+  }, [templates]);
+
+  const loadTemplates = useCallback(async (serviceId) => {
+    if (!session || !orgId || !serviceId) {
+      setTemplates([]);
+      return;
+    }
+
+    setTemplatesLoading(true);
+    try {
+      const response = await authenticatedFetch('report-templates', {
+        session,
+        params: {
+          org_id: orgId,
+          service_id: serviceId,
+        },
+      });
+      setTemplates(Array.isArray(response?.templates) ? response.templates : []);
+    } catch (error) {
+      console.error('Failed to load templates', error);
+      toast.error('טעינת התבניות נכשלה');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, [orgId, session]);
+
+  useEffect(() => {
+    if (serviceCatalogError) {
+      if (serviceCatalogError.includes('services_table_missing')) {
+        setServiceError('נדרש להריץ את עדכון המערכת כדי ליצור טבלת שירותים.');
+        return;
+      }
+      setServiceError(serviceCatalogError);
+      return;
+    }
+    setServiceError('');
+  }, [serviceCatalogError, selectedServiceId]);
+
+  // Load cap from control DB org permissions (fallback 50)
+  useEffect(() => {
+    const run = async () => {
+      try {
+        if (!authClient || !activeOrgId) return;
+        const { data: orgSettings, error } = await authClient
+          .from('org_settings')
+          .select('permissions')
+          .eq('org_id', activeOrgId)
+          .single();
+        if (error) return;
+        const perms = orgSettings?.permissions || {};
+        const capRaw = perms.session_form_preanswers_cap;
+        const parsed = Number.parseInt(String(capRaw ?? '50'), 10);
+        setCap(Number.isFinite(parsed) && parsed > 0 ? parsed : 50);
+      } catch {
+        setCap(50);
+      }
+    };
+    run();
+  }, [authClient, activeOrgId]);
+
+  useEffect(() => {
+    if (!selectedServiceId) {
+      setTemplates([]);
+      setSelectedTemplateId('');
+      setQuestions([]);
+      return;
+    }
+    void loadTemplates(selectedServiceId);
+  }, [loadTemplates, selectedServiceId]);
+
+  useEffect(() => {
+    if (!selectedTemplate) {
+      setTemplateName('');
+      setQuestions([]);
+      setPreanswersMap({});
+      return;
+    }
+    setTemplateName(selectedTemplate.name || '');
+    setQuestions(extractQuestions(selectedTemplate.structure_json));
+    const metadata = selectedTemplate.metadata || {};
+    const preanswers = metadata.preconfigured_answers || {};
+    setPreanswersMap(typeof preanswers === 'object' ? preanswers : {});
+  }, [selectedTemplate]);
+
+  const handleAddQuestion = () => {
+    setQuestions((prev) => [...prev, createEmptyQuestion(prev.length)]);
+  };
+
+  const handleRemoveQuestion = (index) => {
+    setQuestions((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleQuestionChange = (index, updates) => {
+    setQuestions((prev) => prev.map((q, idx) => (idx === index ? { ...q, ...updates } : q)));
+  };
+
+  const handleOptionChange = (questionIndex, optionIndex, updates) => {
+    setQuestions((prev) => prev.map((q, idx) => {
+      if (idx !== questionIndex) return q;
+      const nextOptions = Array.isArray(q.options) ? q.options.map((opt, optIdx) => {
+        if (optIdx !== optionIndex) return opt;
+        return { ...opt, ...updates };
+      }) : [];
+      return { ...q, options: nextOptions };
+    }));
+  };
+
+  const handleAddOption = (questionIndex) => {
+    setQuestions((prev) => prev.map((q, idx) => {
+      if (idx !== questionIndex) return q;
+      const nextOptions = Array.isArray(q.options) ? [...q.options, createEmptyOption()] : [createEmptyOption()];
+      return { ...q, options: nextOptions };
+    }));
+  };
+
+  const handleRemoveOption = (questionIndex, optionIndex) => {
+    setQuestions((prev) => prev.map((q, idx) => {
+      if (idx !== questionIndex) return q;
+      const nextOptions = Array.isArray(q.options) ? q.options.filter((_, optIdx) => optIdx !== optionIndex) : [];
+      return { ...q, options: nextOptions };
+    }));
+  };
+
+  const callTemplateWrite = async (payload, method) => {
+    try {
+      return await authenticatedFetch('report-templates', {
+        session,
+        method,
+        body: payload,
+      });
+    } catch (error) {
+      if (error?.status !== 404) {
+        throw error;
+      }
+      return authenticatedFetch('report-templates-action', {
+        session,
+        method,
+        body: payload,
+      });
+    }
+  };
+
+  const handlePreanswersImport = async (imported) => {
+    // imported is { [questionId]: string[] }
+    setPreanswersMap((prev) => ({ ...prev, ...imported }));
+    toast.success('ערכים מוצעים התווספו בהצלחה');
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!selectedTemplate || !session) return;
+
+    setSaving(true);
+    try {
+      const metadata = selectedTemplate.metadata || {};
+      await callTemplateWrite({
+        org_id: orgId,
+        id: selectedTemplate.id,
+        name: templateName,
+        structure_json: { questions: normalizeQuestionsForSave(questions) },
+        metadata: { ...metadata, preconfigured_answers: preanswersMap },
+      }, 'PUT');
+      toast.success('התבנית נשמרה בהצלחה');
+      await loadTemplates(selectedServiceId);
+    } catch (error) {
+      console.error('Failed to save template', error);
+      toast.error('שמירת התבנית נכשלה');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateSystemTemplates = async () => {
+    if (!session || !selectedServiceId) return;
+    setCreatingSystem(true);
+    try {
+      await callTemplateWrite({
+        org_id: orgId,
+        service_id: selectedServiceId,
+        action: 'ensure_system',
+      }, 'POST');
+      toast.success('תבניות מערכת נוצרו');
+      await loadTemplates(selectedServiceId);
+    } catch (error) {
+      console.error('Failed to create system templates', error);
+      toast.error('יצירת תבניות מערכת נכשלה');
+    } finally {
+      setCreatingSystem(false);
+    }
+  };
+
+  const handleCreateCustomFromBase = async (baseTemplate) => {
+    if (!session || !selectedServiceId || !baseTemplate) return;
+    setCreatingCustom(true);
+    try {
+      const response = await callTemplateWrite({
+        org_id: orgId,
+        service_id: selectedServiceId,
+        action: 'create_custom',
+        base_template_id: baseTemplate.id,
+        system_type: baseTemplate.system_type,
+        name: `תבנית מותאמת - ${baseTemplate.name}`,
+      }, 'POST');
+      toast.success('תבנית מותאמת נוצרה');
+      await loadTemplates(selectedServiceId);
+      if (response?.template?.id) {
+        setSelectedTemplateId(response.template.id);
+      }
+    } catch (error) {
+      console.error('Failed to create custom template', error);
+      toast.error('יצירת תבנית מותאמת נכשלה');
+    } finally {
+      setCreatingCustom(false);
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!selectedTemplate || !session) return;
+    if (selectedTemplate?.metadata?.is_system) {
+      toast.error('לא ניתן למחוק תבניות מערכת');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await callTemplateWrite({
+        org_id: orgId,
+        id: selectedTemplate.id,
+      }, 'DELETE');
+      toast.success('התבנית נמחקה');
+      setSelectedTemplateId('');
+      await loadTemplates(selectedServiceId);
+    } catch (error) {
+      console.error('Failed to delete template', error);
+      toast.error('מחיקת התבנית נכשלה');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="w-full border-0 shadow-lg bg-white/80">
+      <CardHeader>
+        <div className="space-y-2">
+          <p className="text-xs text-slate-600 sm:text-sm">
+            בחרו שירות כדי לנהל את תבניות הדיווח של המטופלים.
+          </p>
+          <div className="flex items-start gap-2 p-2 rounded-md bg-blue-50 border border-blue-100">
+            <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-blue-700">
+              <strong>טפסי מערכת:</strong> משמשים כבסיס להמלצות המערכת האוטומטיות. ניתן לערוך את השאלות והתוכן של טפסים אלה.
+              <br />
+              <strong>טפסים מותאמים:</strong> אפשרויות נוספות לשימוש לפי הצורך. הם לא משפיעים על המלצות המערכת.
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-md">
+        <div className="space-y-xs">
+          <Label className="text-xs sm:text-sm">בחרו שירות *</Label>
+          {loadingServiceCatalog ? (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              טוען שירותים...
+            </div>
+          ) : (
+            <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="בחרו שירות" />
+              </SelectTrigger>
+              <SelectContent>
+                {serviceCatalog.map((service) => (
+                  <SelectItem key={service.id} value={service.id}>
+                    {service.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {serviceError && (
+            <p className="text-xs text-red-600">{serviceError}</p>
+          )}
+        </div>
+
+        {selectedServiceId && (
+          <div className="space-y-md">
+            <div className="flex flex-wrap items-center gap-sm">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => loadTemplates(selectedServiceId)}
+                disabled={templatesLoading}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${templatesLoading ? 'animate-spin' : ''}`} />
+                רענון תבניות
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="default"
+                onClick={handleCreateSystemTemplates}
+                disabled={creatingSystem}
+                className="gap-2"
+              >
+                {creatingSystem ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
+                צור תבניות מערכת
+              </Button>
+            </div>
+
+            {templatesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                טוען תבניות...
+              </div>
+            ) : templates.length === 0 ? (
+              <p className="text-sm text-slate-500">אין תבניות לשירות זה.</p>
+            ) : (
+              <TooltipProvider>
+                <div className="grid gap-md md:grid-cols-[1fr,2fr]">
+                  <div className="space-y-md">
+                    {/* System Templates Section */}
+                    <div className="space-y-sm">
+                      <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        📌 טפסי מערכת (חובה לתפקוד חכם)
+                      </h4>
+                      <div className="space-y-xs">
+                        {systemTemplates.map((template) => {
+                          const typeInfo = SYSTEM_TEMPLATE_TYPES[template.system_type] || {};
+                          const isSelected = selectedTemplateId === template.id;
+                          return (
+                            <Tooltip key={template.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={`w-full text-right rounded-md border p-3 space-y-1 transition-colors ${
+                                    isSelected 
+                                      ? 'border-blue-400 bg-blue-100 ring-1 ring-blue-400' 
+                                      : 'border-blue-100 bg-blue-50 hover:bg-blue-100/70'
+                                  }`}
+                                  onClick={() => setSelectedTemplateId(template.id)}
+                                >
+                                  <div className="text-sm font-medium text-blue-900">
+                                    {typeInfo.name || template.name}
+                                  </div>
+                                  <p className="text-xs text-blue-700">{typeInfo.description}</p>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-xs">
+                                <p className="text-xs">{typeInfo.details}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Custom Templates Section */}
+                    {customTemplates.length > 0 && (
+                      <div className="space-y-sm">
+                        <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                          ➕ טפסים מותאמים (אופציונלי)
+                        </h4>
+                        <div className="space-y-xs">
+                          {customTemplates.map((template) => {
+                            const isSelected = selectedTemplateId === template.id;
+                            return (
+                              <button
+                                key={template.id}
+                                type="button"
+                                className={`w-full flex items-center justify-between gap-2 rounded-md border p-3 transition-colors ${
+                                  isSelected
+                                    ? 'border-slate-400 bg-slate-100 ring-1 ring-slate-400'
+                                    : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                                }`}
+                                onClick={() => setSelectedTemplateId(template.id)}
+                              >
+                                <span className="text-sm font-medium text-slate-700 text-right flex-1">
+                                  {template.name}
+                                </span>
+                                <Badge variant="outline" className="text-xs text-slate-600">
+                                  מותאם
+                                </Badge>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Create Custom Template Button */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (systemTemplates.length > 0) {
+                          handleCreateCustomFromBase(systemTemplates[0]);
+                        }
+                      }}
+                      disabled={creatingCustom || systemTemplates.length === 0}
+                      className="gap-2 w-full"
+                    >
+                      <Plus className="h-4 w-4" />
+                      צור טופס מותאם חדש
+                    </Button>
+                  </div>
+
+                  <div className="space-y-sm">
+                    {selectedTemplate ? (
+                      <>
+                        {/* Template Header */}
+                        <div className="space-y-md border-b pb-md">
+                          {selectedTemplate?.metadata?.is_system && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-blue-100 text-blue-700 border border-blue-200">📌 טופס מערכת</Badge>
+                              </div>
+                              {SYSTEM_TEMPLATE_TYPES[selectedTemplate.system_type] && (
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium text-slate-700">
+                                    {SYSTEM_TEMPLATE_TYPES[selectedTemplate.system_type].details}
+                                  </p>
+                                  <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50 border border-amber-100">
+                                    <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                    <p className="text-xs text-amber-700">
+                                      {SYSTEM_TEMPLATE_TYPES[selectedTemplate.system_type].functionalNote}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {!selectedTemplate?.metadata?.is_system && (
+                            <div>
+                              <Badge className="bg-slate-100 text-slate-700 border border-slate-200">➕ טופס מותאם</Badge>
+                              <p className="text-xs text-slate-600 mt-2">טופס זה משמש לשימוש נוסף ולא משפיע על הטפסים של המערכת.</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Template Name */}
+                        <div className="space-y-xs">
+                          <Label className="text-xs">שם הטופס</Label>
+                          <Input
+                            value={templateName}
+                            onChange={(event) => setTemplateName(event.target.value)}
+                            disabled={saving}
+                            placeholder="הכניסו שם טופס"
+                          />
+                        </div>
+
+                        {/* Export/Import Button */}
+                        <div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreanswersDialogOpen(true)}
+                            disabled={saving || questions.length === 0}
+                            className="gap-2"
+                          >
+                            <Download className="h-4 w-4" />
+                            <Upload className="h-4 w-4" />
+                            <span className="hidden sm:inline">ייצוא/ייבוא ערכים מוצעים</span>
+                            <span className="sm:hidden">ייצוא/ייבוא</span>
+                          </Button>
+                        </div>
+
+                      <div className="space-y-sm">
+                        {questions.map((question, index) => (
+                          <div key={question.id} className="rounded-md border p-sm space-y-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <Label className="text-xs">שאלה {index + 1}</Label>
+                              <div className="flex items-center gap-1">
+                                {(question.type === 'text' || question.type === 'textarea') && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPreanswersQuestion(question)}
+                                    disabled={saving}
+                                    className="text-xs gap-1 h-7 px-2"
+                                  >
+                                    <ListChecks className="h-3.5 w-3.5" />
+                                    <span>תשובות מוכנות</span>
+                                    {(preanswersMap[question.id]?.length > 0) && (
+                                      <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-1">
+                                        {preanswersMap[question.id].length}/{cap}
+                                      </Badge>
+                                    )}
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveQuestion(index)}
+                                  disabled={saving}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <Input
+                              value={question.label || ''}
+                              onChange={(event) => handleQuestionChange(index, { label: event.target.value })}
+                              placeholder="טקסט השאלה"
+                              disabled={saving}
+                            />
+                            <div className="grid gap-sm sm:grid-cols-2">
+                              <div className="space-y-xs">
+                                <Label className="text-xs">סוג שאלה</Label>
+                                <Select
+                                  value={question.type}
+                                  onValueChange={(value) => handleQuestionChange(index, { type: value })}
+                                  disabled={saving}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="בחרו סוג" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {QUESTION_TYPE_OPTIONS.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-xs">
+                                <Label className="text-xs">שדה חובה</Label>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={Boolean(question.required)}
+                                    onCheckedChange={(value) => handleQuestionChange(index, { required: value })}
+                                    disabled={saving}
+                                  />
+                                  <span className="text-xs text-slate-600">חובה</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {OPTION_TYPES.has(question.type) && (
+                              <div className="space-y-xs">
+                                <Label className="text-xs">אפשרויות</Label>
+                                <div className="space-y-xs">
+                                  {(question.options || []).map((option, optionIndex) => (
+                                    <div key={option.id || optionIndex} className="flex items-center gap-2">
+                                      <Input
+                                        value={option.label || ''}
+                                        onChange={(event) => handleOptionChange(index, optionIndex, { label: event.target.value })}
+                                        placeholder="תווית"
+                                        disabled={saving}
+                                      />
+                                      <Input
+                                        value={option.value || ''}
+                                        onChange={(event) => handleOptionChange(index, optionIndex, { value: event.target.value })}
+                                        placeholder="ערך"
+                                        disabled={saving}
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveOption(index, optionIndex)}
+                                        disabled={saving}
+                                        className="text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleAddOption(index)}
+                                    disabled={saving}
+                                    className="gap-2"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    הוסף אפשרות
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
+                            {RANGE_TYPES.has(question.type) && (
+                              <div className="grid gap-sm sm:grid-cols-3">
+                                <div className="space-y-xs">
+                                  <Label className="text-xs">מינימום</Label>
+                                  <Input
+                                    type="number"
+                                    value={question.range?.min ?? DEFAULT_RANGE.min}
+                                    onChange={(event) => handleQuestionChange(index, { range: { ...question.range, min: Number(event.target.value) } })}
+                                    disabled={saving}
+                                  />
+                                </div>
+                                <div className="space-y-xs">
+                                  <Label className="text-xs">מקסימום</Label>
+                                  <Input
+                                    type="number"
+                                    value={question.range?.max ?? DEFAULT_RANGE.max}
+                                    onChange={(event) => handleQuestionChange(index, { range: { ...question.range, max: Number(event.target.value) } })}
+                                    disabled={saving}
+                                  />
+                                </div>
+                                <div className="space-y-xs">
+                                  <Label className="text-xs">קפיצה</Label>
+                                  <Input
+                                    type="number"
+                                    value={question.range?.step ?? DEFAULT_RANGE.step}
+                                    onChange={(event) => handleQuestionChange(index, { range: { ...question.range, step: Number(event.target.value) } })}
+                                    disabled={saving}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap gap-sm">
+                        <Button type="button" variant="outline" onClick={handleAddQuestion} disabled={saving} className="gap-2">
+                          <Plus className="h-4 w-4" />
+                          הוסף שאלה
+                        </Button>
+                        <Button type="button" onClick={handleSaveTemplate} disabled={saving} className="gap-2">
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          שמור טופס
+                        </Button>
+                        {!selectedTemplate?.metadata?.is_system && (
+                          <Button type="button" variant="destructive" onClick={handleDeleteTemplate} disabled={saving} className="gap-2">
+                            <Trash2 className="h-4 w-4" />
+                            מחק טופס
+                          </Button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-slate-500">בחרו טופס מהרשימה שמשמאל כדי לערוך את השאלות והתוכן.</p>
+                    </div>
+                  )}
+                  </div>
+                </div>
+              </TooltipProvider>
+            )}
+          </div>
+        )}
+
+        {/* Preconfigured Answers Export/Import Dialog */}
+        <PreanswersImportExportDialog
+          open={preanswersDialogOpen}
+          onClose={() => setPreanswersDialogOpen(false)}
+          currentAnswers={preanswersMap}
+          questions={questions}
+          onImport={handlePreanswersImport}
+          capLimit={cap}
+        />
+
+        {/* Per-question preconfigured answers manager */}
+        <PreanswersManagerSheet
+          open={Boolean(preanswersQuestion)}
+          onClose={() => setPreanswersQuestion(null)}
+          question={preanswersQuestion}
+          answers={preanswersQuestion ? (preanswersMap[preanswersQuestion.id] || []) : []}
+          onSave={(updatedAnswers) => {
+            setPreanswersMap((prev) => ({ ...prev, [preanswersQuestion.id]: updatedAnswers }));
+          }}
+          capLimit={cap}
+        />
+      </CardContent>
+    </Card>
+  );
+}

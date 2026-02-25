@@ -63,6 +63,32 @@ export default function StudentsPage() {
   const openSelectCountRef = useRef(0);
   const isClosingSelectRef = useRef(false);
 
+  // Save scroll position before navigating to student detail
+  const handleStudentNavigate = useCallback((studentId) => {
+    const mainElement = document.getElementById('main-content');
+    if (mainElement) {
+      sessionStorage.setItem('studentListScrollPosition', String(mainElement.scrollTop));
+    }
+    navigate(`/students/${studentId}`);
+  }, [navigate]);
+
+  // Restore scroll position when returning from student detail
+  // Must happen after students are loaded and filtered
+  useEffect(() => {
+    const savedScrollPosition = sessionStorage.getItem('studentListScrollPosition');
+    if (savedScrollPosition && filteredStudents.length > 0) {
+      // Use setTimeout to ensure DOM has been updated
+      setTimeout(() => {
+        const mainElement = document.getElementById('main-content');
+        if (mainElement) {
+          const position = parseInt(savedScrollPosition, 10);
+          mainElement.scrollTop = position;
+          sessionStorage.removeItem('studentListScrollPosition');
+        }
+      }, 0);
+    }
+  }, [filteredStudents]);
+
   // Determine user role
   const membershipRole = activeOrg?.membership?.role;
   const normalizedRole = useMemo(() => normalizeMembershipRole(membershipRole), [membershipRole]);
@@ -687,12 +713,12 @@ export default function StudentsPage() {
                         <TableRow key={student.id}>
                           <TableCell className="text-right">
                             <div className="flex flex-col gap-1">
-                              <Link
-                                to={`/students/${student.id}`}
-                                className="font-medium text-primary hover:underline"
+                              <button
+                                onClick={() => handleStudentNavigate(student.id)}
+                                className="font-medium text-primary hover:underline text-right"
                               >
                                 {student.name}
-                              </Link>
+                              </button>
                               {isInactive && (
                                 <Badge variant="secondary" className="w-fit bg-neutral-200 text-neutral-700">
                                   לא פעיל
@@ -740,11 +766,13 @@ export default function StudentsPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center gap-2">
-                              <Link to={`/students/${student.id}`}>
-                                <Button variant="ghost" size="icon">
-                                  <User className="h-4 w-4" />
-                                </Button>
-                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleStudentNavigate(student.id)}
+                              >
+                                <User className="h-4 w-4" />
+                              </Button>
                               {isAdmin && (
                                 <Button
                                   variant="ghost"

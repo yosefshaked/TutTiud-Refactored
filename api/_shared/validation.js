@@ -172,13 +172,23 @@ export function validateSessionWrite(body) {
   const contentResult = coerceSessionContent(contentSource);
   if (contentResult.error) return { error: contentResult.error };
 
+  const serviceIdRaw = normalizeString(body?.service_id || body?.serviceId);
+  if (serviceIdRaw && !isUUID(serviceIdRaw)) {
+    return { error: 'invalid_service_id' };
+  }
+
+  const templateIdRaw = normalizeString(body?.template_id || body?.templateId);
+  if (templateIdRaw && !isUUID(templateIdRaw)) {
+    return { error: 'invalid_template_id' };
+  }
+
   const hasServiceField =
     Object.prototype.hasOwnProperty.call(body ?? {}, 'service_context') ||
     Object.prototype.hasOwnProperty.call(body ?? {}, 'serviceContext');
 
   const serviceResult = coerceOptionalText(body?.service_context ?? body?.serviceContext);
   if (!serviceResult.valid) return { error: 'invalid_service_context' };
-  if (isLoose && !serviceResult.value) return { error: 'missing_service_context' };
+  if (isLoose && !serviceResult.value && !serviceIdRaw) return { error: 'missing_service_context' };
 
   const timeRaw = normalizeString(body?.time || body?.session_time || body?.sessionTime);
   if (isLoose && !timeRaw) return { error: 'missing_time' };
@@ -213,6 +223,8 @@ export function validateSessionWrite(body) {
     date,
     content: contentResult.value,
     serviceContext: serviceResult.value,
+    serviceId: serviceIdRaw || null,
+    templateId: templateIdRaw || null,
     hasExplicitService: hasServiceField,
     time: timeResult.value,
     unassignedDetails,
