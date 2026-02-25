@@ -27,7 +27,8 @@ async function fetchServiceByName(tenantClient, orgId, serviceName) {
   const { data, error } = await tenantClient
     .from('Services')
     .select('id, name, linked_student_tag, is_active')
-    .eq('name', normalized)
+    .ilike('name', normalized)
+    .limit(1)
     .maybeSingle();
 
   if (error) throw error;
@@ -89,18 +90,6 @@ async function fetchAnyTemplate(tenantClient, serviceId) {
   return data || null;
 }
 
-async function countStudentSessionsForService(tenantClient, studentId, serviceId) {
-  if (!studentId || !serviceId) return 0;
-  const { count, error } = await tenantClient
-    .from('SessionRecords')
-    .select('id', { count: 'exact', head: true })
-    .eq('student_id', studentId)
-    .eq('service_id', serviceId);
-
-  if (error) throw error;
-  return typeof count === 'number' ? count : 0;
-}
-
 async function fetchLatestSessionForTemplate(tenantClient, studentId, templateId) {
   if (!studentId || !templateId) return null;
   const { data, error } = await tenantClient
@@ -116,6 +105,28 @@ async function fetchLatestSessionForTemplate(tenantClient, studentId, templateId
   return data || null;
 }
 
+async function fetchLatestSessionSystemType(tenantClient, studentId, serviceId) {
+  if (!studentId || !serviceId) return null;
+  const { data, error } = await tenantClient
+    .from('SessionRecords')
+    .select(`
+      id,
+      date,
+      template_id,
+      ReportTemplates (
+        system_type
+      )
+    `)
+    .eq('student_id', studentId)
+    .eq('service_id', serviceId)
+    .order('date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? (data.ReportTemplates?.system_type || 'LEGACY') : null;
+}
+
 export async function resolveServiceSelection({
   tenantClient,
   orgId,
@@ -124,6 +135,8 @@ export async function resolveServiceSelection({
   explicitServiceContext,
 }) {
   const legacyServiceContext = normalizeString(explicitServiceContext);
+  const studentDefaultService = normalizeString(studentRecord?.default_service);
+  const contextToUse = legacyServiceContext || studentDefaultService;
   const normalizedServiceId = normalizeString(explicitServiceId);
 
   if (normalizedServiceId) {
@@ -133,7 +146,7 @@ export async function resolveServiceSelection({
     }
     return {
       service,
-      serviceContext: legacyServiceContext || service.name || null,
+      serviceContext: contextToUse || service.name || null,
       source: 'explicit_id',
     };
   }
@@ -144,7 +157,7 @@ export async function resolveServiceSelection({
     if (service && service.is_active !== false) {
       return {
         service,
-        serviceContext: legacyServiceContext || service.name || null,
+        serviceContext: contextToUse || service.name || null,
         source: 'student_default',
       };
     }
@@ -156,18 +169,18 @@ export async function resolveServiceSelection({
     if (matchedServices.length === 1) {
       return {
         service: matchedServices[0],
-        serviceContext: legacyServiceContext || matchedServices[0].name || null,
+        serviceContext: contextToUse || matchedServices[0].name || null,
         source: 'tag_match',
       };
     }
   }
 
-  if (legacyServiceContext) {
-    const service = await fetchServiceByName(tenantClient, orgId, legacyServiceContext);
+  if (contextToUse) {
+    const service = await fetchServiceByName(tenantClient, orgId, contextToUse);
     if (service && service.is_active !== false) {
       return {
         service,
-        serviceContext: legacyServiceContext,
+        serviceContext: contextToUse,
         source: 'legacy_name',
       };
     }
@@ -175,7 +188,7 @@ export async function resolveServiceSelection({
 
   return {
     service: null,
-    serviceContext: legacyServiceContext || normalizeString(studentRecord?.default_service) || null,
+    serviceContext: contextToUse || null,
     source: 'none',
   };
 }
@@ -208,11 +221,20 @@ export async function resolveTemplateSelection({
   }
 
   const hasStudent = Boolean(studentId) && !isLoose;
-  const reportCount = hasStudent
-    ? await countStudentSessionsForService(tenantClient, studentId, serviceId)
-    : 0;
+  let desiredType = 'INTAKE';
 
-  const desiredType = reportCount > 0 ? 'ONGOING' : 'INTAKE';
+  if (hasStudent) {
+    const latestSystemType = await fetchLatestSessionSystemType(tenantClient, studentId, serviceId);
+    if (latestSystemType) {
+      // If the last report was a SUMMARY, the next one should be an INTAKE
+      if (latestSystemType === 'SUMMARY') {
+        desiredType = 'INTAKE';
+      } else {
+        desiredType = 'ONGOING';
+      }
+    }
+  }
+
   const template = await fetchTemplateByType(tenantClient, serviceId, desiredType)
     ?? await fetchAnyTemplate(tenantClient, serviceId);
 
