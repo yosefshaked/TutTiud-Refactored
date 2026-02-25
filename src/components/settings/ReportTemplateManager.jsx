@@ -13,6 +13,7 @@ import { useServiceCatalog } from '@/hooks/useOrgData.js';
 import { useAuth } from '@/auth/AuthContext.jsx';
 import { useOrg } from '@/org/OrgContext.jsx';
 import PreanswersImportExportDialog from '@/features/sessions/components/PreanswersImportExportDialog.jsx';
+import PreanswersManagerSheet from '@/features/sessions/components/PreanswersManagerSheet.jsx';
 import {
   Tooltip,
   TooltipContent,
@@ -143,6 +144,7 @@ export default function ReportTemplateManager({ session, orgId }) {
   const [preanswersMap, setPreanswersMap] = useState({}); // { [questionId]: string[] }
   const [cap, setCap] = useState(50);
   const [preanswersDialogOpen, setPreanswersDialogOpen] = useState(false);
+  const [preanswersQuestion, setPreanswersQuestion] = useState(null); // question being managed
   const [questions, setQuestions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [creatingSystem, setCreatingSystem] = useState(false);
@@ -631,16 +633,36 @@ export default function ReportTemplateManager({ session, orgId }) {
                           <div key={question.id} className="rounded-md border p-sm space-y-sm">
                             <div className="flex items-center justify-between gap-2">
                               <Label className="text-xs">שאלה {index + 1}</Label>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveQuestion(index)}
-                                disabled={saving}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                {(question.type === 'text' || question.type === 'textarea') && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPreanswersQuestion(question)}
+                                    disabled={saving}
+                                    className="text-xs gap-1 h-7 px-2"
+                                  >
+                                    <ListChecks className="h-3.5 w-3.5" />
+                                    <span>תשובות מוכנות</span>
+                                    {(preanswersMap[question.id]?.length > 0) && (
+                                      <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-1">
+                                        {preanswersMap[question.id].length}
+                                      </Badge>
+                                    )}
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveQuestion(index)}
+                                  disabled={saving}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                             <Input
                               value={question.label || ''}
@@ -797,6 +819,18 @@ export default function ReportTemplateManager({ session, orgId }) {
           currentAnswers={preanswersMap}
           questions={questions}
           onImport={handlePreanswersImport}
+          capLimit={cap}
+        />
+
+        {/* Per-question preconfigured answers manager */}
+        <PreanswersManagerSheet
+          open={Boolean(preanswersQuestion)}
+          onClose={() => setPreanswersQuestion(null)}
+          question={preanswersQuestion}
+          answers={preanswersQuestion ? (preanswersMap[preanswersQuestion.id] || []) : []}
+          onSave={(updatedAnswers) => {
+            setPreanswersMap((prev) => ({ ...prev, [preanswersQuestion.id]: updatedAnswers }));
+          }}
           capLimit={cap}
         />
       </CardContent>
