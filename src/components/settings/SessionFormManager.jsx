@@ -7,9 +7,12 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ListPlus, Loader2, Plus, Save, Trash2, FileText, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import QuestionTypePreview from './QuestionTypePreview.jsx';
+import PreconfiguredAnswersManager from './PreconfiguredAnswersManager.jsx';
+import PreconfiguredAnswersDrawer from './PreconfiguredAnswersDrawer.jsx';
+import PreanswersImportExportDialog from '@/features/sessions/components/PreanswersImportExportDialog.jsx';
 import { fetchSessionFormConfig } from '@/features/settings/api/index.js';
 import { upsertSetting } from '@/features/settings/api/settings.js';
 import { useSupabase } from '@/context/SupabaseContext.jsx';
@@ -418,6 +421,9 @@ export default function SessionFormManager({
   const { authClient } = useSupabase();
   const { activeOrgId } = useOrg();
   const [cap, setCap] = useState(50);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerQuestion, setDrawerQuestion] = useState(null);
+  const [importExportDialogOpen, setImportExportDialogOpen] = useState(false);
 
   const canLoad = Boolean(session && orgId && activeOrgHasConnection && tenantClientReady);
 
@@ -551,34 +557,6 @@ export default function SessionFormManager({
     }));
   };
 
-  const handleAddPreanswer = (questionId) => {
-    setPreanswersMap((prev) => {
-      const current = Array.isArray(prev[questionId]) ? prev[questionId] : [];
-      if (current.length >= cap) {
-        toast.error(`לא ניתן להוסיף יותר מ-${cap} תשובות מוכנות לשאלה זו.`);
-        return prev;
-      }
-      return { ...prev, [questionId]: [...current, ''] };
-    });
-  };
-
-  const handlePreanswerChange = (questionId, index, value) => {
-    setPreanswersMap((prev) => {
-      const current = Array.isArray(prev[questionId]) ? [...prev[questionId]] : [];
-      if (!current[index] && value.trim() === '') return prev;
-      current[index] = value;
-      return { ...prev, [questionId]: current };
-    });
-  };
-
-  const handleRemovePreanswer = (questionId, index) => {
-    setPreanswersMap((prev) => {
-      const current = Array.isArray(prev[questionId]) ? [...prev[questionId]] : [];
-      current.splice(index, 1);
-      return { ...prev, [questionId]: current };
-    });
-  };
-
   const toggleExpanded = (id) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -671,6 +649,85 @@ export default function SessionFormManager({
     setPreanswersMap(lastSavedPreanswersRef.current || {});
   };
 
+  const handleSavePreconfiguredAnswers = async (questionId, answers) => {
+    if (!canLoad) {
+      throw new Error('לא ניתן לשמור בלי חיבור ארגוני פעיל.');
+    }
+    
+    // Update preanswersMap state
+    const nextMap = { ...preanswersMap };
+    nextMap[questionId] = answers;
+    setPreanswersMap(nextMap);
+    
+    // Build full payload with existing questions
+    const payload = buildPayloadFromQuestions(questions);
+    const preconfigured = {};
+    
+    // Process all text/textarea questions and their answers
+    for (const q of questions) {
+      if (q.type !== 'text' && q.type !== 'textarea') continue;
+      const list = Array.isArray(nextMap[q.id]) ? nextMap[q.id] : [];
+      const unique = [];
+      const seen = new Set();
+      for (const raw of list) {
+        if (typeof raw !== 'string') continue;
+        const t = raw.trim();
+        if (!t || seen.has(t)) continue;
+        seen.add(t);
+        unique.push(t);
+        if (unique.length >= cap) break;
+      }
+      if (unique.length) {
+        preconfigured[q.id] = unique;
+      }
+    }
+    
+    // Save to database
+    await upsertSetting({
+      session,
+      orgId,
+      key: 'session_form_config',
+      value: { value: payload, metadata: { preconfigured_answers: preconfigured } },
+    });
+    
+    lastSavedPreanswersRef.current = nextMap;
+  };
+
+  const handleImportPreconfiguredAnswers = async (importedMap) => {
+    if (!canLoad) {
+      throw new Error('לא ניתן לייבא בלי חיבור ארגוני פעיל.');
+    }
+
+    // importedMap is the updated preanswersMap with merged answers from import
+    // The dialog has already handled the merging logic
+    const payload = buildPayloadFromQuestions(questions);
+    const preconfigured = {};
+
+    // Build preconfigured from the imported map (which already has merged answers)
+    for (const q of questions) {
+      if (q.type !== 'text' && q.type !== 'textarea') continue;
+
+      const list = Array.isArray(importedMap[q.id]) ? importedMap[q.id] : [];
+      if (list.length > 0) {
+        preconfigured[q.id] = list;
+      }
+    }
+
+    // Update state
+    setPreanswersMap(importedMap);
+
+    // Save to database
+    await upsertSetting({
+      session,
+      orgId,
+      key: 'session_form_config',
+      value: { value: payload, metadata: { preconfigured_answers: preconfigured } },
+    });
+
+    lastSavedPreanswersRef.current = importedMap;
+    toast.success('תשובות המוכנות מראש יובאו בהצלחה');
+  };
+
   const handleSave = async () => {
     if (!canLoad) {
       toast.error('לא ניתן לשמור בלי חיבור ארגוני פעיל.');
@@ -750,15 +807,33 @@ export default function SessionFormManager({
   }
 
   return (
+    <>
     <Card className="w-full border-0 shadow-lg bg-white/80" dir="rtl">
       <CardHeader className="border-b border-slate-200 space-y-xs sm:space-y-sm">
-        <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">ניהול טופס שאלות למפגש</CardTitle>
-        <p className="text-xs text-slate-600 sm:text-sm">
-          הגדירו את השאלות שיופיעו בטופס רישום המפגש. ניתן להוסיף, להסיר, לסדר ולדרוש שדות חובה.
-        </p>
-        <Badge variant="outline" className="w-fit text-xs text-slate-600">
-          שמירה יוצרת גרסה חדשה שנשלטת בצד השרת
-        </Badge>
+        <div className="flex flex-col-reverse sm:flex-row-reverse sm:items-start sm:justify-between gap-3">
+          <div className="flex-1 space-y-xs">
+            <CardTitle className="text-base font-semibold text-slate-900 sm:text-lg md:text-xl">ניהול טופס שאלות למפגש</CardTitle>
+            <p className="text-xs text-slate-600 sm:text-sm">
+              הגדירו את השאלות שיופיעו בטופס רישום המפגש. ניתן להוסיף, להסיר, לסדר ולדרוש שדות חובה.
+            </p>
+            <Badge variant="outline" className="w-fit text-xs text-slate-600">
+              שמירה יוצרת גרסה חדשה שנשלטת בצד השרת
+            </Badge>
+          </div>
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setImportExportDialogOpen(true)}
+              title="ייצא או ייבא תשובות מוכנות מראש"
+              className="text-sm"
+            >
+              <Download className="h-4 w-4 ml-2" />
+              <span className="hidden sm:inline">ייצוא/ייבוא</span>
+              <span className="sm:hidden">ייצוא</span>
+            </Button>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-md sm:space-y-lg">
         {isLoading ? (
@@ -919,36 +994,37 @@ export default function SessionFormManager({
                           {(question.type === 'text' || question.type === 'textarea') ? (
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-semibold text-slate-800">תשובות מוכנות (עד {cap})</h4>
-                                <Button type="button" variant="outline" size="sm" onClick={() => handleAddPreanswer(question.id)} className="gap-2">
-                                  <Plus className="h-4 w-4" aria-hidden="true" /> הוסף תשובה
+                                <h4 className="text-sm font-semibold text-slate-800">תשובות מוכנות</h4>
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    setDrawerQuestion(question);
+                                    setDrawerOpen(true);
+                                  }} 
+                                  className="gap-2"
+                                >
+                                  <FileText className="h-4 w-4" aria-hidden="true" />
+                                  ערוך תשובות
                                 </Button>
                               </div>
-                              <div className="space-y-2">
-                                {(Array.isArray(preanswersMap[question.id]) ? preanswersMap[question.id] : []).map((ans, idx) => (
-                                  <div key={`${question.id}-pa-${idx}`} className="grid w-full gap-2 sm:grid-cols-[1fr,auto] sm:items-center">
-                                    <Input
-                                      value={ans}
-                                      onChange={(e) => handlePreanswerChange(question.id, idx, e.target.value)}
-                                      placeholder="תשובה מוכנה"
-                                      className="text-sm"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleRemovePreanswer(question.id, idx)}
-                                      className="text-red-600 hover:bg-red-50"
-                                      aria-label="מחק תשובה"
-                                    >
-                                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                                    </Button>
-                                  </div>
-                                ))}
-                                {(!Array.isArray(preanswersMap[question.id]) || preanswersMap[question.id].length === 0) ? (
-                                  <p className="text-xs text-slate-500">לא הוגדרו תשובות מוכנות לשאלה זו.</p>
-                                ) : null}
-                              </div>
+                              {(Array.isArray(preanswersMap[question.id]) && preanswersMap[question.id].length > 0) ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {preanswersMap[question.id].slice(0, 3).map((ans, idx) => (
+                                    <Badge key={`${question.id}-pa-${idx}`} variant="secondary" className="text-xs">
+                                      {ans}
+                                    </Badge>
+                                  ))}
+                                  {preanswersMap[question.id].length > 3 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{preanswersMap[question.id].length - 3}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-500">לא הוגדרו תשובות מוכנות לשאלה זו.</p>
+                              )}
                             </div>
                           ) : null}
 
@@ -1083,6 +1159,14 @@ export default function SessionFormManager({
               </div>
             </div>
 
+            <PreconfiguredAnswersManager
+              questions={questions}
+              currentAnswers={preanswersMap}
+              onSave={handleSavePreconfiguredAnswers}
+              isLoading={loadState === REQUEST_STATE.loading}
+              capLimit={cap}
+            />
+
             {validationErrors.length ? (
               <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
                 <p className="font-semibold">נא לטפל בשגיאות הבאות:</p>
@@ -1132,5 +1216,30 @@ export default function SessionFormManager({
         )}
       </CardContent>
     </Card>
+
+    <PreconfiguredAnswersDrawer
+      open={drawerOpen}
+      onClose={() => {
+        setDrawerOpen(false);
+        setDrawerQuestion(null);
+      }}
+      question={drawerQuestion}
+      currentAnswers={drawerQuestion ? preanswersMap[drawerQuestion.id] : []}
+      onSave={handleSavePreconfiguredAnswers}
+      isLoading={loadState === REQUEST_STATE.loading}
+      capLimit={cap}
+      allQuestions={questions}
+      allPreanswers={preanswersMap}
+    />
+
+    <PreanswersImportExportDialog
+      open={importExportDialogOpen}
+      onClose={() => setImportExportDialogOpen(false)}
+      currentAnswers={preanswersMap}
+      onImport={handleImportPreconfiguredAnswers}
+      questions={questions}
+      capLimit={cap}
+    />
+    </>
   );
 }
