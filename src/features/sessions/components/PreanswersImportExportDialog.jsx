@@ -255,7 +255,7 @@ export default function PreanswersImportExportDialog({
                     .map((question) => (
                       <div
                         key={question.id}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 hover:border-slate-300 transition-colors"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 hover:border-slate-300 transition-colors flex-row-reverse"
                       >
                         <div className="flex gap-2 flex-shrink-0">
                           <Button
