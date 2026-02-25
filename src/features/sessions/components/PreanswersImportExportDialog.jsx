@@ -59,6 +59,7 @@ export default function PreanswersImportExportDialog({
   const [targetQuestionId, setTargetQuestionId] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Filter text/textarea questions for import target
   const textQuestions = questions.filter((q) => q.type === 'text' || q.type === 'textarea');
@@ -102,6 +103,51 @@ export default function PreanswersImportExportDialog({
     } catch (error) {
       toast.error(`שגיאה: ${error.message}`);
     }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+      toast.error('בחר קובץ JSON בלבד');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target.result);
+        const { answers, questionLabel } = importAnswersFromJSON(json);
+        setImportedData(answers);
+        setImportedQuestionLabel(questionLabel);
+        setImportError(null);
+        toast.success('הקובץ נטען בהצלחה');
+      } catch (error) {
+        setImportedData(null);
+        setImportedQuestionLabel(null);
+        setImportError(error.message);
+        toast.error(`שגיאה בטעינת הקובץ: ${error.message}`);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handlePasteImport = async () => {
@@ -299,7 +345,16 @@ export default function PreanswersImportExportDialog({
               <h3 className="font-semibold text-right">ייבא תשובות</h3>
 
               {/* File Upload */}
-              <div className="p-3 bg-amber-50 rounded-lg border-2 border-dashed border-amber-300">
+              <div
+                className={`p-3 rounded-lg border-2 border-dashed transition-colors ${
+                  isDragOver
+                    ? 'bg-amber-100 border-amber-400'
+                    : 'bg-amber-50 border-amber-300'
+                }`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <label className="flex flex-col items-center gap-2 cursor-pointer">
                   <Upload className="w-4 h-4 text-amber-600" />
                   <span className="text-sm font-medium">בחר קובץ JSON</span>
@@ -341,7 +396,7 @@ export default function PreanswersImportExportDialog({
                   onChange={(e) => setImportText(e.target.value)}
                   placeholder="הדבק JSON כאן..."
                   className="font-mono text-xs h-40"
-                  dir="ltr"
+                  dir="rtl"
                 />
                 <Button
                   variant="secondary"
